@@ -1,0 +1,43 @@
+[package]
+name = "standalone"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+utoipa = { workspace = true, features = ["axum_extras", "debug"] }
+utoipa-axum = { version = "0.2.0", features = ["debug"] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+uuid = "1.19.0"
+argon2 = "0.6.0-rc.5"
+time = "0.3.44"
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true, features = ["max_level_debug"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "serde_json", "ansi"] }
+axum = "0.8.8"
+tower = "0.5.2"
+tower-http = { version = "0.6.8", features = ["request-id", "trace"] }
+serde = { workspace = true, features = ["serde_derive", "derive"] }
+serde_json = { workspace = true }
+mydi = { version = "0.2.4" }
+mydi_macros = "0.2.4"
+async-trait = "0.1.89"
+dotenvy = { version = "0.15.7" }
+clap = { workspace = true, features = ["env", "derive", "debug", "color"] }
+figment = { version = "0.10.19", features = ["env", 'toml'] }
+git = { path = "../git" }
+entity = { path = "../entity" }
+domain = { path = "../domain" }
+repository = { path = "../repository" }
+fred = "10.1.0"
+migration = { path = "../migration" }
+sea-orm = { workspace = true, features = [
+    "serde_json",
+    "sqlx-sqlite",
+    "sqlx-postgres",
+    "sqlx-mysql",
+    "runtime-tokio-native-tls",
+    'debug-print'
+] }
+validator = { workspace = true, features = ["derive"] }
+validator_derive = { workspace = true }
+jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }

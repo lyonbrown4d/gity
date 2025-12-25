@@ -1,0 +1,12 @@
+[package]
+name = "ci-runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "debug", "wrap_help", "env"] }
+bollard = "0.19.4"
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true, features = ["max_level_debug"] }
+tracing-subscriber = { workspace = true, features = ["env-filter", "serde_json", "ansi"] }
+dotenvy = { version = "0.15.7" }

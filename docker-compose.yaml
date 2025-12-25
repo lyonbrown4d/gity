@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: 'timescale/timescaledb:latest-pg18'
+    environment:
+      - 'POSTGRES_DB=gity'
+      - 'POSTGRES_PASSWORD=root'
+      - 'POSTGRES_USER=root'
+    ports:
+      - '5432:5432'
+  redis:
+    image: 'redis:latest'
+    ports:
+      - '6379:6379'

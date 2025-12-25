@@ -1,0 +1,12 @@
+[package]
+name = "entity"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+sea-orm = { workspace = true, features = ["sqlx"] }
+mr-ulid = { workspace = true }
+chrono = { workspace = true }
+domain = { path = "../domain" }
+argon2 = { workspace = true, features = ["password-hash", "parallel"] }
