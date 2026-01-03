@@ -1,4 +1,11 @@
+use crate::configuration::cfg::CacheType::MEMORY;
 use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
+pub enum CacheType {
+  REDIS,
+  MEMORY,
+}
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone, Copy)]
 pub struct Server {
@@ -49,6 +56,7 @@ pub struct Git {
 pub struct Config {
   pub server: Server,
   pub database: Database,
+  pub cache: Option<Cache>,
   #[serde(default)]
   pub storage: Option<Storage>,
   #[serde(default)]
@@ -57,6 +65,12 @@ pub struct Config {
   pub logging: Option<Logging>,
   #[serde(default)]
   pub git: Option<Git>,
+}
+
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
+pub struct Cache {
+  pub cache_type: CacheType,
+  pub url: String,
 }
 
 impl Default for Config {
@@ -71,6 +85,7 @@ impl Default for Config {
         url: "postgres://user:pass@localhost:5432/gity".to_string(),
         max_connections: Some(10),
       },
+      cache: Option::from(Cache { cache_type: MEMORY, url: "".to_string() }),
       storage: None,
       auth: None,
       logging: None,

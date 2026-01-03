@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-utoipa = { workspace = true, features = ["axum_extras", "debug"] }
+utoipa = { workspace = true, features = ["axum_extras", "debug", "macros", "chrono", "config"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 uuid = "1.19.0"

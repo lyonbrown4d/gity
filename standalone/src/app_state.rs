@@ -1,62 +1,62 @@
-use crate::configuration;
-use crate::configuration::cfg::Config;
+use crate::configuration::cfg::{CacheType, Config};
 use fred::clients::Client;
 use fred::prelude::{Builder, ClientLike, EventInterface, TcpConfig};
 use migration::{Migrator, MigratorTrait};
 use sea_orm::DatabaseConnection;
 use std::time::Duration;
-use tracing::info;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
   pub config: Config,
   pub db_conn: DatabaseConnection,
-  pub redis_client: Client,
+  pub redis_client: Option<Client>,
 }
 
-fn init_logging() {
-  tracing_subscriber::fmt()
-    .with_max_level(tracing::Level::DEBUG)
-    .with_test_writer()
-    .init();
-}
+pub async fn init(cfg: Config) -> AppState {
+  // 1. 数据库连接
+  let db_conn: DatabaseConnection = sea_orm::Database::connect(&cfg.database.url)
+      .await
+      .expect("Failed to connect to database");
 
-fn init_env() -> Config {
-  dotenvy::dotenv().ok();
-  let cfg = configuration::loader::load();
-  let cfg_json = serde_json::to_string_pretty(&cfg).unwrap();
-  info!("Loaded configuration:\n{}", cfg_json);
-  cfg
-}
+  // 2. Redis 客户端初始化（如果是 MEMORY 或 None 就是 None）
+  let redis_client = match cfg.cache.as_ref().map(|c| &c.cache_type) {
+    Some(CacheType::REDIS) => {
+      let cache_url = cfg.cache.as_ref().unwrap().url.clone();
+      let redis_config = fred::prelude::Config::from_url(&cache_url)
+          .expect("Failed to parse Redis URL");
 
-pub async fn init() -> AppState {
-  init_logging();
-  let cfg = init_env();
-  let connection = sea_orm::Database::connect("postgres://root:root@localhost:5432/gity")
-    .await
-    .unwrap();
+      let client = Builder::from_config(redis_config)
+          .with_connection_config(|c| {
+            c.connection_timeout = Duration::from_secs(5);
+            c.tcp.nodelay = Some(true);
+          })
+          .build()
+          .expect("Failed to build Redis client");
 
-  let config = fred::prelude::Config::from_url("redis://localhost:6379/1").unwrap();
-  let client = Builder::from_config(config)
-    .with_connection_config(|config| {
-      config.connection_timeout = Duration::from_secs(5);
-      config.tcp = TcpConfig {
-        nodelay: Some(true),
-        ..Default::default()
-      };
-    })
-    .build()
-    .unwrap();
-  client.init().await.unwrap();
-  client.on_error(|(error, server)| async move {
-    println!("{:?}: Connection error: {:?}", server, error);
-    Ok(())
-  });
-  Migrator::down(&connection, None).await.unwrap();
-  Migrator::up(&connection, None).await.unwrap();
+      client.init().await.expect("Failed to init Redis client");
+
+      client.on_error(|(err, server)| async move {
+        eprintln!("Redis connection error: {:?} {:?}", server, err);
+        Ok(())
+      });
+
+      Some(client)
+    }
+    _ => None,
+  };
+
+  // 3. 数据库迁移
+  Migrator::down(&db_conn, None)
+      .await
+      .expect("Failed to run migrations down");
+  Migrator::up(&db_conn, None)
+      .await
+      .expect("Failed to run migrations up");
+
+  // 4. 返回 AppState
   AppState {
     config: cfg,
-    db_conn: connection,
-    redis_client: client,
+    db_conn,
+    redis_client,
   }
 }
