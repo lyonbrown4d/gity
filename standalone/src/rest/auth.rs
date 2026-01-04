@@ -1,14 +1,17 @@
 use crate::app_state::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Json, Router};
 use entity::users;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{EncodingKey, Header, encode};
+use sea_orm::ColumnTrait;
 use sea_orm::{EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use utoipa::ToSchema;
-use sea_orm::ColumnTrait;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_axum::routes;
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct LoginRequest {
   pub username: String,
@@ -21,7 +24,7 @@ pub struct LoginResponse {
   pub token: String,
 }
 #[utoipa::path(
-  post, path = "/api/v1/auth/login",
+  post, path = "/login",
   request_body = LoginRequest,
   responses(
         (status = 200, description = "Login success", body = LoginResponse),
@@ -30,12 +33,12 @@ pub struct LoginResponse {
 )
 ]
 pub async fn login(
-  State(state): State<AppState>,
+  State(_state): State<AppState>,
   Json(payload): Json<LoginRequest>,
 ) -> (StatusCode, Json<LoginResponse>) {
   let user = users::Entity::find()
     .filter(users::Column::Username.eq(payload.username.clone()))
-    .one(&state.db_conn)
+    .one(&_state.db_conn)
     .await
     .unwrap();
 
@@ -102,3 +105,8 @@ pub fn encode_jwt(username: &str) -> String {
   )
   .unwrap()
 }
+
+pub fn auth_routes() -> OpenApiRouter<AppState> {
+  OpenApiRouter::new().routes(routes![login])
+}
+

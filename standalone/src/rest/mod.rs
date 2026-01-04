@@ -1,15 +1,13 @@
 use crate::app_state::AppState;
-use crate::rest::auth::__path_login;
-use crate::rest::auth::login;
-use crate::rest::openapi::{ApiDoc, openapi};
+use crate::rest::auth::auth_routes;
+use crate::rest::openapi::{openapi, ApiDoc};
 
 use crate::rest::middleware::apply_request_id_middleware;
 use crate::rest::user::user_routes;
-use axum::Router;
 use axum::routing::get;
+use axum::Router;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
 use utoipa_swagger_ui::SwaggerUi;
 
 pub mod auth;
@@ -19,9 +17,10 @@ pub mod user;
 
 pub fn openapi_router() -> Router<AppState> {
   let user_routes = user_routes();
+  let auth_routes = auth_routes();
   let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
     .nest("/api/v1/user", user_routes)
-    .routes(routes![login])
+    .nest("/api/v1/auth", auth_routes)
     .route("/api-docs/openapi.json", get(openapi))
     .split_for_parts();
   router

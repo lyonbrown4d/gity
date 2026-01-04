@@ -1,7 +1,6 @@
-use crate::app_state::{AppState, init};
+use crate::app_state::{init};
 use crate::configuration::cfg::Config;
 use crate::rest::{build_router};
-use axum::Router;
 use std::net::Ipv4Addr;
 use tokio::net::TcpListener;
 use tracing::info;
@@ -10,6 +9,8 @@ mod app_state;
 mod cli;
 mod configuration;
 mod rest;
+mod service;
+mod security;
 
 fn init_logging() {
   tracing_subscriber::fmt()
