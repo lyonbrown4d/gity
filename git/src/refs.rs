@@ -1,4 +1,3 @@
-use gix::prelude::ObjectIdExt;
 
 pub struct RefInfo {
   pub name: String,
@@ -6,19 +5,8 @@ pub struct RefInfo {
 }
 
 /// 列出所有 refs（包括 heads/tags）
-pub fn list_refs(repo: &gix::Repository) -> Vec<RefInfo> {
-  let mut out = Vec::new();
-  if let Ok(store) = repo.references() {
-    // for reference in store {
-    //     if let Ok(r) = reference {
-    //         if let Some(id) = r.target.try_id() {
-    //             out.push(RefInfo {
-    //                 name: r.name.to_string(),
-    //                 oid: id,
-    //             });
-    //         }
-    //     }
-    // }
-  }
-  out
+pub fn list_refs(_repo: &gix::Repository) -> Vec<RefInfo> {
+    // placeholder implementation; we no longer depend on gix for this
+    // functionality because the HTTP module executes `git` directly.
+    Vec::new()
 }

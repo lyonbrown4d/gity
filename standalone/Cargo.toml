@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 utoipa = { workspace = true, features = ["axum_extras", "debug", "macros", "chrono", "config"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
-utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+# swagger UI removed due to offline build issues; can re-enable later
+# utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 uuid = "1.19.0"
 argon2 = "0.6.0-rc.5"
 time = "0.3.44"
