@@ -10,7 +10,7 @@ use tokio::io::AsyncWriteExt;
 use git::http; // import http helper from git crate
 
 #[derive(Deserialize)]
-struct InfoRefsParams {
+pub struct InfoRefsParams {
     service: String,
 }
 

@@ -1,20 +1,21 @@
 use crate::app_state::AppState;
 use crate::rest::auth::auth_routes;
-use crate::rest::openapi::{openapi, ApiDoc};
+use crate::rest::openapi::{ApiDoc, openapi};
 
 use crate::rest::middleware::apply_request_id_middleware;
 use crate::rest::user::user_routes;
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
+use utoipa_swagger_ui::SwaggerUi;
 // Swagger UI removed to avoid build-time downloads
 
 pub mod auth;
+pub mod git;
 pub mod middleware;
 pub mod openapi;
 pub mod user;
-pub mod git;
 
 pub fn openapi_router() -> Router<AppState> {
   let user_routes = user_routes();
@@ -28,7 +29,9 @@ pub fn openapi_router() -> Router<AppState> {
     .route("/api-docs/openapi.json", get(openapi))
     .split_for_parts();
   // Swagger UI is disabled to avoid download during build
-  router.clone()
+  router
+    .merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
+    .clone()
 }
 
 pub fn build_router(app_state: AppState) -> Router<()> {
