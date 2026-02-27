@@ -1,4 +1,4 @@
-use crate::app_state::AppState;
+use crate::http::app_state::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -127,10 +127,10 @@ pub async fn list_users(State(_state): State<AppState>) -> Json<Vec<UserView>> {
 }
 
 // 子路由
-pub fn user_routes() -> OpenApiRouter<AppState> {
-  OpenApiRouter::new()
-    .routes(routes![create_user, list_users])
-    .routes(routes![get_user])
-    .routes(routes![delete_user])
-    .routes(routes![update_user])
-}
+// pub fn user_routes() -> OpenApiRouter<AppState> {
+//   OpenApiRouter::new()
+//     .routes(routes![create_user, list_users])
+//     .routes(routes![get_user])
+//     .routes(routes![delete_user])
+//     .routes(routes![update_user])
+// }

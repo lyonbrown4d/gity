@@ -4,11 +4,11 @@ use tower::ServiceBuilder;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info_span};
-use crate::app_state::AppState;
+use crate::http::app_state::AppState;
 
 const REQUEST_ID_HEADER: &str = "x-request-id";
 
-/// 构造中间件
+// 构造中间件
 pub fn apply_request_id_middleware(router: Router<AppState>) -> Router<AppState> {
     let x_request_id = HeaderName::from_static(REQUEST_ID_HEADER);
 

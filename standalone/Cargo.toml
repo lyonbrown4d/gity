@@ -7,7 +7,7 @@ edition = "2024"
 utoipa = { workspace = true, features = ["axum_extras", "debug", "macros", "chrono", "config"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 # swagger UI removed due to offline build issues; can re-enable later
-utoipa-swagger-ui = { version = "9.0.2", features = ["axum",'vendored'] }
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum", 'vendored'] }
 uuid = "1.19.0"
 argon2 = "0.6.0-rc.5"
 time = "0.3.44"
@@ -19,8 +19,6 @@ tower = "0.5.2"
 tower-http = { version = "0.6.8", features = ["request-id", "trace"] }
 serde = { workspace = true, features = ["serde_derive", "derive"] }
 serde_json = { workspace = true }
-mydi = { version = "0.2.4" }
-mydi_macros = "0.2.4"
 async-trait = "0.1.89"
 dotenvy = { version = "0.15.7" }
 clap = { workspace = true, features = ["env", "derive", "debug", "color"] }
@@ -28,7 +26,6 @@ figment = { version = "0.10.19", features = ["env", 'toml'] }
 git = { path = "../git" }
 entity = { path = "../entity" }
 domain = { path = "../domain" }
-repository = { path = "../repository" }
 fred = "10.1.0"
 migration = { path = "../migration" }
 sea-orm = { workspace = true, features = [
@@ -39,6 +36,8 @@ sea-orm = { workspace = true, features = [
     "runtime-tokio-native-tls",
     'debug-print'
 ] }
+sea-query = "1.0.0-rc.31"
+sadi = { workspace = true, features = ["debug", "tracing", "thread-safe"] }
 validator = { workspace = true, features = ["derive"] }
 validator_derive = { workspace = true }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }

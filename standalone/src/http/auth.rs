@@ -1,4 +1,4 @@
-use crate::app_state::AppState;
+use crate::http::app_state::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::{Json, Router};
@@ -36,43 +36,43 @@ pub async fn login(
   State(_state): State<AppState>,
   Json(payload): Json<LoginRequest>,
 ) -> (StatusCode, Json<LoginResponse>) {
-  let user = users::Entity::find()
-    .filter(users::Column::Username.eq(payload.username.clone()))
-    .one(&_state.db_conn)
-    .await
-    .unwrap();
-
-  let user = match user {
-    Some(u) => u,
-    None => {
-      return (
-        StatusCode::UNAUTHORIZED,
-        Json(LoginResponse {
-          username: "".to_string(),
-          token: "".to_string(),
-        }),
-      );
-    }
-  };
-
-  let valid = users::Model::verify_password(payload.username.as_str(), payload.password.as_str());
-  let valid = true;
-  if !valid {
-    return (
-      StatusCode::UNAUTHORIZED,
-      Json(LoginResponse {
-        username: "".to_string(),
-        token: "".to_string(),
-      }),
-    );
-  }
-
-  // 生成 JWT
-  let token = encode_jwt(&user.username); // 自己实现生成 token 的函数
-
-  // 返回结果
+  // let user = users::Entity::find()
+  //   .filter(users::Column::Username.eq(payload.username.clone()))
+  //   .one(&_state.db_conn)
+  //   .await
+  //   .unwrap();
+  // 
+  // let user = match user {
+  //   Some(u) => u,
+  //   None => {
+  //     return (
+  //       StatusCode::UNAUTHORIZED,
+  //       Json(LoginResponse {
+  //         username: "".to_string(),
+  //         token: "".to_string(),
+  //       }),
+  //     );
+  //   }
+  // };
+  // 
+  // let valid = users::Model::verify_password(payload.username.as_str(), payload.password.as_str());
+  // let valid = true;
+  // if !valid {
+  //   return (
+  //     StatusCode::UNAUTHORIZED,
+  //     Json(LoginResponse {
+  //       username: "".to_string(),
+  //       token: "".to_string(),
+  //     }),
+  //   );
+  // }
+  // 
+  // // 生成 JWT
+  let token = encode_jwt("&user.username"); // 自己实现生成 token 的函数
+  // 
+  // // 返回结果
   let resp = LoginResponse {
-    username: user.username,
+    username: "123".parse().unwrap(),
     token,
   };
   (StatusCode::OK, Json(resp))
@@ -106,7 +106,7 @@ pub fn encode_jwt(username: &str) -> String {
   .unwrap()
 }
 
-pub fn auth_routes() -> OpenApiRouter<AppState> {
-  OpenApiRouter::new().routes(routes![login])
-}
-
+// pub fn auth_routes() -> OpenApiRouter<AppState> {
+//   OpenApiRouter::new().routes(routes![login])
+// }
+// 
