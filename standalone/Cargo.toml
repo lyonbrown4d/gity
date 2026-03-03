@@ -37,7 +37,8 @@ sea-orm = { workspace = true, features = [
     'debug-print'
 ] }
 sea-query = "1.0.0-rc.31"
-sadi = { workspace = true, features = ["debug", "tracing", "thread-safe"] }
 validator = { workspace = true, features = ["derive"] }
 validator_derive = { workspace = true }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
+chrono = { workspace = true }
+mr-ulid = { workspace = true }

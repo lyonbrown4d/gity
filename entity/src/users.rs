@@ -41,13 +41,13 @@ pub enum UserStatus {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-  #[sea_orm(has_many = "super::users::Entity")]
-  Users,
+  #[sea_orm(has_many = "super::organization_members::Entity")]
+  OrganizationMembers,
 }
 
-impl Related<Entity> for Entity {
+impl Related<super::organization_members::Entity> for Entity {
   fn to() -> RelationDef {
-    Relation::Users.def()
+    Relation::OrganizationMembers.def()
   }
 }
 

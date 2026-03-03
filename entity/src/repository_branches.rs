@@ -5,43 +5,40 @@ use sea_orm::prelude::DateTimeWithTimeZone;
 use sea_orm::prelude::async_trait::async_trait;
 use sea_orm::Set;
 pub use sea_orm::{
-  ActiveModelBehavior, DeriveActiveEnum, DeriveRelation, EnumIter, Related, RelationDef,
+  ActiveModelBehavior, DeriveRelation, EnumIter, Related, RelationDef,
 };
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "organizations")]
+#[sea_orm(table_name = "repository_branches")]
 pub struct Model {
   #[sea_orm(primary_key)]
   pub id: String,
 
-  #[sea_orm(unique)]
-  pub key: String,
-
+  pub repository_id: String,
   pub name: String,
-  pub status: OrgStatus,
+  pub is_protected: bool,
+  pub last_commit_sha: Option<String>,
 
   pub created_at: DateTimeWithTimeZone,
   pub updated_at: DateTimeWithTimeZone,
   pub deleted_at: Option<DateTimeWithTimeZone>,
 }
 
-#[derive(Debug, Clone, PartialEq, EnumIter, DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "Text")]
-pub enum OrgStatus {
-  #[sea_orm(string_value = "active")]
-  Active,
-  #[sea_orm(string_value = "disabled")]
-  Disabled,
-}
-
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-  #[sea_orm(has_many = "super::organization_members::Entity")]
-  OrganizationMembers,
+  #[sea_orm(
+    belongs_to = "super::repositories::Entity",
+    from = "Column::RepositoryId",
+    to = "super::repositories::Column::Id",
+    on_update = "NoAction",
+    on_delete = "Cascade"
+  )]
+  Repository,
 }
 
-impl Related<super::organization_members::Entity> for Entity {
+impl Related<super::repositories::Entity> for Entity {
   fn to() -> RelationDef {
-    Relation::OrganizationMembers.def()
+    Relation::Repository.def()
   }
 }
 
@@ -57,3 +54,4 @@ impl ActiveModelBehavior for ActiveModel {
     }
   }
 }
+
