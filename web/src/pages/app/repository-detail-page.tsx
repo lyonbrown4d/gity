@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import type {
   OrganizationView,
   RepositoryBlobView,
@@ -98,6 +99,10 @@ function detectLanguage(path: string): string {
   return "plaintext";
 }
 
+function normalizeRepoFilePath(path: string): string {
+  return path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
 async function renderMarkdown(content: string): Promise<string> {
   const html = await marked.parse(content);
   return DOMPurify.sanitize(html);
@@ -128,6 +133,12 @@ export function RepositoryDetailPage(): JSX.Element {
   const [readmePreview, setReadmePreview] = useState<string | null>(null);
   const [readmePath, setReadmePath] = useState<string | null>(null);
   const [isLoadingCode, setLoadingCode] = useState(false);
+  const [isCreateFileModalOpen, setCreateFileModalOpen] = useState(false);
+  const [newFileBranch, setNewFileBranch] = useState("");
+  const [newFilePath, setNewFilePath] = useState("");
+  const [newFileMessage, setNewFileMessage] = useState("");
+  const [newFileContent, setNewFileContent] = useState("");
+  const [isCreatingFile, setCreatingFile] = useState(false);
 
   const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
 
@@ -286,6 +297,60 @@ export function RepositoryDetailPage(): JSX.Element {
       await navigator.clipboard.writeText(repository.clone_http_url);
     } catch {
       setActionError(t("Failed to copy clone URL"));
+    }
+  };
+
+  const openCreateFileModal = () => {
+    const fallbackBranch = codeBranch || repository?.default_branch || branches[0]?.name || "main";
+    setNewFileBranch(fallbackBranch);
+    setNewFilePath("");
+    setNewFileMessage(t("Add new file"));
+    setNewFileContent("");
+    setCreateFileModalOpen(true);
+  };
+
+  const submitCreateFileCommit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const branchName = newFileBranch.trim();
+    const filePath = normalizeRepoFilePath(newFilePath);
+    const message = newFileMessage.trim();
+
+    if (!branchName) {
+      setActionError(t("Branch is required"));
+      return;
+    }
+    if (!filePath) {
+      setActionError(t("File path is required"));
+      return;
+    }
+    if (!message) {
+      setActionError(t("Commit message is required"));
+      return;
+    }
+
+    setActionError(null);
+    setCreatingFile(true);
+    try {
+      await apiRequest(`/repos/${repoId}/file-commits`, {
+        method: "POST",
+        body: JSON.stringify({
+          branch_name: branchName,
+          path: filePath,
+          content: newFileContent,
+          message,
+        }),
+      });
+
+      setCreateFileModalOpen(false);
+      setCodeBranch(branchName);
+      const parentPath = filePath.includes("/") ? filePath.split("/").slice(0, -1).join("/") : "";
+      setTreePath(parentPath);
+      await Promise.all([loadBranches(), loadCommits(), loadTree(branchName, parentPath)]);
+      await openFile(filePath);
+    } catch (error) {
+      setActionError(extractErrorMessage(error));
+    } finally {
+      setCreatingFile(false);
     }
   };
 
@@ -469,6 +534,9 @@ export function RepositoryDetailPage(): JSX.Element {
                     <option value={repository.default_branch}>{repository.default_branch}</option>
                   ) : null}
                 </select>
+                <Button type="button" size="sm" variant="outline" onClick={openCreateFileModal}>
+                  {t("Create file and commit")}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -716,6 +784,80 @@ export function RepositoryDetailPage(): JSX.Element {
           </CardContent>
         </Card>
       ) : null}
+
+      <Modal
+        open={isCreateFileModalOpen}
+        onClose={() => setCreateFileModalOpen(false)}
+        title={t("Create file and commit")}
+      >
+        <form className="space-y-3" onSubmit={submitCreateFileCommit}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-file-branch">{t("Branch")}</Label>
+              <select
+                id="new-file-branch"
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                value={newFileBranch}
+                onChange={(event) => setNewFileBranch(event.target.value)}
+                required
+              >
+                {branches.map((branch) => (
+                  <option key={branch.name} value={branch.name}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-file-path">{t("File path")}</Label>
+              <Input
+                id="new-file-path"
+                placeholder="src/new-file.ts"
+                value={newFilePath}
+                onChange={(event) => setNewFilePath(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="new-file-message">{t("Commit message")}</Label>
+            <Input
+              id="new-file-message"
+              placeholder={t("Commit message")}
+              value={newFileMessage}
+              onChange={(event) => setNewFileMessage(event.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("File content")}</Label>
+            <Editor
+              height="40vh"
+              language={detectLanguage(newFilePath)}
+              value={newFileContent}
+              theme={editorTheme}
+              onChange={(value) => setNewFileContent(value ?? "")}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                wordWrap: "on",
+                scrollBeyondLastLine: false,
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setCreateFileModalOpen(false)}>
+              {t("Cancel")}
+            </Button>
+            <Button type="submit" disabled={isCreatingFile}>
+              {isCreatingFile ? t("Committing...") : t("Commit and create file")}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

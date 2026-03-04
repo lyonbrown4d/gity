@@ -35,6 +35,16 @@ pub struct CreateCommitInput {
 }
 
 #[derive(Debug, Clone)]
+pub struct CreateFileCommitInput {
+  pub repo_id: String,
+  pub branch_name: String,
+  pub path: String,
+  pub content: String,
+  pub message: String,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct CreateBranchInput {
   pub repo_id: String,
   pub name: String,
@@ -489,6 +499,120 @@ impl RepositoryService {
         "commit sha already exists in this repository".to_string(),
       ));
     }
+
+    let txn = self
+      .db_conn
+      .begin()
+      .await
+      .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+
+    let commit = RepositoryCommitsRepository::insert_commit(
+      &txn,
+      repository_commits::ActiveModel {
+        repository_id: Set(repository.id.clone()),
+        branch_name: Set(branch_name),
+        commit_sha: Set(commit_sha.clone()),
+        message: Set(message),
+        author_user_id: Set(input.current_user_id),
+        ..Default::default()
+      },
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to insert commit", err))?;
+
+    RepositoryBranchesRepository::update_branch(&txn, branch, None, Some(Some(commit_sha)), None)
+      .await
+      .map_err(|err| Self::internal_error("failed to update branch", err))?;
+
+    txn
+      .commit()
+      .await
+      .map_err(|err| Self::internal_error("failed to commit transaction", err))?;
+
+    Ok(commit)
+  }
+
+  pub async fn create_file_commit(
+    &self,
+    input: CreateFileCommitInput,
+  ) -> Result<repository_commits::Model, RepositoryServiceError> {
+    if !self.storage_enabled {
+      return Err(RepositoryServiceError::BadRequest(
+        "storage backend is required for file commits".to_string(),
+      ));
+    }
+
+    let (repository, membership) = self
+      .require_repo_access_with_membership(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let branch_name = input.branch_name.trim().to_string();
+    if branch_name.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "branch_name is required".to_string(),
+      ));
+    }
+
+    let path = input.path.trim().to_string();
+    if path.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "path is required".to_string(),
+      ));
+    }
+
+    let message = input.message.trim().to_string();
+    if message.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "message is required".to_string(),
+      ));
+    }
+
+    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
+      &self.db_conn,
+      repository.id.as_str(),
+      branch_name.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load branch", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
+
+    if branch.is_protected && membership.role != organization_members::MemberRole::Owner {
+      return Err(RepositoryServiceError::Forbidden(
+        "only organization owner can commit to protected branch".to_string(),
+      ));
+    }
+
+    let organization = OrganizationsRepository::find_active_organization_by_id(
+      &self.db_conn,
+      repository.organization_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load organization", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+
+    let author = UsersRepository::find_active_user_by_id(&self.db_conn, input.current_user_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load current user", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("current user not found".to_string()))?;
+
+    let commit_sha = self
+      .git_backend
+      .commit_file(
+        organization.key.as_str(),
+        repository.key.as_str(),
+        branch_name.as_str(),
+        path.as_str(),
+        input.content.as_str(),
+        message.as_str(),
+        author.username.as_str(),
+        author.email.as_str(),
+      )
+      .await
+      .map_err(Self::map_git_backend_error)?;
 
     let txn = self
       .db_conn

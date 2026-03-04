@@ -1,3 +1,4 @@
+use git2::{ObjectType, Repository, Tree};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, thiserror::Error)]
@@ -28,6 +29,8 @@ pub enum StorageError {
   Signature(String),
   #[error("failed to create initial commit: {0}")]
   CommitWrite(String),
+  #[error("invalid file path: {0}")]
+  InvalidFilePath(String),
 }
 
 pub fn init_bare_repository(repo_path: &Path, default_branch: &str) -> Result<(), StorageError> {
@@ -139,6 +142,167 @@ pub fn seed_initial_commit(
     .map_err(|err| StorageError::CommitWrite(err.to_string()))?;
 
   Ok(Some(commit_id.to_string()))
+}
+
+pub fn commit_file(
+  repo_path: &Path,
+  branch: &str,
+  file_path: &str,
+  content: &str,
+  commit_message: &str,
+  author_name: &str,
+  author_email: &str,
+) -> Result<String, StorageError> {
+  let normalized_branch = branch.trim();
+  if !is_valid_default_branch(normalized_branch) {
+    return Err(StorageError::InvalidDefaultBranch(
+      "branch cannot be empty or contain unsupported characters".to_string(),
+    ));
+  }
+
+  let normalized_path = normalize_repo_file_path(file_path)?;
+  let message = commit_message.trim();
+  if message.is_empty() {
+    return Err(StorageError::CommitWrite(
+      "commit message cannot be empty".to_string(),
+    ));
+  }
+
+  let repo = Repository::open_bare(repo_path).map_err(|err| StorageError::Open(err.to_string()))?;
+  let ref_name = format!("refs/heads/{normalized_branch}");
+  let parent_oid = repo
+    .refname_to_id(ref_name.as_str())
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+  let parent_commit = repo
+    .find_commit(parent_oid)
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+  let parent_tree = parent_commit
+    .tree()
+    .map_err(|err| StorageError::TreeLookup(err.to_string()))?;
+
+  let blob_id = repo
+    .blob(content.as_bytes())
+    .map_err(|err| StorageError::BlobWrite(err.to_string()))?;
+  let tree_id = upsert_blob_into_tree(&repo, Some(&parent_tree), &normalized_path, blob_id)?;
+  let tree = repo
+    .find_tree(tree_id)
+    .map_err(|err| StorageError::TreeLookup(err.to_string()))?;
+
+  let signature = git2::Signature::now(
+    normalize_author_name(author_name).as_str(),
+    normalize_author_email(author_email).as_str(),
+  )
+  .map_err(|err| StorageError::Signature(err.to_string()))?;
+
+  let commit_id = repo
+    .commit(
+      Some(ref_name.as_str()),
+      &signature,
+      &signature,
+      message,
+      &tree,
+      &[&parent_commit],
+    )
+    .map_err(|err| StorageError::CommitWrite(err.to_string()))?;
+
+  Ok(commit_id.to_string())
+}
+
+fn upsert_blob_into_tree(
+  repo: &Repository,
+  base_tree: Option<&Tree<'_>>,
+  path_segments: &[String],
+  blob_id: git2::Oid,
+) -> Result<git2::Oid, StorageError> {
+  if path_segments.is_empty() {
+    return Err(StorageError::InvalidFilePath(
+      "file path cannot be empty".to_string(),
+    ));
+  }
+
+  let mut tree_builder = repo
+    .treebuilder(base_tree)
+    .map_err(|err| StorageError::TreeWrite(err.to_string()))?;
+  if path_segments.len() == 1 {
+    tree_builder
+      .insert(path_segments[0].as_str(), blob_id, 0o100644)
+      .map_err(|err| StorageError::TreeWrite(err.to_string()))?;
+    return tree_builder
+      .write()
+      .map_err(|err| StorageError::TreeWrite(err.to_string()));
+  }
+
+  let head = path_segments[0].as_str();
+  let existing_subtree = resolve_subtree(repo, base_tree, head)?;
+  let nested_tree_id = upsert_blob_into_tree(repo, existing_subtree.as_ref(), &path_segments[1..], blob_id)?;
+  tree_builder
+    .insert(head, nested_tree_id, 0o040000)
+    .map_err(|err| StorageError::TreeWrite(err.to_string()))?;
+  tree_builder
+    .write()
+    .map_err(|err| StorageError::TreeWrite(err.to_string()))
+}
+
+fn resolve_subtree<'a>(
+  repo: &'a Repository,
+  base_tree: Option<&Tree<'a>>,
+  segment: &str,
+) -> Result<Option<Tree<'a>>, StorageError> {
+  let Some(base_tree) = base_tree else {
+    return Ok(None);
+  };
+  let Some(entry) = base_tree.get_name(segment) else {
+    return Ok(None);
+  };
+
+  match entry.kind() {
+    Some(ObjectType::Tree) => repo
+      .find_tree(entry.id())
+      .map(Some)
+      .map_err(|err| StorageError::TreeLookup(err.to_string())),
+    Some(ObjectType::Blob) => Err(StorageError::InvalidFilePath(format!(
+      "path segment '{segment}' conflicts with existing file"
+    ))),
+    _ => Err(StorageError::InvalidFilePath(format!(
+      "path segment '{segment}' is unsupported"
+    ))),
+  }
+}
+
+fn normalize_repo_file_path(path: &str) -> Result<Vec<String>, StorageError> {
+  let normalized = path.trim().replace('\\', "/");
+  let trimmed = normalized.trim_matches('/');
+  if trimmed.is_empty() {
+    return Err(StorageError::InvalidFilePath(
+      "file path cannot be empty".to_string(),
+    ));
+  }
+
+  let mut segments = Vec::new();
+  for segment in trimmed.split('/') {
+    if segment.is_empty() || segment == "." || segment == ".." || segment.contains('\0') {
+      return Err(StorageError::InvalidFilePath(path.to_string()));
+    }
+    segments.push(segment.to_string());
+  }
+
+  Ok(segments)
+}
+
+fn normalize_author_name(value: &str) -> String {
+  let trimmed = value.trim();
+  if trimmed.is_empty() {
+    return "gity".to_string();
+  }
+  trimmed.to_string()
+}
+
+fn normalize_author_email(value: &str) -> String {
+  let trimmed = value.trim();
+  if trimmed.is_empty() {
+    return "noreply@gity.local".to_string();
+  }
+  trimmed.to_string()
 }
 
 fn is_valid_default_branch(value: &str) -> bool {

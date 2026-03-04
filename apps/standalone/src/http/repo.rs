@@ -3,8 +3,8 @@ use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::RequiredOrganizationRole;
 use crate::service::repository_service::{
-  CreateBranchInput, CreateCommitInput, CreateRepositoryInput, ListBranchesInput, ListCommitsInput,
-  RepositoryServiceError,
+  CreateBranchInput, CreateCommitInput, CreateFileCommitInput, CreateRepositoryInput,
+  ListBranchesInput, ListCommitsInput, RepositoryServiceError,
 };
 use axum::Json;
 use axum::extract::{Path, Query, State};
@@ -69,6 +69,14 @@ pub struct ListCommitsQuery {
 pub struct CreateCommitRequest {
   pub branch_name: String,
   pub commit_sha: Option<String>,
+  pub message: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateFileCommitRequest {
+  pub branch_name: String,
+  pub path: String,
+  pub content: String,
   pub message: String,
 }
 
@@ -496,6 +504,42 @@ pub async fn create_commit(
 }
 
 #[utoipa::path(
+  post,
+  path = "/{repo_id}/file-commits",
+  request_body = CreateFileCommitRequest,
+  responses(
+    (status = 201, description = "File committed", body = CommitView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository or branch not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn create_file_commit(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Json(payload): Json<CreateFileCommitRequest>,
+) -> Result<(StatusCode, Json<CommitView>), (StatusCode, Json<ErrorResponse>)> {
+  let commit = state
+    .services
+    .repository
+    .create_file_commit(CreateFileCommitInput {
+      repo_id,
+      branch_name: payload.branch_name,
+      path: payload.path,
+      content: payload.content,
+      message: payload.message,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((StatusCode::CREATED, Json(commit_view(commit))))
+}
+
+#[utoipa::path(
   get,
   path = "/{repo_id}/tree",
   params(ListRepositoryTreeQuery),
@@ -671,6 +715,7 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
     .routes(routes![unprotect_branch])
     .routes(routes![list_commits])
     .routes(routes![create_commit])
+    .routes(routes![create_file_commit])
     .routes(routes![list_repository_tree])
     .routes(routes![read_repository_blob])
     .routes(routes![read_repository_readme])

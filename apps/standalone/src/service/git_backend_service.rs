@@ -306,6 +306,60 @@ impl GitBackendService {
     Ok(())
   }
 
+  pub async fn commit_file(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+    file_path: &str,
+    content: &str,
+    commit_message: &str,
+    author_name: &str,
+    author_email: &str,
+  ) -> Result<String, GitBackendError> {
+    if !is_safe_component(organization_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "organization key contains unsupported characters".to_string(),
+      ));
+    }
+    if !is_safe_component(repository_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "repository key contains unsupported characters".to_string(),
+      ));
+    }
+
+    let root = self
+      .repo_root
+      .as_deref()
+      .ok_or(GitBackendError::StorageNotConfigured)?;
+    let repo_path = build_repo_path(root, organization_key, repository_key);
+    if !repo_path.exists() {
+      return Err(GitBackendError::RepositoryNotFound);
+    }
+
+    let branch = branch.to_string();
+    let file_path = file_path.to_string();
+    let content = content.to_string();
+    let commit_message = commit_message.to_string();
+    let author_name = author_name.to_string();
+    let author_email = author_email.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      storage::commit_file(
+        repo_path.as_path(),
+        branch.as_str(),
+        file_path.as_str(),
+        content.as_str(),
+        commit_message.as_str(),
+        author_name.as_str(),
+        author_email.as_str(),
+      )
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git file commit task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
+
   async fn list_head_refs(
     &self,
     repo_path: &FsPath,
