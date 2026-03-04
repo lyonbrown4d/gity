@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 use entity::organization_members;
-use repository::AppRepository;
+use repository::OrganizationMembersRepository;
 use sea_orm::DatabaseConnection;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,7 +21,7 @@ pub async fn require_organization_role(
   organization_id: &str,
   required: RequiredOrganizationRole,
 ) -> Result<organization_members::Model, AccessError> {
-  let membership = AppRepository::find_active_membership(db, user_id, organization_id)
+  let membership = OrganizationMembersRepository::find_active_membership(db, user_id, organization_id)
     .await
     .map_err(|err| AccessError {
       status: StatusCode::INTERNAL_SERVER_ERROR,

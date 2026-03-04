@@ -1,7 +1,7 @@
 use crate::configuration::cfg::Config;
 use chrono::Utc;
 use git::{rpc, storage};
-use repository::AppRepository;
+use repository::RepositoryBranchesRepository;
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::fmt;
@@ -100,7 +100,7 @@ impl GitBackendService {
   ) -> Result<(), GitBackendError> {
     let refs = self.list_head_refs(repo_path).await?;
     let existing =
-      AppRepository::list_repository_branches_by_repo_id(&self.db_conn, repository_id, true)
+      RepositoryBranchesRepository::list_repository_branches_by_repo_id(&self.db_conn, repository_id, true)
         .await
         .map_err(|err| GitBackendError::Db(format!("failed to load repository branches: {err}")))?;
 
@@ -112,7 +112,7 @@ impl GitBackendService {
     let now = Utc::now().into();
     for (branch_name, commit_sha) in refs {
       if let Some(model) = existing_by_name.remove(branch_name.as_str()) {
-        AppRepository::update_branch(
+        RepositoryBranchesRepository::update_branch(
           &self.db_conn,
           model,
           None,
@@ -124,7 +124,7 @@ impl GitBackendService {
         continue;
       }
 
-      AppRepository::insert_branch(
+      RepositoryBranchesRepository::insert_branch(
         &self.db_conn,
         entity::repository_branches::ActiveModel {
           repository_id: sea_orm::Set(repository_id.to_string()),
@@ -143,7 +143,7 @@ impl GitBackendService {
         continue;
       }
 
-      AppRepository::update_branch(&self.db_conn, model, None, Some(None), Some(Some(now)))
+      RepositoryBranchesRepository::update_branch(&self.db_conn, model, None, Some(None), Some(Some(now)))
         .await
         .map_err(|err| {
           GitBackendError::Db(format!("failed to mark deleted branch metadata: {err}"))

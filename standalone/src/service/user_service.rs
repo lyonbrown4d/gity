@@ -1,7 +1,7 @@
 use crate::configuration::cfg::Config;
 use domain::user::CreateUser;
 use entity::users;
-use repository::AppRepository;
+use repository::UsersRepository;
 use sea_orm::{DatabaseConnection, DbErr};
 use std::collections::HashSet;
 
@@ -43,7 +43,7 @@ impl UserService {
   }
 
   pub async fn get_current_user(&self, user_id: &str) -> Result<users::Model, UserServiceError> {
-    AppRepository::find_active_user_by_id(&self.db_conn, user_id)
+    UsersRepository::find_active_user_by_id(&self.db_conn, user_id)
       .await
       .map_err(Self::internal_error)?
       .ok_or_else(|| UserServiceError::Unauthorized("current user not found".to_string()))
@@ -97,7 +97,7 @@ impl UserService {
       None => (None, None),
     };
 
-    AppRepository::update_user_profile(
+    UsersRepository::update_user_profile(
       &self.db_conn,
       current,
       username,
@@ -131,7 +131,7 @@ impl UserService {
       ));
     }
 
-    let duplicated = AppRepository::find_duplicate_user_by_username_or_email(
+    let duplicated = UsersRepository::find_duplicate_user_by_username_or_email(
       &self.db_conn,
       username.as_str(),
       email.as_str(),
@@ -145,7 +145,7 @@ impl UserService {
       ));
     }
 
-    AppRepository::insert_user(
+    UsersRepository::insert_user(
       &self.db_conn,
       users::ActiveModel::from(CreateUser {
         username,
@@ -176,7 +176,7 @@ impl UserService {
       ));
     }
 
-    AppRepository::list_active_users(&self.db_conn, Some(resolved_limit))
+    UsersRepository::list_active_users(&self.db_conn, Some(resolved_limit))
       .await
       .map_err(Self::internal_error)
   }

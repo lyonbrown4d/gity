@@ -9,7 +9,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use entity::organization_invitations;
-use repository::AppRepository;
+use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
 use sea_orm::DbErr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -130,7 +130,7 @@ async fn list_organizations_internal(
   current_user: &CurrentUser,
 ) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
   if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
-    let organizations = AppRepository::list_active_organizations(&state.db_conn)
+    let organizations = OrganizationsRepository::list_active_organizations(&state.db_conn)
       .await
       .map_err(|err| internal_error("failed to load organizations", err))?;
 
@@ -147,7 +147,7 @@ async fn list_organizations_internal(
   }
 
   let memberships =
-    AppRepository::list_active_memberships_by_user(&state.db_conn, &current_user.user_id)
+    OrganizationMembersRepository::list_active_memberships_by_user(&state.db_conn, &current_user.user_id)
       .await
       .map_err(|err| internal_error("failed to load organization memberships", err))?;
 
@@ -171,7 +171,7 @@ async fn list_organizations_internal(
     .collect();
 
   let organizations =
-    AppRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
+    OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
       .await
       .map_err(|err| internal_error("failed to load organizations", err))?;
 
@@ -352,7 +352,7 @@ pub async fn list_organization_members(
 ) -> Result<(StatusCode, Json<Vec<OrganizationMemberDetailView>>), (StatusCode, Json<ErrorResponse>)>
 {
   let organization =
-    AppRepository::find_active_organization_by_id(&state.db_conn, organization_id.as_str())
+    OrganizationsRepository::find_active_organization_by_id(&state.db_conn, organization_id.as_str())
       .await
       .map_err(|err| internal_error("failed to load organization", err))?
       .ok_or_else(|| {
@@ -371,7 +371,7 @@ pub async fn list_organization_members(
   )
   .await?;
 
-  let members = AppRepository::list_active_memberships_by_organization(
+  let members = OrganizationMembersRepository::list_active_memberships_by_organization(
     &state.db_conn,
     organization.id.as_str(),
   )
@@ -381,7 +381,7 @@ pub async fn list_organization_members(
     .iter()
     .map(|member| member.user_id.clone())
     .collect::<Vec<_>>();
-  let users = AppRepository::list_active_users_by_ids(&state.db_conn, user_ids)
+  let users = UsersRepository::list_active_users_by_ids(&state.db_conn, user_ids)
     .await
     .map_err(|err| internal_error("failed to load users", err))?;
   let user_map = users

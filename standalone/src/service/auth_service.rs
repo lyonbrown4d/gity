@@ -8,7 +8,7 @@ use crate::service::authentication::{
 };
 use domain::user::CreateUser;
 use entity::{organization_members, organizations, users};
-use repository::AppRepository;
+use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
 use sea_orm::{DatabaseConnection, DbErr, Set, TransactionTrait};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -79,7 +79,7 @@ impl AuthService {
     let txn = self.db_conn.begin().await.map_err(Self::internal_error)?;
 
     let duplicated_user =
-      AppRepository::find_duplicate_user_by_username_or_email(&txn, &input.username, &input.email)
+      UsersRepository::find_duplicate_user_by_username_or_email(&txn, &input.username, &input.email)
         .await
         .map_err(Self::internal_error)?
         .is_some();
@@ -96,7 +96,7 @@ impl AuthService {
       password: input.password.clone(),
     };
 
-    let user = AppRepository::insert_user(&txn, users::ActiveModel::from(create_user))
+    let user = UsersRepository::insert_user(&txn, users::ActiveModel::from(create_user))
       .await
       .map_err(|err| Self::map_db_error(err, "failed to create user"))?;
 
@@ -107,7 +107,7 @@ impl AuthService {
       .organization_key
       .unwrap_or_else(|| default_org_key(input.username.as_str()));
 
-    let organization = AppRepository::insert_organization(
+    let organization = OrganizationsRepository::insert_organization(
       &txn,
       organizations::ActiveModel {
         key: Set(org_key),
@@ -119,7 +119,7 @@ impl AuthService {
     .await
     .map_err(|err| Self::map_db_error(err, "failed to create organization"))?;
 
-    AppRepository::insert_organization_membership(
+    OrganizationMembersRepository::insert_organization_membership(
       &txn,
       organization_members::ActiveModel {
         organization_id: Set(organization.id.clone()),
@@ -164,12 +164,12 @@ impl AuthService {
         AuthServiceError::Unauthorized("invalid username/email or password".to_string())
       })?;
 
-    let membership = AppRepository::find_first_active_membership_by_user(&self.db_conn, &user.id)
+    let membership = OrganizationMembersRepository::find_first_active_membership_by_user(&self.db_conn, &user.id)
       .await
       .map_err(Self::internal_error)?;
 
     let organization = match membership.as_ref() {
-      Some(member) => AppRepository::find_active_organization_by_id(
+      Some(member) => OrganizationsRepository::find_active_organization_by_id(
         &self.db_conn,
         member.organization_id.as_str(),
       )
@@ -212,13 +212,13 @@ impl AuthService {
       AuthServiceError::Unauthorized("invalid or expired refresh token".to_string())
     })?;
 
-    let user = AppRepository::find_active_user_by_id(&self.db_conn, claims.sub.as_str())
+    let user = UsersRepository::find_active_user_by_id(&self.db_conn, claims.sub.as_str())
       .await
       .map_err(Self::internal_error)?
       .ok_or_else(|| AuthServiceError::Unauthorized("user not found".to_string()))?;
 
     let organization = match claims.org.as_deref() {
-      Some(org_id) => AppRepository::find_active_organization_by_id(&self.db_conn, org_id)
+      Some(org_id) => OrganizationsRepository::find_active_organization_by_id(&self.db_conn, org_id)
         .await
         .map_err(Self::internal_error)?,
       None => None,

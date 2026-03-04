@@ -9,7 +9,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use entity::{repositories, repository_branches, repository_commits};
-use repository::AppRepository;
+use repository::OrganizationsRepository;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -121,7 +121,7 @@ pub async fn list_repositories(
     .map(|repo| repo.organization_id.clone())
     .collect::<Vec<_>>();
   let organizations =
-    AppRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
+    OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
       .await
       .map_err(|err| {
         (
@@ -184,7 +184,7 @@ pub async fn create_repository(
     .await
     .map_err(map_repository_service_error)?;
 
-  let organization = AppRepository::find_active_organization_by_id(
+  let organization = OrganizationsRepository::find_active_organization_by_id(
     &state.db_conn,
     repository.organization_id.as_str(),
   )

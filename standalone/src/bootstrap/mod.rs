@@ -8,7 +8,7 @@ use chrono::Utc;
 use fred::clients::Client;
 use fred::prelude::{Builder, ClientLike};
 use migration::{Migrator, MigratorTrait};
-use repository::AppRepository;
+use repository::OrganizationInvitationsRepository;
 use sea_orm::{Database, DatabaseConnection};
 use tokio::time::{Duration, interval};
 use tracing::info;
@@ -71,7 +71,7 @@ fn spawn_invitation_expiry_job(db_conn: DatabaseConnection) {
       ticker.tick().await;
 
       let now = Utc::now();
-      let update = AppRepository::expire_pending_invitations_before(&db_conn, now).await;
+      let update = OrganizationInvitationsRepository::expire_pending_invitations_before(&db_conn, now).await;
 
       if let Err(err) = update {
         info!("invitation expiry job failed: {err}");

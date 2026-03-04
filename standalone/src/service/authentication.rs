@@ -2,7 +2,7 @@ use crate::configuration::cfg::Config;
 use async_trait::async_trait;
 use domain::user::CreateUser;
 use entity::users;
-use repository::AppRepository;
+use repository::UsersRepository;
 use sea_orm::{DatabaseConnection, DbErr};
 use std::sync::Arc;
 
@@ -82,7 +82,7 @@ impl SuperAdminCredentialsProvider {
     credential: &SuperAdminCredential,
   ) -> Result<users::Model, AuthenticationError> {
     let identity = credential.username.trim();
-    let existing = AppRepository::find_user_by_username_or_email(&self.db_conn, identity)
+    let existing = UsersRepository::find_user_by_username_or_email(&self.db_conn, identity)
       .await
       .map_err(map_db_error)?;
     if let Some(user) = existing {
@@ -100,7 +100,7 @@ impl SuperAdminCredentialsProvider {
       email,
       password: credential.password.clone(),
     };
-    let inserted = AppRepository::insert_user(&self.db_conn, users::ActiveModel::from(create))
+    let inserted = UsersRepository::insert_user(&self.db_conn, users::ActiveModel::from(create))
       .await
       .map_err(map_db_error)?;
     Ok(inserted)
@@ -149,7 +149,7 @@ impl AuthenticationProvider for DbUserPasswordProvider {
     credentials: &CredentialLogin,
   ) -> Result<AuthenticationDecision, AuthenticationError> {
     let Some(user) =
-      AppRepository::find_user_by_username_or_email(&self.db_conn, credentials.username.as_str())
+      UsersRepository::find_user_by_username_or_email(&self.db_conn, credentials.username.as_str())
         .await
         .map_err(map_db_error)?
     else {

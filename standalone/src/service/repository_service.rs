@@ -4,7 +4,10 @@ use crate::service::git_backend_service::{GitBackendError, GitBackendService};
 use chrono::Utc;
 use entity::{organization_members, repositories, repository_branches, repository_commits};
 use mr_ulid::Ulid;
-use repository::AppRepository;
+use repository::{
+  OrganizationsRepository, RepositoriesRepository, RepositoryBranchesRepository,
+  RepositoryCommitsRepository, UsersRepository,
+};
 use sea_orm::{DatabaseConnection, DbErr, Set, TransactionTrait};
 use std::collections::HashSet;
 use tracing::warn;
@@ -89,7 +92,7 @@ impl RepositoryService {
       .await?;
 
     let organization =
-      AppRepository::find_active_organization_by_id(&self.db_conn, input.organization_id.as_str())
+      OrganizationsRepository::find_active_organization_by_id(&self.db_conn, input.organization_id.as_str())
         .await
         .map_err(|err| Self::internal_error("failed to load organization", err))?
         .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
@@ -113,7 +116,7 @@ impl RepositoryService {
       ));
     }
 
-    let exists = AppRepository::exists_active_repository_by_org_and_key(
+    let exists = RepositoriesRepository::exists_active_repository_by_org_and_key(
       &self.db_conn,
       input.organization_id.as_str(),
       repo_key.as_str(),
@@ -150,7 +153,7 @@ impl RepositoryService {
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
 
-    let repository = AppRepository::insert_repository(
+    let repository = RepositoriesRepository::insert_repository(
       &txn,
       repositories::ActiveModel {
         organization_id: Set(input.organization_id),
@@ -166,7 +169,7 @@ impl RepositoryService {
     .await
     .map_err(|err| Self::internal_error("failed to create repository", err))?;
 
-    AppRepository::insert_branch(
+    RepositoryBranchesRepository::insert_branch(
       &txn,
       repository_branches::ActiveModel {
         repository_id: Set(repository.id.clone()),
@@ -218,7 +221,7 @@ impl RepositoryService {
       .map_err(Self::map_access_error)?;
     }
 
-    AppRepository::list_active_repositories_by_org(&self.db_conn, organization_id)
+    RepositoriesRepository::list_active_repositories_by_org(&self.db_conn, organization_id)
       .await
       .map_err(|err| Self::internal_error("failed to list repositories", err))
   }
@@ -234,7 +237,7 @@ impl RepositoryService {
       ));
     }
 
-    AppRepository::list_active_repositories(&self.db_conn, organization_id)
+    RepositoriesRepository::list_active_repositories(&self.db_conn, organization_id)
       .await
       .map_err(|err| Self::internal_error("failed to list repositories", err))
   }
@@ -257,7 +260,7 @@ impl RepositoryService {
     repo_id: &str,
     required: RequiredOrganizationRole,
   ) -> Result<(repositories::Model, organization_members::Model), RepositoryServiceError> {
-    let repository = AppRepository::find_active_repository_by_id(&self.db_conn, repo_id)
+    let repository = RepositoriesRepository::find_active_repository_by_id(&self.db_conn, repo_id)
       .await
       .map_err(|err| Self::internal_error("failed to load repository", err))?
       .ok_or_else(|| RepositoryServiceError::NotFound("repository not found".to_string()))?;
@@ -295,7 +298,7 @@ impl RepositoryService {
     current_user_id: &str,
     repo_id: &str,
   ) -> Result<(), RepositoryServiceError> {
-    let repository = AppRepository::find_active_repository_by_id(&self.db_conn, repo_id)
+    let repository = RepositoriesRepository::find_active_repository_by_id(&self.db_conn, repo_id)
       .await
       .map_err(|err| Self::internal_error("failed to load repository", err))?
       .ok_or_else(|| RepositoryServiceError::NotFound("repository not found".to_string()))?;
@@ -304,7 +307,7 @@ impl RepositoryService {
       .require_owner_or_super_admin(current_user_id, repository.organization_id.as_str())
       .await?;
 
-    let organization = AppRepository::find_active_organization_by_id(
+    let organization = OrganizationsRepository::find_active_organization_by_id(
       &self.db_conn,
       repository.organization_id.as_str(),
     )
@@ -323,17 +326,17 @@ impl RepositoryService {
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
 
     let branches =
-      AppRepository::list_repository_branches_by_repo_id(&txn, repository.id.as_str(), false)
+      RepositoryBranchesRepository::list_repository_branches_by_repo_id(&txn, repository.id.as_str(), false)
         .await
         .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
 
     for branch in branches {
-      AppRepository::update_branch(&txn, branch, None, None, Some(Some(now)))
+      RepositoryBranchesRepository::update_branch(&txn, branch, None, None, Some(Some(now)))
         .await
         .map_err(|err| Self::internal_error("failed to delete repository branch", err))?;
     }
 
-    AppRepository::update_repository(&txn, repository, None, None, None, Some(Some(now)))
+    RepositoriesRepository::update_repository(&txn, repository, None, None, None, Some(Some(now)))
       .await
       .map_err(|err| Self::internal_error("failed to delete repository", err))?;
 
@@ -385,7 +388,7 @@ impl RepositoryService {
       ));
     }
 
-    let branch = AppRepository::find_active_branch_by_repo_and_name(
+    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
       &self.db_conn,
       repository.id.as_str(),
       branch_name.as_str(),
@@ -404,7 +407,7 @@ impl RepositoryService {
       .commit_sha
       .unwrap_or_else(|| Ulid::new().to_string().to_lowercase());
 
-    let exists = AppRepository::exists_commit_by_repo_and_sha(
+    let exists = RepositoryCommitsRepository::exists_commit_by_repo_and_sha(
       &self.db_conn,
       repository.id.as_str(),
       commit_sha.as_str(),
@@ -424,7 +427,7 @@ impl RepositoryService {
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
 
-    let commit = AppRepository::insert_commit(
+    let commit = RepositoryCommitsRepository::insert_commit(
       &txn,
       repository_commits::ActiveModel {
         repository_id: Set(repository.id.clone()),
@@ -438,7 +441,7 @@ impl RepositoryService {
     .await
     .map_err(|err| Self::internal_error("failed to insert commit", err))?;
 
-    AppRepository::update_branch(&txn, branch, None, Some(Some(commit_sha)), None)
+    RepositoryBranchesRepository::update_branch(&txn, branch, None, Some(Some(commit_sha)), None)
       .await
       .map_err(|err| Self::internal_error("failed to update branch", err))?;
 
@@ -469,7 +472,7 @@ impl RepositoryService {
       ));
     }
 
-    let exists = AppRepository::exists_active_branch_by_repo_and_name(
+    let exists = RepositoryBranchesRepository::exists_active_branch_by_repo_and_name(
       &self.db_conn,
       repository.id.as_str(),
       name.as_str(),
@@ -483,7 +486,7 @@ impl RepositoryService {
       ));
     }
 
-    AppRepository::insert_branch(
+    RepositoryBranchesRepository::insert_branch(
       &self.db_conn,
       repository_branches::ActiveModel {
         repository_id: Set(repository.id),
@@ -509,7 +512,7 @@ impl RepositoryService {
       )
       .await?;
 
-    AppRepository::list_commits_by_repo(
+    RepositoryCommitsRepository::list_commits_by_repo(
       &self.db_conn,
       repository.id.as_str(),
       input.branch_name,
@@ -531,7 +534,7 @@ impl RepositoryService {
       )
       .await?;
 
-    AppRepository::list_repository_branches_by_repo_id(&self.db_conn, repository.id.as_str(), false)
+    RepositoryBranchesRepository::list_repository_branches_by_repo_id(&self.db_conn, repository.id.as_str(), false)
       .await
       .map_err(|err| Self::internal_error("failed to list branches", err))
   }
@@ -547,7 +550,7 @@ impl RepositoryService {
       .require_repo_access(user_id, repo_id, RequiredOrganizationRole::Owner)
       .await?;
 
-    let branch = AppRepository::find_active_branch_by_repo_and_name(
+    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
       &self.db_conn,
       repository.id.as_str(),
       branch_name,
@@ -556,7 +559,7 @@ impl RepositoryService {
     .map_err(|err| Self::internal_error("failed to load branch", err))?
     .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
 
-    AppRepository::update_branch(&self.db_conn, branch, Some(is_protected), None, None)
+    RepositoryBranchesRepository::update_branch(&self.db_conn, branch, Some(is_protected), None, None)
       .await
       .map_err(|err| Self::internal_error("failed to update branch protection", err))
   }
@@ -617,7 +620,7 @@ impl RepositoryService {
       return Ok(false);
     }
 
-    let user = AppRepository::find_active_user_by_id(&self.db_conn, user_id)
+    let user = UsersRepository::find_active_user_by_id(&self.db_conn, user_id)
       .await
       .map_err(|err| Self::internal_error("failed to load current user", err))?;
     let Some(user) = user else {
