@@ -284,15 +284,16 @@ async fn require_repository_permission(
   repo: &str,
   required_role: RequiredOrganizationRole,
 ) -> Result<(organizations::Model, repositories::Model), (StatusCode, String)> {
-  let organization = OrganizationsRepository::find_active_organization_by_key(&state.db_conn, owner)
-    .await
-    .map_err(|err| {
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        format!("failed to load organization: {err}"),
-      )
-    })?
-    .ok_or_else(|| (StatusCode::NOT_FOUND, "organization not found".to_string()))?;
+  let organization =
+    OrganizationsRepository::find_active_organization_by_key(&state.db_conn, owner)
+      .await
+      .map_err(|err| {
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          format!("failed to load organization: {err}"),
+        )
+      })?
+      .ok_or_else(|| (StatusCode::NOT_FOUND, "organization not found".to_string()))?;
 
   let repo_key = repo.strip_suffix(".git").unwrap_or(repo);
   let repository = RepositoriesRepository::find_active_repository_by_org_and_key(

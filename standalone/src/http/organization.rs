@@ -146,10 +146,12 @@ async fn list_organizations_internal(
     return Ok((StatusCode::OK, Json(data)));
   }
 
-  let memberships =
-    OrganizationMembersRepository::list_active_memberships_by_user(&state.db_conn, &current_user.user_id)
-      .await
-      .map_err(|err| internal_error("failed to load organization memberships", err))?;
+  let memberships = OrganizationMembersRepository::list_active_memberships_by_user(
+    &state.db_conn,
+    &current_user.user_id,
+  )
+  .await
+  .map_err(|err| internal_error("failed to load organization memberships", err))?;
 
   if memberships.is_empty() {
     return Ok((StatusCode::OK, Json(vec![])));
@@ -351,18 +353,20 @@ pub async fn list_organization_members(
   Path(organization_id): Path<String>,
 ) -> Result<(StatusCode, Json<Vec<OrganizationMemberDetailView>>), (StatusCode, Json<ErrorResponse>)>
 {
-  let organization =
-    OrganizationsRepository::find_active_organization_by_id(&state.db_conn, organization_id.as_str())
-      .await
-      .map_err(|err| internal_error("failed to load organization", err))?
-      .ok_or_else(|| {
-        (
-          StatusCode::NOT_FOUND,
-          Json(ErrorResponse {
-            message: "organization not found".to_string(),
-          }),
-        )
-      })?;
+  let organization = OrganizationsRepository::find_active_organization_by_id(
+    &state.db_conn,
+    organization_id.as_str(),
+  )
+  .await
+  .map_err(|err| internal_error("failed to load organization", err))?
+  .ok_or_else(|| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
+      }),
+    )
+  })?;
 
   require_org_member_or_super_admin(
     &state,

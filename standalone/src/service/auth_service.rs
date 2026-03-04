@@ -78,11 +78,14 @@ impl AuthService {
   pub async fn register(&self, input: RegisterInput) -> Result<AuthPayload, AuthServiceError> {
     let txn = self.db_conn.begin().await.map_err(Self::internal_error)?;
 
-    let duplicated_user =
-      UsersRepository::find_duplicate_user_by_username_or_email(&txn, &input.username, &input.email)
-        .await
-        .map_err(Self::internal_error)?
-        .is_some();
+    let duplicated_user = UsersRepository::find_duplicate_user_by_username_or_email(
+      &txn,
+      &input.username,
+      &input.email,
+    )
+    .await
+    .map_err(Self::internal_error)?
+    .is_some();
 
     if duplicated_user {
       return Err(AuthServiceError::Conflict(
@@ -164,9 +167,10 @@ impl AuthService {
         AuthServiceError::Unauthorized("invalid username/email or password".to_string())
       })?;
 
-    let membership = OrganizationMembersRepository::find_first_active_membership_by_user(&self.db_conn, &user.id)
-      .await
-      .map_err(Self::internal_error)?;
+    let membership =
+      OrganizationMembersRepository::find_first_active_membership_by_user(&self.db_conn, &user.id)
+        .await
+        .map_err(Self::internal_error)?;
 
     let organization = match membership.as_ref() {
       Some(member) => OrganizationsRepository::find_active_organization_by_id(
@@ -218,9 +222,11 @@ impl AuthService {
       .ok_or_else(|| AuthServiceError::Unauthorized("user not found".to_string()))?;
 
     let organization = match claims.org.as_deref() {
-      Some(org_id) => OrganizationsRepository::find_active_organization_by_id(&self.db_conn, org_id)
-        .await
-        .map_err(Self::internal_error)?,
+      Some(org_id) => {
+        OrganizationsRepository::find_active_organization_by_id(&self.db_conn, org_id)
+          .await
+          .map_err(Self::internal_error)?
+      }
       None => None,
     };
 

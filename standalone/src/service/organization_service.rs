@@ -158,9 +158,10 @@ impl OrganizationService {
     }
 
     if let Some(new_key) = normalized_key.as_ref() {
-      let duplicated = OrganizationsRepository::find_active_organization_by_key(&self.db_conn, new_key)
-        .await
-        .map_err(|err| Self::internal_error("failed to check organization key", err))?;
+      let duplicated =
+        OrganizationsRepository::find_active_organization_by_key(&self.db_conn, new_key)
+          .await
+          .map_err(|err| Self::internal_error("failed to check organization key", err))?;
       if duplicated
         .as_ref()
         .is_some_and(|item| item.id != organization.id)
@@ -218,12 +219,10 @@ impl OrganizationService {
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
 
-    let memberships = OrganizationMembersRepository::list_active_memberships_by_organization(
-      &txn,
-      organization_id,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load organization members", err))?;
+    let memberships =
+      OrganizationMembersRepository::list_active_memberships_by_organization(&txn, organization_id)
+        .await
+        .map_err(|err| Self::internal_error("failed to load organization members", err))?;
     for membership in memberships {
       OrganizationMembersRepository::update_organization_membership(
         &txn,
@@ -231,32 +230,56 @@ impl OrganizationService {
         None,
         Some(Some(now.clone())),
       )
-        .await
-        .map_err(|err| Self::internal_error("failed to delete organization member", err))?;
+      .await
+      .map_err(|err| Self::internal_error("failed to delete organization member", err))?;
     }
 
-    let repositories = RepositoriesRepository::list_active_repositories_by_org(&txn, organization_id)
-      .await
-      .map_err(|err| Self::internal_error("failed to load repositories", err))?;
+    let repositories =
+      RepositoriesRepository::list_active_repositories_by_org(&txn, organization_id)
+        .await
+        .map_err(|err| Self::internal_error("failed to load repositories", err))?;
     for repository in repositories {
-      let branches =
-        RepositoryBranchesRepository::list_repository_branches_by_repo_id(&txn, repository.id.as_str(), false)
-          .await
-          .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
+      let branches = RepositoryBranchesRepository::list_repository_branches_by_repo_id(
+        &txn,
+        repository.id.as_str(),
+        false,
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
       for branch in branches {
-        RepositoryBranchesRepository::update_branch(&txn, branch, None, None, Some(Some(now.clone())))
-          .await
-          .map_err(|err| Self::internal_error("failed to delete repository branch", err))?;
+        RepositoryBranchesRepository::update_branch(
+          &txn,
+          branch,
+          None,
+          None,
+          Some(Some(now.clone())),
+        )
+        .await
+        .map_err(|err| Self::internal_error("failed to delete repository branch", err))?;
       }
 
-      RepositoriesRepository::update_repository(&txn, repository, None, None, None, Some(Some(now.clone())))
-        .await
-        .map_err(|err| Self::internal_error("failed to delete repository", err))?;
+      RepositoriesRepository::update_repository(
+        &txn,
+        repository,
+        None,
+        None,
+        None,
+        Some(Some(now.clone())),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to delete repository", err))?;
     }
 
-    OrganizationsRepository::update_organization(&txn, organization, None, None, None, Some(Some(now)))
-      .await
-      .map_err(|err| Self::internal_error("failed to delete organization", err))?;
+    OrganizationsRepository::update_organization(
+      &txn,
+      organization,
+      None,
+      None,
+      None,
+      Some(Some(now)),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to delete organization", err))?;
 
     txn
       .commit()
@@ -277,10 +300,11 @@ impl OrganizationService {
       .require_owner_or_super_admin(actor_user_id, organization_id)
       .await?;
 
-    let target_user_exists = UsersRepository::find_active_user_by_id(&self.db_conn, &target_user_id)
-      .await
-      .map_err(|err| Self::internal_error("failed to load target user", err))?
-      .is_some();
+    let target_user_exists =
+      UsersRepository::find_active_user_by_id(&self.db_conn, &target_user_id)
+        .await
+        .map_err(|err| Self::internal_error("failed to load target user", err))?
+        .is_some();
 
     if !target_user_exists {
       return Err(OrganizationServiceError::NotFound(
@@ -288,10 +312,13 @@ impl OrganizationService {
       ));
     }
 
-    let exists =
-      OrganizationMembersRepository::exists_active_membership(&self.db_conn, organization_id, &target_user_id)
-        .await
-        .map_err(|err| Self::internal_error("failed to check existing membership", err))?;
+    let exists = OrganizationMembersRepository::exists_active_membership(
+      &self.db_conn,
+      organization_id,
+      &target_user_id,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to check existing membership", err))?;
 
     if exists {
       return Err(OrganizationServiceError::Conflict(
@@ -344,13 +371,14 @@ impl OrganizationService {
       ));
     }
 
-    let existing_pending = OrganizationInvitationsRepository::find_pending_invitation_by_org_and_email(
-      &self.db_conn,
-      organization_id,
-      email.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to check pending invitations", err))?;
+    let existing_pending =
+      OrganizationInvitationsRepository::find_pending_invitation_by_org_and_email(
+        &self.db_conn,
+        organization_id,
+        email.as_str(),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to check pending invitations", err))?;
 
     if existing_pending.is_some() {
       return Err(OrganizationServiceError::Conflict(
@@ -449,10 +477,13 @@ impl OrganizationService {
         OrganizationServiceError::Unauthorized("current user not found".to_string())
       })?;
 
-    let invitation = OrganizationInvitationsRepository::find_active_invitation_by_id(&self.db_conn, &invitation_id)
-      .await
-      .map_err(|err| Self::internal_error("failed to load invitation", err))?
-      .ok_or_else(|| OrganizationServiceError::NotFound("invitation not found".to_string()))?;
+    let invitation = OrganizationInvitationsRepository::find_active_invitation_by_id(
+      &self.db_conn,
+      &invitation_id,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load invitation", err))?
+    .ok_or_else(|| OrganizationServiceError::NotFound("invitation not found".to_string()))?;
 
     if invitation.status != organization_invitations::InvitationStatus::Pending {
       return Err(OrganizationServiceError::Conflict(

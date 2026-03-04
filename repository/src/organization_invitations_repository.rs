@@ -83,7 +83,10 @@ impl OrganizationInvitationsRepository {
         organization_invitations::Column::Status,
         Expr::value(organization_invitations::InvitationStatus::Expired),
       )
-      .col_expr(organization_invitations::Column::UpdatedAt, Expr::value(now))
+      .col_expr(
+        organization_invitations::Column::UpdatedAt,
+        Expr::value(now),
+      )
       .filter(
         organization_invitations::Column::Status
           .eq(organization_invitations::InvitationStatus::Pending),

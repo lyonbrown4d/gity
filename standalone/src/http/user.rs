@@ -1,9 +1,7 @@
 use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
-use crate::service::user_service::{
-  CreateUserInput, UpdateCurrentUserInput, UserServiceError,
-};
+use crate::service::user_service::{CreateUserInput, UpdateCurrentUserInput, UserServiceError};
 use axum::Json;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;

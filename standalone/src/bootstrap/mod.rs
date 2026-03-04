@@ -71,7 +71,8 @@ fn spawn_invitation_expiry_job(db_conn: DatabaseConnection) {
       ticker.tick().await;
 
       let now = Utc::now();
-      let update = OrganizationInvitationsRepository::expire_pending_invitations_before(&db_conn, now).await;
+      let update =
+        OrganizationInvitationsRepository::expire_pending_invitations_before(&db_conn, now).await;
 
       if let Err(err) = update {
         info!("invitation expiry job failed: {err}");
