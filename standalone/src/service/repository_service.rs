@@ -20,6 +20,8 @@ pub struct CreateRepositoryInput {
   pub description: Option<String>,
   pub visibility: Option<String>,
   pub default_branch: Option<String>,
+  pub gitignore_template: Option<String>,
+  pub license_template: Option<String>,
   pub current_user_id: String,
 }
 
@@ -91,11 +93,13 @@ impl RepositoryService {
       )
       .await?;
 
-    let organization =
-      OrganizationsRepository::find_active_organization_by_id(&self.db_conn, input.organization_id.as_str())
-        .await
-        .map_err(|err| Self::internal_error("failed to load organization", err))?
-        .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+    let organization = OrganizationsRepository::find_active_organization_by_id(
+      &self.db_conn,
+      input.organization_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load organization", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
     let repo_key = input.key.trim().to_string();
     if repo_key.is_empty() {
@@ -147,6 +151,22 @@ impl RepositoryService {
       ));
     }
 
+    let creator_user_id = input.current_user_id.clone();
+    let gitignore_content = resolve_gitignore_template(input.gitignore_template.as_deref())?;
+    let license_content = resolve_license_template(input.license_template.as_deref())?;
+    let mut initial_files: Vec<(String, String)> = Vec::new();
+    if let Some(content) = gitignore_content {
+      initial_files.push((".gitignore".to_string(), content.to_string()));
+    }
+    if let Some(content) = license_content {
+      initial_files.push(("LICENSE".to_string(), content.to_string()));
+    }
+    if !initial_files.is_empty() && !self.storage_enabled {
+      return Err(RepositoryServiceError::BadRequest(
+        "storage backend is required when initializing .gitignore or LICENSE".to_string(),
+      ));
+    }
+
     let txn = self
       .db_conn
       .begin()
@@ -162,18 +182,18 @@ impl RepositoryService {
         description: Set(input.description),
         visibility: Set(visibility),
         default_branch: Set(default_branch.clone()),
-        created_by_user_id: Set(input.current_user_id),
+        created_by_user_id: Set(creator_user_id.clone()),
         ..Default::default()
       },
     )
     .await
     .map_err(|err| Self::internal_error("failed to create repository", err))?;
 
-    RepositoryBranchesRepository::insert_branch(
+    let default_branch_model = RepositoryBranchesRepository::insert_branch(
       &txn,
       repository_branches::ActiveModel {
         repository_id: Set(repository.id.clone()),
-        name: Set(default_branch),
+        name: Set(default_branch.clone()),
         is_protected: Set(false),
         last_commit_sha: Set(None),
         ..Default::default()
@@ -194,6 +214,52 @@ impl RepositoryService {
       {
         let _ = txn.rollback().await;
         return Err(Self::map_git_backend_error(err));
+      }
+
+      if !initial_files.is_empty() {
+        let seeded_commit_sha = match self
+          .git_backend
+          .seed_initial_commit(
+            organization.key.as_str(),
+            repository.key.as_str(),
+            repository.default_branch.as_str(),
+            initial_files,
+            "Initialize repository",
+          )
+          .await
+        {
+          Ok(commit_sha) => commit_sha,
+          Err(err) => {
+            let _ = txn.rollback().await;
+            return Err(Self::map_git_backend_error(err));
+          }
+        };
+
+        if let Some(commit_sha) = seeded_commit_sha {
+          RepositoryBranchesRepository::update_branch(
+            &txn,
+            default_branch_model,
+            None,
+            Some(Some(commit_sha.clone())),
+            None,
+          )
+          .await
+          .map_err(|err| Self::internal_error("failed to update default branch", err))?;
+
+          RepositoryCommitsRepository::insert_commit(
+            &txn,
+            repository_commits::ActiveModel {
+              repository_id: Set(repository.id.clone()),
+              branch_name: Set(default_branch),
+              commit_sha: Set(commit_sha),
+              message: Set("Initialize repository".to_string()),
+              author_user_id: Set(creator_user_id),
+              ..Default::default()
+            },
+          )
+          .await
+          .map_err(|err| Self::internal_error("failed to insert initial commit", err))?;
+        }
       }
     }
 
@@ -325,10 +391,13 @@ impl RepositoryService {
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
 
-    let branches =
-      RepositoryBranchesRepository::list_repository_branches_by_repo_id(&txn, repository.id.as_str(), false)
-        .await
-        .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
+    let branches = RepositoryBranchesRepository::list_repository_branches_by_repo_id(
+      &txn,
+      repository.id.as_str(),
+      false,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
 
     for branch in branches {
       RepositoryBranchesRepository::update_branch(&txn, branch, None, None, Some(Some(now)))
@@ -534,9 +603,13 @@ impl RepositoryService {
       )
       .await?;
 
-    RepositoryBranchesRepository::list_repository_branches_by_repo_id(&self.db_conn, repository.id.as_str(), false)
-      .await
-      .map_err(|err| Self::internal_error("failed to list branches", err))
+    RepositoryBranchesRepository::list_repository_branches_by_repo_id(
+      &self.db_conn,
+      repository.id.as_str(),
+      false,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to list branches", err))
   }
 
   pub async fn set_branch_protection(
@@ -559,9 +632,15 @@ impl RepositoryService {
     .map_err(|err| Self::internal_error("failed to load branch", err))?
     .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
 
-    RepositoryBranchesRepository::update_branch(&self.db_conn, branch, Some(is_protected), None, None)
-      .await
-      .map_err(|err| Self::internal_error("failed to update branch protection", err))
+    RepositoryBranchesRepository::update_branch(
+      &self.db_conn,
+      branch,
+      Some(is_protected),
+      None,
+      None,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to update branch protection", err))
   }
 
   fn map_access_error(
@@ -643,6 +722,52 @@ fn parse_visibility(value: Option<&str>) -> Option<repositories::RepositoryVisib
     "public" => Some(repositories::RepositoryVisibility::Public),
     _ => None,
   }
+}
+
+fn resolve_gitignore_template(
+  value: Option<&str>,
+) -> Result<Option<&'static str>, RepositoryServiceError> {
+  let normalized = normalize_optional_template(value);
+  match normalized.as_deref() {
+    None | Some("none") => Ok(None),
+    Some("rust") => Ok(Some("target/\nCargo.lock\n")),
+    Some("node") => Ok(Some("node_modules/\ndist/\n.env\n")),
+    Some("python") => Ok(Some("__pycache__/\n*.pyc\n.venv/\n")),
+    Some("go") => Ok(Some("bin/\n*.test\ncoverage.out\n")),
+    Some("java") => Ok(Some("target/\n*.class\n.idea/\n")),
+    Some(other) => Err(RepositoryServiceError::BadRequest(format!(
+      "unsupported gitignore template: {other}"
+    ))),
+  }
+}
+
+fn resolve_license_template(
+  value: Option<&str>,
+) -> Result<Option<&'static str>, RepositoryServiceError> {
+  let normalized = normalize_optional_template(value);
+  match normalized.as_deref() {
+    None | Some("none") => Ok(None),
+    Some("mit") => Ok(Some(
+      "MIT License\n\nCopyright (c) YEAR OWNER\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.",
+    )),
+    Some("apache-2.0") => Ok(Some(
+      "Apache License\nVersion 2.0, January 2004\nhttp://www.apache.org/licenses/\n\nCopyright (c) YEAR OWNER\n\nLicensed under the Apache License, Version 2.0 (the \"License\");\nyou may not use this file except in compliance with the License.\nYou may obtain a copy of the License at\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software\ndistributed under the License is distributed on an \"AS IS\" BASIS,\nWITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+    )),
+    Some("gpl-3.0") => Ok(Some(
+      "GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n\nCopyright (C) YEAR OWNER\n\nThis program is free software: you can redistribute it and/or modify\nit under the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nThis program is distributed in the hope that it will be useful,\nbut WITHOUT ANY WARRANTY; without even the implied warranty of\nMERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+    )),
+    Some(other) => Err(RepositoryServiceError::BadRequest(format!(
+      "unsupported license template: {other}"
+    ))),
+  }
+}
+
+fn normalize_optional_template(value: Option<&str>) -> Option<String> {
+  let normalized = value?.trim().to_ascii_lowercase();
+  if normalized.is_empty() {
+    return None;
+  }
+  Some(normalized)
 }
 
 fn is_safe_storage_component(value: &str) -> bool {

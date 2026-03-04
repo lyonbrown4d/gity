@@ -99,10 +99,13 @@ impl GitBackendService {
     repo_path: &FsPath,
   ) -> Result<(), GitBackendError> {
     let refs = self.list_head_refs(repo_path).await?;
-    let existing =
-      RepositoryBranchesRepository::list_repository_branches_by_repo_id(&self.db_conn, repository_id, true)
-        .await
-        .map_err(|err| GitBackendError::Db(format!("failed to load repository branches: {err}")))?;
+    let existing = RepositoryBranchesRepository::list_repository_branches_by_repo_id(
+      &self.db_conn,
+      repository_id,
+      true,
+    )
+    .await
+    .map_err(|err| GitBackendError::Db(format!("failed to load repository branches: {err}")))?;
 
     let mut existing_by_name: HashMap<String, entity::repository_branches::Model> = existing
       .into_iter()
@@ -143,11 +146,17 @@ impl GitBackendService {
         continue;
       }
 
-      RepositoryBranchesRepository::update_branch(&self.db_conn, model, None, Some(None), Some(Some(now)))
-        .await
-        .map_err(|err| {
-          GitBackendError::Db(format!("failed to mark deleted branch metadata: {err}"))
-        })?;
+      RepositoryBranchesRepository::update_branch(
+        &self.db_conn,
+        model,
+        None,
+        Some(None),
+        Some(Some(now)),
+      )
+      .await
+      .map_err(|err| {
+        GitBackendError::Db(format!("failed to mark deleted branch metadata: {err}"))
+      })?;
     }
 
     Ok(())
@@ -210,6 +219,59 @@ impl GitBackendService {
     }
 
     Ok(())
+  }
+
+  pub async fn seed_initial_commit(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    default_branch: &str,
+    files: Vec<(String, String)>,
+    commit_message: &str,
+  ) -> Result<Option<String>, GitBackendError> {
+    if files.is_empty() {
+      return Ok(None);
+    }
+    if !is_safe_component(organization_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "organization key contains unsupported characters".to_string(),
+      ));
+    }
+    if !is_safe_component(repository_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "repository key contains unsupported characters".to_string(),
+      ));
+    }
+    if default_branch.trim().is_empty() {
+      return Err(GitBackendError::InvalidComponent(
+        "default branch cannot be empty".to_string(),
+      ));
+    }
+
+    let root = self
+      .repo_root
+      .as_deref()
+      .ok_or(GitBackendError::StorageNotConfigured)?;
+    let repo_path = build_repo_path(root, organization_key, repository_key);
+    if !repo_path.exists() {
+      return Err(GitBackendError::RepositoryNotFound);
+    }
+
+    let default_branch = default_branch.to_string();
+    let commit_message = commit_message.to_string();
+    let repo_path_clone = repo_path.clone();
+    let commit_result = tokio::task::spawn_blocking(move || {
+      storage::seed_initial_commit(
+        repo_path_clone.as_path(),
+        default_branch.as_str(),
+        files.as_slice(),
+        commit_message.as_str(),
+      )
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git commit task: {err}")))?;
+
+    commit_result.map_err(|err| GitBackendError::Git(err.to_string()))
   }
 
   pub async fn remove_repository_storage(

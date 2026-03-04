@@ -13,11 +13,14 @@ export function AppRepositoriesPage(): JSX.Element {
   const { t } = useI18n();
   const [selectedOrg, setSelectedOrg] = useState<string>("");
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+  const [createOwnerOrg, setCreateOwnerOrg] = useState("");
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [defaultBranch, setDefaultBranch] = useState("main");
   const [visibility, setVisibility] = useState("private");
+  const [gitignoreTemplate, setGitignoreTemplate] = useState("none");
+  const [licenseTemplate, setLicenseTemplate] = useState("none");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { mutate: createRepository, isLoading: isCreating } = useCreate<RepositoryView>();
@@ -33,6 +36,12 @@ export function AppRepositoriesPage(): JSX.Element {
       setSelectedOrg(orgs[0].id);
     }
   }, [orgs, selectedOrg]);
+
+  useEffect(() => {
+    if (!createOwnerOrg && selectedOrg) {
+      setCreateOwnerOrg(selectedOrg);
+    }
+  }, [createOwnerOrg, selectedOrg]);
 
   const repoQuery = useList<RepositoryView>({
     resource: "my-repositories",
@@ -56,7 +65,7 @@ export function AppRepositoriesPage(): JSX.Element {
   const submitCreate = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setActionError(null);
-    if (!selectedOrg) {
+    if (!createOwnerOrg) {
       setActionError(t("Please select an organization first."));
       return;
     }
@@ -64,12 +73,14 @@ export function AppRepositoriesPage(): JSX.Element {
       {
         resource: "my-repositories",
         values: {
-          organization_id: selectedOrg,
+          organization_id: createOwnerOrg,
           key,
           name,
           description: description || undefined,
           visibility,
           default_branch: defaultBranch || undefined,
+          gitignore_template: gitignoreTemplate === "none" ? undefined : gitignoreTemplate,
+          license_template: licenseTemplate === "none" ? undefined : licenseTemplate,
         },
       },
       {
@@ -79,8 +90,16 @@ export function AppRepositoriesPage(): JSX.Element {
           setDescription("");
           setDefaultBranch("main");
           setVisibility("private");
+          setGitignoreTemplate("none");
+          setLicenseTemplate("none");
+          const ownerChanged = createOwnerOrg !== selectedOrg;
+          if (ownerChanged) {
+            setSelectedOrg(createOwnerOrg);
+          }
           setCreateModalOpen(false);
-          await repoQuery.refetch();
+          if (!ownerChanged) {
+            await repoQuery.refetch();
+          }
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to create repository"));
@@ -119,6 +138,11 @@ export function AppRepositoriesPage(): JSX.Element {
     }
   };
 
+  const openCreateModal = () => {
+    setCreateOwnerOrg(selectedOrg || orgs[0]?.id || "");
+    setCreateModalOpen(true);
+  };
+
   return (
     <div className="space-y-4 page-enter">
       <Card className="card-enter">
@@ -128,7 +152,7 @@ export function AppRepositoriesPage(): JSX.Element {
               <CardTitle>{t("My Repositories")}</CardTitle>
               <CardDescription>{t("Create, clone, and manage repositories in your organizations.")}</CardDescription>
             </div>
-            <Button type="button" onClick={() => setCreateModalOpen(true)} className="action-pop">
+            <Button type="button" onClick={openCreateModal} className="action-pop">
               {t("New Repository")}
             </Button>
           </div>
@@ -232,6 +256,22 @@ export function AppRepositoriesPage(): JSX.Element {
 
       <Modal open={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} title={t("Create Repository")}>
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitCreate}>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="repo-owner">{t("Owner")}</Label>
+            <select
+              id="repo-owner"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={createOwnerOrg}
+              onChange={(event) => setCreateOwnerOrg(event.target.value)}
+              required
+            >
+              {orgs.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="repo-key">{t("Repository key")}</Label>
             <Input
@@ -281,6 +321,36 @@ export function AppRepositoriesPage(): JSX.Element {
               <option value="private">{t("private")}</option>
               <option value="internal">{t("internal")}</option>
               <option value="public">{t("public")}</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="repo-gitignore">{t("Add .gitignore")}</Label>
+            <select
+              id="repo-gitignore"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={gitignoreTemplate}
+              onChange={(event) => setGitignoreTemplate(event.target.value)}
+            >
+              <option value="none">{t("None")}</option>
+              <option value="rust">{t("Rust")}</option>
+              <option value="node">{t("Node")}</option>
+              <option value="python">{t("Python")}</option>
+              <option value="go">{t("Go")}</option>
+              <option value="java">{t("Java")}</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="repo-license">{t("Add license")}</Label>
+            <select
+              id="repo-license"
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={licenseTemplate}
+              onChange={(event) => setLicenseTemplate(event.target.value)}
+            >
+              <option value="none">{t("None")}</option>
+              <option value="mit">{t("MIT License")}</option>
+              <option value="apache-2.0">{t("Apache License 2.0")}</option>
+              <option value="gpl-3.0">{t("GNU GPLv3")}</option>
             </select>
           </div>
           <div className="flex items-center gap-2 md:col-span-2 md:justify-end">

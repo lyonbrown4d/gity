@@ -29,6 +29,8 @@ pub struct CreateRepositoryRequest {
   pub description: Option<String>,
   pub visibility: Option<String>,
   pub default_branch: Option<String>,
+  pub gitignore_template: Option<String>,
+  pub license_template: Option<String>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -179,6 +181,8 @@ pub async fn create_repository(
       description: payload.description,
       visibility: payload.visibility,
       default_branch: payload.default_branch,
+      gitignore_template: payload.gitignore_template,
+      license_template: payload.license_template,
       current_user_id: current_user.user_id,
     })
     .await
