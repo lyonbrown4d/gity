@@ -3,11 +3,11 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct Args {
-    /// Name of the person to greet
-    #[arg(short, long, required = false)]
-    pub name: String,
+  /// Name of the person to greet
+  #[arg(short, long, required = false)]
+  pub name: String,
 
-    /// Number of times to greet
-    #[arg(short, long, default_value_t = 1)]
-    pub count: u8,
+  /// Number of times to greet
+  #[arg(short, long, default_value_t = 1)]
+  pub count: u8,
 }

@@ -82,3 +82,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 .env
+data
+target_alt
+.pnpm-store
+*.log
+.tmp-e2e

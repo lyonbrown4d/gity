@@ -32,23 +32,35 @@ impl MigrationTrait for Migration {
               .timestamp_with_time_zone()
               .null(),
           )
-          .index(
-            Index::create()
-              .name("idx_users_username")
-              .table(Users::Table)
-              .col(Users::Username)
-              .unique(),
-          )
-          .index(
-            Index::create()
-              .name("idx_users_email")
-              .table(Users::Table)
-              .col(Users::Email)
-              .unique(),
-          )
           .to_owned(),
       )
-      .await
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_users_username")
+          .table(Users::Table)
+          .col(Users::Username)
+          .unique()
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_users_email")
+          .table(Users::Table)
+          .col(Users::Email)
+          .unique()
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    Ok(())
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {

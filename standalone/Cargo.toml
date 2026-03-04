@@ -16,7 +16,7 @@ tracing = { workspace = true, features = ["max_level_debug"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "serde_json", "ansi"] }
 axum = "0.8.8"
 tower = "0.5.2"
-tower-http = { version = "0.6.8", features = ["request-id", "trace"] }
+tower-http = { version = "0.6.8", features = ["request-id", "trace", "cors"] }
 serde = { workspace = true, features = ["serde_derive", "derive"] }
 serde_json = { workspace = true }
 async-trait = "0.1.89"
@@ -28,6 +28,7 @@ entity = { path = "../entity" }
 domain = { path = "../domain" }
 fred = "10.1.0"
 migration = { path = "../migration" }
+repository = { path = "../repository" }
 sea-orm = { workspace = true, features = [
     "serde_json",
     "sqlx-sqlite",
@@ -42,3 +43,10 @@ validator_derive = { workspace = true }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 chrono = { workspace = true }
 mr-ulid = { workspace = true }
+
+[dev-dependencies]
+reqwest = { version = "0.12.24", default-features = false, features = ["json", "rustls-tls"] }
+tempfile = "3.24.0"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }

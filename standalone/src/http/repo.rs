@@ -1,18 +1,15 @@
 use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
-use crate::security::organization_acl::{
-  AccessError, RequiredOrganizationRole, require_organization_role,
+use crate::service::repository_service::{
+  CreateBranchInput, CreateCommitInput, CreateRepositoryInput, ListBranchesInput, ListCommitsInput,
+  RepositoryServiceError,
 };
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
-use entity::{organization_members, repositories, repository_branches, repository_commits};
-use mr_ulid::Ulid;
-use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, DbErr, EntityTrait, IntoActiveModel, QueryFilter,
-  QueryOrder, QuerySelect, Set, TransactionTrait,
-};
+use entity::{repositories, repository_branches, repository_commits};
+use repository::AppRepository;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -21,6 +18,7 @@ use utoipa_axum::routes;
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct ListRepositoriesQuery {
   pub organization_id: Option<String>,
+  pub all: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -42,6 +40,7 @@ pub struct RepositoryView {
   pub description: Option<String>,
   pub visibility: String,
   pub default_branch: String,
+  pub clone_http_url: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -97,27 +96,57 @@ pub async fn list_repositories(
   current_user: CurrentUser,
   Query(query): Query<ListRepositoriesQuery>,
 ) -> Result<(StatusCode, Json<Vec<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
-  let organization_id = resolve_organization_id(query.organization_id, &current_user)?;
-  require_organization_role(
-    &state.db_conn,
-    current_user.user_id.as_str(),
-    organization_id.as_str(),
-    RequiredOrganizationRole::Member,
-  )
-  .await
-  .map_err(access_error)?;
+  let repositories = if query.all.unwrap_or(false) {
+    state
+      .services
+      .repository
+      .list_repositories_as_super_admin(
+        current_user.user_id.as_str(),
+        query.organization_id.as_deref(),
+      )
+      .await
+      .map_err(map_repository_service_error)?
+  } else {
+    let organization_id = resolve_organization_id(query.organization_id, &current_user)?;
+    state
+      .services
+      .repository
+      .list_repositories(current_user.user_id.as_str(), organization_id.as_str())
+      .await
+      .map_err(map_repository_service_error)?
+  };
 
-  let repositories = repositories::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repositories::Column::OrganizationId.eq(organization_id))
-        .add(repositories::Column::DeletedAt.is_null()),
-    )
-    .all(&state.db_conn)
-    .await
-    .map_err(|err| internal_error("failed to list repositories", err))?;
+  let organization_ids = repositories
+    .iter()
+    .map(|repo| repo.organization_id.clone())
+    .collect::<Vec<_>>();
+  let organizations =
+    AppRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
+      .await
+      .map_err(|err| {
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            message: format!("failed to load organizations: {err}"),
+          }),
+        )
+      })?;
+  let organization_key_by_id = organizations
+    .into_iter()
+    .map(|org| (org.id, org.key))
+    .collect::<std::collections::HashMap<_, _>>();
 
-  let data = repositories.into_iter().map(repository_view).collect();
+  let base_url = public_base_url(&state);
+  let data = repositories
+    .into_iter()
+    .map(|repo| {
+      let organization_key = organization_key_by_id
+        .get(repo.organization_id.as_str())
+        .cloned()
+        .unwrap_or_else(|| repo.organization_id.clone());
+      repository_view(repo, organization_key.as_str(), base_url.as_str())
+    })
+    .collect();
   Ok((StatusCode::OK, Json(data)))
 }
 
@@ -140,82 +169,76 @@ pub async fn create_repository(
   Json(payload): Json<CreateRepositoryRequest>,
 ) -> Result<(StatusCode, Json<RepositoryView>), (StatusCode, Json<ErrorResponse>)> {
   let organization_id = resolve_organization_id(payload.organization_id, &current_user)?;
-  require_organization_role(
+  let repository = state
+    .services
+    .repository
+    .create_repository(CreateRepositoryInput {
+      organization_id,
+      key: payload.key,
+      name: payload.name,
+      description: payload.description,
+      visibility: payload.visibility,
+      default_branch: payload.default_branch,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  let organization = AppRepository::find_active_organization_by_id(
     &state.db_conn,
-    current_user.user_id.as_str(),
-    organization_id.as_str(),
-    RequiredOrganizationRole::Owner,
+    repository.organization_id.as_str(),
   )
   .await
-  .map_err(access_error)?;
-
-  let exists = repositories::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repositories::Column::OrganizationId.eq(organization_id.clone()))
-        .add(repositories::Column::Key.eq(payload.key.clone()))
-        .add(repositories::Column::DeletedAt.is_null()),
-    )
-    .one(&state.db_conn)
-    .await
-    .map_err(|err| internal_error("failed to check repository key", err))?
-    .is_some();
-
-  if exists {
-    return Err((
-      StatusCode::CONFLICT,
-      Json(ErrorResponse {
-        message: "repository key already exists in this organization".to_string(),
-      }),
-    ));
-  }
-
-  let visibility = parse_visibility(payload.visibility.as_deref()).ok_or_else(|| {
+  .map_err(|err| {
     (
-      StatusCode::BAD_REQUEST,
+      StatusCode::INTERNAL_SERVER_ERROR,
       Json(ErrorResponse {
-        message: "visibility must be private, internal, or public".to_string(),
+        message: format!("failed to load organization: {err}"),
+      }),
+    )
+  })?
+  .ok_or_else(|| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
       }),
     )
   })?;
-  let default_branch = payload.default_branch.unwrap_or_else(|| "main".to_string());
 
-  let txn = state
-    .db_conn
-    .begin()
+  Ok((
+    StatusCode::CREATED,
+    Json(repository_view(
+      repository,
+      organization.key.as_str(),
+      public_base_url(&state).as_str(),
+    )),
+  ))
+}
+
+#[utoipa::path(
+  delete,
+  path = "/{repo_id}",
+  responses(
+    (status = 204, description = "Repository deleted"),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn delete_repository(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+  state
+    .services
+    .repository
+    .delete_repository(current_user.user_id.as_str(), repo_id.as_str())
     .await
-    .map_err(|err| internal_error("failed to begin transaction", err))?;
-
-  let repository = repositories::ActiveModel {
-    organization_id: Set(organization_id.clone()),
-    key: Set(payload.key),
-    name: Set(payload.name),
-    description: Set(payload.description),
-    visibility: Set(visibility),
-    default_branch: Set(default_branch.clone()),
-    created_by_user_id: Set(current_user.user_id),
-    ..Default::default()
-  }
-  .insert(&txn)
-  .await
-  .map_err(|err| internal_error("failed to create repository", err))?;
-
-  repository_branches::ActiveModel {
-    repository_id: Set(repository.id.clone()),
-    name: Set(default_branch),
-    is_protected: Set(false),
-    last_commit_sha: Set(None),
-    ..Default::default()
-  }
-  .insert(&txn)
-  .await
-  .map_err(|err| internal_error("failed to create default branch", err))?;
-
-  txn.commit()
-    .await
-    .map_err(|err| internal_error("failed to commit transaction", err))?;
-
-  Ok((StatusCode::CREATED, Json(repository_view(repository))))
+    .map_err(map_repository_service_error)?;
+  Ok(StatusCode::NO_CONTENT)
 }
 
 #[utoipa::path(
@@ -234,24 +257,15 @@ pub async fn list_branches(
   current_user: CurrentUser,
   Path(repo_id): Path<String>,
 ) -> Result<(StatusCode, Json<Vec<BranchView>>), (StatusCode, Json<ErrorResponse>)> {
-  let repository = require_repo_access(
-    &state,
-    current_user.user_id.as_str(),
-    repo_id.as_str(),
-    RequiredOrganizationRole::Member,
-  )
-  .await?;
-
-  let branches = repository_branches::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repository_branches::Column::RepositoryId.eq(repository.id))
-        .add(repository_branches::Column::DeletedAt.is_null()),
-    )
-    .order_by_asc(repository_branches::Column::Name)
-    .all(&state.db_conn)
+  let branches = state
+    .services
+    .repository
+    .list_branches(ListBranchesInput {
+      repo_id,
+      current_user_id: current_user.user_id,
+    })
     .await
-    .map_err(|err| internal_error("failed to list branches", err))?;
+    .map_err(map_repository_service_error)?;
 
   Ok((
     StatusCode::OK,
@@ -278,55 +292,16 @@ pub async fn create_branch(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateBranchRequest>,
 ) -> Result<(StatusCode, Json<BranchView>), (StatusCode, Json<ErrorResponse>)> {
-  let repository = require_repo_access(
-    &state,
-    current_user.user_id.as_str(),
-    repo_id.as_str(),
-    RequiredOrganizationRole::Member,
-  )
-  .await?;
-
-  let name = payload.name.trim().to_string();
-  if name.is_empty() {
-    return Err((
-      StatusCode::BAD_REQUEST,
-      Json(ErrorResponse {
-        message: "branch name is required".to_string(),
-      }),
-    ));
-  }
-
-  let exists = repository_branches::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repository_branches::Column::RepositoryId.eq(repository.id.clone()))
-        .add(repository_branches::Column::Name.eq(name.clone()))
-        .add(repository_branches::Column::DeletedAt.is_null()),
-    )
-    .one(&state.db_conn)
+  let branch = state
+    .services
+    .repository
+    .create_branch(CreateBranchInput {
+      repo_id,
+      name: payload.name,
+      current_user_id: current_user.user_id,
+    })
     .await
-    .map_err(|err| internal_error("failed to check branch name", err))?
-    .is_some();
-
-  if exists {
-    return Err((
-      StatusCode::CONFLICT,
-      Json(ErrorResponse {
-        message: "branch already exists".to_string(),
-      }),
-    ));
-  }
-
-  let branch = repository_branches::ActiveModel {
-    repository_id: Set(repository.id),
-    name: Set(name),
-    is_protected: Set(false),
-    last_commit_sha: Set(None),
-    ..Default::default()
-  }
-  .insert(&state.db_conn)
-  .await
-  .map_err(|err| internal_error("failed to create branch", err))?;
+    .map_err(map_repository_service_error)?;
 
   Ok((StatusCode::CREATED, Json(branch_view(branch))))
 }
@@ -387,26 +362,17 @@ pub async fn list_commits(
   Path(repo_id): Path<String>,
   Query(query): Query<ListCommitsQuery>,
 ) -> Result<(StatusCode, Json<Vec<CommitView>>), (StatusCode, Json<ErrorResponse>)> {
-  let repository = require_repo_access(
-    &state,
-    current_user.user_id.as_str(),
-    repo_id.as_str(),
-    RequiredOrganizationRole::Member,
-  )
-  .await?;
-
-  let mut finder = repository_commits::Entity::find().filter(
-    Condition::all().add(repository_commits::Column::RepositoryId.eq(repository.id)),
-  );
-  if let Some(branch_name) = query.branch_name {
-    finder = finder.filter(repository_commits::Column::BranchName.eq(branch_name));
-  }
-  let commits = finder
-    .order_by_desc(repository_commits::Column::CreatedAt)
-    .limit(query.limit.unwrap_or(50))
-    .all(&state.db_conn)
+  let commits = state
+    .services
+    .repository
+    .list_commits(ListCommitsInput {
+      repo_id,
+      branch_name: query.branch_name,
+      limit: query.limit,
+      current_user_id: current_user.user_id,
+    })
     .await
-    .map_err(|err| internal_error("failed to list commits", err))?;
+    .map_err(map_repository_service_error)?;
 
   Ok((
     StatusCode::OK,
@@ -434,114 +400,18 @@ pub async fn create_commit(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateCommitRequest>,
 ) -> Result<(StatusCode, Json<CommitView>), (StatusCode, Json<ErrorResponse>)> {
-  let (repository, membership) = require_repo_access_with_membership(
-    &state,
-    current_user.user_id.as_str(),
-    repo_id.as_str(),
-    RequiredOrganizationRole::Member,
-  )
-  .await?;
-
-  let branch_name = payload.branch_name.trim().to_string();
-  if branch_name.is_empty() {
-    return Err((
-      StatusCode::BAD_REQUEST,
-      Json(ErrorResponse {
-        message: "branch_name is required".to_string(),
-      }),
-    ));
-  }
-  let message = payload.message.trim().to_string();
-  if message.is_empty() {
-    return Err((
-      StatusCode::BAD_REQUEST,
-      Json(ErrorResponse {
-        message: "message is required".to_string(),
-      }),
-    ));
-  }
-
-  let branch = repository_branches::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repository_branches::Column::RepositoryId.eq(repository.id.clone()))
-        .add(repository_branches::Column::Name.eq(branch_name.clone()))
-        .add(repository_branches::Column::DeletedAt.is_null()),
-    )
-    .one(&state.db_conn)
+  let commit = state
+    .services
+    .repository
+    .create_commit(CreateCommitInput {
+      repo_id,
+      branch_name: payload.branch_name,
+      commit_sha: payload.commit_sha,
+      message: payload.message,
+      current_user_id: current_user.user_id,
+    })
     .await
-    .map_err(|err| internal_error("failed to load branch", err))?
-    .ok_or_else(|| {
-      (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse {
-          message: "branch not found".to_string(),
-        }),
-      )
-    })?;
-
-  if branch.is_protected && membership.role != organization_members::MemberRole::Owner {
-    return Err((
-      StatusCode::FORBIDDEN,
-      Json(ErrorResponse {
-        message: "only organization owner can commit to protected branch".to_string(),
-      }),
-    ));
-  }
-
-  let commit_sha = payload
-    .commit_sha
-    .unwrap_or_else(|| Ulid::new().to_string().to_lowercase());
-
-  let exists = repository_commits::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repository_commits::Column::RepositoryId.eq(repository.id.clone()))
-        .add(repository_commits::Column::CommitSha.eq(commit_sha.clone())),
-    )
-    .one(&state.db_conn)
-    .await
-    .map_err(|err| internal_error("failed to check commit sha", err))?
-    .is_some();
-
-  if exists {
-    return Err((
-      StatusCode::CONFLICT,
-      Json(ErrorResponse {
-        message: "commit sha already exists in this repository".to_string(),
-      }),
-    ));
-  }
-
-  let txn = state
-    .db_conn
-    .begin()
-    .await
-    .map_err(|err| internal_error("failed to begin transaction", err))?;
-
-  let commit = repository_commits::ActiveModel {
-    repository_id: Set(repository.id.clone()),
-    branch_name: Set(branch_name.clone()),
-    commit_sha: Set(commit_sha.clone()),
-    message: Set(message),
-    author_user_id: Set(current_user.user_id),
-    ..Default::default()
-  }
-  .insert(&txn)
-  .await
-  .map_err(|err| internal_error("failed to insert commit", err))?;
-
-  let mut branch_active = branch.into_active_model();
-  branch_active.last_commit_sha = Set(Some(commit_sha));
-  branch_active.updated_at = Set(chrono::Utc::now().into());
-  branch_active
-    .update(&txn)
-    .await
-    .map_err(|err| internal_error("failed to update branch", err))?;
-
-  txn.commit()
-    .await
-    .map_err(|err| internal_error("failed to commit transaction", err))?;
+    .map_err(map_repository_service_error)?;
 
   Ok((StatusCode::CREATED, Json(commit_view(commit))))
 }
@@ -550,6 +420,7 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
   OpenApiRouter::new()
     .routes(routes![list_repositories])
     .routes(routes![create_repository])
+    .routes(routes![delete_repository])
     .routes(routes![list_branches])
     .routes(routes![create_branch])
     .routes(routes![protect_branch])
@@ -565,85 +436,19 @@ async fn set_branch_protection(
   branch_name: String,
   is_protected: bool,
 ) -> Result<(StatusCode, Json<BranchView>), (StatusCode, Json<ErrorResponse>)> {
-  let repository = require_repo_access(
-    state,
-    current_user.user_id.as_str(),
-    repo_id.as_str(),
-    RequiredOrganizationRole::Owner,
-  )
-  .await?;
-
-  let branch = repository_branches::Entity::find()
-    .filter(
-      Condition::all()
-        .add(repository_branches::Column::RepositoryId.eq(repository.id))
-        .add(repository_branches::Column::Name.eq(branch_name))
-        .add(repository_branches::Column::DeletedAt.is_null()),
+  let branch = state
+    .services
+    .repository
+    .set_branch_protection(
+      current_user.user_id.as_str(),
+      repo_id.as_str(),
+      branch_name.as_str(),
+      is_protected,
     )
-    .one(&state.db_conn)
     .await
-    .map_err(|err| internal_error("failed to load branch", err))?
-    .ok_or_else(|| {
-      (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse {
-          message: "branch not found".to_string(),
-        }),
-      )
-    })?;
+    .map_err(map_repository_service_error)?;
 
-  let mut active = branch.into_active_model();
-  active.is_protected = Set(is_protected);
-  active.updated_at = Set(chrono::Utc::now().into());
-  let updated = active
-    .update(&state.db_conn)
-    .await
-    .map_err(|err| internal_error("failed to update branch protection", err))?;
-
-  Ok((StatusCode::OK, Json(branch_view(updated))))
-}
-
-async fn require_repo_access(
-  state: &AppState,
-  user_id: &str,
-  repo_id: &str,
-  required: RequiredOrganizationRole,
-) -> Result<repositories::Model, (StatusCode, Json<ErrorResponse>)> {
-  let (repo, _) = require_repo_access_with_membership(state, user_id, repo_id, required).await?;
-  Ok(repo)
-}
-
-async fn require_repo_access_with_membership(
-  state: &AppState,
-  user_id: &str,
-  repo_id: &str,
-  required: RequiredOrganizationRole,
-) -> Result<(repositories::Model, organization_members::Model), (StatusCode, Json<ErrorResponse>)>
-{
-  let repository = repositories::Entity::find_by_id(repo_id.to_string())
-    .filter(repositories::Column::DeletedAt.is_null())
-    .one(&state.db_conn)
-    .await
-    .map_err(|err| internal_error("failed to load repository", err))?
-    .ok_or_else(|| {
-      (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse {
-          message: "repository not found".to_string(),
-        }),
-      )
-    })?;
-
-  let membership = require_organization_role(
-    &state.db_conn,
-    user_id,
-    repository.organization_id.as_str(),
-    required,
-  )
-  .await
-  .map_err(access_error)?;
-
-  Ok((repository, membership))
+  Ok((StatusCode::OK, Json(branch_view(branch))))
 }
 
 fn resolve_organization_id(
@@ -662,16 +467,12 @@ fn resolve_organization_id(
     })
 }
 
-fn parse_visibility(value: Option<&str>) -> Option<repositories::RepositoryVisibility> {
-  match value.unwrap_or("private").to_ascii_lowercase().as_str() {
-    "private" => Some(repositories::RepositoryVisibility::Private),
-    "internal" => Some(repositories::RepositoryVisibility::Internal),
-    "public" => Some(repositories::RepositoryVisibility::Public),
-    _ => None,
-  }
-}
-
-fn repository_view(model: repositories::Model) -> RepositoryView {
+fn repository_view(
+  model: repositories::Model,
+  organization_key: &str,
+  base_url: &str,
+) -> RepositoryView {
+  let repo_key = model.key.clone();
   RepositoryView {
     id: model.id,
     organization_id: model.organization_id,
@@ -684,6 +485,7 @@ fn repository_view(model: repositories::Model) -> RepositoryView {
       repositories::RepositoryVisibility::Public => "public".to_string(),
     },
     default_branch: model.default_branch,
+    clone_http_url: format!("{base_url}/git/{organization_key}/{repo_key}.git"),
   }
 }
 
@@ -707,20 +509,17 @@ fn commit_view(model: repository_commits::Model) -> CommitView {
   }
 }
 
-fn access_error(err: AccessError) -> (StatusCode, Json<ErrorResponse>) {
-  (
-    err.status,
-    Json(ErrorResponse {
-      message: err.message,
-    }),
-  )
+fn map_repository_service_error(err: RepositoryServiceError) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    RepositoryServiceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+    RepositoryServiceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+    RepositoryServiceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+    RepositoryServiceError::Conflict(message) => (StatusCode::CONFLICT, message),
+    RepositoryServiceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+  };
+  (status, Json(ErrorResponse { message }))
 }
 
-fn internal_error(message: &str, err: DbErr) -> (StatusCode, Json<ErrorResponse>) {
-  (
-    StatusCode::INTERNAL_SERVER_ERROR,
-    Json(ErrorResponse {
-      message: format!("{message}: {err}"),
-    }),
-  )
+fn public_base_url(state: &AppState) -> String {
+  format!("http://localhost:{}", state.config.server.port)
 }

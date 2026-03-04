@@ -1,9 +1,9 @@
 use chrono::Utc;
 use mr_ulid::Ulid;
+use sea_orm::Set;
 use sea_orm::entity::prelude::*;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use sea_orm::prelude::async_trait::async_trait;
-use sea_orm::Set;
 pub use sea_orm::{
   ActiveModelBehavior, DeriveActiveEnum, DeriveRelation, EnumIter, Related, RelationDef,
 };
@@ -94,4 +94,3 @@ impl ActiveModelBehavior for ActiveModel {
     }
   }
 }
-

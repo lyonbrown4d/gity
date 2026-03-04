@@ -29,7 +29,11 @@ impl MigrationTrait for Migration {
               .not_null()
               .default(false),
           )
-          .col(ColumnDef::new(RepositoryBranches::LastCommitSha).string().null())
+          .col(
+            ColumnDef::new(RepositoryBranches::LastCommitSha)
+              .string()
+              .null(),
+          )
           .col(
             ColumnDef::new(RepositoryBranches::CreatedAt)
               .timestamp_with_time_zone()
@@ -52,14 +56,19 @@ impl MigrationTrait for Migration {
               .to(Repositories::Table, Repositories::Id)
               .on_delete(ForeignKeyAction::Cascade),
           )
-          .index(
-            Index::create()
-              .name("idx_repo_branches_repo_name")
-              .table(RepositoryBranches::Table)
-              .col(RepositoryBranches::RepositoryId)
-              .col(RepositoryBranches::Name)
-              .unique(),
-          )
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_repo_branches_repo_name")
+          .table(RepositoryBranches::Table)
+          .col(RepositoryBranches::RepositoryId)
+          .col(RepositoryBranches::Name)
+          .unique()
+          .if_not_exists()
           .to_owned(),
       )
       .await?;
@@ -80,9 +89,21 @@ impl MigrationTrait for Migration {
               .string()
               .not_null(),
           )
-          .col(ColumnDef::new(RepositoryCommits::BranchName).string().not_null())
-          .col(ColumnDef::new(RepositoryCommits::CommitSha).string().not_null())
-          .col(ColumnDef::new(RepositoryCommits::Message).string().not_null())
+          .col(
+            ColumnDef::new(RepositoryCommits::BranchName)
+              .string()
+              .not_null(),
+          )
+          .col(
+            ColumnDef::new(RepositoryCommits::CommitSha)
+              .string()
+              .not_null(),
+          )
+          .col(
+            ColumnDef::new(RepositoryCommits::Message)
+              .string()
+              .not_null(),
+          )
           .col(
             ColumnDef::new(RepositoryCommits::AuthorUserId)
               .string()
@@ -107,24 +128,36 @@ impl MigrationTrait for Migration {
               .to(Users::Table, Users::Id)
               .on_delete(ForeignKeyAction::Cascade),
           )
-          .index(
-            Index::create()
-              .name("idx_repo_commits_repo_sha")
-              .table(RepositoryCommits::Table)
-              .col(RepositoryCommits::RepositoryId)
-              .col(RepositoryCommits::CommitSha)
-              .unique(),
-          )
-          .index(
-            Index::create()
-              .name("idx_repo_commits_repo_branch")
-              .table(RepositoryCommits::Table)
-              .col(RepositoryCommits::RepositoryId)
-              .col(RepositoryCommits::BranchName),
-          )
           .to_owned(),
       )
-      .await
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_repo_commits_repo_sha")
+          .table(RepositoryCommits::Table)
+          .col(RepositoryCommits::RepositoryId)
+          .col(RepositoryCommits::CommitSha)
+          .unique()
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_repo_commits_repo_branch")
+          .table(RepositoryCommits::Table)
+          .col(RepositoryCommits::RepositoryId)
+          .col(RepositoryCommits::BranchName)
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    Ok(())
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -174,4 +207,3 @@ enum Users {
   Table,
   Id,
 }
-

@@ -1,12 +1,10 @@
 use chrono::Utc;
 use mr_ulid::Ulid;
+use sea_orm::Set;
 use sea_orm::entity::prelude::*;
 use sea_orm::prelude::DateTimeWithTimeZone;
 use sea_orm::prelude::async_trait::async_trait;
-use sea_orm::Set;
-pub use sea_orm::{
-  ActiveModelBehavior, DeriveRelation, EnumIter, Related, RelationDef,
-};
+pub use sea_orm::{ActiveModelBehavior, DeriveRelation, EnumIter, Related, RelationDef};
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "repository_branches")]
@@ -54,4 +52,3 @@ impl ActiveModelBehavior for ActiveModel {
     }
   }
 }
-

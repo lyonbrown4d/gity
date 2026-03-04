@@ -6,6 +6,16 @@ use serde::{Deserialize, Serialize};
 pub struct AccessClaims {
   pub sub: String,
   pub org: Option<String>,
+  pub typ: Option<String>,
+  pub iat: usize,
+  pub exp: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RefreshClaims {
+  pub sub: String,
+  pub org: Option<String>,
+  pub typ: Option<String>,
   pub iat: usize,
   pub exp: usize,
 }
@@ -30,6 +40,7 @@ pub fn issue_access_token(
   let claims = AccessClaims {
     sub: user_id.to_string(),
     org: organization_id.map(ToString::to_string),
+    typ: Some("access".to_string()),
     iat: now.timestamp() as usize,
     exp: exp.timestamp() as usize,
   };
@@ -50,6 +61,56 @@ pub fn verify_access_token(
     &DecodingKey::from_secret(secret.as_bytes()),
     &Validation::default(),
   )?;
+  if data
+    .claims
+    .typ
+    .as_deref()
+    .is_some_and(|token_type| token_type != "access")
+  {
+    return Err(jsonwebtoken::errors::Error::from(
+      jsonwebtoken::errors::ErrorKind::InvalidToken,
+    ));
+  }
+  Ok(data.claims)
+}
+
+pub fn issue_refresh_token(
+  secret: &str,
+  user_id: &str,
+  organization_id: Option<&str>,
+) -> Result<String, jsonwebtoken::errors::Error> {
+  let now = Utc::now();
+  let exp = now + Duration::days(30);
+
+  let claims = RefreshClaims {
+    sub: user_id.to_string(),
+    org: organization_id.map(ToString::to_string),
+    typ: Some("refresh".to_string()),
+    iat: now.timestamp() as usize,
+    exp: exp.timestamp() as usize,
+  };
+
+  encode(
+    &Header::default(),
+    &claims,
+    &EncodingKey::from_secret(secret.as_bytes()),
+  )
+}
+
+pub fn verify_refresh_token(
+  secret: &str,
+  token: &str,
+) -> Result<RefreshClaims, jsonwebtoken::errors::Error> {
+  let data = decode::<RefreshClaims>(
+    token,
+    &DecodingKey::from_secret(secret.as_bytes()),
+    &Validation::default(),
+  )?;
+  if data.claims.typ.as_deref() != Some("refresh") {
+    return Err(jsonwebtoken::errors::Error::from(
+      jsonwebtoken::errors::ErrorKind::InvalidToken,
+    ));
+  }
   Ok(data.claims)
 }
 

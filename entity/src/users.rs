@@ -3,10 +3,10 @@ use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use chrono::Utc;
 use domain::user::{CreateUser, UserViewObject};
 use mr_ulid::Ulid;
-use sea_orm::entity::prelude::*;
-use sea_orm::prelude::async_trait::async_trait;
-use sea_orm::prelude::DateTimeWithTimeZone;
 use sea_orm::Set;
+use sea_orm::entity::prelude::*;
+use sea_orm::prelude::DateTimeWithTimeZone;
+use sea_orm::prelude::async_trait::async_trait;
 pub use sea_orm::{
   ActiveModelBehavior, DeriveActiveEnum, DeriveRelation, EnumIter, Related, RelationDef,
 };

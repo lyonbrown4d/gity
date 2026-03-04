@@ -1,15 +1,9 @@
 use crate::http::app_state::AppState;
-use crate::security::jwt::issue_access_token;
-use axum::extract::State;
-use axum::http::StatusCode;
+use crate::security::current_user::CurrentUser;
+use crate::service::auth_service::{AuthPayload, AuthServiceError, LoginInput, RegisterInput};
 use axum::Json;
-use domain::user::CreateUser;
-use entity::{organization_members, organizations, users};
-use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, DbErr, EntityTrait, QueryFilter, QueryOrder,
-  TransactionTrait,
-};
-use sea_orm::Set;
+use axum::extract::State;
+use axum::http::{HeaderMap, StatusCode, header};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -42,6 +36,17 @@ pub struct AuthResponse {
   pub organization_id: Option<String>,
   pub organization_name: Option<String>,
   pub token: String,
+  pub refresh_token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct RefreshRequest {
+  pub refresh_token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct LogoutRequest {
+  pub refresh_token: Option<String>,
 }
 
 #[utoipa::path(
@@ -58,102 +63,20 @@ pub async fn register(
   State(state): State<AppState>,
   Json(payload): Json<RegisterRequest>,
 ) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<ErrorResponse>)> {
-  let txn = match state.db_conn.begin().await {
-    Ok(txn) => txn,
-    Err(err) => return Err(internal_error(err)),
-  };
-
-  let duplicated_user = match users::Entity::find()
-    .filter(
-      Condition::any()
-        .add(users::Column::Username.eq(payload.username.clone()))
-        .add(users::Column::Email.eq(payload.email.clone())),
-    )
-    .one(&txn)
+  let auth = state
+    .services
+    .auth
+    .register(RegisterInput {
+      username: payload.username,
+      email: payload.email,
+      password: payload.password,
+      organization_name: payload.organization_name,
+      organization_key: payload.organization_key,
+    })
     .await
-  {
-    Ok(user) => user.is_some(),
-    Err(err) => return Err(internal_error(err)),
-  };
+    .map_err(map_auth_error)?;
 
-  if duplicated_user {
-    return Err((
-      StatusCode::CONFLICT,
-      Json(ErrorResponse {
-        message: "username or email already exists".to_string(),
-      }),
-    ));
-  }
-
-  let create_user = CreateUser {
-    username: payload.username.clone(),
-    email: payload.email.clone(),
-    password: payload.password.clone(),
-  };
-
-  let user = match users::ActiveModel::from(create_user).insert(&txn).await {
-    Ok(user) => user,
-    Err(err) => return Err(map_db_error(err, "failed to create user")),
-  };
-
-  let org_name = payload
-    .organization_name
-    .clone()
-    .unwrap_or_else(|| format!("{}'s organization", payload.username));
-  let org_key = payload
-    .organization_key
-    .clone()
-    .unwrap_or_else(|| default_org_key(&payload.username));
-
-  let org_active = organizations::ActiveModel {
-    key: Set(org_key),
-    name: Set(org_name),
-    status: Set(organizations::OrgStatus::Active),
-    ..Default::default()
-  };
-
-  let organization = match org_active.insert(&txn).await {
-    Ok(org) => org,
-    Err(err) => return Err(map_db_error(err, "failed to create organization")),
-  };
-
-  let member_active = organization_members::ActiveModel {
-    organization_id: Set(organization.id.clone()),
-    user_id: Set(user.id.clone()),
-    role: Set(organization_members::MemberRole::Owner),
-    ..Default::default()
-  };
-
-  if let Err(err) = member_active.insert(&txn).await {
-    return Err(map_db_error(err, "failed to create organization membership"));
-  }
-
-  if let Err(err) = txn.commit().await {
-    return Err(internal_error(err));
-  }
-
-  let token = match issue_token(&state, &user.id, Some(&organization.id)) {
-    Ok(token) => token,
-    Err(err) => {
-      return Err((
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(ErrorResponse {
-          message: format!("failed to issue token: {err}"),
-        }),
-      ));
-    }
-  };
-
-  Ok((
-    StatusCode::CREATED,
-    Json(AuthResponse {
-      user_id: user.id,
-      username: user.username,
-      organization_id: Some(organization.id),
-      organization_name: Some(organization.name),
-      token,
-    }),
-  ))
+  Ok((StatusCode::CREATED, Json(auth_response(auth))))
 }
 
 #[utoipa::path(
@@ -170,162 +93,113 @@ pub async fn login(
   State(state): State<AppState>,
   Json(payload): Json<LoginRequest>,
 ) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<ErrorResponse>)> {
-  let user = match users::Entity::find()
-    .filter(
-      Condition::any()
-        .add(users::Column::Username.eq(payload.username.clone()))
-        .add(users::Column::Email.eq(payload.username.clone())),
-    )
-    .one(&state.db_conn)
+  let auth = state
+    .services
+    .auth
+    .login(LoginInput {
+      username: payload.username,
+      password: payload.password,
+    })
     .await
-  {
-    Ok(Some(user)) => user,
-    Ok(None) => {
-      return Err((
+    .map_err(map_auth_error)?;
+
+  Ok((StatusCode::OK, Json(auth_response(auth))))
+}
+
+#[utoipa::path(
+  post,
+  path = "/refresh",
+  request_body = RefreshRequest,
+  responses(
+    (status = 200, description = "Token refreshed", body = AuthResponse),
+    (status = 401, description = "Invalid refresh token", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn refresh(
+  State(state): State<AppState>,
+  Json(payload): Json<RefreshRequest>,
+) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<ErrorResponse>)> {
+  let auth = state
+    .services
+    .auth
+    .refresh(payload.refresh_token.as_str())
+    .await
+    .map_err(map_auth_error)?;
+
+  Ok((StatusCode::OK, Json(auth_response(auth))))
+}
+
+#[utoipa::path(
+  post,
+  path = "/logout",
+  request_body = LogoutRequest,
+  responses(
+    (status = 204, description = "Logged out"),
+    (status = 401, description = "Invalid token", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn logout(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  headers: HeaderMap,
+  payload: Option<Json<LogoutRequest>>,
+) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+  let access_token = headers
+    .get(header::AUTHORIZATION)
+    .and_then(|value| value.to_str().ok())
+    .and_then(|value| value.strip_prefix("Bearer "))
+    .ok_or_else(|| {
+      (
         StatusCode::UNAUTHORIZED,
         Json(ErrorResponse {
-          message: "invalid username/email or password".to_string(),
+          message: "missing authorization header".to_string(),
         }),
-      ));
-    }
-    Err(err) => return Err(internal_error(err)),
-  };
+      )
+    })?;
 
-  if !users::Model::verify_password(payload.password.as_str(), user.password.as_str()) {
-    return Err((
-      StatusCode::UNAUTHORIZED,
-      Json(ErrorResponse {
-        message: "invalid username/email or password".to_string(),
-      }),
-    ));
-  }
+  let refresh_token = payload.and_then(|Json(payload)| payload.refresh_token);
 
-  let membership: Option<organization_members::Model> = match organization_members::Entity::find()
-    .filter(
-      Condition::all()
-        .add(organization_members::Column::UserId.eq(user.id.clone()))
-        .add(organization_members::Column::DeletedAt.is_null()),
+  state
+    .services
+    .auth
+    .logout(
+      current_user.user_id.as_str(),
+      access_token,
+      refresh_token.as_deref(),
     )
-    .order_by_asc(organization_members::Column::CreatedAt)
-    .one(&state.db_conn)
     .await
-  {
-    Ok(member) => member,
-    Err(err) => return Err(internal_error(err)),
-  };
+    .map_err(map_auth_error)?;
 
-  let organization = match membership.as_ref() {
-    Some(member) => match organizations::Entity::find_by_id(member.organization_id.clone())
-      .filter(organizations::Column::DeletedAt.is_null())
-      .one(&state.db_conn)
-      .await
-    {
-      Ok(org) => org,
-      Err(err) => return Err(internal_error(err)),
-    },
-    None => None,
-  };
-
-  let token = match issue_token(
-    &state,
-    &user.id,
-    organization.as_ref().map(|org| org.id.as_str()),
-  ) {
-    Ok(token) => token,
-    Err(err) => {
-      return Err((
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(ErrorResponse {
-          message: format!("failed to issue token: {err}"),
-        }),
-      ));
-    }
-  };
-
-  Ok((
-    StatusCode::OK,
-    Json(AuthResponse {
-      user_id: user.id,
-      username: user.username,
-      organization_id: organization.as_ref().map(|org| org.id.clone()),
-      organization_name: organization.as_ref().map(|org| org.name.clone()),
-      token,
-    }),
-  ))
+  Ok(StatusCode::NO_CONTENT)
 }
 
 pub fn auth_routes() -> OpenApiRouter<AppState> {
-  OpenApiRouter::new().routes(routes![register, login])
+  OpenApiRouter::new()
+    .routes(routes![register])
+    .routes(routes![login])
+    .routes(routes![refresh])
+    .routes(routes![logout])
 }
 
-fn default_org_key(username: &str) -> String {
-  let normalized = username.trim().to_lowercase();
-  let mapped: String = normalized
-    .chars()
-    .map(|c| {
-      if c.is_ascii_alphanumeric() {
-        c
-      } else {
-        '-'
-      }
-    })
-    .collect();
-
-  format!("{}-org", collapse_hyphens(mapped))
-}
-
-fn collapse_hyphens(input: String) -> String {
-  input
-    .split('-')
-    .filter(|part| !part.is_empty())
-    .collect::<Vec<_>>()
-    .join("-")
-}
-
-fn issue_token(
-  state: &AppState,
-  user_id: &str,
-  organization_id: Option<&str>,
-) -> Result<String, String> {
-  let secret = state
-    .config
-    .auth
-    .as_ref()
-    .and_then(|auth| auth.jwt_secret.clone())
-    .filter(|secret| !secret.is_empty())
-    .unwrap_or_else(|| "gity-dev-secret-change-me".to_string());
-
-  issue_access_token(secret.as_str(), user_id, organization_id).map_err(|err| err.to_string())
-}
-
-fn map_db_error(err: DbErr, message: &str) -> (StatusCode, Json<ErrorResponse>) {
-  if is_unique_violation(&err) {
-    (
-      StatusCode::CONFLICT,
-      Json(ErrorResponse {
-        message: err.to_string(),
-      }),
-    )
-  } else {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("{message}: {err}"),
-      }),
-    )
+fn auth_response(payload: AuthPayload) -> AuthResponse {
+  AuthResponse {
+    user_id: payload.user_id,
+    username: payload.username,
+    organization_id: payload.organization_id,
+    organization_name: payload.organization_name,
+    token: payload.token,
+    refresh_token: payload.refresh_token,
   }
 }
 
-fn internal_error(err: DbErr) -> (StatusCode, Json<ErrorResponse>) {
-  (
-    StatusCode::INTERNAL_SERVER_ERROR,
-    Json(ErrorResponse {
-      message: format!("internal server error: {err}"),
-    }),
-  )
-}
+fn map_auth_error(err: AuthServiceError) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    AuthServiceError::Conflict(message) => (StatusCode::CONFLICT, message),
+    AuthServiceError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
+    AuthServiceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+  };
 
-fn is_unique_violation(err: &DbErr) -> bool {
-  let message = err.to_string().to_lowercase();
-  message.contains("unique") || message.contains("duplicate")
+  (status, Json(ErrorResponse { message }))
 }

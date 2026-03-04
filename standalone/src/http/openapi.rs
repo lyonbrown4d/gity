@@ -14,5 +14,5 @@ pub struct ApiDoc;
     )
 )]
 pub async fn openapi() -> Json<utoipa::openapi::OpenApi> {
-    Json(ApiDoc::openapi())
+  Json(ApiDoc::openapi())
 }

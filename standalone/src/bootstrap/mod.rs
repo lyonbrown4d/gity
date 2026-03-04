@@ -5,12 +5,11 @@ use crate::configuration::cfg::{CacheType, Config};
 use crate::configuration::load_config;
 use crate::http::app_state::AppState;
 use chrono::Utc;
-use entity::organization_invitations;
 use fred::clients::Client;
 use fred::prelude::{Builder, ClientLike};
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter};
-use sea_orm::sea_query::Expr;
+use repository::AppRepository;
+use sea_orm::{Database, DatabaseConnection};
 use tokio::time::{Duration, interval};
 use tracing::info;
 
@@ -27,11 +26,7 @@ pub async fn bootstrap() -> Result<AppState, String> {
   let redis_client = init_redis_if_enabled(&cfg).await?;
   info!("bootstrap completed");
 
-  let app_state = AppState {
-    config: cfg,
-    db_conn,
-    redis_client,
-  };
+  let app_state = AppState::new(cfg, db_conn, redis_client);
 
   spawn_invitation_expiry_job(app_state.db_conn.clone());
 
@@ -76,19 +71,7 @@ fn spawn_invitation_expiry_job(db_conn: DatabaseConnection) {
       ticker.tick().await;
 
       let now = Utc::now();
-      let update = organization_invitations::Entity::update_many()
-        .col_expr(
-          organization_invitations::Column::Status,
-          Expr::value(organization_invitations::InvitationStatus::Expired),
-        )
-        .col_expr(organization_invitations::Column::UpdatedAt, Expr::value(now))
-        .filter(
-          organization_invitations::Column::Status.eq(organization_invitations::InvitationStatus::Pending),
-        )
-        .filter(organization_invitations::Column::DeletedAt.is_null())
-        .filter(organization_invitations::Column::ExpiresAt.lt(now))
-        .exec(&db_conn)
-        .await;
+      let update = AppRepository::expire_pending_invitations_before(&db_conn, now).await;
 
       if let Err(err) = update {
         info!("invitation expiry job failed: {err}");

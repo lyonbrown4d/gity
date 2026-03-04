@@ -1,8 +1,7 @@
-pub mod user;
 mod page;
+pub mod user;
 
 #[cfg(test)]
 mod tests {
   use super::*;
-
 }

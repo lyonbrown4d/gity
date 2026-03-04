@@ -1,10 +1,9 @@
 use crate::http::app_state::AppState;
-use crate::security::jwt::verify_access_token;
+use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::{StatusCode, header};
-use axum::Json;
 use serde::Serialize;
-use std::future::{Future, ready};
+use std::future::Future;
 
 #[derive(Debug, Clone)]
 pub struct CurrentUser {
@@ -29,37 +28,30 @@ where
     state: &S,
   ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
     let app_state = AppState::from_ref(state);
-    let secret = app_state
-      .config
-      .auth
-      .as_ref()
-      .and_then(|auth| auth.jwt_secret.clone())
-      .filter(|secret| !secret.is_empty())
-      .unwrap_or_else(|| "gity-dev-secret-change-me".to_string());
-
-    let auth_header = match parts
+    let auth_header = parts
       .headers
       .get(header::AUTHORIZATION)
       .and_then(|value| value.to_str().ok())
-    {
-      Some(header) => header,
-      None => return ready(Err(unauthorized("missing authorization header"))),
-    };
+      .map(|value| value.to_string());
+    async move {
+      let auth_header = auth_header.ok_or_else(|| unauthorized("missing authorization header"))?;
+      let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| unauthorized("invalid authorization scheme"))?
+        .to_string();
 
-    let token = match auth_header.strip_prefix("Bearer ") {
-      Some(token) => token,
-      None => return ready(Err(unauthorized("invalid authorization scheme"))),
-    };
+      let claims = app_state
+        .services
+        .auth
+        .verify_access_token_for_request(token.as_str())
+        .await
+        .map_err(|_| unauthorized("invalid, expired, or revoked token"))?;
 
-    let claims = verify_access_token(secret.as_str(), token)
-      .map_err(|_| unauthorized("invalid or expired token"));
-
-    let result = claims.map(|claims| Self {
-      user_id: claims.sub,
-      organization_id: claims.org,
-    });
-
-    ready(result)
+      Ok(Self {
+        user_id: claims.sub,
+        organization_id: claims.org,
+      })
+    }
   }
 }
 

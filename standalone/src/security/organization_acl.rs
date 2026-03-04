@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use entity::organization_members;
-use sea_orm::{ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter};
+use repository::AppRepository;
+use sea_orm::DatabaseConnection;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequiredOrganizationRole {
@@ -20,14 +21,7 @@ pub async fn require_organization_role(
   organization_id: &str,
   required: RequiredOrganizationRole,
 ) -> Result<organization_members::Model, AccessError> {
-  let membership = organization_members::Entity::find()
-    .filter(
-      Condition::all()
-        .add(organization_members::Column::OrganizationId.eq(organization_id.to_string()))
-        .add(organization_members::Column::UserId.eq(user_id.to_string()))
-        .add(organization_members::Column::DeletedAt.is_null()),
-    )
-    .one(db)
+  let membership = AppRepository::find_active_membership(db, user_id, organization_id)
     .await
     .map_err(|err| AccessError {
       status: StatusCode::INTERNAL_SERVER_ERROR,
@@ -73,4 +67,3 @@ pub fn member_role_to_string(role: organization_members::MemberRole) -> String {
     organization_members::MemberRole::Member => "member".to_string(),
   }
 }
-

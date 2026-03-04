@@ -7,11 +7,12 @@ pub enum CacheType {
   MEMORY,
 }
 
-#[derive(Deserialize, PartialEq, Debug, Serialize, Clone, Copy)]
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
 pub struct Server {
   pub port: usize,
   pub tls_enabled: Option<bool>,
   pub publish: Option<bool>,
+  pub cors_allowed_origins: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
@@ -32,6 +33,7 @@ pub struct Auth {
   pub jwt_secret: Option<String>,
   pub enable_ldap: Option<bool>,
   pub ldap_url: Option<String>,
+  pub super_admins: Option<Vec<String>>,
   pub admin: Option<Admin>,
 }
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
@@ -50,6 +52,7 @@ pub struct Logging {
 pub struct Git {
   pub default_branch: Option<String>,
   pub hooks_dir: Option<String>,
+  pub allow_anonymous_read: Option<bool>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
@@ -80,12 +83,19 @@ impl Default for Config {
         port: 8080,
         publish: Some(false),
         tls_enabled: Some(false),
+        cors_allowed_origins: Some(vec![
+          "http://localhost:5173".to_string(),
+          "http://127.0.0.1:5173".to_string(),
+        ]),
       },
       database: Database {
         url: "postgres://user:pass@localhost:5432/gity".to_string(),
         max_connections: Some(10),
       },
-      cache: Option::from(Cache { cache_type: MEMORY, url: "".to_string() }),
+      cache: Option::from(Cache {
+        cache_type: MEMORY,
+        url: "".to_string(),
+      }),
       storage: None,
       auth: None,
       logging: None,

@@ -26,7 +26,11 @@ impl MigrationTrait for Migration {
           .col(ColumnDef::new(Repositories::Name).string().not_null())
           .col(ColumnDef::new(Repositories::Description).text().null())
           .col(ColumnDef::new(Repositories::Visibility).string().not_null())
-          .col(ColumnDef::new(Repositories::DefaultBranch).string().not_null())
+          .col(
+            ColumnDef::new(Repositories::DefaultBranch)
+              .string()
+              .not_null(),
+          )
           .col(
             ColumnDef::new(Repositories::CreatedByUserId)
               .string()
@@ -61,20 +65,30 @@ impl MigrationTrait for Migration {
               .to(Users::Table, Users::Id)
               .on_delete(ForeignKeyAction::Cascade),
           )
-          .index(
-            Index::create()
-              .name("idx_repositories_org_key")
-              .table(Repositories::Table)
-              .col(Repositories::OrganizationId)
-              .col(Repositories::Key)
-              .unique(),
-          )
-          .index(
-            Index::create()
-              .name("idx_repositories_org_id")
-              .table(Repositories::Table)
-              .col(Repositories::OrganizationId),
-          )
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_repositories_org_key")
+          .table(Repositories::Table)
+          .col(Repositories::OrganizationId)
+          .col(Repositories::Key)
+          .unique()
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_repositories_org_id")
+          .table(Repositories::Table)
+          .col(Repositories::OrganizationId)
+          .if_not_exists()
           .to_owned(),
       )
       .await?;
@@ -95,9 +109,21 @@ impl MigrationTrait for Migration {
               .string()
               .not_null(),
           )
-          .col(ColumnDef::new(OrganizationInvitations::Email).string().not_null())
-          .col(ColumnDef::new(OrganizationInvitations::Role).string().not_null())
-          .col(ColumnDef::new(OrganizationInvitations::Status).string().not_null())
+          .col(
+            ColumnDef::new(OrganizationInvitations::Email)
+              .string()
+              .not_null(),
+          )
+          .col(
+            ColumnDef::new(OrganizationInvitations::Role)
+              .string()
+              .not_null(),
+          )
+          .col(
+            ColumnDef::new(OrganizationInvitations::Status)
+              .string()
+              .not_null(),
+          )
           .col(
             ColumnDef::new(OrganizationInvitations::InvitedByUserId)
               .string()
@@ -158,22 +184,33 @@ impl MigrationTrait for Migration {
               .to(Users::Table, Users::Id)
               .on_delete(ForeignKeyAction::SetNull),
           )
-          .index(
-            Index::create()
-              .name("idx_org_invitations_org_email_status")
-              .table(OrganizationInvitations::Table)
-              .col(OrganizationInvitations::OrganizationId)
-              .col(OrganizationInvitations::Email)
-              .col(OrganizationInvitations::Status),
-          )
           .to_owned(),
       )
-      .await
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_org_invitations_org_email_status")
+          .table(OrganizationInvitations::Table)
+          .col(OrganizationInvitations::OrganizationId)
+          .col(OrganizationInvitations::Email)
+          .col(OrganizationInvitations::Status)
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    Ok(())
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
     manager
-      .drop_table(Table::drop().table(OrganizationInvitations::Table).to_owned())
+      .drop_table(
+        Table::drop()
+          .table(OrganizationInvitations::Table)
+          .to_owned(),
+      )
       .await?;
 
     manager
@@ -225,4 +262,3 @@ enum Users {
   Table,
   Id,
 }
-

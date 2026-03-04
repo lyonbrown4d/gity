@@ -35,13 +35,18 @@ impl MigrationTrait for Migration {
               .timestamp_with_time_zone()
               .null(),
           )
-          .index(
-            Index::create()
-              .name("idx_organizations_key")
-              .table(Organizations::Table)
-              .col(Organizations::Key)
-              .unique(),
-          )
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_organizations_key")
+          .table(Organizations::Table)
+          .col(Organizations::Key)
+          .unique()
+          .if_not_exists()
           .to_owned(),
       )
       .await?;
@@ -62,8 +67,16 @@ impl MigrationTrait for Migration {
               .string()
               .not_null(),
           )
-          .col(ColumnDef::new(OrganizationMembers::UserId).string().not_null())
-          .col(ColumnDef::new(OrganizationMembers::Role).string().not_null())
+          .col(
+            ColumnDef::new(OrganizationMembers::UserId)
+              .string()
+              .not_null(),
+          )
+          .col(
+            ColumnDef::new(OrganizationMembers::Role)
+              .string()
+              .not_null(),
+          )
           .col(
             ColumnDef::new(OrganizationMembers::CreatedAt)
               .timestamp_with_time_zone()
@@ -96,23 +109,35 @@ impl MigrationTrait for Migration {
               .to(Users::Table, Users::Id)
               .on_delete(ForeignKeyAction::Cascade),
           )
-          .index(
-            Index::create()
-              .name("idx_organization_members_org_user")
-              .table(OrganizationMembers::Table)
-              .col(OrganizationMembers::OrganizationId)
-              .col(OrganizationMembers::UserId)
-              .unique(),
-          )
-          .index(
-            Index::create()
-              .name("idx_organization_members_user_id")
-              .table(OrganizationMembers::Table)
-              .col(OrganizationMembers::UserId),
-          )
           .to_owned(),
       )
-      .await
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_organization_members_org_user")
+          .table(OrganizationMembers::Table)
+          .col(OrganizationMembers::OrganizationId)
+          .col(OrganizationMembers::UserId)
+          .unique()
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    manager
+      .create_index(
+        Index::create()
+          .name("idx_organization_members_user_id")
+          .table(OrganizationMembers::Table)
+          .col(OrganizationMembers::UserId)
+          .if_not_exists()
+          .to_owned(),
+      )
+      .await?;
+
+    Ok(())
   }
 
   async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -155,4 +180,3 @@ enum Users {
   Table,
   Id,
 }
-

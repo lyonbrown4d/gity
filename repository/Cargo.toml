@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 sea-orm = {workspace = true}
 sea-query = "1.0.0-rc.23"
+chrono = { workspace = true }
+entity = { path = "../entity" }
