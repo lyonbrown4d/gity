@@ -1,5 +1,13 @@
 [workspace]
-members = ["ci-runner", "domain", "entity", "git", 'standalone', 'migration', "repository"]
+members = [
+  "apps/ci-runner",
+  "apps/standalone",
+  "crates/domain",
+  "crates/entity",
+  "crates/git",
+  "crates/migration",
+  "crates/repository",
+]
 resolver = "3"
 
 [workspace.metadata]

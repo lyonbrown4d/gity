@@ -33,7 +33,21 @@ Dependency assembly is explicit (no DI container):
 - `AppState` carries runtime dependencies
 - HTTP handlers and services receive state explicitly
 
-Workspace crates:
+Workspace layout:
+
+| Path | Responsibility |
+| --- | --- |
+| `apps/standalone` | HTTP server, routing, auth, org/repo APIs, bootstrap |
+| `apps/ci-runner` | CI runner binary (early stage) |
+| `crates/domain` | DTOs and shared models |
+| `crates/entity` | SeaORM entity models |
+| `crates/migration` | SeaORM migration definitions + migrator CLI |
+| `crates/git` | Git-related integration helpers |
+| `crates/repository` | Data access abstractions |
+
+Previous crate responsibilities are preserved; only filesystem layout changed to align with `apps/` + `crates/`.
+
+Repository modules:
 
 | Crate | Responsibility |
 | --- | --- |
@@ -44,6 +58,10 @@ Workspace crates:
 | `git` | Git-related integration helpers |
 | `repository` | Data access abstractions (in progress) |
 | `ci-runner` | CI runner binary (early stage) |
+
+Distributed Git direction:
+
+- See [docs/distributed-git-layer.md](docs/distributed-git-layer.md) for the phased backend plan.
 
 ## Quick Start
 

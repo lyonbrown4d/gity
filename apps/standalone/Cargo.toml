@@ -23,12 +23,12 @@ async-trait = "0.1.89"
 dotenvy = { version = "0.15.7" }
 clap = { workspace = true, features = ["env", "derive", "debug", "color"] }
 figment = { version = "0.10.19", features = ["env", 'toml'] }
-git = { path = "../git" }
-entity = { path = "../entity" }
-domain = { path = "../domain" }
+git = { path = "../../crates/git" }
+entity = { path = "../../crates/entity" }
+domain = { path = "../../crates/domain" }
 fred = "10.1.0"
-migration = { path = "../migration" }
-repository = { path = "../repository" }
+migration = { path = "../../crates/migration" }
+repository = { path = "../../crates/repository" }
 sea-orm = { workspace = true, features = [
     "serde_json",
     "sqlx-sqlite",

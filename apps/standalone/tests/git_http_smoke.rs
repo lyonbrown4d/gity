@@ -119,7 +119,7 @@ async fn git_http_smoke_push_and_branch_sync() {
 }
 
 async fn run_smoke() -> Result<(), String> {
-  let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
+  let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
   let standalone_bin = resolve_standalone_bin()?;
   let port = find_free_port()?;
   let run_id = unique_id();
