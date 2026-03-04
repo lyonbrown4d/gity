@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useCreate, useDelete, useList } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
@@ -208,7 +209,14 @@ export function AppRepositoriesPage(): JSX.Element {
             <div key={repo.id} className="space-y-3 rounded-lg border p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0 space-y-1">
-                  <p className="truncate font-medium">{repo.name}</p>
+                  <p className="truncate font-medium">
+                    <Link
+                      to={`/app/repositories/${repo.organization_id}/${repo.id}`}
+                      className="underline-offset-4 hover:underline"
+                    >
+                      {repo.name}
+                    </Link>
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {repo.key} · {t("default branch:")} {repo.default_branch}
                   </p>
@@ -225,6 +233,17 @@ export function AppRepositoriesPage(): JSX.Element {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="action-pop"
+                  asChild
+                >
+                  <Link to={`/app/repositories/${repo.organization_id}/${repo.id}`}>
+                    {t("Open")}
+                  </Link>
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

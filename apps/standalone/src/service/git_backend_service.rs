@@ -1,6 +1,6 @@
 use crate::configuration::cfg::Config;
 use chrono::Utc;
-use git::{rpc, storage};
+use git::{object, rpc, storage};
 use repository::RepositoryBranchesRepository;
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
@@ -316,6 +316,78 @@ impl GitBackendService {
       .map_err(|err| GitBackendError::Git(format!("failed to join ref listing task: {err}")))?;
 
     refs.map_err(|err| GitBackendError::Git(format!("failed to list git refs: {err}")))
+  }
+
+  pub async fn list_tree_entries(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+    path: Option<&str>,
+  ) -> Result<Vec<object::TreeEntry>, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    let branch = branch.to_string();
+    let path = path.map(str::to_string);
+    let output = tokio::task::spawn_blocking(move || {
+      object::list_tree_entries(repo_path.as_path(), branch.as_str(), path.as_deref())
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git tree task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
+
+  pub async fn read_blob(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+    file_path: &str,
+  ) -> Result<object::BlobObject, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    let branch = branch.to_string();
+    let file_path = file_path.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      object::read_blob(repo_path.as_path(), branch.as_str(), file_path.as_str())
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git blob task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
+
+  pub async fn read_root_readme(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+  ) -> Result<Option<object::BlobObject>, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    let branch = branch.to_string();
+    let output =
+      tokio::task::spawn_blocking(move || object::read_root_readme(repo_path.as_path(), branch.as_str()))
+        .await
+        .map_err(|err| GitBackendError::Git(format!("failed to join git readme task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
+
+  pub async fn list_commits(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+    limit: usize,
+  ) -> Result<Vec<object::CommitObject>, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    let branch = branch.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      object::list_commits(repo_path.as_path(), branch.as_str(), limit)
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git commit list task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
   }
 }
 

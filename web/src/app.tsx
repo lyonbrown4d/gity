@@ -39,6 +39,9 @@ const AppDashboardPage = lazy(() =>
 const AppRepositoriesPage = lazy(() =>
   import("@/pages/app/repositories-page").then((module) => ({ default: module.AppRepositoriesPage })),
 );
+const RepositoryDetailPage = lazy(() =>
+  import("@/pages/app/repository-detail-page").then((module) => ({ default: module.RepositoryDetailPage })),
+);
 const AppProfilePage = lazy(() =>
   import("@/pages/app/profile-page").then((module) => ({ default: module.AppProfilePage })),
 );
@@ -101,6 +104,7 @@ export function App(): JSX.Element {
               >
                 <Route path="/app/dashboard" element={<AppDashboardPage />} />
                 <Route path="/app/repositories" element={<AppRepositoriesPage />} />
+                <Route path="/app/repositories/:organizationId/:repoId" element={<RepositoryDetailPage />} />
                 <Route path="/app/profile" element={<AppProfilePage />} />
               </Route>
 

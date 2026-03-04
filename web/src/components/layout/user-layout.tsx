@@ -25,7 +25,11 @@ export function UserLayout(): JSX.Element {
   const { mutate: logout } = useLogout();
   const { data: identity } = useGetIdentity<{ name?: string; email?: string; isSuperAdmin?: boolean }>();
   const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>();
-  const currentTitle = t(routeTitleMap[location.pathname] ?? "Workspace");
+  const currentTitle = t(
+    location.pathname.startsWith("/app/repositories/")
+      ? "Repository"
+      : (routeTitleMap[location.pathname] ?? "Workspace"),
+  );
 
   return (
     <SidebarProvider>

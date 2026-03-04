@@ -23,11 +23,13 @@ pub fn openapi_router() -> Router<AppState> {
     .nest("/api/v1/orgs", organization::organization_routes())
     .nest("/api/v1/repos", repo::repo_routes())
     .nest("/api/v1/users", user::user_routes())
-    .nest("/git", git::git_routes().into())
     .route("/api-docs/openapi.json", get(openapi))
     .split_for_parts();
   // Swagger UI is disabled to avoid download during build
   router
+    .merge(git::git_routes())
+    // Keep backward compatibility for old clone urls that include /git.
+    .nest("/git", git::git_routes())
     .merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
     .clone()
 }

@@ -1,6 +1,7 @@
 use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
+use crate::security::organization_acl::RequiredOrganizationRole;
 use crate::service::repository_service::{
   CreateBranchInput, CreateCommitInput, CreateRepositoryInput, ListBranchesInput, ListCommitsInput,
   RepositoryServiceError,
@@ -79,6 +80,41 @@ pub struct CommitView {
   pub message: String,
   pub author_user_id: String,
   pub created_at: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ListRepositoryTreeQuery {
+  pub branch_name: Option<String>,
+  pub path: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RepositoryTreeEntryView {
+  pub name: String,
+  pub path: String,
+  pub kind: String,
+  pub oid: String,
+  pub size: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct RepositoryBlobQuery {
+  pub branch_name: Option<String>,
+  pub path: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RepositoryBlobView {
+  pub path: String,
+  pub content: String,
+  pub size: usize,
+  pub is_binary: bool,
+  pub encoding: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct RepositoryReadmeQuery {
+  pub branch_name: Option<String>,
 }
 
 #[utoipa::path(
@@ -366,12 +402,51 @@ pub async fn list_commits(
   Path(repo_id): Path<String>,
   Query(query): Query<ListCommitsQuery>,
 ) -> Result<(StatusCode, Json<Vec<CommitView>>), (StatusCode, Json<ErrorResponse>)> {
+  let requested_branch = query.branch_name.clone();
+  let resolved_limit = query.limit.unwrap_or(50).clamp(1, 500) as usize;
+  let (organization_key, repository_key, resolved_branch) = resolve_repo_storage_context(
+    &state,
+    current_user.user_id.as_str(),
+    repo_id.as_str(),
+    requested_branch.clone(),
+  )
+  .await?;
+
+  match state
+    .services
+    .git_backend
+    .list_commits(
+      organization_key.as_str(),
+      repository_key.as_str(),
+      resolved_branch.as_str(),
+      resolved_limit,
+    )
+    .await
+  {
+    Ok(commits) => {
+      let data = commits
+        .into_iter()
+        .map(|commit| CommitView {
+          repository_id: repo_id.clone(),
+          branch_name: resolved_branch.clone(),
+          commit_sha: commit.commit_sha,
+          message: commit.message,
+          author_user_id: commit.author,
+          created_at: unix_seconds_to_rfc3339(commit.authored_at),
+        })
+        .collect::<Vec<_>>();
+      return Ok((StatusCode::OK, Json(data)));
+    }
+    Err(crate::service::git_backend_service::GitBackendError::StorageNotConfigured) => {}
+    Err(err) => return Err(map_repository_content_error(err)),
+  }
+
   let commits = state
     .services
     .repository
     .list_commits(ListCommitsInput {
       repo_id,
-      branch_name: query.branch_name,
+      branch_name: requested_branch,
       limit: query.limit,
       current_user_id: current_user.user_id,
     })
@@ -420,6 +495,171 @@ pub async fn create_commit(
   Ok((StatusCode::CREATED, Json(commit_view(commit))))
 }
 
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/tree",
+  params(ListRepositoryTreeQuery),
+  responses(
+    (status = 200, description = "List repository tree entries", body = [RepositoryTreeEntryView]),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository or path not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn list_repository_tree(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<ListRepositoryTreeQuery>,
+) -> Result<(StatusCode, Json<Vec<RepositoryTreeEntryView>>), (StatusCode, Json<ErrorResponse>)> {
+  let (organization_key, repository_key, branch_name) = resolve_repo_storage_context(
+    &state,
+    current_user.user_id.as_str(),
+    repo_id.as_str(),
+    query.branch_name,
+  )
+  .await?;
+
+  let entries = state
+    .services
+    .git_backend
+    .list_tree_entries(
+      organization_key.as_str(),
+      repository_key.as_str(),
+      branch_name.as_str(),
+      query.path.as_deref(),
+    )
+    .await
+    .map_err(map_repository_content_error)?;
+
+  Ok((
+    StatusCode::OK,
+    Json(
+      entries
+        .into_iter()
+        .map(|entry| RepositoryTreeEntryView {
+          name: entry.name,
+          path: entry.path,
+          kind: entry.kind,
+          oid: entry.oid,
+          size: entry.size,
+        })
+        .collect(),
+    ),
+  ))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/blob",
+  params(RepositoryBlobQuery),
+  responses(
+    (status = 200, description = "Read repository blob content", body = RepositoryBlobView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository or file not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn read_repository_blob(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<RepositoryBlobQuery>,
+) -> Result<(StatusCode, Json<RepositoryBlobView>), (StatusCode, Json<ErrorResponse>)> {
+  let (organization_key, repository_key, branch_name) = resolve_repo_storage_context(
+    &state,
+    current_user.user_id.as_str(),
+    repo_id.as_str(),
+    query.branch_name,
+  )
+  .await?;
+
+  let blob = state
+    .services
+    .git_backend
+    .read_blob(
+      organization_key.as_str(),
+      repository_key.as_str(),
+      branch_name.as_str(),
+      query.path.as_str(),
+    )
+    .await
+    .map_err(map_repository_content_error)?;
+  let (content, is_binary, encoding) = decode_blob_content(blob.content.as_slice());
+
+  Ok((
+    StatusCode::OK,
+    Json(RepositoryBlobView {
+      path: blob.path,
+      content,
+      size: blob.size,
+      is_binary,
+      encoding,
+    }),
+  ))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/readme",
+  params(RepositoryReadmeQuery),
+  responses(
+    (status = 200, description = "Read repository root README", body = RepositoryBlobView),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "README not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn read_repository_readme(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<RepositoryReadmeQuery>,
+) -> Result<(StatusCode, Json<RepositoryBlobView>), (StatusCode, Json<ErrorResponse>)> {
+  let (organization_key, repository_key, branch_name) = resolve_repo_storage_context(
+    &state,
+    current_user.user_id.as_str(),
+    repo_id.as_str(),
+    query.branch_name,
+  )
+  .await?;
+
+  let blob = state
+    .services
+    .git_backend
+    .read_root_readme(
+      organization_key.as_str(),
+      repository_key.as_str(),
+      branch_name.as_str(),
+    )
+    .await
+    .map_err(map_repository_content_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "README not found".to_string(),
+        }),
+      )
+    })?;
+
+  let (content, is_binary, encoding) = decode_blob_content(blob.content.as_slice());
+  Ok((
+    StatusCode::OK,
+    Json(RepositoryBlobView {
+      path: blob.path,
+      content,
+      size: blob.size,
+      is_binary,
+      encoding,
+    }),
+  ))
+}
+
 pub fn repo_routes() -> OpenApiRouter<AppState> {
   OpenApiRouter::new()
     .routes(routes![list_repositories])
@@ -431,6 +671,9 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
     .routes(routes![unprotect_branch])
     .routes(routes![list_commits])
     .routes(routes![create_commit])
+    .routes(routes![list_repository_tree])
+    .routes(routes![read_repository_blob])
+    .routes(routes![read_repository_readme])
 }
 
 async fn set_branch_protection(
@@ -489,7 +732,7 @@ fn repository_view(
       repositories::RepositoryVisibility::Public => "public".to_string(),
     },
     default_branch: model.default_branch,
-    clone_http_url: format!("{base_url}/git/{organization_key}/{repo_key}.git"),
+    clone_http_url: format!("{base_url}/{organization_key}/{repo_key}.git"),
   }
 }
 
@@ -526,4 +769,97 @@ fn map_repository_service_error(err: RepositoryServiceError) -> (StatusCode, Jso
 
 fn public_base_url(state: &AppState) -> String {
   format!("http://localhost:{}", state.config.server.port)
+}
+
+async fn resolve_repo_storage_context(
+  state: &AppState,
+  user_id: &str,
+  repo_id: &str,
+  branch_name: Option<String>,
+) -> Result<(String, String, String), (StatusCode, Json<ErrorResponse>)> {
+  let repository = state
+    .services
+    .repository
+    .require_repo_access(user_id, repo_id, RequiredOrganizationRole::Member)
+    .await
+    .map_err(map_repository_service_error)?;
+
+  let organization = OrganizationsRepository::find_active_organization_by_id(
+    &state.db_conn,
+    repository.organization_id.as_str(),
+  )
+  .await
+  .map_err(|err| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: format!("failed to load organization: {err}"),
+      }),
+    )
+  })?
+  .ok_or_else(|| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
+      }),
+    )
+  })?;
+
+  let branch = branch_name.unwrap_or(repository.default_branch.clone());
+  Ok((organization.key, repository.key, branch))
+}
+
+fn decode_blob_content(bytes: &[u8]) -> (String, bool, String) {
+  match std::str::from_utf8(bytes) {
+    Ok(value) => (value.to_string(), false, "utf-8".to_string()),
+    Err(_) => (
+      String::from_utf8_lossy(bytes).to_string(),
+      true,
+      "utf-8-lossy".to_string(),
+    ),
+  }
+}
+
+fn unix_seconds_to_rfc3339(seconds: i64) -> String {
+  chrono::DateTime::from_timestamp(seconds, 0)
+    .map(|value| value.to_rfc3339())
+    .unwrap_or_else(|| chrono::DateTime::<chrono::Utc>::UNIX_EPOCH.to_rfc3339())
+}
+
+fn map_repository_content_error(
+  err: crate::service::git_backend_service::GitBackendError,
+) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    crate::service::git_backend_service::GitBackendError::InvalidRepositoryPath => {
+      (StatusCode::BAD_REQUEST, "invalid repository path".to_string())
+    }
+    crate::service::git_backend_service::GitBackendError::RepositoryNotFound => {
+      (StatusCode::NOT_FOUND, "repository not found".to_string())
+    }
+    crate::service::git_backend_service::GitBackendError::InvalidComponent(message) => {
+      (StatusCode::BAD_REQUEST, message)
+    }
+    crate::service::git_backend_service::GitBackendError::Git(message) => {
+      let normalized = message.to_ascii_lowercase();
+      if normalized.contains("not found") {
+        (StatusCode::NOT_FOUND, message)
+      } else if normalized.contains("invalid path")
+        || normalized.contains("not a directory")
+        || normalized.contains("not a file")
+      {
+        (StatusCode::BAD_REQUEST, message)
+      } else {
+        (StatusCode::INTERNAL_SERVER_ERROR, message)
+      }
+    }
+    crate::service::git_backend_service::GitBackendError::StorageNotConfigured
+    | crate::service::git_backend_service::GitBackendError::AlreadyExists(_)
+    | crate::service::git_backend_service::GitBackendError::Io(_)
+    | crate::service::git_backend_service::GitBackendError::Db(_)
+    | crate::service::git_backend_service::GitBackendError::Utf8(_) => {
+      (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+    }
+  };
+  (status, Json(ErrorResponse { message }))
 }

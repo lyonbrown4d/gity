@@ -16,6 +16,38 @@ export interface RepositoryView {
   clone_http_url: string;
 }
 
+export interface RepositoryBranchView {
+  repository_id: string;
+  name: string;
+  is_protected: boolean;
+  last_commit_sha?: string | null;
+}
+
+export interface RepositoryCommitView {
+  repository_id: string;
+  branch_name: string;
+  commit_sha: string;
+  message: string;
+  author_user_id: string;
+  created_at: string;
+}
+
+export interface RepositoryTreeEntryView {
+  name: string;
+  path: string;
+  kind: string;
+  oid: string;
+  size?: number;
+}
+
+export interface RepositoryBlobView {
+  path: string;
+  content: string;
+  size: number;
+  is_binary: boolean;
+  encoding: string;
+}
+
 export interface UserView {
   id: string;
   username: string;
