@@ -198,6 +198,22 @@ pub async fn receive_pack(
     );
   }
 
+  if let Some(job_client) = app_state.repository_language_jobs.as_ref()
+    && let Err(err) = job_client
+      .enqueue_repository_branch(
+        repository.id.as_str(),
+        Some(repository.default_branch.as_str()),
+      )
+      .await
+  {
+    warn!(
+      organization = organization.key,
+      repository = repository.key,
+      error = err,
+      "receive-pack succeeded but failed to enqueue repository language job"
+    );
+  }
+
   build_service_response("receive-pack", output)
 }
 

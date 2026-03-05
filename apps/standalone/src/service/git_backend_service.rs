@@ -443,6 +443,23 @@ impl GitBackendService {
 
     output.map_err(|err| GitBackendError::Git(err.to_string()))
   }
+
+  pub async fn analyze_languages(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    revision: &str,
+  ) -> Result<Vec<object::RepositoryLanguageStat>, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    let revision = revision.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      object::summarize_languages(repo_path.as_path(), revision.as_str())
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join language analysis task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
 }
 
 fn build_repo_path(root: &str, owner: &str, repo: &str) -> PathBuf {

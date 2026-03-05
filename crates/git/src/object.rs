@@ -1,4 +1,4 @@
-
+use gengo::{Builder as LanguageBuilder, Git as LanguageGit};
 use git2::{ObjectType, Repository, Tree};
 use std::path::Path;
 
@@ -16,6 +16,8 @@ pub enum ObjectError {
   ResolveTree(String),
   #[error("failed to resolve blob: {0}")]
   ResolveBlob(String),
+  #[error("failed to analyze repository languages: {0}")]
+  Language(String),
   #[error("{0} not found")]
   NotFound(String),
   #[error("{0} is not a directory")]
@@ -46,6 +48,12 @@ pub struct CommitObject {
   pub message: String,
   pub author: String,
   pub authored_at: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct RepositoryLanguageStat {
+  pub language: String,
+  pub bytes: u64,
 }
 
 pub fn list_tree_entries(
@@ -243,6 +251,45 @@ pub fn list_commits(
   }
 
   Ok(commits)
+}
+
+pub fn summarize_languages(
+  repo_path: &Path,
+  revision: &str,
+) -> Result<Vec<RepositoryLanguageStat>, ObjectError> {
+  let normalized_revision = revision.trim();
+  if normalized_revision.is_empty() {
+    return Err(ObjectError::InvalidPath(
+      "revision cannot be empty".to_string(),
+    ));
+  }
+
+  let git = LanguageGit::new(repo_path, normalized_revision)
+    .map_err(|err| ObjectError::Language(format!("failed to open git source: {err}")))?;
+  let gengo = LanguageBuilder::new(git)
+    .build()
+    .map_err(|err| ObjectError::Language(format!("failed to build analyzer: {err}")))?;
+  let analysis = gengo
+    .analyze()
+    .map_err(|err| ObjectError::Language(format!("failed to analyze repository: {err}")))?;
+  let summary = analysis.summary();
+
+  let mut stats = summary
+    .iter()
+    .map(|(language, size)| RepositoryLanguageStat {
+      language: format!("{language:?}"),
+      bytes: *size as u64,
+    })
+    .collect::<Vec<_>>();
+
+  stats.sort_by(|left, right| {
+    right
+      .bytes
+      .cmp(&left.bytes)
+      .then_with(|| left.language.cmp(&right.language))
+  });
+
+  Ok(stats)
 }
 
 fn resolve_tree_by_branch_and_segments<'a>(

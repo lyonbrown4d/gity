@@ -8,6 +8,7 @@ pub mod bootstrap;
 mod cli;
 mod configuration;
 mod http;
+mod jobs;
 mod repository;
 mod security;
 mod service;

@@ -10,8 +10,9 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use entity::{repositories, repository_branches, repository_commits};
-use repository::OrganizationsRepository;
+use repository::{OrganizationsRepository, RepositoryLanguageSnapshotsRepository};
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -123,6 +124,29 @@ pub struct RepositoryBlobView {
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct RepositoryReadmeQuery {
   pub branch_name: Option<String>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct RepositoryLanguagesQuery {
+  pub branch_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RepositoryLanguageItemView {
+  pub language: String,
+  pub bytes: u64,
+  pub percentage: f64,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RepositoryLanguagesView {
+  pub repository_id: String,
+  pub branch_name: String,
+  pub status: String,
+  pub revision: Option<String>,
+  pub analyzed_at: Option<String>,
+  pub total_bytes: u64,
+  pub languages: Vec<RepositoryLanguageItemView>,
 }
 
 #[utoipa::path(
@@ -253,6 +277,12 @@ pub async fn create_repository(
       }),
     )
   })?;
+  enqueue_repository_language_job(
+    &state,
+    repository.id.as_str(),
+    Some(repository.default_branch.as_str()),
+  )
+  .await;
 
   Ok((
     StatusCode::CREATED,
@@ -535,6 +565,12 @@ pub async fn create_file_commit(
     })
     .await
     .map_err(map_repository_service_error)?;
+  enqueue_repository_language_job(
+    &state,
+    commit.repository_id.as_str(),
+    Some(commit.branch_name.as_str()),
+  )
+  .await;
 
   Ok((StatusCode::CREATED, Json(commit_view(commit))))
 }
@@ -704,6 +740,116 @@ pub async fn read_repository_readme(
   ))
 }
 
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/languages",
+  params(RepositoryLanguagesQuery),
+  responses(
+    (status = 200, description = "Read repository language statistics", body = RepositoryLanguagesView),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn get_repository_languages(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<RepositoryLanguagesQuery>,
+) -> Result<(StatusCode, Json<RepositoryLanguagesView>), (StatusCode, Json<ErrorResponse>)> {
+  let repository = state
+    .services
+    .repository
+    .require_repo_access(
+      current_user.user_id.as_str(),
+      repo_id.as_str(),
+      RequiredOrganizationRole::Member,
+    )
+    .await
+    .map_err(map_repository_service_error)?;
+  let branch_name = query
+    .branch_name
+    .unwrap_or_else(|| repository.default_branch.clone());
+
+  let snapshot = RepositoryLanguageSnapshotsRepository::find_latest_snapshot_by_repo_and_branch(
+    &state.db_conn,
+    repo_id.as_str(),
+    branch_name.as_str(),
+  )
+  .await
+  .map_err(|err| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: format!("failed to load repository language snapshot: {err}"),
+      }),
+    )
+  })?;
+
+  let Some(snapshot) = snapshot else {
+    enqueue_repository_language_job(&state, repo_id.as_str(), Some(branch_name.as_str())).await;
+    return Ok((
+      StatusCode::OK,
+      Json(RepositoryLanguagesView {
+        repository_id: repo_id,
+        branch_name,
+        status: "pending".to_string(),
+        revision: None,
+        analyzed_at: None,
+        total_bytes: 0,
+        languages: Vec::new(),
+      }),
+    ));
+  };
+
+  let items = RepositoryLanguageSnapshotsRepository::list_snapshot_items_by_snapshot_id(
+    &state.db_conn,
+    snapshot.id.as_str(),
+  )
+  .await
+  .map_err(|err| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: format!("failed to load repository language snapshot items: {err}"),
+      }),
+    )
+  })?;
+
+  let total_bytes = snapshot.total_bytes.max(0) as u64;
+  let languages = items
+    .into_iter()
+    .map(|item| {
+      let bytes = item.bytes.max(0) as u64;
+      let percentage = if total_bytes == 0 {
+        0.0
+      } else {
+        let raw = (bytes as f64) * 100.0 / (total_bytes as f64);
+        (raw * 100.0).round() / 100.0
+      };
+      RepositoryLanguageItemView {
+        language: item.language,
+        bytes,
+        percentage,
+      }
+    })
+    .collect();
+
+  Ok((
+    StatusCode::OK,
+    Json(RepositoryLanguagesView {
+      repository_id: repo_id,
+      branch_name,
+      status: "ready".to_string(),
+      revision: Some(snapshot.revision),
+      analyzed_at: Some(snapshot.analyzed_at.to_rfc3339()),
+      total_bytes,
+      languages,
+    }),
+  ))
+}
+
 pub fn repo_routes() -> OpenApiRouter<AppState> {
   OpenApiRouter::new()
     .routes(routes![list_repositories])
@@ -719,6 +865,7 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
     .routes(routes![list_repository_tree])
     .routes(routes![read_repository_blob])
     .routes(routes![read_repository_readme])
+    .routes(routes![get_repository_languages])
 }
 
 async fn set_branch_protection(
@@ -814,6 +961,28 @@ fn map_repository_service_error(err: RepositoryServiceError) -> (StatusCode, Jso
 
 fn public_base_url(state: &AppState) -> String {
   format!("http://localhost:{}", state.config.server.port)
+}
+
+async fn enqueue_repository_language_job(
+  state: &AppState,
+  repository_id: &str,
+  branch_name: Option<&str>,
+) {
+  let Some(job_client) = state.repository_language_jobs.as_ref() else {
+    return;
+  };
+
+  if let Err(err) = job_client
+    .enqueue_repository_branch(repository_id, branch_name)
+    .await
+  {
+    warn!(
+      repository_id = repository_id,
+      branch = branch_name.unwrap_or(""),
+      error = err,
+      "failed to enqueue repository language job"
+    );
+  }
 }
 
 async fn resolve_repo_storage_context(

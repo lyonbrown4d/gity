@@ -23,6 +23,8 @@ async-trait = "0.1.89"
 dotenvy = { version = "0.15.7" }
 clap = { workspace = true, features = ["env", "derive", "debug", "color"] }
 figment = { version = "0.10.19", features = ["env", 'toml'] }
+apalis = "1.0.0-rc.4"
+apalis-redis = "1.0.0-rc.4"
 git = { path = "../../crates/git" }
 entity = { path = "../../crates/entity" }
 domain = { path = "../../crates/domain" }

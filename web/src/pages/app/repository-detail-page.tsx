@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { FileCode2, FolderTree } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCode2, FolderTree } from "lucide-react";
 import { useDelete, useList } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { apiRequest } from "@/lib/api";
@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import type {
+  RepositoryLanguageItemView,
+  RepositoryLanguagesView,
   OrganizationView,
   RepositoryBlobView,
   RepositoryBranchView,
@@ -23,6 +25,32 @@ import type {
 } from "@/pages/types";
 
 type RepoTab = "code" | "commits" | "branches" | "settings";
+
+interface RepositoryTreeNode {
+  name: string;
+  path: string;
+  kind: string;
+  children: RepositoryTreeNode[];
+  expanded: boolean;
+  loaded: boolean;
+  loading: boolean;
+}
+
+const LANGUAGE_COLORS: Record<string, string> = {
+  rust: "#dea584",
+  typescript: "#3178c6",
+  javascript: "#f1e05a",
+  go: "#00add8",
+  java: "#b07219",
+  python: "#3572a5",
+  shell: "#89e051",
+  html: "#e34c26",
+  css: "#563d7c",
+  json: "#6e4a7e",
+  markdown: "#083fa1",
+  toml: "#9c4221",
+  yaml: "#cb171e",
+};
 
 function shortSha(value: string): string {
   return value.slice(0, 8);
@@ -99,8 +127,74 @@ function detectLanguage(path: string): string {
   return "plaintext";
 }
 
+function languageBarColor(language: string): string {
+  const normalized = language.trim().toLowerCase();
+  return LANGUAGE_COLORS[normalized] ?? "#6b7280";
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let index = 0;
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024;
+    index += 1;
+  }
+  const precision = size >= 100 || index === 0 ? 0 : 1;
+  return `${size.toFixed(precision)} ${units[index]}`;
+}
+
 function normalizeRepoFilePath(path: string): string {
   return path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+}
+
+function toTreeNodes(entries: RepositoryTreeEntryView[]): RepositoryTreeNode[] {
+  return entries.map((entry) => ({
+    name: entry.name,
+    path: entry.path,
+    kind: entry.kind,
+    children: [],
+    expanded: false,
+    loaded: entry.kind !== "tree",
+    loading: false,
+  }));
+}
+
+function patchTreeNode(
+  nodes: RepositoryTreeNode[],
+  targetPath: string,
+  updater: (node: RepositoryTreeNode) => RepositoryTreeNode,
+): RepositoryTreeNode[] {
+  return nodes.map((node) => {
+    if (node.path === targetPath) {
+      return updater(node);
+    }
+    if (node.children.length === 0) {
+      return node;
+    }
+    return {
+      ...node,
+      children: patchTreeNode(node.children, targetPath, updater),
+    };
+  });
+}
+
+function findTreeNode(nodes: RepositoryTreeNode[], targetPath: string): RepositoryTreeNode | null {
+  for (const node of nodes) {
+    if (node.path === targetPath) {
+      return node;
+    }
+    if (node.children.length > 0) {
+      const found = findTreeNode(node.children, targetPath);
+      if (found) {
+        return found;
+      }
+    }
+  }
+  return null;
 }
 
 async function renderMarkdown(content: string): Promise<string> {
@@ -127,18 +221,19 @@ export function RepositoryDetailPage(): JSX.Element {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [codeBranch, setCodeBranch] = useState("");
-  const [treePath, setTreePath] = useState("");
-  const [treeEntries, setTreeEntries] = useState<RepositoryTreeEntryView[]>([]);
+  const [treeNodes, setTreeNodes] = useState<RepositoryTreeNode[]>([]);
   const [selectedBlob, setSelectedBlob] = useState<RepositoryBlobView | null>(null);
   const [readmePreview, setReadmePreview] = useState<string | null>(null);
   const [readmePath, setReadmePath] = useState<string | null>(null);
-  const [isLoadingCode, setLoadingCode] = useState(false);
+  const [isLoadingTree, setLoadingTree] = useState(false);
   const [isCreateFileModalOpen, setCreateFileModalOpen] = useState(false);
   const [newFileBranch, setNewFileBranch] = useState("");
   const [newFilePath, setNewFilePath] = useState("");
   const [newFileMessage, setNewFileMessage] = useState("");
   const [newFileContent, setNewFileContent] = useState("");
   const [isCreatingFile, setCreatingFile] = useState(false);
+  const [languages, setLanguages] = useState<RepositoryLanguagesView | null>(null);
+  const [isLoadingLanguages, setLoadingLanguages] = useState(false);
 
   const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
 
@@ -195,20 +290,78 @@ export function RepositoryDetailPage(): JSX.Element {
     }
   };
 
-  const loadTree = async (branchName: string, path: string) => {
-    setLoadingCode(true);
+  const loadLanguages = async (branchName: string) => {
+    if (!branchName) {
+      return;
+    }
+    setLoadingLanguages(true);
     try {
       const query = new URLSearchParams();
       query.set("branch_name", branchName);
-      if (path) {
-        query.set("path", path);
-      }
-      const data = await apiRequest<RepositoryTreeEntryView[]>(`/repos/${repoId}/tree?${query.toString()}`);
-      setTreeEntries(data);
+      const data = await apiRequest<RepositoryLanguagesView>(`/repos/${repoId}/languages?${query.toString()}`);
+      setLanguages(data);
     } catch (error) {
       setActionError(extractErrorMessage(error));
     } finally {
-      setLoadingCode(false);
+      setLoadingLanguages(false);
+    }
+  };
+
+  const fetchTreeEntries = async (branchName: string, path?: string): Promise<RepositoryTreeEntryView[]> => {
+    const query = new URLSearchParams();
+    query.set("branch_name", branchName);
+    if (path) {
+      query.set("path", path);
+    }
+    return apiRequest<RepositoryTreeEntryView[]>(`/repos/${repoId}/tree?${query.toString()}`);
+  };
+
+  const loadTreeRoot = async (branchName: string) => {
+    setLoadingTree(true);
+    try {
+      const entries = await fetchTreeEntries(branchName);
+      setTreeNodes(toTreeNodes(entries));
+    } catch (error) {
+      setActionError(extractErrorMessage(error));
+    } finally {
+      setLoadingTree(false);
+    }
+  };
+
+  const toggleTreeDirectory = async (path: string) => {
+    const node = findTreeNode(treeNodes, path);
+    if (!node || node.kind !== "tree" || !codeBranch) {
+      return;
+    }
+
+    if (node.expanded) {
+      setTreeNodes((current) => patchTreeNode(current, path, (target) => ({ ...target, expanded: false })));
+      return;
+    }
+
+    if (node.loaded) {
+      setTreeNodes((current) => patchTreeNode(current, path, (target) => ({ ...target, expanded: true })));
+      return;
+    }
+
+    setTreeNodes((current) => patchTreeNode(current, path, (target) => ({
+      ...target,
+      expanded: true,
+      loading: true,
+    })));
+
+    try {
+      const entries = await fetchTreeEntries(codeBranch, path);
+      setTreeNodes((current) => patchTreeNode(current, path, (target) => ({
+        ...target,
+        expanded: true,
+        loaded: true,
+        loading: false,
+        children: toTreeNodes(entries),
+      })));
+    } catch (error) {
+      setTreeNodes((current) => patchTreeNode(current, path, (target) => ({ ...target, loading: false })));
+      setActionError(extractErrorMessage(error));
     }
   };
 
@@ -240,7 +393,6 @@ export function RepositoryDetailPage(): JSX.Element {
       return;
     }
     setActionError(null);
-    setLoadingCode(true);
     try {
       const query = new URLSearchParams();
       query.set("branch_name", codeBranch);
@@ -249,8 +401,6 @@ export function RepositoryDetailPage(): JSX.Element {
       setSelectedBlob(blob);
     } catch (error) {
       setActionError(extractErrorMessage(error));
-    } finally {
-      setLoadingCode(false);
     }
   };
 
@@ -279,8 +429,15 @@ export function RepositoryDetailPage(): JSX.Element {
     if (!repoId || !codeBranch) {
       return;
     }
-    void loadTree(codeBranch, treePath);
-  }, [repoId, codeBranch, treePath]);
+    void loadTreeRoot(codeBranch);
+  }, [repoId, codeBranch]);
+
+  useEffect(() => {
+    if (!repoId || !codeBranch) {
+      return;
+    }
+    void loadLanguages(codeBranch);
+  }, [repoId, codeBranch]);
 
   useEffect(() => {
     if (!repoId || !codeBranch || activeTab !== "code" || selectedBlob) {
@@ -343,9 +500,7 @@ export function RepositoryDetailPage(): JSX.Element {
 
       setCreateFileModalOpen(false);
       setCodeBranch(branchName);
-      const parentPath = filePath.includes("/") ? filePath.split("/").slice(0, -1).join("/") : "";
-      setTreePath(parentPath);
-      await Promise.all([loadBranches(), loadCommits(), loadTree(branchName, parentPath)]);
+      await Promise.all([loadBranches(), loadCommits(), loadTreeRoot(branchName), loadLanguages(branchName)]);
       await openFile(filePath);
     } catch (error) {
       setActionError(extractErrorMessage(error));
@@ -418,18 +573,12 @@ export function RepositoryDetailPage(): JSX.Element {
 
   const changeCodeBranch = (nextBranch: string) => {
     setCodeBranch(nextBranch);
-    setTreePath("");
+    setTreeNodes([]);
     setSelectedBlob(null);
     setReadmePreview(null);
     setReadmePath(null);
+    setLanguages(null);
   };
-
-  const enterDirectory = (path: string) => {
-    setTreePath(path);
-    setSelectedBlob(null);
-  };
-
-  const pathSegments = treePath ? treePath.split("/") : [];
   const isLoading = orgQuery.isLoading || repoQuery.isLoading;
   const errorMessage = actionError
     ?? (orgQuery.error instanceof Error
@@ -438,6 +587,60 @@ export function RepositoryDetailPage(): JSX.Element {
         ? repoQuery.error.message
         : null);
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
+  const renderTreeNodes = (nodes: RepositoryTreeNode[], depth = 0): JSX.Element[] =>
+    nodes.map((node) => (
+      <div key={node.path}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={`w-full justify-start ${selectedBlob?.path === node.path ? "bg-muted" : ""}`}
+          style={{ paddingLeft: `${depth * 14 + 8}px` }}
+          onClick={() => {
+            if (node.kind === "tree") {
+              void toggleTreeDirectory(node.path);
+            } else {
+              void openFile(node.path);
+            }
+          }}
+        >
+          {node.kind === "tree" ? (
+            node.expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />
+          ) : (
+            <span className="inline-block size-4" />
+          )}
+          {node.kind === "tree" ? <FolderTree className="size-4" /> : <FileCode2 className="size-4" />}
+          <span className="truncate">{node.name}</span>
+        </Button>
+        {node.kind === "tree" && node.expanded ? (
+          node.loading ? (
+            <p className="px-2 py-1 text-xs text-muted-foreground" style={{ paddingLeft: `${(depth + 1) * 14 + 8}px` }}>
+              {t("Loading files...")}
+            </p>
+          ) : (
+            renderTreeNodes(node.children, depth + 1)
+          )
+        ) : null}
+      </div>
+    ));
+  const renderLanguageRows = (items: RepositoryLanguageItemView[]): JSX.Element[] =>
+    items.map((item) => (
+      <div key={item.language} className="space-y-1">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="truncate font-medium">{item.language}</span>
+          <span className="text-muted-foreground">{item.percentage.toFixed(2)}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded bg-muted">
+          <div
+            className="h-full"
+            style={{
+              width: `${Math.max(item.percentage, item.percentage > 0 ? 2 : 0)}%`,
+              backgroundColor: languageBarColor(item.language),
+            }}
+          />
+        </div>
+      </div>
+    ));
 
   return (
     <div className="space-y-4 page-enter">
@@ -546,53 +749,11 @@ export function RepositoryDetailPage(): JSX.Element {
               <p className="break-all font-mono text-xs">{repository.clone_http_url}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <Button type="button" size="sm" variant="outline" onClick={() => enterDirectory("")}>
-                /
-              </Button>
-              {pathSegments.map((segment, index) => {
-                const next = pathSegments.slice(0, index + 1).join("/");
-                return (
-                  <Button
-                    key={next}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => enterDirectory(next)}
-                  >
-                    {segment}
-                  </Button>
-                );
-              })}
-              {treePath ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => enterDirectory(pathSegments.slice(0, -1).join("/"))}
-                >
-                  {t("Up")}
-                </Button>
-              ) : null}
-            </div>
-
-            <div className="grid gap-3 lg:grid-cols-[300px_1fr]">
+            <div className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
               <div className="space-y-2 rounded-md border p-2">
-                {isLoadingCode ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
-                {treeEntries.map((entry) => (
-                  <Button
-                    key={entry.path}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start"
-                    onClick={() => (entry.kind === "tree" ? enterDirectory(entry.path) : void openFile(entry.path))}
-                  >
-                    {entry.kind === "tree" ? <FolderTree className="size-4" /> : <FileCode2 className="size-4" />}
-                    {entry.name}
-                  </Button>
-                ))}
-                {!isLoadingCode && treeEntries.length === 0 ? (
+                {isLoadingTree ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
+                {!isLoadingTree ? renderTreeNodes(treeNodes) : null}
+                {!isLoadingTree && treeNodes.length === 0 ? (
                   <p className="px-2 py-1 text-xs text-muted-foreground">{t("No files found.")}</p>
                 ) : null}
               </div>
@@ -640,6 +801,52 @@ export function RepositoryDetailPage(): JSX.Element {
                     {t("README not found. Select a source file from the left to open in Monaco.")}
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">{t("Languages")}</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!codeBranch || isLoadingLanguages}
+                    onClick={() => {
+                      if (codeBranch) {
+                        void loadLanguages(codeBranch);
+                      }
+                    }}
+                  >
+                    {t("Refresh")}
+                  </Button>
+                </div>
+
+                {isLoadingLanguages ? (
+                  <p className="text-xs text-muted-foreground">{t("Loading language statistics...")}</p>
+                ) : null}
+
+                {!isLoadingLanguages && languages?.status === "pending" ? (
+                  <p className="text-xs text-muted-foreground">{t("Language statistics are being computed...")}</p>
+                ) : null}
+
+                {!isLoadingLanguages && languages?.status === "ready" && languages.languages.length > 0 ? (
+                  <div className="space-y-3">{renderLanguageRows(languages.languages)}</div>
+                ) : null}
+
+                {!isLoadingLanguages && (!languages || languages.languages.length === 0) && languages?.status !== "pending" ? (
+                  <p className="text-xs text-muted-foreground">{t("No language statistics yet.")}</p>
+                ) : null}
+
+                {languages?.status === "ready" ? (
+                  <div className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
+                    <p>
+                      {t("Total size")}: {formatBytes(languages.total_bytes)}
+                    </p>
+                    <p>
+                      {t("Last analyzed")}: {languages.analyzed_at ? formatTime(languages.analyzed_at) : t("N/A")}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </CardContent>

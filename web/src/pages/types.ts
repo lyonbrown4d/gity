@@ -48,6 +48,22 @@ export interface RepositoryBlobView {
   encoding: string;
 }
 
+export interface RepositoryLanguageItemView {
+  language: string;
+  bytes: number;
+  percentage: number;
+}
+
+export interface RepositoryLanguagesView {
+  repository_id: string;
+  branch_name: string;
+  status: string;
+  revision?: string | null;
+  analyzed_at?: string | null;
+  total_bytes: number;
+  languages: RepositoryLanguageItemView[];
+}
+
 export interface UserView {
   id: string;
   username: string;

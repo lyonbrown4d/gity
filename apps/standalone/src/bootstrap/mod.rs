@@ -4,6 +4,7 @@ use crate::bootstrap::logging::init_logging;
 use crate::configuration::cfg::{CacheType, Config};
 use crate::configuration::load_config;
 use crate::http::app_state::AppState;
+use crate::jobs::repository_language_job::init_repository_language_jobs;
 use chrono::Utc;
 use fred::clients::Client;
 use fred::prelude::{Builder, ClientLike};
@@ -24,9 +25,10 @@ pub async fn bootstrap() -> Result<AppState, String> {
     .map_err(|err| format!("failed to run migrations: {err}"))?;
 
   let redis_client = init_redis_if_enabled(&cfg).await?;
+  let repository_language_jobs = init_repository_language_jobs(&cfg, db_conn.clone()).await?;
   info!("bootstrap completed");
 
-  let app_state = AppState::new(cfg, db_conn, redis_client);
+  let app_state = AppState::new(cfg, db_conn, redis_client, repository_language_jobs);
 
   spawn_invitation_expiry_job(app_state.db_conn.clone());
 

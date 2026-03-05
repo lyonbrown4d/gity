@@ -4,6 +4,7 @@ pub mod organizations_repository;
 pub mod repositories_repository;
 pub mod repository_branches_repository;
 pub mod repository_commits_repository;
+pub mod repository_language_snapshots_repository;
 pub mod users_repository;
 
 pub use organization_invitations_repository::OrganizationInvitationsRepository;
@@ -12,4 +13,5 @@ pub use organizations_repository::OrganizationsRepository;
 pub use repositories_repository::RepositoriesRepository;
 pub use repository_branches_repository::RepositoryBranchesRepository;
 pub use repository_commits_repository::RepositoryCommitsRepository;
+pub use repository_language_snapshots_repository::RepositoryLanguageSnapshotsRepository;
 pub use users_repository::UsersRepository;
