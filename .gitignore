@@ -87,3 +87,4 @@ target_alt
 .pnpm-store
 *.log
 .tmp-e2e
+.cargo-home
