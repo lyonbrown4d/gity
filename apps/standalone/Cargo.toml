@@ -14,7 +14,7 @@ time = "0.3.44"
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true, features = ["max_level_debug"] }
 tracing-subscriber = { workspace = true, features = ["env-filter", "serde_json", "ansi"] }
-axum = "0.8.8"
+axum = { version = "0.8.8", features = ["multipart"] }
 tower = "0.5.2"
 tower-http = { version = "0.6.8", features = ["request-id", "trace", "cors"] }
 serde = { workspace = true, features = ["serde_derive", "derive"] }
@@ -45,6 +45,8 @@ validator_derive = { workspace = true }
 jsonwebtoken = { version = "10.2.0", features = ["rust_crypto"] }
 chrono = { workspace = true }
 mr-ulid = { workspace = true }
+aws-config = "1.8.11"
+aws-sdk-s3 = "1.115.0"
 
 [dev-dependencies]
 reqwest = { version = "0.12.24", default-features = false, features = ["json", "rustls-tls"] }

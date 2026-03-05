@@ -1,15 +1,23 @@
 use crate::configuration::cfg::Config;
 use crate::security::organization_acl::{RequiredOrganizationRole, require_organization_role};
 use crate::service::git_backend_service::{GitBackendError, GitBackendService};
+use crate::service::issue_attachment_service::{
+  IssueAttachmentService, IssueAttachmentUploadResult,
+};
 use chrono::Utc;
-use entity::{organization_members, repositories, repository_branches, repository_commits};
+use entity::{
+  organization_members, repositories, repository_branches, repository_commits,
+  repository_issue_comments, repository_issues,
+};
 use mr_ulid::Ulid;
 use repository::{
   OrganizationsRepository, RepositoriesRepository, RepositoryBranchesRepository,
-  RepositoryCommitsRepository, UsersRepository,
+  RepositoryCommitsRepository, RepositoryIssueCommentsRepository, RepositoryIssuesRepository,
+  UsersRepository,
 };
 use sea_orm::{DatabaseConnection, DbErr, Set, TransactionTrait};
 use std::collections::HashSet;
+use std::path::Path;
 use tracing::warn;
 
 #[derive(Debug, Clone)]
@@ -65,6 +73,77 @@ pub struct ListBranchesInput {
   pub current_user_id: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct CreateIssueInput {
+  pub repo_id: String,
+  pub title: String,
+  pub description: Option<String>,
+  pub assignee_user_id: Option<String>,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListIssuesInput {
+  pub repo_id: String,
+  pub status: Option<String>,
+  pub limit: Option<u64>,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetIssueByNumberInput {
+  pub repo_id: String,
+  pub number: i32,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpdateIssueInput {
+  pub repo_id: String,
+  pub issue_id: String,
+  pub title: Option<String>,
+  pub description: Option<Option<String>>,
+  pub status: Option<String>,
+  pub assignee_user_id: Option<Option<String>>,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateIssueCommentInput {
+  pub repo_id: String,
+  pub issue_id: String,
+  pub content: String,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ListIssueCommentsInput {
+  pub repo_id: String,
+  pub issue_id: String,
+  pub limit: Option<u64>,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UploadIssueAttachmentInput {
+  pub repo_id: String,
+  pub issue_id: Option<String>,
+  pub file_name: Option<String>,
+  pub content_type: Option<String>,
+  pub bytes: Vec<u8>,
+  pub current_user_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UploadIssueAttachmentOutput {
+  pub url: String,
+  pub object_key: String,
+  pub file_name: String,
+  pub content_type: String,
+  pub size: usize,
+  pub markdown: String,
+}
+
 #[derive(Debug)]
 pub enum RepositoryServiceError {
   BadRequest(String),
@@ -78,6 +157,7 @@ pub enum RepositoryServiceError {
 pub struct RepositoryService {
   db_conn: DatabaseConnection,
   git_backend: GitBackendService,
+  issue_attachment: IssueAttachmentService,
   storage_enabled: bool,
   super_admin_identities: HashSet<String>,
 }
@@ -87,6 +167,7 @@ impl RepositoryService {
     Self {
       db_conn,
       git_backend,
+      issue_attachment: IssueAttachmentService::new(config),
       storage_enabled: config.storage.is_some(),
       super_admin_identities: collect_super_admin_identities(config),
     }
@@ -594,10 +675,11 @@ impl RepositoryService {
     .map_err(|err| Self::internal_error("failed to load organization", err))?
     .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
-    let author = UsersRepository::find_active_user_by_id(&self.db_conn, input.current_user_id.as_str())
-      .await
-      .map_err(|err| Self::internal_error("failed to load current user", err))?
-      .ok_or_else(|| RepositoryServiceError::NotFound("current user not found".to_string()))?;
+    let author =
+      UsersRepository::find_active_user_by_id(&self.db_conn, input.current_user_id.as_str())
+        .await
+        .map_err(|err| Self::internal_error("failed to load current user", err))?
+        .ok_or_else(|| RepositoryServiceError::NotFound("current user not found".to_string()))?;
 
     let commit_sha = self
       .git_backend
@@ -736,6 +818,360 @@ impl RepositoryService {
     .map_err(|err| Self::internal_error("failed to list branches", err))
   }
 
+  pub async fn create_issue(
+    &self,
+    input: CreateIssueInput,
+  ) -> Result<repository_issues::Model, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let title = input.title.trim().to_string();
+    if title.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "title is required".to_string(),
+      ));
+    }
+
+    let description = input
+      .description
+      .map(|value| value.trim().to_string())
+      .filter(|value| !value.is_empty());
+    let assignee_user_id = normalize_optional_id(input.assignee_user_id);
+
+    if let Some(assignee_user_id) = assignee_user_id.as_deref() {
+      require_organization_role(
+        &self.db_conn,
+        assignee_user_id,
+        repository.organization_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await
+      .map_err(Self::map_access_error)?;
+    }
+
+    let txn = self
+      .db_conn
+      .begin()
+      .await
+      .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+
+    let number =
+      RepositoryIssuesRepository::next_issue_number_by_repo(&txn, repository.id.as_str())
+        .await
+        .map_err(|err| Self::internal_error("failed to allocate issue number", err))?;
+
+    let issue = RepositoryIssuesRepository::insert_issue(
+      &txn,
+      repository_issues::ActiveModel {
+        repository_id: Set(repository.id),
+        number: Set(number),
+        title: Set(title),
+        description: Set(description),
+        status: Set(repository_issues::RepositoryIssueStatus::Open),
+        author_user_id: Set(input.current_user_id),
+        assignee_user_id: Set(assignee_user_id),
+        ..Default::default()
+      },
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to create issue", err))?;
+
+    txn
+      .commit()
+      .await
+      .map_err(|err| Self::internal_error("failed to commit transaction", err))?;
+
+    Ok(issue)
+  }
+
+  pub async fn list_issues(
+    &self,
+    input: ListIssuesInput,
+  ) -> Result<Vec<repository_issues::Model>, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let status = parse_issue_status_filter(input.status.as_deref())?;
+    RepositoryIssuesRepository::list_issues_by_repo(
+      &self.db_conn,
+      repository.id.as_str(),
+      status,
+      input.limit.unwrap_or(50).clamp(1, 200),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to list issues", err))
+  }
+
+  pub async fn update_issue(
+    &self,
+    input: UpdateIssueInput,
+  ) -> Result<repository_issues::Model, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let issue = RepositoryIssuesRepository::find_issue_by_repo_and_id(
+      &self.db_conn,
+      repository.id.as_str(),
+      input.issue_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load issue", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
+
+    let title = match input.title {
+      Some(value) => {
+        let value = value.trim().to_string();
+        if value.is_empty() {
+          return Err(RepositoryServiceError::BadRequest(
+            "title cannot be empty".to_string(),
+          ));
+        }
+        Some(value)
+      }
+      None => None,
+    };
+
+    let description = input.description.map(|value| {
+      value
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+    });
+
+    let status = parse_issue_status(input.status.as_deref())?;
+    let assignee_user_id = if let Some(assignee_user_id) = input.assignee_user_id {
+      let normalized = normalize_optional_id(assignee_user_id);
+      if let Some(assignee_user_id) = normalized.as_deref() {
+        require_organization_role(
+          &self.db_conn,
+          assignee_user_id,
+          repository.organization_id.as_str(),
+          RequiredOrganizationRole::Member,
+        )
+        .await
+        .map_err(Self::map_access_error)?;
+      }
+      Some(normalized)
+    } else {
+      None
+    };
+
+    let closed_at = status.clone().map(|status| match status {
+      repository_issues::RepositoryIssueStatus::Open => None,
+      repository_issues::RepositoryIssueStatus::Closed => Some(Utc::now().into()),
+    });
+
+    RepositoryIssuesRepository::update_issue(
+      &self.db_conn,
+      issue,
+      title,
+      description,
+      status,
+      assignee_user_id,
+      closed_at,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to update issue", err))
+  }
+
+  pub async fn get_issue_by_number(
+    &self,
+    input: GetIssueByNumberInput,
+  ) -> Result<repository_issues::Model, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    if input.number <= 0 {
+      return Err(RepositoryServiceError::BadRequest(
+        "issue number must be positive".to_string(),
+      ));
+    }
+
+    RepositoryIssuesRepository::find_issue_by_repo_and_number(
+      &self.db_conn,
+      repository.id.as_str(),
+      input.number,
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load issue", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))
+  }
+
+  pub async fn create_issue_comment(
+    &self,
+    input: CreateIssueCommentInput,
+  ) -> Result<repository_issue_comments::Model, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let issue = RepositoryIssuesRepository::find_issue_by_repo_and_id(
+      &self.db_conn,
+      repository.id.as_str(),
+      input.issue_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load issue", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
+
+    let content = input.content.trim().to_string();
+    if content.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "content is required".to_string(),
+      ));
+    }
+
+    RepositoryIssueCommentsRepository::insert_comment(
+      &self.db_conn,
+      repository_issue_comments::ActiveModel {
+        issue_id: Set(issue.id),
+        author_user_id: Set(input.current_user_id),
+        content: Set(content),
+        ..Default::default()
+      },
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to create issue comment", err))
+  }
+
+  pub async fn list_issue_comments(
+    &self,
+    input: ListIssueCommentsInput,
+  ) -> Result<Vec<repository_issue_comments::Model>, RepositoryServiceError> {
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let issue_exists = RepositoryIssuesRepository::find_issue_by_repo_and_id(
+      &self.db_conn,
+      repository.id.as_str(),
+      input.issue_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load issue", err))?
+    .is_some();
+    if !issue_exists {
+      return Err(RepositoryServiceError::NotFound(
+        "issue not found".to_string(),
+      ));
+    }
+
+    RepositoryIssueCommentsRepository::list_comments_by_issue(
+      &self.db_conn,
+      input.issue_id.as_str(),
+      input.limit.unwrap_or(100).clamp(1, 500),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to list issue comments", err))
+  }
+
+  pub async fn upload_issue_attachment(
+    &self,
+    input: UploadIssueAttachmentInput,
+  ) -> Result<UploadIssueAttachmentOutput, RepositoryServiceError> {
+    if !self.issue_attachment.is_enabled() {
+      return Err(RepositoryServiceError::BadRequest(
+        "issue attachment storage is not configured".to_string(),
+      ));
+    }
+
+    let repository = self
+      .require_repo_access(
+        input.current_user_id.as_str(),
+        input.repo_id.as_str(),
+        RequiredOrganizationRole::Member,
+      )
+      .await?;
+
+    let organization = OrganizationsRepository::find_active_organization_by_id(
+      &self.db_conn,
+      repository.organization_id.as_str(),
+    )
+    .await
+    .map_err(|err| Self::internal_error("failed to load organization", err))?
+    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+
+    let issue_id = normalize_optional_id(input.issue_id);
+    if let Some(issue_id) = issue_id.as_deref() {
+      let exists = RepositoryIssuesRepository::find_issue_by_repo_and_id(
+        &self.db_conn,
+        repository.id.as_str(),
+        issue_id,
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to load issue", err))?
+      .is_some();
+      if !exists {
+        return Err(RepositoryServiceError::NotFound(
+          "issue not found".to_string(),
+        ));
+      }
+    }
+
+    if input.bytes.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "attachment file is required".to_string(),
+      ));
+    }
+
+    if input.bytes.len() > self.issue_attachment.max_file_size {
+      return Err(RepositoryServiceError::BadRequest(format!(
+        "attachment exceeds max_file_size ({} bytes)",
+        self.issue_attachment.max_file_size
+      )));
+    }
+
+    let file_name = sanitize_attachment_file_name(input.file_name.as_deref())
+      .ok_or_else(|| RepositoryServiceError::BadRequest("invalid attachment file name".to_string()))?;
+    let issue_segment = issue_id.unwrap_or_else(|| "draft".to_string());
+    let object_key = format!(
+      "issues/{}/{}/{}/{}-{}",
+      organization.key,
+      repository.key,
+      issue_segment,
+      Ulid::new(),
+      file_name
+    );
+    let uploaded = self
+      .issue_attachment
+      .upload(
+        object_key,
+        input.bytes,
+        input.content_type.as_deref(),
+      )
+      .await
+      .map_err(RepositoryServiceError::BadRequest)?;
+
+    Ok(upload_output_from_result(uploaded, file_name))
+  }
+
   pub async fn set_branch_protection(
     &self,
     user_id: &str,
@@ -848,6 +1284,34 @@ fn parse_visibility(value: Option<&str>) -> Option<repositories::RepositoryVisib
   }
 }
 
+fn parse_issue_status(
+  value: Option<&str>,
+) -> Result<Option<repository_issues::RepositoryIssueStatus>, RepositoryServiceError> {
+  let Some(value) = value else {
+    return Ok(None);
+  };
+  match value.trim().to_ascii_lowercase().as_str() {
+    "open" => Ok(Some(repository_issues::RepositoryIssueStatus::Open)),
+    "closed" => Ok(Some(repository_issues::RepositoryIssueStatus::Closed)),
+    _ => Err(RepositoryServiceError::BadRequest(
+      "status must be open or closed".to_string(),
+    )),
+  }
+}
+
+fn parse_issue_status_filter(
+  value: Option<&str>,
+) -> Result<Option<repository_issues::RepositoryIssueStatus>, RepositoryServiceError> {
+  let Some(value) = value else {
+    return Ok(None);
+  };
+  let normalized = value.trim().to_ascii_lowercase();
+  if normalized.is_empty() || normalized == "all" {
+    return Ok(None);
+  }
+  parse_issue_status(Some(normalized.as_str()))
+}
+
 fn resolve_gitignore_template(
   value: Option<&str>,
 ) -> Result<Option<&'static str>, RepositoryServiceError> {
@@ -892,6 +1356,57 @@ fn normalize_optional_template(value: Option<&str>) -> Option<String> {
     return None;
   }
   Some(normalized)
+}
+
+fn normalize_optional_id(value: Option<String>) -> Option<String> {
+  let value = value?;
+  let normalized = value.trim();
+  if normalized.is_empty() {
+    return None;
+  }
+  Some(normalized.to_string())
+}
+
+fn sanitize_attachment_file_name(value: Option<&str>) -> Option<String> {
+  let raw = value?.trim();
+  if raw.is_empty() {
+    return None;
+  }
+  let base_name = Path::new(raw).file_name()?.to_string_lossy();
+  let mut sanitized = String::with_capacity(base_name.len());
+  for ch in base_name.chars() {
+    if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-') {
+      sanitized.push(ch);
+    } else {
+      sanitized.push('-');
+    }
+  }
+  let sanitized = sanitized.trim_matches('-').to_string();
+  if sanitized.is_empty() {
+    None
+  } else {
+    Some(sanitized)
+  }
+}
+
+fn upload_output_from_result(
+  uploaded: IssueAttachmentUploadResult,
+  file_name: String,
+) -> UploadIssueAttachmentOutput {
+  let markdown = if uploaded.content_type.starts_with("image/") {
+    format!("![{}]({})", file_name, uploaded.url)
+  } else {
+    format!("[{}]({})", file_name, uploaded.url)
+  };
+
+  UploadIssueAttachmentOutput {
+    url: uploaded.url,
+    object_key: uploaded.object_key,
+    file_name,
+    content_type: uploaded.content_type,
+    size: uploaded.size,
+    markdown,
+  }
 }
 
 fn is_safe_storage_component(value: &str) -> bool {

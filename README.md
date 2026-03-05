@@ -73,13 +73,15 @@ Distributed Git direction:
 ### 2. Start infrastructure
 
 ```bash
-docker compose up -d postgres redis
+docker compose up -d postgres redis minio minio-init
 ```
 
 Current compose mapping:
 
 - Postgres: `localhost:5433 -> container:5432`
 - Redis: `localhost:6379`
+- MinIO S3 API: `localhost:9000`
+- MinIO Console: `localhost:9001`
 
 ### 3. Configure environment
 
@@ -95,6 +97,12 @@ Important defaults:
 - `GITY_CACHE_CACHE_TYPE=REDIS`
 - `GITY_CACHE_URL=redis://localhost:6379`
 - `GITY_STORAGE_REPO_ROOT=./data/repos`
+- `GITY_ISSUE_ATTACHMENTS_PROVIDER=s3`
+- `GITY_ISSUE_ATTACHMENTS_S3_ENDPOINT=http://127.0.0.1:9000`
+- `GITY_ISSUE_ATTACHMENTS_S3_BUCKET=gity-issues`
+- `GITY_ISSUE_ATTACHMENTS_S3_ACCESS_KEY=minioadmin`
+- `GITY_ISSUE_ATTACHMENTS_S3_SECRET_KEY=minioadmin`
+- `GITY_ISSUE_ATTACHMENTS_S3_PUBLIC_BASE_URL=http://127.0.0.1:9000/gity-issues`
 - `GITY_AUTH_SUPER_ADMINS=admin` (comma-separated usernames/emails)
 - Super-admin matching is done against existing user `username/email` values (it does not auto-create accounts)
 
@@ -159,6 +167,13 @@ Repositories:
 - `POST /repos/{repo_id}/branches/{branch_name}/unprotect`
 - `GET /repos/{repo_id}/commits`
 - `POST /repos/{repo_id}/commits`
+- `GET /repos/{repo_id}/issues`
+- `POST /repos/{repo_id}/issues`
+- `GET /repos/{repo_id}/issues/by-number/{number}`
+- `PATCH /repos/{repo_id}/issues/{issue_id}`
+- `GET /repos/{repo_id}/issues/{issue_id}/comments`
+- `POST /repos/{repo_id}/issues/{issue_id}/comments`
+- `POST /repos/{repo_id}/issues/attachments` (multipart, field: `file`)
 
 Users:
 

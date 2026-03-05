@@ -28,6 +28,24 @@ pub struct Storage {
 }
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
+pub struct IssueAttachments {
+  pub provider: Option<String>,
+  pub max_file_size: Option<usize>,
+  pub s3: Option<S3IssueAttachments>,
+}
+
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
+pub struct S3IssueAttachments {
+  pub endpoint: Option<String>,
+  pub region: Option<String>,
+  pub bucket: Option<String>,
+  pub access_key: Option<String>,
+  pub secret_key: Option<String>,
+  pub public_base_url: Option<String>,
+  pub force_path_style: Option<bool>,
+}
+
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
 pub struct Auth {
   pub enable_jwt: Option<bool>,
   pub jwt_secret: Option<String>,
@@ -63,6 +81,8 @@ pub struct Config {
   #[serde(default)]
   pub storage: Option<Storage>,
   #[serde(default)]
+  pub issue_attachments: Option<IssueAttachments>,
+  #[serde(default)]
   pub auth: Option<Auth>,
   #[serde(default)]
   pub logging: Option<Logging>,
@@ -97,6 +117,7 @@ impl Default for Config {
         url: "".to_string(),
       }),
       storage: None,
+      issue_attachments: None,
       auth: None,
       logging: None,
       git: None,

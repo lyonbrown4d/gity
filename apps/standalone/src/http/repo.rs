@@ -3,13 +3,18 @@ use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::RequiredOrganizationRole;
 use crate::service::repository_service::{
-  CreateBranchInput, CreateCommitInput, CreateFileCommitInput, CreateRepositoryInput,
-  ListBranchesInput, ListCommitsInput, RepositoryServiceError,
+  CreateBranchInput, CreateCommitInput, CreateFileCommitInput, CreateIssueCommentInput,
+  CreateIssueInput, CreateRepositoryInput, GetIssueByNumberInput, ListBranchesInput, ListCommitsInput,
+  ListIssueCommentsInput, ListIssuesInput, RepositoryServiceError, UpdateIssueInput,
+  UploadIssueAttachmentInput, UploadIssueAttachmentOutput,
 };
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
-use entity::{repositories, repository_branches, repository_commits};
+use entity::{
+  repositories, repository_branches, repository_commits, repository_issue_comments,
+  repository_issues,
+};
 use repository::{OrganizationsRepository, RepositoryLanguageSnapshotsRepository};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -89,6 +94,79 @@ pub struct CommitView {
   pub message: String,
   pub author_user_id: String,
   pub created_at: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateIssueRequest {
+  pub title: String,
+  pub description: Option<String>,
+  pub assignee_user_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateIssueRequest {
+  pub title: Option<String>,
+  #[serde(default)]
+  pub description: Option<Option<String>>,
+  pub status: Option<String>,
+  #[serde(default)]
+  pub assignee_user_id: Option<Option<String>>,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ListIssuesQuery {
+  pub status: Option<String>,
+  pub limit: Option<u64>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct IssueView {
+  pub id: String,
+  pub repository_id: String,
+  pub number: i32,
+  pub title: String,
+  pub description: Option<String>,
+  pub status: String,
+  pub author_user_id: String,
+  pub assignee_user_id: Option<String>,
+  pub created_at: String,
+  pub updated_at: String,
+  pub closed_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct CreateIssueCommentRequest {
+  pub content: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct ListIssueCommentsQuery {
+  pub limit: Option<u64>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct IssueCommentView {
+  pub id: String,
+  pub issue_id: String,
+  pub author_user_id: String,
+  pub content: String,
+  pub created_at: String,
+  pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct UploadIssueAttachmentQuery {
+  pub issue_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct IssueAttachmentUploadView {
+  pub url: String,
+  pub object_key: String,
+  pub file_name: String,
+  pub content_type: String,
+  pub size: usize,
+  pub markdown: String,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -577,6 +655,294 @@ pub async fn create_file_commit(
 
 #[utoipa::path(
   get,
+  path = "/{repo_id}/issues",
+  params(ListIssuesQuery),
+  responses(
+    (status = 200, description = "List repository issues", body = [IssueView]),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn list_issues(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<ListIssuesQuery>,
+) -> Result<(StatusCode, Json<Vec<IssueView>>), (StatusCode, Json<ErrorResponse>)> {
+  let issues = state
+    .services
+    .repository
+    .list_issues(ListIssuesInput {
+      repo_id,
+      status: query.status,
+      limit: query.limit,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((
+    StatusCode::OK,
+    Json(issues.into_iter().map(issue_view).collect()),
+  ))
+}
+
+#[utoipa::path(
+  post,
+  path = "/{repo_id}/issues",
+  request_body = CreateIssueRequest,
+  responses(
+    (status = 201, description = "Issue created", body = IssueView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn create_issue(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Json(payload): Json<CreateIssueRequest>,
+) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  let issue = state
+    .services
+    .repository
+    .create_issue(CreateIssueInput {
+      repo_id,
+      title: payload.title,
+      description: payload.description,
+      assignee_user_id: payload.assignee_user_id,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((StatusCode::CREATED, Json(issue_view(issue))))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/issues/by-number/{number}",
+  responses(
+    (status = 200, description = "Get issue by number", body = IssueView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Issue not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn get_issue_by_number(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path((repo_id, number)): Path<(String, i32)>,
+) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  let issue = state
+    .services
+    .repository
+    .get_issue_by_number(GetIssueByNumberInput {
+      repo_id,
+      number,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((StatusCode::OK, Json(issue_view(issue))))
+}
+
+#[utoipa::path(
+  patch,
+  path = "/{repo_id}/issues/{issue_id}",
+  request_body = UpdateIssueRequest,
+  responses(
+    (status = 200, description = "Issue updated", body = IssueView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Issue not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn update_issue(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path((repo_id, issue_id)): Path<(String, String)>,
+  Json(payload): Json<UpdateIssueRequest>,
+) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  let issue = state
+    .services
+    .repository
+    .update_issue(UpdateIssueInput {
+      repo_id,
+      issue_id,
+      title: payload.title,
+      description: payload.description,
+      status: payload.status,
+      assignee_user_id: payload.assignee_user_id,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((StatusCode::OK, Json(issue_view(issue))))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{repo_id}/issues/{issue_id}/comments",
+  params(ListIssueCommentsQuery),
+  responses(
+    (status = 200, description = "List issue comments", body = [IssueCommentView]),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Issue not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn list_issue_comments(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path((repo_id, issue_id)): Path<(String, String)>,
+  Query(query): Query<ListIssueCommentsQuery>,
+) -> Result<(StatusCode, Json<Vec<IssueCommentView>>), (StatusCode, Json<ErrorResponse>)> {
+  let comments = state
+    .services
+    .repository
+    .list_issue_comments(ListIssueCommentsInput {
+      repo_id,
+      issue_id,
+      limit: query.limit,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((
+    StatusCode::OK,
+    Json(comments.into_iter().map(issue_comment_view).collect()),
+  ))
+}
+
+#[utoipa::path(
+  post,
+  path = "/{repo_id}/issues/{issue_id}/comments",
+  request_body = CreateIssueCommentRequest,
+  responses(
+    (status = 201, description = "Issue comment created", body = IssueCommentView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Issue not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn create_issue_comment(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path((repo_id, issue_id)): Path<(String, String)>,
+  Json(payload): Json<CreateIssueCommentRequest>,
+) -> Result<(StatusCode, Json<IssueCommentView>), (StatusCode, Json<ErrorResponse>)> {
+  let comment = state
+    .services
+    .repository
+    .create_issue_comment(CreateIssueCommentInput {
+      repo_id,
+      issue_id,
+      content: payload.content,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((StatusCode::CREATED, Json(issue_comment_view(comment))))
+}
+
+#[utoipa::path(
+  post,
+  path = "/{repo_id}/issues/attachments",
+  params(UploadIssueAttachmentQuery),
+  responses(
+    (status = 201, description = "Issue attachment uploaded", body = IssueAttachmentUploadView),
+    (status = 400, description = "Invalid request", body = ErrorResponse),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Issue not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn upload_issue_attachment(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+  Query(query): Query<UploadIssueAttachmentQuery>,
+  mut multipart: Multipart,
+) -> Result<(StatusCode, Json<IssueAttachmentUploadView>), (StatusCode, Json<ErrorResponse>)> {
+  let mut file_name: Option<String> = None;
+  let mut content_type: Option<String> = None;
+  let mut bytes: Option<Vec<u8>> = None;
+
+  while let Some(field) = multipart.next_field().await.map_err(|err| {
+    (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
+        message: format!("failed to parse multipart form: {err}"),
+      }),
+    )
+  })? {
+    if field.name() != Some("file") {
+      continue;
+    }
+    file_name = field.file_name().map(ToString::to_string);
+    content_type = field.content_type().map(ToString::to_string);
+    let body = field.bytes().await.map_err(|err| {
+      (
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponse {
+          message: format!("failed to read uploaded file: {err}"),
+        }),
+      )
+    })?;
+    bytes = Some(body.to_vec());
+    break;
+  }
+
+  let bytes = bytes.ok_or_else(|| {
+    (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
+        message: "file field is required".to_string(),
+      }),
+    )
+  })?;
+
+  let uploaded = state
+    .services
+    .repository
+    .upload_issue_attachment(UploadIssueAttachmentInput {
+      repo_id,
+      issue_id: query.issue_id,
+      file_name,
+      content_type,
+      bytes,
+      current_user_id: current_user.user_id,
+    })
+    .await
+    .map_err(map_repository_service_error)?;
+
+  Ok((
+    StatusCode::CREATED,
+    Json(issue_attachment_upload_view(uploaded)),
+  ))
+}
+
+#[utoipa::path(
+  get,
   path = "/{repo_id}/tree",
   params(ListRepositoryTreeQuery),
   responses(
@@ -862,6 +1228,13 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
     .routes(routes![list_commits])
     .routes(routes![create_commit])
     .routes(routes![create_file_commit])
+    .routes(routes![list_issues])
+    .routes(routes![create_issue])
+    .routes(routes![get_issue_by_number])
+    .routes(routes![update_issue])
+    .routes(routes![list_issue_comments])
+    .routes(routes![create_issue_comment])
+    .routes(routes![upload_issue_attachment])
     .routes(routes![list_repository_tree])
     .routes(routes![read_repository_blob])
     .routes(routes![read_repository_readme])
@@ -945,6 +1318,47 @@ fn commit_view(model: repository_commits::Model) -> CommitView {
     message: model.message,
     author_user_id: model.author_user_id,
     created_at: model.created_at.to_rfc3339(),
+  }
+}
+
+fn issue_view(model: repository_issues::Model) -> IssueView {
+  IssueView {
+    id: model.id,
+    repository_id: model.repository_id,
+    number: model.number,
+    title: model.title,
+    description: model.description,
+    status: match model.status {
+      repository_issues::RepositoryIssueStatus::Open => "open".to_string(),
+      repository_issues::RepositoryIssueStatus::Closed => "closed".to_string(),
+    },
+    author_user_id: model.author_user_id,
+    assignee_user_id: model.assignee_user_id,
+    created_at: model.created_at.to_rfc3339(),
+    updated_at: model.updated_at.to_rfc3339(),
+    closed_at: model.closed_at.map(|time| time.to_rfc3339()),
+  }
+}
+
+fn issue_comment_view(model: repository_issue_comments::Model) -> IssueCommentView {
+  IssueCommentView {
+    id: model.id,
+    issue_id: model.issue_id,
+    author_user_id: model.author_user_id,
+    content: model.content,
+    created_at: model.created_at.to_rfc3339(),
+    updated_at: model.updated_at.to_rfc3339(),
+  }
+}
+
+fn issue_attachment_upload_view(output: UploadIssueAttachmentOutput) -> IssueAttachmentUploadView {
+  IssueAttachmentUploadView {
+    url: output.url,
+    object_key: output.object_key,
+    file_name: output.file_name,
+    content_type: output.content_type,
+    size: output.size,
+    markdown: output.markdown,
   }
 }
 
@@ -1045,9 +1459,10 @@ fn map_repository_content_error(
   err: crate::service::git_backend_service::GitBackendError,
 ) -> (StatusCode, Json<ErrorResponse>) {
   let (status, message) = match err {
-    crate::service::git_backend_service::GitBackendError::InvalidRepositoryPath => {
-      (StatusCode::BAD_REQUEST, "invalid repository path".to_string())
-    }
+    crate::service::git_backend_service::GitBackendError::InvalidRepositoryPath => (
+      StatusCode::BAD_REQUEST,
+      "invalid repository path".to_string(),
+    ),
     crate::service::git_backend_service::GitBackendError::RepositoryNotFound => {
       (StatusCode::NOT_FOUND, "repository not found".to_string())
     }

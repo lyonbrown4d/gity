@@ -64,6 +64,38 @@ export interface RepositoryLanguagesView {
   languages: RepositoryLanguageItemView[];
 }
 
+export interface RepositoryIssueView {
+  id: string;
+  repository_id: string;
+  number: number;
+  title: string;
+  description?: string | null;
+  status: "open" | "closed";
+  author_user_id: string;
+  assignee_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string | null;
+}
+
+export interface RepositoryIssueCommentView {
+  id: string;
+  issue_id: string;
+  author_user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssueAttachmentUploadView {
+  url: string;
+  object_key: string;
+  file_name: string;
+  content_type: string;
+  size: number;
+  markdown: string;
+}
+
 export interface UserView {
   id: string;
   username: string;

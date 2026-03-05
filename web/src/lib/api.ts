@@ -63,7 +63,10 @@ export async function apiRequest<T>(
   const auth = options?.auth ?? true;
   const retryOnAuth = options?.retryOnAuth ?? true;
   const headers = new Headers(init?.headers ?? {});
-  headers.set("Content-Type", "application/json");
+  const isFormDataBody = typeof FormData !== "undefined" && init?.body instanceof FormData;
+  if (!isFormDataBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (auth) {
     const tokens = getTokens();

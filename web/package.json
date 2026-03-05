@@ -9,6 +9,12 @@
     "preview": "vite preview --config vite.config.ts"
   },
   "dependencies": {
+    "@milkdown/core": "^7.19.0",
+    "@milkdown/plugin-listener": "^7.19.0",
+    "@milkdown/preset-commonmark": "^7.19.0",
+    "@milkdown/preset-gfm": "^7.19.0",
+    "@milkdown/react": "^7.19.0",
+    "@milkdown/theme-nord": "^7.19.0",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",

@@ -149,6 +149,68 @@
   .markdown-body a {
     @apply text-primary underline underline-offset-2;
   }
+
+  .issue-editor-shell {
+    @apply overflow-hidden rounded-md border bg-background;
+  }
+
+  .issue-editor-toolbar {
+    @apply flex flex-wrap items-center gap-1 border-b bg-muted/30 px-2 py-1;
+  }
+
+  .issue-editor-toolbar-group {
+    @apply mr-2 flex items-center gap-1 pr-2 last:mr-0 last:pr-0;
+    border-right: 1px solid hsl(var(--border));
+  }
+
+  .issue-editor-toolbar-group:last-child {
+    border-right: none;
+  }
+
+  .issue-milkdown [data-milkdown-root] {
+    @apply min-h-[160px];
+  }
+
+  .issue-milkdown .ProseMirror {
+    @apply min-h-[160px] cursor-text px-3 py-2 text-sm leading-7 text-foreground;
+    outline: none;
+  }
+
+  .issue-milkdown .ProseMirror h1 {
+    @apply my-3 text-2xl font-semibold leading-tight;
+  }
+
+  .issue-milkdown .ProseMirror h2 {
+    @apply my-2.5 text-xl font-semibold leading-tight;
+  }
+
+  .issue-milkdown .ProseMirror h3 {
+    @apply my-2 text-lg font-semibold leading-tight;
+  }
+
+  .issue-milkdown .ProseMirror p {
+    @apply my-2;
+  }
+
+  .issue-milkdown .ProseMirror ul {
+    @apply my-2 list-disc pl-5;
+  }
+
+  .issue-milkdown .ProseMirror ol {
+    @apply my-2 list-decimal pl-5;
+  }
+
+  .issue-milkdown .ProseMirror blockquote {
+    @apply my-2 border-l-2 border-border pl-3 text-muted-foreground;
+  }
+
+  .issue-milkdown .ProseMirror code {
+    @apply rounded bg-muted px-1 py-0.5 text-xs;
+  }
+
+  .issue-milkdown .ProseMirror pre {
+    @apply my-3 overflow-x-auto rounded-md border bg-muted/40 p-3 text-xs;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
