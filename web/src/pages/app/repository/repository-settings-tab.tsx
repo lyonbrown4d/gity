@@ -24,6 +24,10 @@ export const RepositorySettingsTab = ({
       <CardContent className="space-y-4">
         <div className="rounded-md border p-3 text-sm">
           <p>
+            <span className="text-muted-foreground">{t("Repository UUID")}:</span>{" "}
+            <span className="font-mono text-xs">{repository.uuid}</span>
+          </p>
+          <p>
             <span className="text-muted-foreground">{t("Repository key")}:</span> {repository.key}
           </p>
           <p>

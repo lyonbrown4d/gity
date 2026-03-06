@@ -7,6 +7,7 @@ export interface OrganizationView {
 
 export interface RepositoryView {
   id: string;
+  uuid: string;
   organization_id: string;
   key: string;
   name: string;

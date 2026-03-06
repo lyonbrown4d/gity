@@ -4,6 +4,7 @@ use crate::service::auth_service::{AuthPayload, AuthServiceError, LoginInput, Re
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, header};
+use domain::api::response::{ApiResponse, EmptyData};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -52,11 +53,12 @@ pub struct LogoutRequest {
 #[utoipa::path(
   post,
   path = "/register",
+  tag = "Auth",
   request_body = RegisterRequest,
   responses(
-    (status = 201, description = "User and default organization created", body = AuthResponse),
-    (status = 409, description = "User or organization already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "User and default organization created", body = ApiResponse<AuthResponse>),
+    (status = 409, description = "User or organization already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn register(
@@ -82,11 +84,12 @@ pub async fn register(
 #[utoipa::path(
   post,
   path = "/login",
+  tag = "Auth",
   request_body = LoginRequest,
   responses(
-    (status = 200, description = "Login success", body = AuthResponse),
-    (status = 401, description = "Invalid credentials", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Login success", body = ApiResponse<AuthResponse>),
+    (status = 401, description = "Invalid credentials", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn login(
@@ -109,11 +112,12 @@ pub async fn login(
 #[utoipa::path(
   post,
   path = "/refresh",
+  tag = "Auth",
   request_body = RefreshRequest,
   responses(
-    (status = 200, description = "Token refreshed", body = AuthResponse),
-    (status = 401, description = "Invalid refresh token", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Token refreshed", body = ApiResponse<AuthResponse>),
+    (status = 401, description = "Invalid refresh token", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn refresh(
@@ -133,11 +137,12 @@ pub async fn refresh(
 #[utoipa::path(
   post,
   path = "/logout",
+  tag = "Auth",
   request_body = LogoutRequest,
   responses(
-    (status = 204, description = "Logged out"),
-    (status = 401, description = "Invalid token", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Logged out", body = ApiResponse<EmptyData>),
+    (status = 401, description = "Invalid token", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn logout(
@@ -145,7 +150,7 @@ pub async fn logout(
   current_user: CurrentUser,
   headers: HeaderMap,
   payload: Option<Json<LogoutRequest>>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
   let access_token = headers
     .get(header::AUTHORIZATION)
     .and_then(|value| value.to_str().ok())
@@ -172,7 +177,7 @@ pub async fn logout(
     .await
     .map_err(map_auth_error)?;
 
-  Ok(StatusCode::NO_CONTENT)
+  Ok((StatusCode::OK, Json(EmptyData {})))
 }
 
 pub fn auth_routes() -> OpenApiRouter<AppState> {

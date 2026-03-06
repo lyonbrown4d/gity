@@ -1,3 +1,4 @@
+pub mod base_repository;
 pub mod organization_invitations_repository;
 pub mod organization_members_repository;
 pub mod organizations_repository;
@@ -9,6 +10,7 @@ pub mod repository_issues_repository;
 pub mod repository_language_snapshots_repository;
 pub mod users_repository;
 
+pub use base_repository::{BaseRepository, TransactionConnection};
 pub use organization_invitations_repository::OrganizationInvitationsRepository;
 pub use organization_members_repository::OrganizationMembersRepository;
 pub use organizations_repository::OrganizationsRepository;

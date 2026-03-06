@@ -1,5 +1,6 @@
 use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
+use crate::http::pagination::{resolve_pagination, to_page, to_single_page};
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::RequiredOrganizationRole;
 use crate::service::repository_service::{
@@ -13,6 +14,8 @@ use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use domain::api::crud::parse_csv_ids;
 use domain::api::repository::{CreateRepositoryRequest, ListRepositoriesQuery, RepositoryView};
+use domain::api::response::{ApiResponse, EmptyData};
+use domain::page::Page;
 use entity::{
   repositories, repository_branches, repository_commits, repository_issue_comments,
   repository_issues,
@@ -202,67 +205,123 @@ pub struct RepositoryLanguagesView {
 #[utoipa::path(
   get,
   path = "/",
+  tag = "Repositories",
   params(ListRepositoriesQuery),
   responses(
-    (status = 200, description = "List repositories in organization", body = [RepositoryView]),
-    (status = 400, description = "Missing organization context", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List repositories in organization", body = ApiResponse<Page<RepositoryView>>),
+    (status = 400, description = "Missing organization context", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_repositories(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Query(query): Query<ListRepositoriesQuery>,
-) -> Result<(StatusCode, Json<Vec<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<Page<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
   let ids = parse_csv_ids(query.ids.as_deref());
   let has_ids_filter = !ids.is_empty();
   let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
+  let pagination = if has_ids_filter {
+    None
+  } else {
+    Some(resolve_pagination(query.page, query.page_size, 50, 200)?)
+  };
 
-  let repositories = if query.all.unwrap_or(false) {
-    state
-      .services
-      .repository
-      .list_repositories_as_super_admin(
-        current_user.user_id.as_str(),
-        query.organization_id.as_deref(),
-      )
-      .await
-      .map_err(map_repository_service_error)?
+  let (repositories, total, use_single_page) = if query.all.unwrap_or(false) {
+    if has_ids_filter {
+      let repositories = state
+        .services
+        .repository
+        .list_repositories_as_super_admin(
+          current_user.user_id.as_str(),
+          query.organization_id.as_deref(),
+        )
+        .await
+        .map_err(map_repository_service_error)?;
+      let filtered = repositories
+        .into_iter()
+        .filter(|repo| ids_filter.contains(&repo.id))
+        .collect::<Vec<_>>();
+      let total = filtered.len() as u64;
+      (filtered, total, true)
+    } else {
+      let pagination = pagination.ok_or_else(|| {
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            message: "pagination state is invalid".to_string(),
+          }),
+        )
+      })?;
+      let (repositories, total) = state
+        .services
+        .repository
+        .list_repositories_as_super_admin_page(
+          current_user.user_id.as_str(),
+          query.organization_id.as_deref(),
+          pagination.page,
+          pagination.page_size,
+        )
+        .await
+        .map_err(map_repository_service_error)?;
+      (repositories, total, false)
+    }
   } else {
     let organization_id = resolve_organization_id(query.organization_id, &current_user)?;
-    state
-      .services
-      .repository
-      .list_repositories(current_user.user_id.as_str(), organization_id.as_str())
-      .await
-      .map_err(map_repository_service_error)?
-  };
-  let repositories = if has_ids_filter {
-    repositories
-      .into_iter()
-      .filter(|repo| ids_filter.contains(&repo.id))
-      .collect()
-  } else {
-    repositories
+    if has_ids_filter {
+      let repositories = state
+        .services
+        .repository
+        .list_repositories(current_user.user_id.as_str(), organization_id.as_str())
+        .await
+        .map_err(map_repository_service_error)?;
+      let filtered = repositories
+        .into_iter()
+        .filter(|repo| ids_filter.contains(&repo.id))
+        .collect::<Vec<_>>();
+      let total = filtered.len() as u64;
+      (filtered, total, true)
+    } else {
+      let pagination = pagination.ok_or_else(|| {
+        (
+          StatusCode::INTERNAL_SERVER_ERROR,
+          Json(ErrorResponse {
+            message: "pagination state is invalid".to_string(),
+          }),
+        )
+      })?;
+      let (repositories, total) = state
+        .services
+        .repository
+        .list_repositories_page(
+          current_user.user_id.as_str(),
+          organization_id.as_str(),
+          pagination.page,
+          pagination.page_size,
+        )
+        .await
+        .map_err(map_repository_service_error)?;
+      (repositories, total, false)
+    }
   };
 
   let organization_ids = repositories
     .iter()
     .map(|repo| repo.organization_id.clone())
     .collect::<Vec<_>>();
-  let organizations =
-    OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
-      .await
-      .map_err(|err| {
-        (
-          StatusCode::INTERNAL_SERVER_ERROR,
-          Json(ErrorResponse {
-            message: format!("failed to load organizations: {err}"),
-          }),
-        )
-      })?;
+  let organizations = OrganizationsRepository::new(state.db_conn.clone())
+    .list_active_organizations_by_ids(organization_ids)
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load organizations: {err}"),
+        }),
+      )
+    })?;
   let organization_key_by_id = organizations
     .into_iter()
     .map(|org| (org.id, org.key))
@@ -278,19 +337,33 @@ pub async fn list_repositories(
         .unwrap_or_else(|| repo.organization_id.clone());
       repository_view(repo, organization_key.as_str(), base_url.as_str())
     })
-    .collect();
-  Ok((StatusCode::OK, Json(data)))
+    .collect::<Vec<_>>();
+
+  if use_single_page {
+    return Ok((StatusCode::OK, Json(to_single_page(data))));
+  }
+
+  let pagination = pagination.ok_or_else(|| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: "pagination state is invalid".to_string(),
+      }),
+    )
+  })?;
+  Ok((StatusCode::OK, Json(to_page(data, total, pagination))))
 }
 
 #[utoipa::path(
   get,
   path = "/{repo_id}",
+  tag = "Repositories",
   responses(
-    (status = 200, description = "Get repository by id", body = RepositoryView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Get repository by id", body = ApiResponse<RepositoryView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn get_repository(
@@ -309,27 +382,25 @@ pub async fn get_repository(
     .await
     .map_err(map_repository_service_error)?;
 
-  let organization = OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    repository.organization_id.as_str(),
-  )
-  .await
-  .map_err(|err| {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("failed to load organization: {err}"),
-      }),
-    )
-  })?
-  .ok_or_else(|| {
-    (
-      StatusCode::NOT_FOUND,
-      Json(ErrorResponse {
-        message: "organization not found".to_string(),
-      }),
-    )
-  })?;
+  let organization = OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(repository.organization_id.as_str())
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load organization: {err}"),
+        }),
+      )
+    })?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
 
   let view = repository_view(
     repository,
@@ -342,14 +413,15 @@ pub async fn get_repository(
 #[utoipa::path(
   post,
   path = "/",
+  tag = "Repositories",
   request_body = CreateRepositoryRequest,
   responses(
-    (status = 201, description = "Repository created", body = RepositoryView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 409, description = "Repository key already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Repository created", body = ApiResponse<RepositoryView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Repository key already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_repository(
@@ -375,27 +447,25 @@ pub async fn create_repository(
     .await
     .map_err(map_repository_service_error)?;
 
-  let organization = OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    repository.organization_id.as_str(),
-  )
-  .await
-  .map_err(|err| {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("failed to load organization: {err}"),
-      }),
-    )
-  })?
-  .ok_or_else(|| {
-    (
-      StatusCode::NOT_FOUND,
-      Json(ErrorResponse {
-        message: "organization not found".to_string(),
-      }),
-    )
-  })?;
+  let organization = OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(repository.organization_id.as_str())
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load organization: {err}"),
+        }),
+      )
+    })?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
   enqueue_repository_language_job(
     &state,
     repository.id.as_str(),
@@ -416,37 +486,39 @@ pub async fn create_repository(
 #[utoipa::path(
   delete,
   path = "/{repo_id}",
+  tag = "Repositories",
   responses(
-    (status = 204, description = "Repository deleted"),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Repository deleted", body = ApiResponse<EmptyData>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn delete_repository(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Path(repo_id): Path<String>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
   state
     .services
     .repository
     .delete_repository(current_user.user_id.as_str(), repo_id.as_str())
     .await
     .map_err(map_repository_service_error)?;
-  Ok(StatusCode::NO_CONTENT)
+  Ok((StatusCode::OK, Json(EmptyData {})))
 }
 
 #[utoipa::path(
   get,
   path = "/{repo_id}/branches",
+  tag = "Repositories",
   responses(
-    (status = 200, description = "List repository branches", body = [BranchView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List repository branches", body = ApiResponse<Vec<BranchView>>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_branches(
@@ -473,14 +545,15 @@ pub async fn list_branches(
 #[utoipa::path(
   post,
   path = "/{repo_id}/branches",
+  tag = "Repositories",
   request_body = CreateBranchRequest,
   responses(
-    (status = 201, description = "Branch created", body = BranchView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 409, description = "Branch already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Branch created", body = ApiResponse<BranchView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Branch already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_branch(
@@ -506,12 +579,13 @@ pub async fn create_branch(
 #[utoipa::path(
   post,
   path = "/{repo_id}/branches/{branch_name}/protect",
+  tag = "Repositories",
   responses(
-    (status = 200, description = "Branch protected", body = BranchView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Branch not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Branch protected", body = ApiResponse<BranchView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Branch not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn protect_branch(
@@ -525,12 +599,13 @@ pub async fn protect_branch(
 #[utoipa::path(
   post,
   path = "/{repo_id}/branches/{branch_name}/unprotect",
+  tag = "Repositories",
   responses(
-    (status = 200, description = "Branch unprotected", body = BranchView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Branch not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Branch unprotected", body = ApiResponse<BranchView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Branch not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn unprotect_branch(
@@ -544,13 +619,14 @@ pub async fn unprotect_branch(
 #[utoipa::path(
   get,
   path = "/{repo_id}/commits",
+  tag = "Repositories",
   params(ListCommitsQuery),
   responses(
-    (status = 200, description = "List repository commits", body = [CommitView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List repository commits", body = ApiResponse<Vec<CommitView>>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_commits(
@@ -619,15 +695,16 @@ pub async fn list_commits(
 #[utoipa::path(
   post,
   path = "/{repo_id}/commits",
+  tag = "Repositories",
   request_body = CreateCommitRequest,
   responses(
-    (status = 201, description = "Commit recorded", body = CommitView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Branch not found", body = ErrorResponse),
-    (status = 409, description = "Commit already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Commit recorded", body = ApiResponse<CommitView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Branch not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Commit already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_commit(
@@ -655,14 +732,15 @@ pub async fn create_commit(
 #[utoipa::path(
   post,
   path = "/{repo_id}/file-commits",
+  tag = "Repositories",
   request_body = CreateFileCommitRequest,
   responses(
-    (status = 201, description = "File committed", body = CommitView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository or branch not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "File committed", body = ApiResponse<CommitView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository or branch not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_file_commit(
@@ -697,14 +775,15 @@ pub async fn create_file_commit(
 #[utoipa::path(
   get,
   path = "/{repo_id}/issues",
+  tag = "Repositories",
   params(ListIssuesQuery),
   responses(
-    (status = 200, description = "List repository issues", body = [IssueView]),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List repository issues", body = ApiResponse<Vec<IssueView>>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_issues(
@@ -734,14 +813,15 @@ pub async fn list_issues(
 #[utoipa::path(
   post,
   path = "/{repo_id}/issues",
+  tag = "Repositories",
   request_body = CreateIssueRequest,
   responses(
-    (status = 201, description = "Issue created", body = IssueView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Issue created", body = ApiResponse<IssueView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_issue(
@@ -769,13 +849,14 @@ pub async fn create_issue(
 #[utoipa::path(
   get,
   path = "/{repo_id}/issues/by-number/{number}",
+  tag = "Repositories",
   responses(
-    (status = 200, description = "Get issue by number", body = IssueView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Issue not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Get issue by number", body = ApiResponse<IssueView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Issue not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn get_issue_by_number(
@@ -800,14 +881,15 @@ pub async fn get_issue_by_number(
 #[utoipa::path(
   patch,
   path = "/{repo_id}/issues/{issue_id}",
+  tag = "Repositories",
   request_body = UpdateIssueRequest,
   responses(
-    (status = 200, description = "Issue updated", body = IssueView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Issue not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Issue updated", body = ApiResponse<IssueView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Issue not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn update_issue(
@@ -837,13 +919,14 @@ pub async fn update_issue(
 #[utoipa::path(
   get,
   path = "/{repo_id}/issues/{issue_id}/comments",
+  tag = "Repositories",
   params(ListIssueCommentsQuery),
   responses(
-    (status = 200, description = "List issue comments", body = [IssueCommentView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Issue not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List issue comments", body = ApiResponse<Vec<IssueCommentView>>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Issue not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_issue_comments(
@@ -873,14 +956,15 @@ pub async fn list_issue_comments(
 #[utoipa::path(
   post,
   path = "/{repo_id}/issues/{issue_id}/comments",
+  tag = "Repositories",
   request_body = CreateIssueCommentRequest,
   responses(
-    (status = 201, description = "Issue comment created", body = IssueCommentView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Issue not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Issue comment created", body = ApiResponse<IssueCommentView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Issue not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_issue_comment(
@@ -907,14 +991,15 @@ pub async fn create_issue_comment(
 #[utoipa::path(
   post,
   path = "/{repo_id}/issues/attachments",
+  tag = "Repositories",
   params(UploadIssueAttachmentQuery),
   responses(
-    (status = 201, description = "Issue attachment uploaded", body = IssueAttachmentUploadView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Issue not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Issue attachment uploaded", body = ApiResponse<IssueAttachmentUploadView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Issue not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn upload_issue_attachment(
@@ -985,13 +1070,14 @@ pub async fn upload_issue_attachment(
 #[utoipa::path(
   get,
   path = "/{repo_id}/tree",
+  tag = "Repositories",
   params(ListRepositoryTreeQuery),
   responses(
-    (status = 200, description = "List repository tree entries", body = [RepositoryTreeEntryView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository or path not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "List repository tree entries", body = ApiResponse<Vec<RepositoryTreeEntryView>>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository or path not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_repository_tree(
@@ -1040,14 +1126,15 @@ pub async fn list_repository_tree(
 #[utoipa::path(
   get,
   path = "/{repo_id}/blob",
+  tag = "Repositories",
   params(RepositoryBlobQuery),
   responses(
-    (status = 200, description = "Read repository blob content", body = RepositoryBlobView),
-    (status = 400, description = "Invalid request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository or file not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Read repository blob content", body = ApiResponse<RepositoryBlobView>),
+    (status = 400, description = "Invalid request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository or file not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn read_repository_blob(
@@ -1092,13 +1179,14 @@ pub async fn read_repository_blob(
 #[utoipa::path(
   get,
   path = "/{repo_id}/readme",
+  tag = "Repositories",
   params(RepositoryReadmeQuery),
   responses(
-    (status = 200, description = "Read repository root README", body = RepositoryBlobView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "README not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Read repository root README", body = ApiResponse<RepositoryBlobView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "README not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn read_repository_readme(
@@ -1150,13 +1238,14 @@ pub async fn read_repository_readme(
 #[utoipa::path(
   get,
   path = "/{repo_id}/languages",
+  tag = "Repositories",
   params(RepositoryLanguagesQuery),
   responses(
-    (status = 200, description = "Read repository language statistics", body = RepositoryLanguagesView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Repository not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Read repository language statistics", body = ApiResponse<RepositoryLanguagesView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Repository not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn get_repository_languages(
@@ -1179,20 +1268,17 @@ pub async fn get_repository_languages(
     .branch_name
     .unwrap_or_else(|| repository.default_branch.clone());
 
-  let snapshot = RepositoryLanguageSnapshotsRepository::find_latest_snapshot_by_repo_and_branch(
-    &state.db_conn,
-    repo_id.as_str(),
-    branch_name.as_str(),
-  )
-  .await
-  .map_err(|err| {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("failed to load repository language snapshot: {err}"),
-      }),
-    )
-  })?;
+  let snapshot = RepositoryLanguageSnapshotsRepository::new(state.db_conn.clone())
+    .find_latest_snapshot_by_repo_and_branch(repo_id.as_str(), branch_name.as_str())
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load repository language snapshot: {err}"),
+        }),
+      )
+    })?;
 
   let Some(snapshot) = snapshot else {
     enqueue_repository_language_job(&state, repo_id.as_str(), Some(branch_name.as_str())).await;
@@ -1210,19 +1296,17 @@ pub async fn get_repository_languages(
     ));
   };
 
-  let items = RepositoryLanguageSnapshotsRepository::list_snapshot_items_by_snapshot_id(
-    &state.db_conn,
-    snapshot.id.as_str(),
-  )
-  .await
-  .map_err(|err| {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("failed to load repository language snapshot items: {err}"),
-      }),
-    )
-  })?;
+  let items = RepositoryLanguageSnapshotsRepository::new(state.db_conn.clone())
+    .list_snapshot_items_by_snapshot_id(snapshot.id.as_str())
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load repository language snapshot items: {err}"),
+        }),
+      )
+    })?;
 
   let total_bytes = snapshot.total_bytes.max(0) as u64;
   let languages = items
@@ -1329,6 +1413,7 @@ fn repository_view(
   let repo_key = model.key.clone();
   RepositoryView {
     id: model.id,
+    uuid: model.uuid,
     organization_id: model.organization_id,
     key: model.key,
     name: model.name,
@@ -1454,27 +1539,32 @@ async fn resolve_repo_storage_context(
     .await
     .map_err(map_repository_service_error)?;
 
-  let organization = OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    repository.organization_id.as_str(),
-  )
-  .await
-  .map_err(|err| {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      Json(ErrorResponse {
-        message: format!("failed to load organization: {err}"),
-      }),
-    )
-  })?
-  .ok_or_else(|| {
-    (
-      StatusCode::NOT_FOUND,
-      Json(ErrorResponse {
-        message: "organization not found".to_string(),
-      }),
-    )
-  })?;
+  let organization = OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(repository.organization_id.as_str())
+    .await
+    .map_err(|err| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: format!("failed to load organization: {err}"),
+        }),
+      )
+    })?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
+
+  state
+    .services
+    .repository
+    .ensure_repository_storage_ready(organization.key.as_str(), &repository)
+    .await
+    .map_err(map_repository_service_error)?;
 
   let branch = branch_name.unwrap_or(repository.default_branch.clone());
   Ok((organization.key, repository.key, branch))

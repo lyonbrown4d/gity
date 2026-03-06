@@ -8,7 +8,7 @@ use repository::{
   OrganizationsRepository, RepositoriesRepository, RepositoryBranchesRepository,
   RepositoryLanguageSnapshotsRepository,
 };
-use sea_orm::{DatabaseConnection, Set, TransactionTrait};
+use sea_orm::{DatabaseConnection, Set};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
@@ -66,8 +66,14 @@ pub async fn init_repository_language_jobs(
   if cache.cache_type != CacheType::REDIS {
     return Ok(None);
   }
+  let cache_url = cache
+    .url
+    .as_deref()
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+    .ok_or_else(|| "cache.url is required when cache.cache_type=REDIS".to_string())?;
 
-  let conn = apalis_redis::connect(cache.url.as_str())
+  let conn = apalis_redis::connect(cache_url)
     .await
     .map_err(|err| format!("failed to connect apalis redis storage: {err}"))?;
   let queue = RedisStorage::new_with_config(
@@ -78,7 +84,7 @@ pub async fn init_repository_language_jobs(
 
   let worker_state = RepositoryLanguageWorkerState {
     db_conn: db_conn.clone(),
-    git_backend: GitBackendService::new(config, db_conn),
+    git_backend: GitBackendService::new(config, RepositoryBranchesRepository::new(db_conn)),
   };
   tokio::spawn(async move {
     let state = worker_state.clone();
@@ -104,12 +110,13 @@ pub async fn init_repository_language_jobs(
   Ok(Some(client))
 }
 
-async fn process_repository_language_job(job: RepositoryLanguageJob, state: RepositoryLanguageWorkerState) {
-  let repository = match RepositoriesRepository::find_active_repository_by_id(
-    &state.db_conn,
-    job.repository_id.as_str(),
-  )
-  .await
+async fn process_repository_language_job(
+  job: RepositoryLanguageJob,
+  state: RepositoryLanguageWorkerState,
+) {
+  let repository = match RepositoriesRepository::new(state.db_conn.clone())
+    .find_active_repository_by_id(job.repository_id.as_str())
+    .await
   {
     Ok(Some(repository)) => repository,
     Ok(None) => return,
@@ -123,11 +130,9 @@ async fn process_repository_language_job(job: RepositoryLanguageJob, state: Repo
     }
   };
 
-  let organization = match OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    repository.organization_id.as_str(),
-  )
-  .await
+  let organization = match OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(repository.organization_id.as_str())
+    .await
   {
     Ok(Some(organization)) => organization,
     Ok(None) => return,
@@ -144,12 +149,9 @@ async fn process_repository_language_job(job: RepositoryLanguageJob, state: Repo
   let branch_name = job
     .branch_name
     .unwrap_or_else(|| repository.default_branch.clone());
-  let branch = match RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
-    &state.db_conn,
-    repository.id.as_str(),
-    branch_name.as_str(),
-  )
-  .await
+  let branch = match RepositoryBranchesRepository::new(state.db_conn.clone())
+    .find_active_branch_by_repo_and_name(repository.id.as_str(), branch_name.as_str())
+    .await
   {
     Ok(Some(branch)) => branch,
     Ok(None) => return,
@@ -220,19 +222,14 @@ async fn persist_snapshot(
   revision: &str,
   stats: &[git::object::RepositoryLanguageStat],
 ) -> Result<(), String> {
+  let snapshots_repository = RepositoryLanguageSnapshotsRepository::new(db_conn.clone());
   let analyzed_at = Utc::now().into();
   let total_bytes = stats.iter().fold(0_i64, |acc, stat| {
     acc.saturating_add(saturating_u64_to_i64(stat.bytes))
   });
 
-  let txn = db_conn
-    .begin()
-    .await
-    .map_err(|err| format!("failed to begin language snapshot transaction: {err}"))?;
-
-  let snapshot = RepositoryLanguageSnapshotsRepository::insert_snapshot(
-    &txn,
-    repository_language_snapshots::ActiveModel {
+  let snapshot = snapshots_repository
+    .insert_snapshot(repository_language_snapshots::ActiveModel {
       repository_id: Set(repository_id.to_string()),
       branch_name: Set(branch_name.to_string()),
       revision: Set(revision.to_string()),
@@ -240,30 +237,22 @@ async fn persist_snapshot(
       analyzed_at: Set(analyzed_at),
       created_at: Set(analyzed_at),
       ..Default::default()
-    },
-  )
-  .await
-  .map_err(|err| format!("failed to insert language snapshot: {err}"))?;
+    })
+    .await
+    .map_err(|err| format!("failed to insert language snapshot: {err}"))?;
 
   for stat in stats {
-    RepositoryLanguageSnapshotsRepository::insert_snapshot_item(
-      &txn,
-      repository_language_snapshot_items::ActiveModel {
+    snapshots_repository
+      .insert_snapshot_item(repository_language_snapshot_items::ActiveModel {
         snapshot_id: Set(snapshot.id.clone()),
         language: Set(stat.language.clone()),
         bytes: Set(saturating_u64_to_i64(stat.bytes)),
         created_at: Set(analyzed_at),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| format!("failed to insert language snapshot item: {err}"))?;
+      })
+      .await
+      .map_err(|err| format!("failed to insert language snapshot item: {err}"))?;
   }
-
-  txn
-    .commit()
-    .await
-    .map_err(|err| format!("failed to commit language snapshot transaction: {err}"))?;
 
   Ok(())
 }

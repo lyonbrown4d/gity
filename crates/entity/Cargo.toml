@@ -10,3 +10,4 @@ mr-ulid = { workspace = true }
 chrono = { workspace = true }
 domain = { path = "../domain" }
 argon2 = { workspace = true, features = ["password-hash", "parallel"] }
+uuid = "1.22.0"

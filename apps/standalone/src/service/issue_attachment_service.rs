@@ -77,8 +77,7 @@ impl IssueAttachmentService {
           .unwrap_or("application/octet-stream")
           .to_string();
 
-        s3
-          .client
+        s3.client
           .put_object()
           .bucket(s3.bucket.as_str())
           .key(object_key.as_str())

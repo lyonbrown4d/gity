@@ -1,15 +1,29 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::repository_branches;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
   QueryFilter, QueryOrder, Set, prelude::DateTimeWithTimeZone,
 };
 
-pub struct RepositoryBranchesRepository;
+#[derive(Clone)]
+pub struct RepositoryBranchesRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl RepositoryBranchesRepository {
-  pub async fn list_repository_branches_by_repo_id<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> RepositoryBranchesRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn list_repository_branches_by_repo_id(
+    &self,
     repository_id: &str,
     include_deleted: bool,
   ) -> Result<Vec<repository_branches::Model>, DbErr> {
@@ -22,12 +36,12 @@ impl RepositoryBranchesRepository {
 
     query
       .order_by_asc(repository_branches::Column::Name)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn find_active_branch_by_repo_and_name<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_active_branch_by_repo_and_name(
+    &self,
     repository_id: &str,
     branch_name: &str,
   ) -> Result<Option<repository_branches::Model>, DbErr> {
@@ -38,31 +52,32 @@ impl RepositoryBranchesRepository {
           .add(repository_branches::Column::Name.eq(branch_name.to_string()))
           .add(repository_branches::Column::DeletedAt.is_null()),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn exists_active_branch_by_repo_and_name<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn exists_active_branch_by_repo_and_name(
+    &self,
     repository_id: &str,
     branch_name: &str,
   ) -> Result<bool, DbErr> {
     Ok(
-      Self::find_active_branch_by_repo_and_name(conn, repository_id, branch_name)
+      self
+        .find_active_branch_by_repo_and_name(repository_id, branch_name)
         .await?
         .is_some(),
     )
   }
 
-  pub async fn insert_branch<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_branch(
+    &self,
     active: repository_branches::ActiveModel,
   ) -> Result<repository_branches::Model, DbErr> {
-    active.insert(conn).await
+    self.base.insert(active).await
   }
 
-  pub async fn update_branch<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn update_branch(
+    &self,
     model: repository_branches::Model,
     is_protected: Option<bool>,
     last_commit_sha: Option<Option<String>>,
@@ -79,6 +94,6 @@ impl RepositoryBranchesRepository {
       active.deleted_at = Set(deleted_at);
     }
     active.updated_at = Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
   }
 }

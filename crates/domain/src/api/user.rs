@@ -3,6 +3,8 @@ use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, IntoParams, ToSchema)]
 pub struct ListUsersQuery {
+  pub page: Option<u64>,
+  pub page_size: Option<u64>,
   pub limit: Option<u64>,
   pub ids: Option<String>,
 }
@@ -28,4 +30,12 @@ pub struct CreateUserRequest {
   pub username: String,
   pub email: String,
   pub password: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
+pub struct UpdateUserRequest {
+  pub username: Option<String>,
+  pub email: Option<String>,
+  pub password: Option<String>,
+  pub status: Option<String>,
 }

@@ -11,17 +11,31 @@ import { apiRequest } from "@/lib/api";
 import {
   asRecord,
   asString,
+  normalizeListPayload,
+  type PagePayload,
   resolveBoolean,
-  resolveLimit,
+  resolvePagination,
   resolveOrganizationId,
   type MetaLike,
   type ResourceAdapter,
 } from "./shared";
 
+type ListPayload<TData extends BaseRecord = BaseRecord> = TData[] | PagePayload<TData>;
+
 const appendIds = (query: URLSearchParams, ids: Array<string | number>): void => {
   if (ids.length > 0) {
     query.set("ids", ids.map((item) => String(item)).join(","));
   }
+};
+
+const appendPagination = (
+  query: URLSearchParams,
+  pagination: GetListParams["pagination"],
+  fallbackPageSize: number,
+): void => {
+  const { page, pageSize } = resolvePagination(pagination, 1, fallbackPageSize, 200);
+  query.set("page", String(page));
+  query.set("page_size", String(pageSize));
 };
 
 const resolveFilterIds = (params: GetListParams): string[] =>
@@ -32,11 +46,15 @@ const resolveFilterIds = (params: GetListParams): string[] =>
 
 const organizationsAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
+    const ids = resolveFilterIds(params);
     const query = new URLSearchParams();
-    appendIds(query, resolveFilterIds(params));
+    appendIds(query, ids);
+    if (ids.length === 0) {
+      appendPagination(query, params.pagination, 50);
+    }
     const path = query.size > 0 ? `/orgs?${query.toString()}` : "/orgs";
-    const data = await apiRequest<TData[]>(path);
-    return { data, total: data.length };
+    const payload = await apiRequest<ListPayload<TData>>(path);
+    return normalizeListPayload(payload);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => ({
     data: await apiRequest<TData>(`/orgs/${params.id}`),
@@ -44,8 +62,8 @@ const organizationsAdapter: ResourceAdapter = {
   getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
     const query = new URLSearchParams();
     appendIds(query, params.ids);
-    const data = await apiRequest<TData[]>(`/orgs?${query.toString()}`);
-    return { data };
+    const payload = await apiRequest<ListPayload<TData>>(`/orgs?${query.toString()}`);
+    return { data: normalizeListPayload(payload).data };
   },
   create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: CreateParams<TVariables>,
@@ -75,6 +93,7 @@ const organizationsAdapter: ResourceAdapter = {
 
 const repositoriesAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
+    const ids = resolveFilterIds(params);
     const query = new URLSearchParams();
     const organizationId = resolveOrganizationId(params.meta as MetaLike, params.filters);
     if (organizationId) {
@@ -84,10 +103,13 @@ const repositoriesAdapter: ResourceAdapter = {
     if (all) {
       query.set("all", "true");
     }
-    appendIds(query, resolveFilterIds(params));
+    appendIds(query, ids);
+    if (ids.length === 0) {
+      appendPagination(query, params.pagination, 50);
+    }
     const path = query.size > 0 ? `/repos?${query.toString()}` : "/repos";
-    const data = await apiRequest<TData[]>(path);
-    return { data, total: data.length };
+    const payload = await apiRequest<ListPayload<TData>>(path);
+    return normalizeListPayload(payload);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => ({
     data: await apiRequest<TData>(`/repos/${params.id}`),
@@ -103,8 +125,8 @@ const repositoriesAdapter: ResourceAdapter = {
       query.set("all", "true");
     }
     appendIds(query, params.ids);
-    const data = await apiRequest<TData[]>(`/repos?${query.toString()}`);
-    return { data };
+    const payload = await apiRequest<ListPayload<TData>>(`/repos?${query.toString()}`);
+    return { data: normalizeListPayload(payload).data };
   },
   create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: CreateParams<TVariables>,
@@ -129,8 +151,8 @@ const organizationMembersAdapter: ResourceAdapter = {
     if (!organizationId) {
       throw new Error("organization_id is required for organization-members");
     }
-    const data = await apiRequest<TData[]>(`/orgs/${organizationId}/members`);
-    return { data, total: data.length };
+    const payload = await apiRequest<ListPayload<TData>>(`/orgs/${organizationId}/members`);
+    return normalizeListPayload(payload);
   },
   create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: CreateParams<TVariables>,
@@ -154,11 +176,14 @@ const organizationMembersAdapter: ResourceAdapter = {
 
 const usersAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
-    const limit = resolveLimit(params.pagination, 100);
-    const query = new URLSearchParams({ limit: String(limit) });
-    appendIds(query, resolveFilterIds(params));
-    const data = await apiRequest<TData[]>(`/users?${query.toString()}`);
-    return { data, total: data.length };
+    const ids = resolveFilterIds(params);
+    const query = new URLSearchParams();
+    appendIds(query, ids);
+    if (ids.length === 0) {
+      appendPagination(query, params.pagination, 100);
+    }
+    const payload = await apiRequest<ListPayload<TData>>(`/users?${query.toString()}`);
+    return normalizeListPayload(payload);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => {
     if (String(params.id) === "me") {
@@ -169,8 +194,8 @@ const usersAdapter: ResourceAdapter = {
   getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
     const query = new URLSearchParams();
     appendIds(query, params.ids);
-    const data = await apiRequest<TData[]>(`/users?${query.toString()}`);
-    return { data };
+    const payload = await apiRequest<ListPayload<TData>>(`/users?${query.toString()}`);
+    return { data: normalizeListPayload(payload).data };
   },
   create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: CreateParams<TVariables>,
@@ -184,10 +209,17 @@ const usersAdapter: ResourceAdapter = {
   update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: UpdateParams<TVariables>,
   ) => {
-    const data = await apiRequest<TData>("/users/me", {
+    const target = String(params.id) === "me" ? "/users/me" : `/users/${params.id}`;
+    const data = await apiRequest<TData>(target, {
       method: "PATCH",
       body: JSON.stringify(params.variables),
     });
+    return { data };
+  },
+  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
+    params: DeleteOneParams<TVariables>,
+  ) => {
+    const data = await apiRequest<TData>(`/users/${params.id}`, { method: "DELETE" });
     return { data };
   },
 };

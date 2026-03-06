@@ -220,6 +220,9 @@ export function AppRepositoriesPage(): JSX.Element {
                   <p className="truncate text-xs text-muted-foreground">
                     {repo.key} · {t("default branch:")} {repo.default_branch}
                   </p>
+                  <p className="truncate font-mono text-[11px] text-muted-foreground">
+                    UUID: {repo.uuid}
+                  </p>
                   {repo.description ? (
                     <p className="text-sm text-muted-foreground">{repo.description}</p>
                   ) : null}

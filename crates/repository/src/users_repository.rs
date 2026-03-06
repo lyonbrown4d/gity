@@ -1,15 +1,29 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::users;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
-  QueryFilter, QueryOrder, QuerySelect, Set,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+  PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, prelude::DateTimeWithTimeZone,
 };
 
-pub struct UsersRepository;
+#[derive(Clone)]
+pub struct UsersRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl UsersRepository {
-  pub async fn find_user_by_username_or_email<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> UsersRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn find_user_by_username_or_email(
+    &self,
     identity: &str,
   ) -> Result<Option<users::Model>, DbErr> {
     users::Entity::find()
@@ -18,12 +32,12 @@ impl UsersRepository {
           .add(users::Column::Username.eq(identity.to_string()))
           .add(users::Column::Email.eq(identity.to_string())),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn find_duplicate_user_by_username_or_email<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_duplicate_user_by_username_or_email(
+    &self,
     username: &str,
     email: &str,
   ) -> Result<Option<users::Model>, DbErr> {
@@ -33,24 +47,18 @@ impl UsersRepository {
           .add(users::Column::Username.eq(username.to_string()))
           .add(users::Column::Email.eq(email.to_string())),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn find_active_user_by_id<C: ConnectionTrait>(
-    conn: &C,
-    user_id: &str,
-  ) -> Result<Option<users::Model>, DbErr> {
+  pub async fn find_active_user_by_id(&self, user_id: &str) -> Result<Option<users::Model>, DbErr> {
     users::Entity::find_by_id(user_id.to_string())
       .filter(users::Column::DeletedAt.is_null())
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn list_active_users<C: ConnectionTrait>(
-    conn: &C,
-    limit: Option<u64>,
-  ) -> Result<Vec<users::Model>, DbErr> {
+  pub async fn list_active_users(&self, limit: Option<u64>) -> Result<Vec<users::Model>, DbErr> {
     let mut query = users::Entity::find()
       .filter(users::Column::DeletedAt.is_null())
       .order_by_desc(users::Column::CreatedAt);
@@ -59,11 +67,11 @@ impl UsersRepository {
       query = query.limit(limit);
     }
 
-    query.all(conn).await
+    query.all(self.connection()).await
   }
 
-  pub async fn list_active_users_by_ids<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_users_by_ids(
+    &self,
     user_ids: Vec<String>,
   ) -> Result<Vec<users::Model>, DbErr> {
     if user_ids.is_empty() {
@@ -76,19 +84,31 @@ impl UsersRepository {
           .add(users::Column::Id.is_in(user_ids))
           .add(users::Column::DeletedAt.is_null()),
       )
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn insert_user<C: ConnectionTrait>(
-    conn: &C,
-    active: users::ActiveModel,
-  ) -> Result<users::Model, DbErr> {
-    active.insert(conn).await
+  pub async fn list_active_users_paginated(
+    &self,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<users::Model>, u64), DbErr> {
+    let query = users::Entity::find()
+      .filter(users::Column::DeletedAt.is_null())
+      .order_by_desc(users::Column::CreatedAt);
+
+    let paginator = query.paginate(self.connection(), page_size);
+    let total = paginator.num_items().await?;
+    let items = paginator.fetch_page(page.saturating_sub(1)).await?;
+    Ok((items, total))
   }
 
-  pub async fn update_user_profile<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_user(&self, active: users::ActiveModel) -> Result<users::Model, DbErr> {
+    self.base.insert(active).await
+  }
+
+  pub async fn update_user_profile(
+    &self,
     model: users::Model,
     username: Option<String>,
     email: Option<String>,
@@ -109,6 +129,50 @@ impl UsersRepository {
       active.password_salt = Set(password_salt);
     }
     active.updated_at = Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
+  }
+
+  pub async fn update_user_for_admin(
+    &self,
+    model: users::Model,
+    username: Option<String>,
+    email: Option<String>,
+    password_hash: Option<String>,
+    password_salt: Option<String>,
+    status: Option<users::UserStatus>,
+  ) -> Result<users::Model, DbErr> {
+    let mut active = model.into_active_model();
+    if let Some(username) = username {
+      active.username = Set(username);
+    }
+    if let Some(email) = email {
+      active.email = Set(email);
+    }
+    if let Some(password_hash) = password_hash {
+      active.password = Set(password_hash);
+    }
+    if let Some(password_salt) = password_salt {
+      active.password_salt = Set(password_salt);
+    }
+    if let Some(status) = status {
+      active.status = Set(status);
+    }
+    active.updated_at = Set(Utc::now().into());
+    self.base.update(active).await
+  }
+
+  pub async fn mark_user_deleted(
+    &self,
+    model: users::Model,
+    deleted_at: Option<DateTimeWithTimeZone>,
+    status: Option<users::UserStatus>,
+  ) -> Result<users::Model, DbErr> {
+    let mut active = model.into_active_model();
+    active.deleted_at = Set(deleted_at);
+    if let Some(status) = status {
+      active.status = Set(status);
+    }
+    active.updated_at = Set(Utc::now().into());
+    self.base.update(active).await
   }
 }

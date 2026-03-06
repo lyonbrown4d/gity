@@ -13,9 +13,9 @@ use mr_ulid::Ulid;
 use repository::{
   OrganizationsRepository, RepositoriesRepository, RepositoryBranchesRepository,
   RepositoryCommitsRepository, RepositoryIssueCommentsRepository, RepositoryIssuesRepository,
-  UsersRepository,
+  TransactionConnection, UsersRepository,
 };
-use sea_orm::{DatabaseConnection, DbErr, Set, TransactionTrait};
+use sea_orm::{DbErr, Set, TransactionTrait};
 use std::collections::HashSet;
 use std::path::Path;
 use tracing::warn;
@@ -155,7 +155,7 @@ pub enum RepositoryServiceError {
 
 #[derive(Clone)]
 pub struct RepositoryService {
-  db_conn: DatabaseConnection,
+  repositories_repository: RepositoriesRepository,
   git_backend: GitBackendService,
   issue_attachment: IssueAttachmentService,
   storage_enabled: bool,
@@ -163,9 +163,13 @@ pub struct RepositoryService {
 }
 
 impl RepositoryService {
-  pub fn new(config: &Config, db_conn: DatabaseConnection, git_backend: GitBackendService) -> Self {
+  pub fn new(
+    config: &Config,
+    repositories_repository: RepositoriesRepository,
+    git_backend: GitBackendService,
+  ) -> Self {
     Self {
-      db_conn,
+      repositories_repository,
       git_backend,
       issue_attachment: IssueAttachmentService::new(config),
       storage_enabled: config.storage.is_some(),
@@ -184,13 +188,12 @@ impl RepositoryService {
       )
       .await?;
 
-    let organization = OrganizationsRepository::find_active_organization_by_id(
-      &self.db_conn,
-      input.organization_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load organization", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+    let organization = self
+      .organizations_repository()
+      .find_active_organization_by_id(input.organization_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load organization", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
     let repo_key = input.key.trim().to_string();
     if repo_key.is_empty() {
@@ -211,13 +214,11 @@ impl RepositoryService {
       ));
     }
 
-    let exists = RepositoriesRepository::exists_active_repository_by_org_and_key(
-      &self.db_conn,
-      input.organization_id.as_str(),
-      repo_key.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to check repository key", err))?;
+    let exists = self
+      .repositories_repository
+      .exists_active_repository_by_org_and_key(input.organization_id.as_str(), repo_key.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to check repository key", err))?;
 
     if exists {
       return Err(RepositoryServiceError::Conflict(
@@ -257,16 +258,25 @@ impl RepositoryService {
         "storage backend is required when initializing .gitignore or LICENSE".to_string(),
       ));
     }
+    if self.storage_enabled && initial_files.is_empty() {
+      initial_files.push((
+        "README.md".to_string(),
+        format!("# {repo_name}\n\nInitialized by Gity.\n"),
+      ));
+    }
 
     let txn = self
-      .db_conn
+      .repositories_repository
+      .connection()
       .begin()
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_repositories = RepositoriesRepository::new(TransactionConnection::new(&txn));
+    let tx_branches = RepositoryBranchesRepository::new(TransactionConnection::new(&txn));
+    let tx_commits = RepositoryCommitsRepository::new(TransactionConnection::new(&txn));
 
-    let repository = RepositoriesRepository::insert_repository(
-      &txn,
-      repositories::ActiveModel {
+    let repository = tx_repositories
+      .insert_repository(repositories::ActiveModel {
         organization_id: Set(input.organization_id),
         key: Set(repo_key),
         name: Set(repo_name),
@@ -275,24 +285,22 @@ impl RepositoryService {
         default_branch: Set(default_branch.clone()),
         created_by_user_id: Set(creator_user_id.clone()),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to create repository", err))?;
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to create repository", err))?;
 
-    let default_branch_model = RepositoryBranchesRepository::insert_branch(
-      &txn,
-      repository_branches::ActiveModel {
+    let default_branch_model = tx_branches
+      .insert_branch(repository_branches::ActiveModel {
         repository_id: Set(repository.id.clone()),
         name: Set(default_branch.clone()),
         is_protected: Set(false),
         last_commit_sha: Set(None),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to create default branch", err))?;
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to create default branch", err))?;
 
+    let mut storage_initialized = false;
     if self.storage_enabled {
       if let Err(err) = self
         .git_backend
@@ -306,6 +314,7 @@ impl RepositoryService {
         let _ = txn.rollback().await;
         return Err(Self::map_git_backend_error(err));
       }
+      storage_initialized = true;
 
       if !initial_files.is_empty() {
         let seeded_commit_sha = match self
@@ -322,42 +331,75 @@ impl RepositoryService {
           Ok(commit_sha) => commit_sha,
           Err(err) => {
             let _ = txn.rollback().await;
+            self
+              .cleanup_repository_storage_after_failed_creation(
+                organization.key.as_str(),
+                repository.key.as_str(),
+              )
+              .await;
             return Err(Self::map_git_backend_error(err));
           }
         };
 
         if let Some(commit_sha) = seeded_commit_sha {
-          RepositoryBranchesRepository::update_branch(
-            &txn,
-            default_branch_model,
-            None,
-            Some(Some(commit_sha.clone())),
-            None,
-          )
-          .await
-          .map_err(|err| Self::internal_error("failed to update default branch", err))?;
+          if let Err(err) = tx_branches
+            .update_branch(
+              default_branch_model,
+              None,
+              Some(Some(commit_sha.clone())),
+              None,
+            )
+            .await
+          {
+            let _ = txn.rollback().await;
+            if storage_initialized {
+              self
+                .cleanup_repository_storage_after_failed_creation(
+                  organization.key.as_str(),
+                  repository.key.as_str(),
+                )
+                .await;
+            }
+            return Err(Self::internal_error("failed to update default branch", err));
+          }
 
-          RepositoryCommitsRepository::insert_commit(
-            &txn,
-            repository_commits::ActiveModel {
+          if let Err(err) = tx_commits
+            .insert_commit(repository_commits::ActiveModel {
               repository_id: Set(repository.id.clone()),
               branch_name: Set(default_branch),
               commit_sha: Set(commit_sha),
               message: Set("Initialize repository".to_string()),
               author_user_id: Set(creator_user_id),
               ..Default::default()
-            },
-          )
-          .await
-          .map_err(|err| Self::internal_error("failed to insert initial commit", err))?;
+            })
+            .await
+          {
+            let _ = txn.rollback().await;
+            if storage_initialized {
+              self
+                .cleanup_repository_storage_after_failed_creation(
+                  organization.key.as_str(),
+                  repository.key.as_str(),
+                )
+                .await;
+            }
+            return Err(Self::internal_error("failed to insert initial commit", err));
+          }
         }
       }
     }
 
-    txn
-      .commit()
-      .await
-      .map_err(|err| Self::internal_error("failed to commit transaction", err))?;
+    if let Err(err) = txn.commit().await {
+      if storage_initialized {
+        self
+          .cleanup_repository_storage_after_failed_creation(
+            organization.key.as_str(),
+            repository.key.as_str(),
+          )
+          .await;
+      }
+      return Err(Self::internal_error("failed to commit transaction", err));
+    }
 
     Ok(repository)
   }
@@ -369,7 +411,7 @@ impl RepositoryService {
   ) -> Result<Vec<repositories::Model>, RepositoryServiceError> {
     if !self.is_super_admin_user_id(user_id).await? {
       require_organization_role(
-        &self.db_conn,
+        self.repositories_repository.connection(),
         user_id,
         organization_id,
         RequiredOrganizationRole::Member,
@@ -378,7 +420,45 @@ impl RepositoryService {
       .map_err(Self::map_access_error)?;
     }
 
-    RepositoriesRepository::list_active_repositories_by_org(&self.db_conn, organization_id)
+    self
+      .repositories_repository
+      .list_active_repositories_by_org(organization_id)
+      .await
+      .map_err(|err| Self::internal_error("failed to list repositories", err))
+  }
+
+  pub async fn list_repositories_page(
+    &self,
+    user_id: &str,
+    organization_id: &str,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<repositories::Model>, u64), RepositoryServiceError> {
+    if page == 0 {
+      return Err(RepositoryServiceError::BadRequest(
+        "page must be greater than 0".to_string(),
+      ));
+    }
+    if !(1..=200).contains(&page_size) {
+      return Err(RepositoryServiceError::BadRequest(
+        "page_size must be in range [1, 200]".to_string(),
+      ));
+    }
+
+    if !self.is_super_admin_user_id(user_id).await? {
+      require_organization_role(
+        self.repositories_repository.connection(),
+        user_id,
+        organization_id,
+        RequiredOrganizationRole::Member,
+      )
+      .await
+      .map_err(Self::map_access_error)?;
+    }
+
+    self
+      .repositories_repository
+      .list_active_repositories_paginated(Some(organization_id), page, page_size)
       .await
       .map_err(|err| Self::internal_error("failed to list repositories", err))
   }
@@ -394,7 +474,40 @@ impl RepositoryService {
       ));
     }
 
-    RepositoriesRepository::list_active_repositories(&self.db_conn, organization_id)
+    self
+      .repositories_repository
+      .list_active_repositories(organization_id)
+      .await
+      .map_err(|err| Self::internal_error("failed to list repositories", err))
+  }
+
+  pub async fn list_repositories_as_super_admin_page(
+    &self,
+    user_id: &str,
+    organization_id: Option<&str>,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<repositories::Model>, u64), RepositoryServiceError> {
+    if page == 0 {
+      return Err(RepositoryServiceError::BadRequest(
+        "page must be greater than 0".to_string(),
+      ));
+    }
+    if !(1..=200).contains(&page_size) {
+      return Err(RepositoryServiceError::BadRequest(
+        "page_size must be in range [1, 200]".to_string(),
+      ));
+    }
+
+    if !self.is_super_admin_user_id(user_id).await? {
+      return Err(RepositoryServiceError::Forbidden(
+        "super admin permission is required".to_string(),
+      ));
+    }
+
+    self
+      .repositories_repository
+      .list_active_repositories_paginated(organization_id, page, page_size)
       .await
       .map_err(|err| Self::internal_error("failed to list repositories", err))
   }
@@ -417,7 +530,9 @@ impl RepositoryService {
     repo_id: &str,
     required: RequiredOrganizationRole,
   ) -> Result<(repositories::Model, organization_members::Model), RepositoryServiceError> {
-    let repository = RepositoriesRepository::find_active_repository_by_id(&self.db_conn, repo_id)
+    let repository = self
+      .repositories_repository
+      .find_active_repository_by_id(repo_id)
       .await
       .map_err(|err| Self::internal_error("failed to load repository", err))?
       .ok_or_else(|| RepositoryServiceError::NotFound("repository not found".to_string()))?;
@@ -439,7 +554,7 @@ impl RepositoryService {
     }
 
     let membership = require_organization_role(
-      &self.db_conn,
+      self.repositories_repository.connection(),
       user_id,
       repository.organization_id.as_str(),
       required,
@@ -450,12 +565,151 @@ impl RepositoryService {
     Ok((repository, membership))
   }
 
+  pub async fn ensure_repository_storage_ready(
+    &self,
+    organization_key: &str,
+    repository: &repositories::Model,
+  ) -> Result<(), RepositoryServiceError> {
+    if !self.storage_enabled {
+      return Ok(());
+    }
+
+    match self
+      .git_backend
+      .resolve_repo_path(organization_key, repository.key.as_str())
+    {
+      Ok(_) => {}
+      Err(GitBackendError::RepositoryNotFound) => {
+        if let Err(err) = self
+          .git_backend
+          .init_bare_repository_storage(
+            organization_key,
+            repository.key.as_str(),
+            repository.default_branch.as_str(),
+          )
+          .await
+        {
+          match err {
+            GitBackendError::AlreadyExists(_) => {}
+            other => return Err(Self::map_git_backend_error(other)),
+          }
+        }
+      }
+      Err(err) => return Err(Self::map_git_backend_error(err)),
+    }
+
+    let needs_seed = match self
+      .git_backend
+      .list_commits(
+        organization_key,
+        repository.key.as_str(),
+        repository.default_branch.as_str(),
+        1,
+      )
+      .await
+    {
+      Ok(commits) => commits.is_empty(),
+      Err(GitBackendError::Git(message)) if is_missing_git_reference_error(message.as_str()) => {
+        true
+      }
+      Err(GitBackendError::RepositoryNotFound) => true,
+      Err(err) => return Err(Self::map_git_backend_error(err)),
+    };
+
+    if !needs_seed {
+      return Ok(());
+    }
+
+    let commit_sha = self
+      .git_backend
+      .seed_initial_commit(
+        organization_key,
+        repository.key.as_str(),
+        repository.default_branch.as_str(),
+        vec![(
+          "README.md".to_string(),
+          format!("# {}\n\nInitialized by Gity.\n", repository.name),
+        )],
+        "Initialize repository",
+      )
+      .await
+      .map_err(Self::map_git_backend_error)?
+      .ok_or_else(|| {
+        RepositoryServiceError::Internal("failed to seed repository: missing commit id".to_string())
+      })?;
+
+    let txn = self
+      .repositories_repository
+      .connection()
+      .begin()
+      .await
+      .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_branches = RepositoryBranchesRepository::new(TransactionConnection::new(&txn));
+    let tx_commits = RepositoryCommitsRepository::new(TransactionConnection::new(&txn));
+
+    let branch = tx_branches
+      .find_active_branch_by_repo_and_name(
+        repository.id.as_str(),
+        repository.default_branch.as_str(),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to load default branch", err))?;
+
+    match branch {
+      Some(branch) => {
+        tx_branches
+          .update_branch(branch, None, Some(Some(commit_sha.clone())), None)
+          .await
+          .map_err(|err| Self::internal_error("failed to update default branch", err))?;
+      }
+      None => {
+        tx_branches
+          .insert_branch(repository_branches::ActiveModel {
+            repository_id: Set(repository.id.clone()),
+            name: Set(repository.default_branch.clone()),
+            is_protected: Set(false),
+            last_commit_sha: Set(Some(commit_sha.clone())),
+            ..Default::default()
+          })
+          .await
+          .map_err(|err| Self::internal_error("failed to insert default branch", err))?;
+      }
+    }
+
+    let commit_exists = tx_commits
+      .exists_commit_by_repo_and_sha(repository.id.as_str(), commit_sha.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to inspect repository commits", err))?;
+    if !commit_exists {
+      tx_commits
+        .insert_commit(repository_commits::ActiveModel {
+          repository_id: Set(repository.id.clone()),
+          branch_name: Set(repository.default_branch.clone()),
+          commit_sha: Set(commit_sha),
+          message: Set("Initialize repository".to_string()),
+          author_user_id: Set(repository.created_by_user_id.clone()),
+          ..Default::default()
+        })
+        .await
+        .map_err(|err| Self::internal_error("failed to insert initial commit", err))?;
+    }
+
+    txn
+      .commit()
+      .await
+      .map_err(|err| Self::internal_error("failed to commit transaction", err))?;
+
+    Ok(())
+  }
+
   pub async fn delete_repository(
     &self,
     current_user_id: &str,
     repo_id: &str,
   ) -> Result<(), RepositoryServiceError> {
-    let repository = RepositoriesRepository::find_active_repository_by_id(&self.db_conn, repo_id)
+    let repository = self
+      .repositories_repository
+      .find_active_repository_by_id(repo_id)
       .await
       .map_err(|err| Self::internal_error("failed to load repository", err))?
       .ok_or_else(|| RepositoryServiceError::NotFound("repository not found".to_string()))?;
@@ -464,39 +718,40 @@ impl RepositoryService {
       .require_owner_or_super_admin(current_user_id, repository.organization_id.as_str())
       .await?;
 
-    let organization = OrganizationsRepository::find_active_organization_by_id(
-      &self.db_conn,
-      repository.organization_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load organization", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+    let organization = self
+      .organizations_repository()
+      .find_active_organization_by_id(repository.organization_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load organization", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
     let now = Utc::now().into();
     let repo_key = repository.key.clone();
     let organization_key = organization.key.clone();
 
     let txn = self
-      .db_conn
+      .repositories_repository
+      .connection()
       .begin()
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_repositories = RepositoriesRepository::new(TransactionConnection::new(&txn));
+    let tx_branches = RepositoryBranchesRepository::new(TransactionConnection::new(&txn));
 
-    let branches = RepositoryBranchesRepository::list_repository_branches_by_repo_id(
-      &txn,
-      repository.id.as_str(),
-      false,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
+    let branches = tx_branches
+      .list_repository_branches_by_repo_id(repository.id.as_str(), false)
+      .await
+      .map_err(|err| Self::internal_error("failed to load repository branches", err))?;
 
     for branch in branches {
-      RepositoryBranchesRepository::update_branch(&txn, branch, None, None, Some(Some(now)))
+      tx_branches
+        .update_branch(branch, None, None, Some(Some(now)))
         .await
         .map_err(|err| Self::internal_error("failed to delete repository branch", err))?;
     }
 
-    RepositoriesRepository::update_repository(&txn, repository, None, None, None, Some(Some(now)))
+    tx_repositories
+      .update_repository(repository, None, None, None, Some(Some(now)))
       .await
       .map_err(|err| Self::internal_error("failed to delete repository", err))?;
 
@@ -548,14 +803,12 @@ impl RepositoryService {
       ));
     }
 
-    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
-      &self.db_conn,
-      repository.id.as_str(),
-      branch_name.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load branch", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
+    let branch = self
+      .repository_branches_repository()
+      .find_active_branch_by_repo_and_name(repository.id.as_str(), branch_name.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load branch", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
 
     if branch.is_protected && membership.role != organization_members::MemberRole::Owner {
       return Err(RepositoryServiceError::Forbidden(
@@ -567,13 +820,11 @@ impl RepositoryService {
       .commit_sha
       .unwrap_or_else(|| Ulid::new().to_string().to_lowercase());
 
-    let exists = RepositoryCommitsRepository::exists_commit_by_repo_and_sha(
-      &self.db_conn,
-      repository.id.as_str(),
-      commit_sha.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to check commit sha", err))?;
+    let exists = self
+      .repository_commits_repository()
+      .exists_commit_by_repo_and_sha(repository.id.as_str(), commit_sha.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to check commit sha", err))?;
 
     if exists {
       return Err(RepositoryServiceError::Conflict(
@@ -582,26 +833,28 @@ impl RepositoryService {
     }
 
     let txn = self
-      .db_conn
+      .repositories_repository
+      .connection()
       .begin()
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_commits = RepositoryCommitsRepository::new(TransactionConnection::new(&txn));
+    let tx_branches = RepositoryBranchesRepository::new(TransactionConnection::new(&txn));
 
-    let commit = RepositoryCommitsRepository::insert_commit(
-      &txn,
-      repository_commits::ActiveModel {
+    let commit = tx_commits
+      .insert_commit(repository_commits::ActiveModel {
         repository_id: Set(repository.id.clone()),
         branch_name: Set(branch_name),
         commit_sha: Set(commit_sha.clone()),
         message: Set(message),
         author_user_id: Set(input.current_user_id),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to insert commit", err))?;
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to insert commit", err))?;
 
-    RepositoryBranchesRepository::update_branch(&txn, branch, None, Some(Some(commit_sha)), None)
+    tx_branches
+      .update_branch(branch, None, Some(Some(commit_sha)), None)
       .await
       .map_err(|err| Self::internal_error("failed to update branch", err))?;
 
@@ -652,14 +905,12 @@ impl RepositoryService {
       ));
     }
 
-    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
-      &self.db_conn,
-      repository.id.as_str(),
-      branch_name.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load branch", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
+    let branch = self
+      .repository_branches_repository()
+      .find_active_branch_by_repo_and_name(repository.id.as_str(), branch_name.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load branch", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
 
     if branch.is_protected && membership.role != organization_members::MemberRole::Owner {
       return Err(RepositoryServiceError::Forbidden(
@@ -667,19 +918,19 @@ impl RepositoryService {
       ));
     }
 
-    let organization = OrganizationsRepository::find_active_organization_by_id(
-      &self.db_conn,
-      repository.organization_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load organization", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+    let organization = self
+      .organizations_repository()
+      .find_active_organization_by_id(repository.organization_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load organization", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
-    let author =
-      UsersRepository::find_active_user_by_id(&self.db_conn, input.current_user_id.as_str())
-        .await
-        .map_err(|err| Self::internal_error("failed to load current user", err))?
-        .ok_or_else(|| RepositoryServiceError::NotFound("current user not found".to_string()))?;
+    let author = self
+      .users_repository()
+      .find_active_user_by_id(input.current_user_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load current user", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("current user not found".to_string()))?;
 
     let commit_sha = self
       .git_backend
@@ -697,26 +948,28 @@ impl RepositoryService {
       .map_err(Self::map_git_backend_error)?;
 
     let txn = self
-      .db_conn
+      .repositories_repository
+      .connection()
       .begin()
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_commits = RepositoryCommitsRepository::new(TransactionConnection::new(&txn));
+    let tx_branches = RepositoryBranchesRepository::new(TransactionConnection::new(&txn));
 
-    let commit = RepositoryCommitsRepository::insert_commit(
-      &txn,
-      repository_commits::ActiveModel {
+    let commit = tx_commits
+      .insert_commit(repository_commits::ActiveModel {
         repository_id: Set(repository.id.clone()),
         branch_name: Set(branch_name),
         commit_sha: Set(commit_sha.clone()),
         message: Set(message),
         author_user_id: Set(input.current_user_id),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to insert commit", err))?;
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to insert commit", err))?;
 
-    RepositoryBranchesRepository::update_branch(&txn, branch, None, Some(Some(commit_sha)), None)
+    tx_branches
+      .update_branch(branch, None, Some(Some(commit_sha)), None)
       .await
       .map_err(|err| Self::internal_error("failed to update branch", err))?;
 
@@ -747,13 +1000,11 @@ impl RepositoryService {
       ));
     }
 
-    let exists = RepositoryBranchesRepository::exists_active_branch_by_repo_and_name(
-      &self.db_conn,
-      repository.id.as_str(),
-      name.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to check branch name", err))?;
+    let exists = self
+      .repository_branches_repository()
+      .exists_active_branch_by_repo_and_name(repository.id.as_str(), name.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to check branch name", err))?;
 
     if exists {
       return Err(RepositoryServiceError::Conflict(
@@ -761,18 +1012,17 @@ impl RepositoryService {
       ));
     }
 
-    RepositoryBranchesRepository::insert_branch(
-      &self.db_conn,
-      repository_branches::ActiveModel {
+    self
+      .repository_branches_repository()
+      .insert_branch(repository_branches::ActiveModel {
         repository_id: Set(repository.id),
         name: Set(name),
         is_protected: Set(false),
         last_commit_sha: Set(None),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to create branch", err))
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to create branch", err))
   }
 
   pub async fn list_commits(
@@ -787,14 +1037,15 @@ impl RepositoryService {
       )
       .await?;
 
-    RepositoryCommitsRepository::list_commits_by_repo(
-      &self.db_conn,
-      repository.id.as_str(),
-      input.branch_name,
-      input.limit.unwrap_or(50),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to list commits", err))
+    self
+      .repository_commits_repository()
+      .list_commits_by_repo(
+        repository.id.as_str(),
+        input.branch_name,
+        input.limit.unwrap_or(50),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to list commits", err))
   }
 
   pub async fn list_branches(
@@ -809,13 +1060,11 @@ impl RepositoryService {
       )
       .await?;
 
-    RepositoryBranchesRepository::list_repository_branches_by_repo_id(
-      &self.db_conn,
-      repository.id.as_str(),
-      false,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to list branches", err))
+    self
+      .repository_branches_repository()
+      .list_repository_branches_by_repo_id(repository.id.as_str(), false)
+      .await
+      .map_err(|err| Self::internal_error("failed to list branches", err))
   }
 
   pub async fn create_issue(
@@ -845,7 +1094,7 @@ impl RepositoryService {
 
     if let Some(assignee_user_id) = assignee_user_id.as_deref() {
       require_organization_role(
-        &self.db_conn,
+        self.repositories_repository.connection(),
         assignee_user_id,
         repository.organization_id.as_str(),
         RequiredOrganizationRole::Member,
@@ -855,19 +1104,20 @@ impl RepositoryService {
     }
 
     let txn = self
-      .db_conn
+      .repositories_repository
+      .connection()
       .begin()
       .await
       .map_err(|err| Self::internal_error("failed to begin transaction", err))?;
+    let tx_issues = RepositoryIssuesRepository::new(TransactionConnection::new(&txn));
 
-    let number =
-      RepositoryIssuesRepository::next_issue_number_by_repo(&txn, repository.id.as_str())
-        .await
-        .map_err(|err| Self::internal_error("failed to allocate issue number", err))?;
+    let number = tx_issues
+      .next_issue_number_by_repo(repository.id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to allocate issue number", err))?;
 
-    let issue = RepositoryIssuesRepository::insert_issue(
-      &txn,
-      repository_issues::ActiveModel {
+    let issue = tx_issues
+      .insert_issue(repository_issues::ActiveModel {
         repository_id: Set(repository.id),
         number: Set(number),
         title: Set(title),
@@ -876,10 +1126,9 @@ impl RepositoryService {
         author_user_id: Set(input.current_user_id),
         assignee_user_id: Set(assignee_user_id),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to create issue", err))?;
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to create issue", err))?;
 
     txn
       .commit()
@@ -902,14 +1151,15 @@ impl RepositoryService {
       .await?;
 
     let status = parse_issue_status_filter(input.status.as_deref())?;
-    RepositoryIssuesRepository::list_issues_by_repo(
-      &self.db_conn,
-      repository.id.as_str(),
-      status,
-      input.limit.unwrap_or(50).clamp(1, 200),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to list issues", err))
+    self
+      .repository_issues_repository()
+      .list_issues_by_repo(
+        repository.id.as_str(),
+        status,
+        input.limit.unwrap_or(50).clamp(1, 200),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to list issues", err))
   }
 
   pub async fn update_issue(
@@ -924,14 +1174,12 @@ impl RepositoryService {
       )
       .await?;
 
-    let issue = RepositoryIssuesRepository::find_issue_by_repo_and_id(
-      &self.db_conn,
-      repository.id.as_str(),
-      input.issue_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load issue", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
+    let issue = self
+      .repository_issues_repository()
+      .find_issue_by_repo_and_id(repository.id.as_str(), input.issue_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load issue", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
 
     let title = match input.title {
       Some(value) => {
@@ -957,7 +1205,7 @@ impl RepositoryService {
       let normalized = normalize_optional_id(assignee_user_id);
       if let Some(assignee_user_id) = normalized.as_deref() {
         require_organization_role(
-          &self.db_conn,
+          self.repositories_repository.connection(),
           assignee_user_id,
           repository.organization_id.as_str(),
           RequiredOrganizationRole::Member,
@@ -975,17 +1223,18 @@ impl RepositoryService {
       repository_issues::RepositoryIssueStatus::Closed => Some(Utc::now().into()),
     });
 
-    RepositoryIssuesRepository::update_issue(
-      &self.db_conn,
-      issue,
-      title,
-      description,
-      status,
-      assignee_user_id,
-      closed_at,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to update issue", err))
+    self
+      .repository_issues_repository()
+      .update_issue(
+        issue,
+        title,
+        description,
+        status,
+        assignee_user_id,
+        closed_at,
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to update issue", err))
   }
 
   pub async fn get_issue_by_number(
@@ -1006,14 +1255,12 @@ impl RepositoryService {
       ));
     }
 
-    RepositoryIssuesRepository::find_issue_by_repo_and_number(
-      &self.db_conn,
-      repository.id.as_str(),
-      input.number,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load issue", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))
+    self
+      .repository_issues_repository()
+      .find_issue_by_repo_and_number(repository.id.as_str(), input.number)
+      .await
+      .map_err(|err| Self::internal_error("failed to load issue", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))
   }
 
   pub async fn create_issue_comment(
@@ -1028,14 +1275,12 @@ impl RepositoryService {
       )
       .await?;
 
-    let issue = RepositoryIssuesRepository::find_issue_by_repo_and_id(
-      &self.db_conn,
-      repository.id.as_str(),
-      input.issue_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load issue", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
+    let issue = self
+      .repository_issues_repository()
+      .find_issue_by_repo_and_id(repository.id.as_str(), input.issue_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load issue", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("issue not found".to_string()))?;
 
     let content = input.content.trim().to_string();
     if content.is_empty() {
@@ -1044,17 +1289,16 @@ impl RepositoryService {
       ));
     }
 
-    RepositoryIssueCommentsRepository::insert_comment(
-      &self.db_conn,
-      repository_issue_comments::ActiveModel {
+    self
+      .repository_issue_comments_repository()
+      .insert_comment(repository_issue_comments::ActiveModel {
         issue_id: Set(issue.id),
         author_user_id: Set(input.current_user_id),
         content: Set(content),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to create issue comment", err))
+      })
+      .await
+      .map_err(|err| Self::internal_error("failed to create issue comment", err))
   }
 
   pub async fn list_issue_comments(
@@ -1069,27 +1313,26 @@ impl RepositoryService {
       )
       .await?;
 
-    let issue_exists = RepositoryIssuesRepository::find_issue_by_repo_and_id(
-      &self.db_conn,
-      repository.id.as_str(),
-      input.issue_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load issue", err))?
-    .is_some();
+    let issue_exists = self
+      .repository_issues_repository()
+      .find_issue_by_repo_and_id(repository.id.as_str(), input.issue_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load issue", err))?
+      .is_some();
     if !issue_exists {
       return Err(RepositoryServiceError::NotFound(
         "issue not found".to_string(),
       ));
     }
 
-    RepositoryIssueCommentsRepository::list_comments_by_issue(
-      &self.db_conn,
-      input.issue_id.as_str(),
-      input.limit.unwrap_or(100).clamp(1, 500),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to list issue comments", err))
+    self
+      .repository_issue_comments_repository()
+      .list_comments_by_issue(
+        input.issue_id.as_str(),
+        input.limit.unwrap_or(100).clamp(1, 500),
+      )
+      .await
+      .map_err(|err| Self::internal_error("failed to list issue comments", err))
   }
 
   pub async fn upload_issue_attachment(
@@ -1110,24 +1353,21 @@ impl RepositoryService {
       )
       .await?;
 
-    let organization = OrganizationsRepository::find_active_organization_by_id(
-      &self.db_conn,
-      repository.organization_id.as_str(),
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load organization", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
+    let organization = self
+      .organizations_repository()
+      .find_active_organization_by_id(repository.organization_id.as_str())
+      .await
+      .map_err(|err| Self::internal_error("failed to load organization", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("organization not found".to_string()))?;
 
     let issue_id = normalize_optional_id(input.issue_id);
     if let Some(issue_id) = issue_id.as_deref() {
-      let exists = RepositoryIssuesRepository::find_issue_by_repo_and_id(
-        &self.db_conn,
-        repository.id.as_str(),
-        issue_id,
-      )
-      .await
-      .map_err(|err| Self::internal_error("failed to load issue", err))?
-      .is_some();
+      let exists = self
+        .repository_issues_repository()
+        .find_issue_by_repo_and_id(repository.id.as_str(), issue_id)
+        .await
+        .map_err(|err| Self::internal_error("failed to load issue", err))?
+        .is_some();
       if !exists {
         return Err(RepositoryServiceError::NotFound(
           "issue not found".to_string(),
@@ -1148,8 +1388,9 @@ impl RepositoryService {
       )));
     }
 
-    let file_name = sanitize_attachment_file_name(input.file_name.as_deref())
-      .ok_or_else(|| RepositoryServiceError::BadRequest("invalid attachment file name".to_string()))?;
+    let file_name = sanitize_attachment_file_name(input.file_name.as_deref()).ok_or_else(|| {
+      RepositoryServiceError::BadRequest("invalid attachment file name".to_string())
+    })?;
     let issue_segment = issue_id.unwrap_or_else(|| "draft".to_string());
     let object_key = format!(
       "issues/{}/{}/{}/{}-{}",
@@ -1161,11 +1402,7 @@ impl RepositoryService {
     );
     let uploaded = self
       .issue_attachment
-      .upload(
-        object_key,
-        input.bytes,
-        input.content_type.as_deref(),
-      )
+      .upload(object_key, input.bytes, input.content_type.as_deref())
       .await
       .map_err(RepositoryServiceError::BadRequest)?;
 
@@ -1183,24 +1420,42 @@ impl RepositoryService {
       .require_repo_access(user_id, repo_id, RequiredOrganizationRole::Owner)
       .await?;
 
-    let branch = RepositoryBranchesRepository::find_active_branch_by_repo_and_name(
-      &self.db_conn,
-      repository.id.as_str(),
-      branch_name,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to load branch", err))?
-    .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
+    let branch = self
+      .repository_branches_repository()
+      .find_active_branch_by_repo_and_name(repository.id.as_str(), branch_name)
+      .await
+      .map_err(|err| Self::internal_error("failed to load branch", err))?
+      .ok_or_else(|| RepositoryServiceError::NotFound("branch not found".to_string()))?;
 
-    RepositoryBranchesRepository::update_branch(
-      &self.db_conn,
-      branch,
-      Some(is_protected),
-      None,
-      None,
-    )
-    .await
-    .map_err(|err| Self::internal_error("failed to update branch protection", err))
+    self
+      .repository_branches_repository()
+      .update_branch(branch, Some(is_protected), None, None)
+      .await
+      .map_err(|err| Self::internal_error("failed to update branch protection", err))
+  }
+
+  fn organizations_repository(&self) -> OrganizationsRepository {
+    OrganizationsRepository::new(self.repositories_repository.connection().clone())
+  }
+
+  fn repository_branches_repository(&self) -> RepositoryBranchesRepository {
+    RepositoryBranchesRepository::new(self.repositories_repository.connection().clone())
+  }
+
+  fn repository_commits_repository(&self) -> RepositoryCommitsRepository {
+    RepositoryCommitsRepository::new(self.repositories_repository.connection().clone())
+  }
+
+  fn repository_issues_repository(&self) -> RepositoryIssuesRepository {
+    RepositoryIssuesRepository::new(self.repositories_repository.connection().clone())
+  }
+
+  fn repository_issue_comments_repository(&self) -> RepositoryIssueCommentsRepository {
+    RepositoryIssueCommentsRepository::new(self.repositories_repository.connection().clone())
+  }
+
+  fn users_repository(&self) -> UsersRepository {
+    UsersRepository::new(self.repositories_repository.connection().clone())
   }
 
   fn map_access_error(
@@ -1210,6 +1465,25 @@ impl RepositoryService {
       RepositoryServiceError::Internal(err.message)
     } else {
       RepositoryServiceError::Forbidden(err.message)
+    }
+  }
+
+  async fn cleanup_repository_storage_after_failed_creation(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+  ) {
+    if let Err(err) = self
+      .git_backend
+      .remove_repository_storage(organization_key, repository_key)
+      .await
+    {
+      warn!(
+        organization_key = organization_key,
+        repository_key = repository_key,
+        error = err.to_string(),
+        "failed to cleanup repository storage after failed creation",
+      );
     }
   }
 
@@ -1244,7 +1518,7 @@ impl RepositoryService {
     }
 
     require_organization_role(
-      &self.db_conn,
+      self.repositories_repository.connection(),
       user_id,
       organization_id,
       RequiredOrganizationRole::Owner,
@@ -1259,7 +1533,9 @@ impl RepositoryService {
       return Ok(false);
     }
 
-    let user = UsersRepository::find_active_user_by_id(&self.db_conn, user_id)
+    let user = self
+      .users_repository()
+      .find_active_user_by_id(user_id)
       .await
       .map_err(|err| Self::internal_error("failed to load current user", err))?;
     let Some(user) = user else {
@@ -1310,6 +1586,12 @@ fn parse_issue_status_filter(
     return Ok(None);
   }
   parse_issue_status(Some(normalized.as_str()))
+}
+
+fn is_missing_git_reference_error(message: &str) -> bool {
+  let normalized = message.to_ascii_lowercase();
+  (normalized.contains("reference") || normalized.contains("revspec"))
+    && normalized.contains("not found")
 }
 
 fn resolve_gitignore_template(

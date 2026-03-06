@@ -11,6 +11,13 @@ export type ResourceAdapter = {
   getMany?: DataProvider["getMany"];
 };
 
+export type PagePayload<TData extends BaseRecord = BaseRecord> = {
+  total: number;
+  page: number;
+  page_size: number;
+  items: TData[];
+};
+
 export const asString = (value: unknown): string | undefined => {
   if (typeof value !== "string") {
     return undefined;
@@ -83,6 +90,70 @@ export const resolveLimit = (pagination: unknown, fallback = 100): number => {
   }
 
   return Math.max(1, Math.min(200, Math.floor(pageSize)));
+};
+
+const asPositiveInteger = (value: unknown, fallback: number): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return fallback;
+  }
+  const normalized = Math.floor(value);
+  return normalized > 0 ? normalized : fallback;
+};
+
+export const resolvePagination = (
+  pagination: unknown,
+  fallbackPage = 1,
+  fallbackPageSize = 50,
+  maxPageSize = 200,
+): { page: number; pageSize: number } => {
+  const record = asRecord(pagination);
+  if (!record) {
+    return { page: fallbackPage, pageSize: fallbackPageSize };
+  }
+
+  const page = asPositiveInteger(record.current, fallbackPage);
+  const pageSize = Math.min(
+    maxPageSize,
+    asPositiveInteger(record.pageSize, fallbackPageSize),
+  );
+  return { page, pageSize };
+};
+
+const isPagePayload = <TData extends BaseRecord = BaseRecord>(
+  value: unknown,
+): value is PagePayload<TData> => {
+  const record = asRecord(value);
+  if (!record) {
+    return false;
+  }
+  return (
+    typeof record.total === "number"
+    && typeof record.page === "number"
+    && typeof record.page_size === "number"
+    && Array.isArray(record.items)
+  );
+};
+
+export const normalizeListPayload = <TData extends BaseRecord = BaseRecord>(
+  payload: TData[] | PagePayload<TData>,
+): { data: TData[]; total: number } => {
+  if (Array.isArray(payload)) {
+    return {
+      data: payload,
+      total: payload.length,
+    };
+  }
+  if (isPagePayload<TData>(payload)) {
+    return {
+      data: payload.items,
+      total: payload.total,
+    };
+  }
+
+  return {
+    data: [],
+    total: 0,
+  };
 };
 
 export const notSupported = (resource: string, method: string): never => {

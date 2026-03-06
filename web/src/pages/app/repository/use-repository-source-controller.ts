@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiRequest } from "@/lib/api";
+import { useCustomMutation, useDataProvider, type BaseRecord } from "@refinedev/core";
 import type {
   RepositoryBlobView,
   RepositoryBranchView,
@@ -31,6 +31,8 @@ export const useRepositorySourceController = ({
   refreshBranches,
   refreshCommits,
 }: UseRepositorySourceControllerArgs) => {
+  const dataProvider = useDataProvider();
+  const { mutateAsync: createFileCommit, isLoading: isCreatingFile } = useCustomMutation();
   const [codeBranch, setCodeBranch] = useState("");
   const [treeNodes, setTreeNodes] = useState<RepositoryTreeNode[]>([]);
   const [selectedBlob, setSelectedBlob] = useState<RepositoryBlobView | null>(null);
@@ -42,9 +44,27 @@ export const useRepositorySourceController = ({
   const [newFilePath, setNewFilePath] = useState("");
   const [newFileMessage, setNewFileMessage] = useState("");
   const [newFileContent, setNewFileContent] = useState("");
-  const [isCreatingFile, setCreatingFile] = useState(false);
   const [languages, setLanguages] = useState<RepositoryLanguagesView | null>(null);
   const [isLoadingLanguages, setLoadingLanguages] = useState(false);
+
+  const request = async <T extends BaseRecord = BaseRecord>(
+    url: string,
+    method: "get" | "delete" | "head" | "options" | "post" | "put" | "patch" = "get",
+    options?: { query?: Record<string, string>; payload?: unknown },
+  ): Promise<T> => {
+    const custom = dataProvider().custom;
+    if (!custom) {
+      throw new Error("dataProvider.custom is not configured");
+    }
+
+    const response = await custom<T>({
+      url,
+      method,
+      query: options?.query,
+      payload: options?.payload,
+    });
+    return response.data;
+  };
 
   const loadLanguages = async (branchName: string) => {
     if (!branchName) {
@@ -52,8 +72,9 @@ export const useRepositorySourceController = ({
     }
     setLoadingLanguages(true);
     try {
-      const query = new URLSearchParams({ branch_name: branchName });
-      setLanguages(await apiRequest<RepositoryLanguagesView>(`/repos/${repoId}/languages?${query.toString()}`));
+      setLanguages(await request<RepositoryLanguagesView>(`/repos/${repoId}/languages`, "get", {
+        query: { branch_name: branchName },
+      }));
     } catch (error) {
       onError(extractErrorMessage(error));
     } finally {
@@ -62,11 +83,11 @@ export const useRepositorySourceController = ({
   };
 
   const fetchTreeEntries = async (branchName: string, path?: string): Promise<RepositoryTreeEntryView[]> => {
-    const query = new URLSearchParams({ branch_name: branchName });
+    const query: Record<string, string> = { branch_name: branchName };
     if (path) {
-      query.set("path", path);
+      query.path = path;
     }
-    return apiRequest<RepositoryTreeEntryView[]>(`/repos/${repoId}/tree?${query.toString()}`);
+    return request<RepositoryTreeEntryView[]>(`/repos/${repoId}/tree`, "get", { query });
   };
 
   const loadTreeRoot = async (branchName: string) => {
@@ -111,8 +132,9 @@ export const useRepositorySourceController = ({
 
   const loadReadmePreview = async (branchName: string) => {
     try {
-      const query = new URLSearchParams({ branch_name: branchName });
-      const blob = await apiRequest<RepositoryBlobView>(`/repos/${repoId}/readme?${query.toString()}`);
+      const blob = await request<RepositoryBlobView>(`/repos/${repoId}/readme`, "get", {
+        query: { branch_name: branchName },
+      });
       setReadmePath(blob.path);
       if (blob.is_binary) {
         setReadmePreview(`<p>${t("README is binary and cannot be rendered.")}</p>`);
@@ -136,8 +158,9 @@ export const useRepositorySourceController = ({
     }
     onError(null);
     try {
-      const query = new URLSearchParams({ branch_name: codeBranch, path });
-      setSelectedBlob(await apiRequest<RepositoryBlobView>(`/repos/${repoId}/blob?${query.toString()}`));
+      setSelectedBlob(await request<RepositoryBlobView>(`/repos/${repoId}/blob`, "get", {
+        query: { branch_name: codeBranch, path },
+      }));
     } catch (error) {
       onError(extractErrorMessage(error));
     }
@@ -171,21 +194,20 @@ export const useRepositorySourceController = ({
     if (!message) return onError(t("Commit message is required"));
 
     onError(null);
-    setCreatingFile(true);
     try {
-      await apiRequest(`/repos/${repoId}/file-commits`, {
-        method: "POST",
-        body: JSON.stringify({ branch_name: branchName, path: filePath, content: newFileContent, message }),
+      await createFileCommit({
+        url: `/repos/${repoId}/file-commits`,
+        method: "post",
+        values: { branch_name: branchName, path: filePath, content: newFileContent, message },
       });
       setCreateFileModalOpen(false);
       setCodeBranch(branchName);
       await Promise.all([refreshBranches(), refreshCommits(), loadTreeRoot(branchName), loadLanguages(branchName)]);
-      const query = new URLSearchParams({ branch_name: branchName, path: filePath });
-      setSelectedBlob(await apiRequest<RepositoryBlobView>(`/repos/${repoId}/blob?${query.toString()}`));
+      setSelectedBlob(await request<RepositoryBlobView>(`/repos/${repoId}/blob`, "get", {
+        query: { branch_name: branchName, path: filePath },
+      }));
     } catch (error) {
       onError(extractErrorMessage(error));
-    } finally {
-      setCreatingFile(false);
     }
   };
 

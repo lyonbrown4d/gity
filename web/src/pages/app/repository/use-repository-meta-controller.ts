@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useDelete, useList } from "@refinedev/core";
-import { apiRequest } from "@/lib/api";
+import { useMemo, useState } from "react";
+import { useCustom, useCustomMutation, useDelete, useList } from "@refinedev/core";
 import type { OrganizationView, RepositoryBranchView, RepositoryCommitView, RepositoryView } from "@/pages/types";
 import { extractErrorMessage } from "./repository-utils";
 
@@ -19,20 +18,40 @@ export const useRepositoryMetaController = ({
 }: UseRepositoryMetaControllerArgs) => {
   const [branchFilter, setBranchFilter] = useState("all");
   const [newBranchName, setNewBranchName] = useState("");
-  const [branches, setBranches] = useState<RepositoryBranchView[]>([]);
-  const [commits, setCommits] = useState<RepositoryCommitView[]>([]);
-  const [isLoadingBranches, setLoadingBranches] = useState(false);
-  const [isLoadingCommits, setLoadingCommits] = useState(false);
-  const [isUpdatingBranch, setUpdatingBranch] = useState(false);
-  const [isCreatingBranch, setCreatingBranch] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
+  const { mutateAsync: createBranch, isLoading: isCreatingBranch } = useCustomMutation();
+  const { mutateAsync: patchBranchProtection, isLoading: isUpdatingBranch } = useCustomMutation();
+
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const repoQuery = useList<RepositoryView>({
     resource: "my-repositories",
     meta: { organization_id: organizationId },
     queryOptions: { enabled: Boolean(organizationId) },
+  });
+  const commitQuery = useMemo(() => {
+    if (branchFilter === "all") {
+      return { limit: 50 };
+    }
+    return { limit: 50, branch_name: branchFilter };
+  }, [branchFilter]);
+  const branchesQuery = useCustom<RepositoryBranchView[]>({
+    url: `/repos/${repoId}/branches`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+    },
+  });
+  const commitsQuery = useCustom<RepositoryCommitView[]>({
+    url: `/repos/${repoId}/commits`,
+    method: "get",
+    config: { query: commitQuery },
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+    },
   });
 
   const organization = useMemo(
@@ -43,31 +62,25 @@ export const useRepositoryMetaController = ({
     () => (repoQuery.data?.data ?? []).find((item) => item.id === repoId) ?? null,
     [repoQuery.data?.data, repoId],
   );
+  const branches = branchesQuery.data?.data ?? [];
+  const commits = commitsQuery.data?.data ?? [];
 
-  const loadBranches = async () => {
-    setLoadingBranches(true);
-    try {
-      setBranches(await apiRequest<RepositoryBranchView[]>(`/repos/${repoId}/branches`));
-    } catch (error) {
-      setActionError(extractErrorMessage(error));
-    } finally {
-      setLoadingBranches(false);
+  const loadBranches = async (): Promise<void> => {
+    const result = await branchesQuery.refetch();
+    if (result.error) {
+      setActionError(extractErrorMessage(result.error));
+      return;
     }
+    setActionError(null);
   };
 
-  const loadCommits = async () => {
-    setLoadingCommits(true);
-    try {
-      const query = new URLSearchParams({ limit: "50" });
-      if (branchFilter !== "all") {
-        query.set("branch_name", branchFilter);
-      }
-      setCommits(await apiRequest<RepositoryCommitView[]>(`/repos/${repoId}/commits?${query.toString()}`));
-    } catch (error) {
-      setActionError(extractErrorMessage(error));
-    } finally {
-      setLoadingCommits(false);
+  const loadCommits = async (): Promise<void> => {
+    const result = await commitsQuery.refetch();
+    if (result.error) {
+      setActionError(extractErrorMessage(result.error));
+      return;
     }
+    setActionError(null);
   };
 
   const submitCreateBranch = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -76,32 +89,31 @@ export const useRepositoryMetaController = ({
       return;
     }
     setActionError(null);
-    setCreatingBranch(true);
     try {
-      await apiRequest(`/repos/${repoId}/branches`, {
-        method: "POST",
-        body: JSON.stringify({ name: newBranchName.trim() }),
+      await createBranch({
+        url: `/repos/${repoId}/branches`,
+        method: "post",
+        values: { name: newBranchName.trim() },
       });
       setNewBranchName("");
       await Promise.all([loadBranches(), loadCommits()]);
     } catch (error) {
       setActionError(extractErrorMessage(error));
-    } finally {
-      setCreatingBranch(false);
     }
   };
 
   const toggleBranchProtection = async (branch: RepositoryBranchView, protect: boolean) => {
     setActionError(null);
-    setUpdatingBranch(true);
     try {
       const op = protect ? "protect" : "unprotect";
-      await apiRequest(`/repos/${repoId}/branches/${encodeURIComponent(branch.name)}/${op}`, { method: "POST" });
+      await patchBranchProtection({
+        url: `/repos/${repoId}/branches/${encodeURIComponent(branch.name)}/${op}`,
+        method: "post",
+        values: {},
+      });
       await loadBranches();
     } catch (error) {
       setActionError(extractErrorMessage(error));
-    } finally {
-      setUpdatingBranch(false);
     }
   };
 
@@ -131,25 +143,9 @@ export const useRepositoryMetaController = ({
     );
   };
 
-  useEffect(() => {
-    if (repoId) {
-      void loadBranches();
-    }
-  }, [repoId]);
-
-  useEffect(() => {
-    if (repoId) {
-      void loadCommits();
-    }
-  }, [repoId, branchFilter]);
-
   const isLoading = orgQuery.isLoading || repoQuery.isLoading;
-  const errorMessage = actionError
-    ?? (orgQuery.error instanceof Error
-      ? orgQuery.error.message
-      : repoQuery.error instanceof Error
-        ? repoQuery.error.message
-        : null);
+  const queryError = orgQuery.error ?? repoQuery.error ?? branchesQuery.error ?? commitsQuery.error;
+  const errorMessage = actionError ?? (queryError ? extractErrorMessage(queryError) : null);
 
   return {
     organization,
@@ -161,8 +157,8 @@ export const useRepositoryMetaController = ({
     commits,
     branchFilter,
     newBranchName,
-    isLoadingBranches,
-    isLoadingCommits,
+    isLoadingBranches: branchesQuery.isFetching,
+    isLoadingCommits: commitsQuery.isFetching,
     isUpdatingBranch,
     isCreatingBranch,
     isDeleting,

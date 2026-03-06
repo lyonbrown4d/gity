@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleDot, Search } from "lucide-react";
+import { useCustom, useCustomMutation } from "@refinedev/core";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,8 +25,22 @@ export const RepositoryIssuesTab = ({
   onError,
 }: RepositoryIssuesTabProps): JSX.Element => {
   const navigate = useNavigate();
-  const [issues, setIssues] = useState<RepositoryIssueView[]>([]);
-  const [isLoadingIssues, setLoadingIssues] = useState(false);
+  const issuesQuery = useCustom<RepositoryIssueView[]>({
+    url: `/repos/${repoId}/issues`,
+    method: "get",
+    config: {
+      query: {
+        status: "all",
+        limit: 100,
+      },
+    },
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+    },
+  });
+  const { mutateAsync: createIssue, isLoading: isCreatingIssue } = useCustomMutation<RepositoryIssueView>();
+  const issues = issuesQuery.data?.data ?? [];
   const [issueStatusFilter, setIssueStatusFilter] = useState<"open" | "closed" | "all">("open");
   const [issueSearchQuery, setIssueSearchQuery] = useState("");
   const [issueSort, setIssueSort] = useState<IssueSortMode>("updated_desc");
@@ -34,7 +48,6 @@ export const RepositoryIssuesTab = ({
   const [newIssueTitle, setNewIssueTitle] = useState("");
   const [newIssueDescription, setNewIssueDescription] = useState("");
   const [newIssueAssigneeId, setNewIssueAssigneeId] = useState("");
-  const [isCreatingIssue, setCreatingIssue] = useState(false);
 
   const issueStats = useMemo(
     () => ({
@@ -48,20 +61,15 @@ export const RepositoryIssuesTab = ({
     () => filterAndSortIssues(issues, issueStatusFilter, issueSearchQuery, issueSort),
     [issues, issueStatusFilter, issueSearchQuery, issueSort],
   );
+  const isLoadingIssues = issuesQuery.isFetching && !issuesQuery.data;
 
   const loadIssues = async () => {
-    setLoadingIssues(true);
-    try {
-      const query = new URLSearchParams();
-      query.set("status", "all");
-      query.set("limit", "100");
-      const data = await apiRequest<RepositoryIssueView[]>(`/repos/${repoId}/issues?${query.toString()}`);
-      setIssues(data);
-    } catch (error) {
-      onError(extractErrorMessage(error));
-    } finally {
-      setLoadingIssues(false);
+    const result = await issuesQuery.refetch();
+    if (result.error) {
+      onError(extractErrorMessage(result.error));
+      return;
     }
+    onError(null);
   };
 
   const submitCreateIssue = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -73,26 +81,24 @@ export const RepositoryIssuesTab = ({
     }
 
     onError(null);
-    setCreatingIssue(true);
     try {
-      const issue = await apiRequest<RepositoryIssueView>(`/repos/${repoId}/issues`, {
-        method: "POST",
-        body: JSON.stringify({
+      const response = await createIssue({
+        url: `/repos/${repoId}/issues`,
+        method: "post",
+        values: {
           title,
           description: newIssueDescription.trim() || null,
           assignee_user_id: newIssueAssigneeId.trim() || null,
-        }),
+        },
       });
       setNewIssueTitle("");
       setNewIssueDescription("");
       setNewIssueAssigneeId("");
       setIssueComposerOpen(false);
       await loadIssues();
-      navigate(buildIssueDetailPath(organizationId, repoId, issue.number));
+      navigate(buildIssueDetailPath(organizationId, repoId, response.data.number));
     } catch (error) {
       onError(extractErrorMessage(error));
-    } finally {
-      setCreatingIssue(false);
     }
   };
 
@@ -101,8 +107,14 @@ export const RepositoryIssuesTab = ({
       return;
     }
     onError(null);
-    void loadIssues();
-  }, [repoId]);
+  }, [repoId, onError]);
+
+  useEffect(() => {
+    if (!issuesQuery.error) {
+      return;
+    }
+    onError(extractErrorMessage(issuesQuery.error));
+  }, [issuesQuery.error, onError]);
 
   return (
     <Card className="card-enter">

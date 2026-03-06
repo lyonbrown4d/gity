@@ -7,12 +7,15 @@ use sea_orm::prelude::async_trait::async_trait;
 pub use sea_orm::{
   ActiveModelBehavior, DeriveActiveEnum, DeriveRelation, EnumIter, Related, RelationDef,
 };
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "repositories")]
 pub struct Model {
   #[sea_orm(primary_key)]
   pub id: String,
+  #[sea_orm(unique)]
+  pub uuid: String,
 
   pub organization_id: String,
   pub key: String,
@@ -76,6 +79,7 @@ impl ActiveModelBehavior for ActiveModel {
     let now = Utc::now().into();
     Self {
       id: Set(Ulid::new().to_string()),
+      uuid: Set(Uuid::new_v4().to_string()),
       created_at: Set(now),
       updated_at: Set(now),
       ..ActiveModelTrait::default()

@@ -16,6 +16,32 @@ import { apiRequest, getApiBaseUrl } from "@/lib/api";
 import { resolveAdapter } from "./refine/resource-adapters";
 import { buildCustomPath, filterByIds, notSupported, requireValue } from "./refine/shared";
 
+const toRequestBody = (payload: unknown, headers: Headers): RequestInit["body"] => {
+  if (payload === undefined || payload === null) {
+    return undefined;
+  }
+
+  if (typeof FormData !== "undefined" && payload instanceof FormData) {
+    headers.delete("Content-Type");
+    return payload;
+  }
+
+  if (
+    typeof payload === "string"
+    || (typeof Blob !== "undefined" && payload instanceof Blob)
+    || (typeof URLSearchParams !== "undefined" && payload instanceof URLSearchParams)
+    || payload instanceof ArrayBuffer
+  ) {
+    return payload as RequestInit["body"];
+  }
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return JSON.stringify(payload);
+};
+
 const getList: DataProvider["getList"] = async <TData extends BaseRecord = BaseRecord>(
   params: GetListParams,
 ) => {
@@ -112,12 +138,13 @@ const custom: DataProvider["custom"] = async <
   const path = buildCustomPath(url, query, filters, sorters);
   const requestHeaders = new Headers(headers as HeadersInit | undefined);
   const auth = (meta as Record<string, unknown> | undefined)?.auth as boolean | undefined;
+  const body = toRequestBody(payload, requestHeaders);
   const data = await apiRequest<TData>(
     path,
     {
       method: method?.toUpperCase() ?? "GET",
       headers: requestHeaders,
-      body: payload === undefined ? undefined : JSON.stringify(payload),
+      body,
     },
     { auth: auth ?? true },
   );

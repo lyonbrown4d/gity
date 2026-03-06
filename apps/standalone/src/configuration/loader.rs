@@ -1,5 +1,5 @@
 use crate::configuration::cfg::{
-  Auth, Cache, CacheType, Config, IssueAttachments, S3IssueAttachments, Storage,
+  Auth, Cache, CacheType, Config, DatabaseType, IssueAttachments, S3IssueAttachments, Storage,
 };
 use figment::Figment;
 use figment::providers::{Env, Format, Serialized, Toml};
@@ -23,10 +23,11 @@ pub fn load() -> Config {
 fn apply_env_overrides(cfg: &mut Config) {
   if let Ok(cache_url) = env::var("GITY_CACHE_URL") {
     let cache = cfg.cache.get_or_insert(Cache {
-      cache_type: CacheType::MEMORY,
-      url: String::new(),
+      cache_type: CacheType::MOKA,
+      url: None,
+      moka_max_entries: Some(10_000),
     });
-    cache.url = cache_url;
+    cache.url = Some(cache_url);
   }
 
   let cache_type_value = env::var("GITY_CACHE_CACHE_TYPE")
@@ -36,10 +37,31 @@ fn apply_env_overrides(cfg: &mut Config) {
     && let Some(cache_type) = parse_cache_type(value.as_str())
   {
     let cache = cfg.cache.get_or_insert(Cache {
-      cache_type: CacheType::MEMORY,
-      url: String::new(),
+      cache_type: CacheType::MOKA,
+      url: None,
+      moka_max_entries: Some(10_000),
     });
     cache.cache_type = cache_type;
+  }
+
+  if let Ok(value) = env::var("GITY_CACHE_MOKA_MAX_ENTRIES")
+    && let Ok(parsed) = value.trim().parse::<u64>()
+  {
+    let cache = cfg.cache.get_or_insert(Cache {
+      cache_type: CacheType::MOKA,
+      url: None,
+      moka_max_entries: Some(10_000),
+    });
+    cache.moka_max_entries = Some(parsed.max(1));
+  }
+
+  let database_type_value = env::var("GITY_DATABASE_DATABASE_TYPE")
+    .ok()
+    .or_else(|| env::var("GITY_DATABASE_TYPE").ok());
+  if let Some(value) = database_type_value
+    && let Some(database_type) = parse_database_type(value.as_str())
+  {
+    cfg.database.database_type = database_type;
   }
 
   if let Ok(repo_root) = env::var("GITY_STORAGE_REPO_ROOT") {
@@ -157,7 +179,16 @@ fn apply_issue_attachment_overrides(cfg: &mut Config) {
 fn parse_cache_type(value: &str) -> Option<CacheType> {
   match value.trim().to_ascii_uppercase().as_str() {
     "REDIS" => Some(CacheType::REDIS),
-    "MEMORY" => Some(CacheType::MEMORY),
+    "MOKA" | "MEMORY" => Some(CacheType::MOKA),
+    _ => None,
+  }
+}
+
+fn parse_database_type(value: &str) -> Option<DatabaseType> {
+  match value.trim().to_ascii_uppercase().as_str() {
+    "SQLITE" => Some(DatabaseType::SQLITE),
+    "MYSQL" => Some(DatabaseType::MYSQL),
+    "POSTGRES" | "POSTGRESQL" => Some(DatabaseType::POSTGRES),
     _ => None,
   }
 }

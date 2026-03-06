@@ -3,6 +3,8 @@ use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, IntoParams, ToSchema)]
 pub struct ListOrganizationsQuery {
+  pub page: Option<u64>,
+  pub page_size: Option<u64>,
   pub ids: Option<String>,
 }
 

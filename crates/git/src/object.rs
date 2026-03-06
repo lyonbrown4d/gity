@@ -123,9 +123,10 @@ pub fn read_blob(
     ));
   }
 
-  let file_name = full_segments.last().cloned().ok_or_else(|| {
-    ObjectError::InvalidPath("file path cannot be empty".to_string())
-  })?;
+  let file_name = full_segments
+    .last()
+    .cloned()
+    .ok_or_else(|| ObjectError::InvalidPath("file path cannot be empty".to_string()))?;
   let dir_segments = full_segments
     .iter()
     .take(full_segments.len().saturating_sub(1))
@@ -332,7 +333,9 @@ fn resolve_branch_commit<'a>(
 ) -> Result<git2::Commit<'a>, ObjectError> {
   let normalized_branch = branch.trim();
   if normalized_branch.is_empty() {
-    return Err(ObjectError::InvalidPath("branch cannot be empty".to_string()));
+    return Err(ObjectError::InvalidPath(
+      "branch cannot be empty".to_string(),
+    ));
   }
 
   let head_ref = format!("refs/heads/{normalized_branch}");

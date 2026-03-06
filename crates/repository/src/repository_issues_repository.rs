@@ -1,15 +1,29 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::repository_issues;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
   QueryFilter, QueryOrder, QuerySelect, Set,
 };
 
-pub struct RepositoryIssuesRepository;
+#[derive(Clone)]
+pub struct RepositoryIssuesRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl RepositoryIssuesRepository {
-  pub async fn list_issues_by_repo<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> RepositoryIssuesRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn list_issues_by_repo(
+    &self,
     repository_id: &str,
     status: Option<repository_issues::RepositoryIssueStatus>,
     limit: u64,
@@ -23,12 +37,12 @@ impl RepositoryIssuesRepository {
     query
       .order_by_desc(repository_issues::Column::Number)
       .limit(limit)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn find_issue_by_repo_and_id<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_issue_by_repo_and_id(
+    &self,
     repository_id: &str,
     issue_id: &str,
   ) -> Result<Option<repository_issues::Model>, DbErr> {
@@ -38,12 +52,12 @@ impl RepositoryIssuesRepository {
           .add(repository_issues::Column::RepositoryId.eq(repository_id.to_string()))
           .add(repository_issues::Column::Id.eq(issue_id.to_string())),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn find_issue_by_repo_and_number<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_issue_by_repo_and_number(
+    &self,
     repository_id: &str,
     number: i32,
   ) -> Result<Option<repository_issues::Model>, DbErr> {
@@ -53,32 +67,29 @@ impl RepositoryIssuesRepository {
           .add(repository_issues::Column::RepositoryId.eq(repository_id.to_string()))
           .add(repository_issues::Column::Number.eq(number)),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn next_issue_number_by_repo<C: ConnectionTrait>(
-    conn: &C,
-    repository_id: &str,
-  ) -> Result<i32, DbErr> {
+  pub async fn next_issue_number_by_repo(&self, repository_id: &str) -> Result<i32, DbErr> {
     let latest = repository_issues::Entity::find()
       .filter(repository_issues::Column::RepositoryId.eq(repository_id.to_string()))
       .order_by_desc(repository_issues::Column::Number)
-      .one(conn)
+      .one(self.connection())
       .await?;
 
     Ok(latest.map(|issue| issue.number + 1).unwrap_or(1))
   }
 
-  pub async fn insert_issue<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_issue(
+    &self,
     active: repository_issues::ActiveModel,
   ) -> Result<repository_issues::Model, DbErr> {
-    active.insert(conn).await
+    self.base.insert(active).await
   }
 
-  pub async fn update_issue<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn update_issue(
+    &self,
     model: repository_issues::Model,
     title: Option<String>,
     description: Option<Option<String>>,
@@ -103,6 +114,6 @@ impl RepositoryIssuesRepository {
       active.closed_at = Set(closed_at);
     }
     active.updated_at = Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
   }
 }

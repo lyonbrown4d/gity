@@ -12,9 +12,9 @@ import { commonmark } from "@milkdown/preset-commonmark";
 import { gfm } from "@milkdown/preset-gfm";
 import { Milkdown, MilkdownProvider, useEditor } from "@milkdown/react";
 import { nord } from "@milkdown/theme-nord";
+import { useCustomMutation, type HttpError } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { apiRequest } from "@/lib/api";
 import type { IssueAttachmentUploadView } from "@/pages/types";
 import { renderIssueMarkdown } from "./issue-markdown";
 import { IssueMarkdownToolbar, type IssueEditorToolbarAction } from "./issue-markdown-toolbar";
@@ -250,6 +250,7 @@ const IssueMilkdownCore = ({
 
 export const IssueMarkdownEditor = (props: IssueMarkdownEditorProps): JSX.Element => {
   const { repoId, issueId, onError, onChange, value } = props;
+  const { mutateAsync: uploadAttachment } = useCustomMutation<IssueAttachmentUploadView, HttpError, FormData>();
   const [uploadedFiles, setUploadedFiles] = useState<IssueAttachmentUploadView[]>([]);
 
   const uploadFile = async (file: File) => {
@@ -260,10 +261,12 @@ export const IssueMarkdownEditor = (props: IssueMarkdownEditorProps): JSX.Elemen
       query.set("issue_id", issueId);
     }
     const suffix = query.toString() ? `?${query.toString()}` : "";
-    return apiRequest<IssueAttachmentUploadView>(`/repos/${repoId}/issues/attachments${suffix}`, {
-      method: "POST",
-      body: form,
+    const response = await uploadAttachment({
+      url: `/repos/${repoId}/issues/attachments${suffix}`,
+      method: "post",
+      values: form,
     });
+    return response.data;
   };
 
   const handleUploadFiles = async (files: File[]) => {

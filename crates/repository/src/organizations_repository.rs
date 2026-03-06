@@ -1,25 +1,39 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::organizations;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
-  QueryFilter, QueryOrder, Set, prelude::DateTimeWithTimeZone,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+  PaginatorTrait, QueryFilter, QueryOrder, Set, prelude::DateTimeWithTimeZone,
 };
 
-pub struct OrganizationsRepository;
+#[derive(Clone)]
+pub struct OrganizationsRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl OrganizationsRepository {
-  pub async fn find_active_organization_by_id<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> OrganizationsRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn find_active_organization_by_id(
+    &self,
     organization_id: &str,
   ) -> Result<Option<organizations::Model>, DbErr> {
     organizations::Entity::find_by_id(organization_id.to_string())
       .filter(organizations::Column::DeletedAt.is_null())
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn find_active_organization_by_key<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_active_organization_by_key(
+    &self,
     key: &str,
   ) -> Result<Option<organizations::Model>, DbErr> {
     organizations::Entity::find()
@@ -28,12 +42,12 @@ impl OrganizationsRepository {
           .add(organizations::Column::Key.eq(key.to_string()))
           .add(organizations::Column::DeletedAt.is_null()),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn list_active_organizations_by_ids<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_organizations_by_ids(
+    &self,
     organization_ids: Vec<String>,
   ) -> Result<Vec<organizations::Model>, DbErr> {
     if organization_ids.is_empty() {
@@ -46,39 +60,52 @@ impl OrganizationsRepository {
           .add(organizations::Column::Id.is_in(organization_ids))
           .add(organizations::Column::DeletedAt.is_null()),
       )
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn list_active_organizations<C: ConnectionTrait>(
-    conn: &C,
-  ) -> Result<Vec<organizations::Model>, DbErr> {
+  pub async fn list_active_organizations(&self) -> Result<Vec<organizations::Model>, DbErr> {
     organizations::Entity::find()
       .filter(organizations::Column::DeletedAt.is_null())
       .order_by_desc(organizations::Column::CreatedAt)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn find_organization_by_key<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_organizations_paginated(
+    &self,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<organizations::Model>, u64), DbErr> {
+    let query = organizations::Entity::find()
+      .filter(organizations::Column::DeletedAt.is_null())
+      .order_by_desc(organizations::Column::CreatedAt);
+
+    let paginator = query.paginate(self.connection(), page_size);
+    let total = paginator.num_items().await?;
+    let items = paginator.fetch_page(page.saturating_sub(1)).await?;
+    Ok((items, total))
+  }
+
+  pub async fn find_organization_by_key(
+    &self,
     key: &str,
   ) -> Result<Option<organizations::Model>, DbErr> {
     organizations::Entity::find()
       .filter(organizations::Column::Key.eq(key.to_string()))
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn insert_organization<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_organization(
+    &self,
     active: organizations::ActiveModel,
   ) -> Result<organizations::Model, DbErr> {
-    active.insert(conn).await
+    self.base.insert(active).await
   }
 
-  pub async fn update_organization<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn update_organization(
+    &self,
     model: organizations::Model,
     key: Option<String>,
     name: Option<String>,
@@ -99,6 +126,6 @@ impl OrganizationsRepository {
       active.deleted_at = Set(deleted_at);
     }
     active.updated_at = Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
   }
 }

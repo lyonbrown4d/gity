@@ -136,6 +136,9 @@ export function AdminRepositoriesPage(): JSX.Element {
                     <p className="truncate text-xs text-muted-foreground">
                       {repo.key} · {t("default:")} {repo.default_branch}
                     </p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">
+                      UUID: {repo.uuid}
+                    </p>
                     {repo.description ? (
                       <p className="mt-1 text-sm text-muted-foreground">{repo.description}</p>
                     ) : null}

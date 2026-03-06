@@ -8,7 +8,7 @@ utoipa = { workspace = true, features = ["axum_extras", "debug", "macros", "chro
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 # swagger UI removed due to offline build issues; can re-enable later
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum", 'vendored'] }
-uuid = "1.19.0"
+uuid = "1.22.0"
 argon2 = "0.6.0-rc.5"
 time = "0.3.44"
 tokio = { workspace = true, features = ["full"] }
@@ -47,6 +47,7 @@ chrono = { workspace = true }
 mr-ulid = { workspace = true }
 aws-config = "1.8.11"
 aws-sdk-s3 = "1.115.0"
+moka = { version = "0.12.11", features = ["sync"] }
 
 [dev-dependencies]
 reqwest = { version = "0.12.24", default-features = false, features = ["json", "rustls-tls"] }

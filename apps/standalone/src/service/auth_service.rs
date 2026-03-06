@@ -8,8 +8,10 @@ use crate::service::authentication::{
 };
 use domain::user::CreateUser;
 use entity::{organization_members, organizations, users};
-use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
-use sea_orm::{DatabaseConnection, DbErr, Set, TransactionTrait};
+use repository::{
+  OrganizationMembersRepository, OrganizationsRepository, TransactionConnection, UsersRepository,
+};
+use sea_orm::{DbErr, Set, TransactionTrait};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -48,14 +50,21 @@ pub enum AuthServiceError {
 
 #[derive(Clone)]
 pub struct AuthService {
-  db_conn: DatabaseConnection,
+  users_repository: UsersRepository,
+  organizations_repository: OrganizationsRepository,
+  organization_members_repository: OrganizationMembersRepository,
   jwt_secret: String,
   authentication_manager: AuthenticationManager,
   revoked_tokens: Arc<RwLock<HashMap<String, usize>>>,
 }
 
 impl AuthService {
-  pub fn new(config: &Config, db_conn: DatabaseConnection) -> Self {
+  pub fn new(
+    config: &Config,
+    users_repository: UsersRepository,
+    organizations_repository: OrganizationsRepository,
+    organization_members_repository: OrganizationMembersRepository,
+  ) -> Self {
     let jwt_secret = config
       .auth
       .as_ref()
@@ -63,12 +72,17 @@ impl AuthService {
       .filter(|secret| !secret.is_empty())
       .unwrap_or_else(|| "gity-dev-secret-change-me".to_string());
     let authentication_manager = AuthenticationManager::new(vec![
-      Arc::new(SuperAdminCredentialsProvider::new(config, db_conn.clone())),
-      Arc::new(DbUserPasswordProvider::new(db_conn.clone())),
+      Arc::new(SuperAdminCredentialsProvider::new(
+        config,
+        users_repository.clone(),
+      )),
+      Arc::new(DbUserPasswordProvider::new(users_repository.clone())),
     ]);
 
     Self {
-      db_conn,
+      users_repository,
+      organizations_repository,
+      organization_members_repository,
       jwt_secret,
       authentication_manager,
       revoked_tokens: Arc::new(RwLock::new(HashMap::new())),
@@ -76,16 +90,21 @@ impl AuthService {
   }
 
   pub async fn register(&self, input: RegisterInput) -> Result<AuthPayload, AuthServiceError> {
-    let txn = self.db_conn.begin().await.map_err(Self::internal_error)?;
+    let txn = self
+      .users_repository
+      .connection()
+      .begin()
+      .await
+      .map_err(Self::internal_error)?;
+    let tx_users = UsersRepository::new(TransactionConnection::new(&txn));
+    let tx_organizations = OrganizationsRepository::new(TransactionConnection::new(&txn));
+    let tx_members = OrganizationMembersRepository::new(TransactionConnection::new(&txn));
 
-    let duplicated_user = UsersRepository::find_duplicate_user_by_username_or_email(
-      &txn,
-      &input.username,
-      &input.email,
-    )
-    .await
-    .map_err(Self::internal_error)?
-    .is_some();
+    let duplicated_user = tx_users
+      .find_duplicate_user_by_username_or_email(&input.username, &input.email)
+      .await
+      .map_err(Self::internal_error)?
+      .is_some();
 
     if duplicated_user {
       return Err(AuthServiceError::Conflict(
@@ -99,7 +118,8 @@ impl AuthService {
       password: input.password.clone(),
     };
 
-    let user = UsersRepository::insert_user(&txn, users::ActiveModel::from(create_user))
+    let user = tx_users
+      .insert_user(users::ActiveModel::from(create_user))
       .await
       .map_err(|err| Self::map_db_error(err, "failed to create user"))?;
 
@@ -110,29 +130,25 @@ impl AuthService {
       .organization_key
       .unwrap_or_else(|| default_org_key(input.username.as_str()));
 
-    let organization = OrganizationsRepository::insert_organization(
-      &txn,
-      organizations::ActiveModel {
+    let organization = tx_organizations
+      .insert_organization(organizations::ActiveModel {
         key: Set(org_key),
         name: Set(org_name),
         status: Set(organizations::OrgStatus::Active),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::map_db_error(err, "failed to create organization"))?;
+      })
+      .await
+      .map_err(|err| Self::map_db_error(err, "failed to create organization"))?;
 
-    OrganizationMembersRepository::insert_organization_membership(
-      &txn,
-      organization_members::ActiveModel {
+    tx_members
+      .insert_organization_membership(organization_members::ActiveModel {
         organization_id: Set(organization.id.clone()),
         user_id: Set(user.id.clone()),
         role: Set(organization_members::MemberRole::Owner),
         ..Default::default()
-      },
-    )
-    .await
-    .map_err(|err| Self::map_db_error(err, "failed to create organization membership"))?;
+      })
+      .await
+      .map_err(|err| Self::map_db_error(err, "failed to create organization membership"))?;
 
     txn.commit().await.map_err(Self::internal_error)?;
 
@@ -167,18 +183,18 @@ impl AuthService {
         AuthServiceError::Unauthorized("invalid username/email or password".to_string())
       })?;
 
-    let membership =
-      OrganizationMembersRepository::find_first_active_membership_by_user(&self.db_conn, &user.id)
-        .await
-        .map_err(Self::internal_error)?;
+    let membership = self
+      .organization_members_repository
+      .find_first_active_membership_by_user(&user.id)
+      .await
+      .map_err(Self::internal_error)?;
 
     let organization = match membership.as_ref() {
-      Some(member) => OrganizationsRepository::find_active_organization_by_id(
-        &self.db_conn,
-        member.organization_id.as_str(),
-      )
-      .await
-      .map_err(Self::internal_error)?,
+      Some(member) => self
+        .organizations_repository
+        .find_active_organization_by_id(member.organization_id.as_str())
+        .await
+        .map_err(Self::internal_error)?,
       None => None,
     };
 
@@ -216,17 +232,19 @@ impl AuthService {
       AuthServiceError::Unauthorized("invalid or expired refresh token".to_string())
     })?;
 
-    let user = UsersRepository::find_active_user_by_id(&self.db_conn, claims.sub.as_str())
+    let user = self
+      .users_repository
+      .find_active_user_by_id(claims.sub.as_str())
       .await
       .map_err(Self::internal_error)?
       .ok_or_else(|| AuthServiceError::Unauthorized("user not found".to_string()))?;
 
     let organization = match claims.org.as_deref() {
-      Some(org_id) => {
-        OrganizationsRepository::find_active_organization_by_id(&self.db_conn, org_id)
-          .await
-          .map_err(Self::internal_error)?
-      }
+      Some(org_id) => self
+        .organizations_repository
+        .find_active_organization_by_id(org_id)
+        .await
+        .map_err(Self::internal_error)?,
       None => None,
     };
 

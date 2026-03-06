@@ -1,8 +1,9 @@
 use crate::configuration::cfg::Config;
+use chrono::Utc;
 use domain::user::CreateUser;
 use entity::users;
 use repository::UsersRepository;
-use sea_orm::{DatabaseConnection, DbErr};
+use sea_orm::DbErr;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,15 @@ pub struct UpdateCurrentUserInput {
   pub password: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct UpdateUserForAdminInput {
+  pub user_id: String,
+  pub username: Option<String>,
+  pub email: Option<String>,
+  pub password: Option<String>,
+  pub status: Option<users::UserStatus>,
+}
+
 #[derive(Debug)]
 pub enum UserServiceError {
   BadRequest(String),
@@ -31,20 +41,22 @@ pub enum UserServiceError {
 
 #[derive(Clone)]
 pub struct UserService {
-  db_conn: DatabaseConnection,
+  users_repository: UsersRepository,
   super_admin_identities: HashSet<String>,
 }
 
 impl UserService {
-  pub fn new(config: &Config, db_conn: DatabaseConnection) -> Self {
+  pub fn new(config: &Config, users_repository: UsersRepository) -> Self {
     Self {
-      db_conn,
+      users_repository,
       super_admin_identities: collect_super_admin_identities(config),
     }
   }
 
   pub async fn get_current_user(&self, user_id: &str) -> Result<users::Model, UserServiceError> {
-    UsersRepository::find_active_user_by_id(&self.db_conn, user_id)
+    self
+      .users_repository
+      .find_active_user_by_id(user_id)
       .await
       .map_err(Self::internal_error)?
       .ok_or_else(|| UserServiceError::Unauthorized("current user not found".to_string()))
@@ -98,16 +110,11 @@ impl UserService {
       None => (None, None),
     };
 
-    UsersRepository::update_user_profile(
-      &self.db_conn,
-      current,
-      username,
-      email,
-      password_hash,
-      password_salt,
-    )
-    .await
-    .map_err(Self::map_db_error)
+    self
+      .users_repository
+      .update_user_profile(current, username, email, password_hash, password_salt)
+      .await
+      .map_err(Self::map_db_error)
   }
 
   pub async fn create_user_for_admin(
@@ -127,30 +134,27 @@ impl UserService {
       ));
     }
 
-    let duplicated = UsersRepository::find_duplicate_user_by_username_or_email(
-      &self.db_conn,
-      username.as_str(),
-      email.as_str(),
-    )
-    .await
-    .map_err(Self::internal_error)?
-    .is_some();
+    let duplicated = self
+      .users_repository
+      .find_duplicate_user_by_username_or_email(username.as_str(), email.as_str())
+      .await
+      .map_err(Self::internal_error)?
+      .is_some();
     if duplicated {
       return Err(UserServiceError::Conflict(
         "username or email already exists".to_string(),
       ));
     }
 
-    UsersRepository::insert_user(
-      &self.db_conn,
-      users::ActiveModel::from(CreateUser {
+    self
+      .users_repository
+      .insert_user(users::ActiveModel::from(CreateUser {
         username,
         email,
         password,
-      }),
-    )
-    .await
-    .map_err(Self::map_db_error)
+      }))
+      .await
+      .map_err(Self::map_db_error)
   }
 
   pub async fn list_users_for_admin(
@@ -158,16 +162,35 @@ impl UserService {
     current_user_id: &str,
     limit: Option<u64>,
   ) -> Result<Vec<users::Model>, UserServiceError> {
+    let resolved_limit = limit.unwrap_or(100).clamp(1, 200);
+    let (items, _) = self
+      .list_users_page_for_admin(current_user_id, 1, resolved_limit)
+      .await?;
+    Ok(items)
+  }
+
+  pub async fn list_users_page_for_admin(
+    &self,
+    current_user_id: &str,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<users::Model>, u64), UserServiceError> {
     self.require_super_admin_user(current_user_id).await?;
 
-    let resolved_limit = limit.unwrap_or(100);
-    if !(1..=200).contains(&resolved_limit) {
+    if page == 0 {
       return Err(UserServiceError::BadRequest(
-        "limit must be in range [1, 200]".to_string(),
+        "page must be greater than 0".to_string(),
+      ));
+    }
+    if !(1..=200).contains(&page_size) {
+      return Err(UserServiceError::BadRequest(
+        "page_size must be in range [1, 200]".to_string(),
       ));
     }
 
-    UsersRepository::list_active_users(&self.db_conn, Some(resolved_limit))
+    self
+      .users_repository
+      .list_active_users_paginated(page, page_size)
       .await
       .map_err(Self::internal_error)
   }
@@ -179,7 +202,9 @@ impl UserService {
   ) -> Result<Vec<users::Model>, UserServiceError> {
     self.require_super_admin_user(current_user_id).await?;
 
-    UsersRepository::list_active_users_by_ids(&self.db_conn, user_ids)
+    self
+      .users_repository
+      .list_active_users_by_ids(user_ids)
       .await
       .map_err(Self::internal_error)
   }
@@ -191,10 +216,147 @@ impl UserService {
   ) -> Result<users::Model, UserServiceError> {
     self.require_super_admin_user(current_user_id).await?;
 
-    UsersRepository::find_active_user_by_id(&self.db_conn, user_id)
+    self
+      .users_repository
+      .find_active_user_by_id(user_id)
       .await
       .map_err(Self::internal_error)?
       .ok_or_else(|| UserServiceError::NotFound("user not found".to_string()))
+  }
+
+  pub async fn update_user_for_admin(
+    &self,
+    current_user_id: &str,
+    input: UpdateUserForAdminInput,
+  ) -> Result<users::Model, UserServiceError> {
+    self.require_super_admin_user(current_user_id).await?;
+
+    let mut username = input.username.map(|value| value.trim().to_string());
+    let mut email = input.email.map(|value| value.trim().to_ascii_lowercase());
+
+    if username.as_ref().is_some_and(String::is_empty)
+      || email.as_ref().is_some_and(String::is_empty)
+    {
+      return Err(UserServiceError::BadRequest(
+        "username/email cannot be empty".to_string(),
+      ));
+    }
+
+    if input
+      .password
+      .as_ref()
+      .is_some_and(|value| value.trim().is_empty())
+    {
+      return Err(UserServiceError::BadRequest(
+        "password cannot be empty".to_string(),
+      ));
+    }
+
+    if username.is_none() && email.is_none() && input.password.is_none() && input.status.is_none() {
+      return Err(UserServiceError::BadRequest(
+        "at least one field must be provided".to_string(),
+      ));
+    }
+
+    let current = self
+      .users_repository
+      .find_active_user_by_id(input.user_id.as_str())
+      .await
+      .map_err(Self::internal_error)?
+      .ok_or_else(|| UserServiceError::NotFound("user not found".to_string()))?;
+
+    if username
+      .as_ref()
+      .is_some_and(|value| value == current.username.as_str())
+    {
+      username = None;
+    }
+    if email
+      .as_ref()
+      .is_some_and(|value| value == current.email.as_str())
+    {
+      email = None;
+    }
+
+    if username.is_some() || email.is_some() {
+      let candidate_username = username
+        .as_deref()
+        .unwrap_or(current.username.as_str())
+        .to_string();
+      let candidate_email = email
+        .as_deref()
+        .unwrap_or(current.email.as_str())
+        .to_string();
+      let duplicate = self
+        .users_repository
+        .find_duplicate_user_by_username_or_email(
+          candidate_username.as_str(),
+          candidate_email.as_str(),
+        )
+        .await
+        .map_err(Self::internal_error)?;
+      if let Some(duplicate) = duplicate {
+        if duplicate.id != current.id {
+          return Err(UserServiceError::Conflict(
+            "username or email already exists".to_string(),
+          ));
+        }
+      }
+    }
+
+    let (password_hash, password_salt) = match input.password {
+      Some(password) => {
+        let (hash, salt) = users::Model::hash_password(password.as_str());
+        (Some(hash), Some(salt.to_string()))
+      }
+      None => (None, None),
+    };
+
+    self
+      .users_repository
+      .update_user_for_admin(
+        current,
+        username,
+        email,
+        password_hash,
+        password_salt,
+        input.status,
+      )
+      .await
+      .map_err(Self::map_db_error)
+  }
+
+  pub async fn delete_user_for_admin(
+    &self,
+    current_user_id: &str,
+    user_id: &str,
+  ) -> Result<(), UserServiceError> {
+    self.require_super_admin_user(current_user_id).await?;
+
+    if user_id == current_user_id {
+      return Err(UserServiceError::BadRequest(
+        "cannot delete current user".to_string(),
+      ));
+    }
+
+    let current = self
+      .users_repository
+      .find_active_user_by_id(user_id)
+      .await
+      .map_err(Self::internal_error)?
+      .ok_or_else(|| UserServiceError::NotFound("user not found".to_string()))?;
+
+    self
+      .users_repository
+      .mark_user_deleted(
+        current,
+        Some(Utc::now().into()),
+        Some(users::UserStatus::Disabled),
+      )
+      .await
+      .map_err(Self::internal_error)?;
+
+    Ok(())
   }
 
   pub fn is_super_admin(&self, user: &users::Model) -> bool {

@@ -1,25 +1,53 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::repositories;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, IntoActiveModel,
-  QueryFilter, QueryOrder, Set, prelude::DateTimeWithTimeZone,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, IntoActiveModel,
+  PaginatorTrait, QueryFilter, QueryOrder, Set, prelude::DateTimeWithTimeZone,
 };
 
-pub struct RepositoriesRepository;
+#[derive(Clone)]
+pub struct RepositoriesRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl RepositoriesRepository {
-  pub async fn find_active_repository_by_id<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> RepositoriesRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn find_active_repository_by_id(
+    &self,
     repo_id: &str,
   ) -> Result<Option<repositories::Model>, DbErr> {
-    repositories::Entity::find_by_id(repo_id.to_string())
-      .filter(repositories::Column::DeletedAt.is_null())
-      .one(conn)
+    let by_id = self
+      .base
+      .find_by_id::<repositories::Entity, _>(repo_id.to_string())
+      .await?;
+    if let Some(model) = by_id
+      && model.deleted_at.is_none()
+    {
+      return Ok(Some(model));
+    }
+
+    repositories::Entity::find()
+      .filter(
+        Condition::all()
+          .add(repositories::Column::Uuid.eq(repo_id.to_string()))
+          .add(repositories::Column::DeletedAt.is_null()),
+      )
+      .one(self.connection())
       .await
   }
 
-  pub async fn find_active_repository_by_org_and_key<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn find_active_repository_by_org_and_key(
+    &self,
     organization_id: &str,
     repo_key: &str,
   ) -> Result<Option<repositories::Model>, DbErr> {
@@ -30,24 +58,25 @@ impl RepositoriesRepository {
           .add(repositories::Column::Key.eq(repo_key.to_string()))
           .add(repositories::Column::DeletedAt.is_null()),
       )
-      .one(conn)
+      .one(self.connection())
       .await
   }
 
-  pub async fn exists_active_repository_by_org_and_key<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn exists_active_repository_by_org_and_key(
+    &self,
     organization_id: &str,
     repo_key: &str,
   ) -> Result<bool, DbErr> {
     Ok(
-      Self::find_active_repository_by_org_and_key(conn, organization_id, repo_key)
+      self
+        .find_active_repository_by_org_and_key(organization_id, repo_key)
         .await?
         .is_some(),
     )
   }
 
-  pub async fn list_active_repositories_by_org<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_repositories_by_org(
+    &self,
     organization_id: &str,
   ) -> Result<Vec<repositories::Model>, DbErr> {
     repositories::Entity::find()
@@ -56,12 +85,12 @@ impl RepositoriesRepository {
           .add(repositories::Column::OrganizationId.eq(organization_id.to_string()))
           .add(repositories::Column::DeletedAt.is_null()),
       )
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn list_active_repositories<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_repositories(
+    &self,
     organization_id: Option<&str>,
   ) -> Result<Vec<repositories::Model>, DbErr> {
     let mut query = repositories::Entity::find().filter(repositories::Column::DeletedAt.is_null());
@@ -71,12 +100,12 @@ impl RepositoriesRepository {
 
     query
       .order_by_desc(repositories::Column::CreatedAt)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn list_active_repositories_by_ids<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn list_active_repositories_by_ids(
+    &self,
     repository_ids: Vec<String>,
     organization_id: Option<&str>,
   ) -> Result<Vec<repositories::Model>, DbErr> {
@@ -95,19 +124,38 @@ impl RepositoriesRepository {
     repositories::Entity::find()
       .filter(condition)
       .order_by_desc(repositories::Column::CreatedAt)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn insert_repository<C: ConnectionTrait>(
-    conn: &C,
-    active: repositories::ActiveModel,
-  ) -> Result<repositories::Model, DbErr> {
-    active.insert(conn).await
+  pub async fn list_active_repositories_paginated(
+    &self,
+    organization_id: Option<&str>,
+    page: u64,
+    page_size: u64,
+  ) -> Result<(Vec<repositories::Model>, u64), DbErr> {
+    let mut query = repositories::Entity::find().filter(repositories::Column::DeletedAt.is_null());
+    if let Some(organization_id) = organization_id {
+      query = query.filter(repositories::Column::OrganizationId.eq(organization_id.to_string()));
+    }
+
+    let paginator = query
+      .order_by_desc(repositories::Column::CreatedAt)
+      .paginate(self.connection(), page_size);
+    let total = paginator.num_items().await?;
+    let items = paginator.fetch_page(page.saturating_sub(1)).await?;
+    Ok((items, total))
   }
 
-  pub async fn update_repository<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_repository(
+    &self,
+    active: repositories::ActiveModel,
+  ) -> Result<repositories::Model, DbErr> {
+    self.base.insert(active).await
+  }
+
+  pub async fn update_repository(
+    &self,
     model: repositories::Model,
     description: Option<Option<String>>,
     visibility: Option<repositories::RepositoryVisibility>,
@@ -128,6 +176,6 @@ impl RepositoriesRepository {
       active.deleted_at = Set(deleted_at);
     }
     active.updated_at = Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
   }
 }

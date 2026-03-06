@@ -21,13 +21,13 @@ pub async fn require_organization_role(
   organization_id: &str,
   required: RequiredOrganizationRole,
 ) -> Result<organization_members::Model, AccessError> {
-  let membership =
-    OrganizationMembersRepository::find_active_membership(db, user_id, organization_id)
-      .await
-      .map_err(|err| AccessError {
-        status: StatusCode::INTERNAL_SERVER_ERROR,
-        message: format!("failed to load organization membership: {err}"),
-      })?;
+  let membership = OrganizationMembersRepository::new(db.clone())
+    .find_active_membership(user_id, organization_id)
+    .await
+    .map_err(|err| AccessError {
+      status: StatusCode::INTERNAL_SERVER_ERROR,
+      message: format!("failed to load organization membership: {err}"),
+    })?;
 
   let membership = match membership {
     Some(membership) => membership,

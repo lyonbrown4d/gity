@@ -234,7 +234,12 @@ fn upsert_blob_into_tree(
 
   let head = path_segments[0].as_str();
   let existing_subtree = resolve_subtree(repo, base_tree, head)?;
-  let nested_tree_id = upsert_blob_into_tree(repo, existing_subtree.as_ref(), &path_segments[1..], blob_id)?;
+  let nested_tree_id = upsert_blob_into_tree(
+    repo,
+    existing_subtree.as_ref(),
+    &path_segments[1..],
+    blob_id,
+  )?;
   tree_builder
     .insert(head, nested_tree_id, 0o040000)
     .map_err(|err| StorageError::TreeWrite(err.to_string()))?;

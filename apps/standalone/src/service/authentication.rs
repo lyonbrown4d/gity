@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use domain::user::CreateUser;
 use entity::users;
 use repository::UsersRepository;
-use sea_orm::{DatabaseConnection, DbErr};
+use sea_orm::DbErr;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -65,14 +65,14 @@ struct SuperAdminCredential {
 }
 
 pub struct SuperAdminCredentialsProvider {
-  db_conn: DatabaseConnection,
+  users_repository: UsersRepository,
   credential: Option<SuperAdminCredential>,
 }
 
 impl SuperAdminCredentialsProvider {
-  pub fn new(config: &Config, db_conn: DatabaseConnection) -> Self {
+  pub fn new(config: &Config, users_repository: UsersRepository) -> Self {
     Self {
-      db_conn,
+      users_repository,
       credential: extract_super_admin_credential(config),
     }
   }
@@ -82,7 +82,9 @@ impl SuperAdminCredentialsProvider {
     credential: &SuperAdminCredential,
   ) -> Result<users::Model, AuthenticationError> {
     let identity = credential.username.trim();
-    let existing = UsersRepository::find_user_by_username_or_email(&self.db_conn, identity)
+    let existing = self
+      .users_repository
+      .find_user_by_username_or_email(identity)
       .await
       .map_err(map_db_error)?;
     if let Some(user) = existing {
@@ -100,7 +102,9 @@ impl SuperAdminCredentialsProvider {
       email,
       password: credential.password.clone(),
     };
-    let inserted = UsersRepository::insert_user(&self.db_conn, users::ActiveModel::from(create))
+    let inserted = self
+      .users_repository
+      .insert_user(users::ActiveModel::from(create))
       .await
       .map_err(map_db_error)?;
     Ok(inserted)
@@ -133,12 +137,12 @@ impl AuthenticationProvider for SuperAdminCredentialsProvider {
 }
 
 pub struct DbUserPasswordProvider {
-  db_conn: DatabaseConnection,
+  users_repository: UsersRepository,
 }
 
 impl DbUserPasswordProvider {
-  pub fn new(db_conn: DatabaseConnection) -> Self {
-    Self { db_conn }
+  pub fn new(users_repository: UsersRepository) -> Self {
+    Self { users_repository }
   }
 }
 
@@ -148,10 +152,11 @@ impl AuthenticationProvider for DbUserPasswordProvider {
     &self,
     credentials: &CredentialLogin,
   ) -> Result<AuthenticationDecision, AuthenticationError> {
-    let Some(user) =
-      UsersRepository::find_user_by_username_or_email(&self.db_conn, credentials.username.as_str())
-        .await
-        .map_err(map_db_error)?
+    let Some(user) = self
+      .users_repository
+      .find_user_by_username_or_email(credentials.username.as_str())
+      .await
+      .map_err(map_db_error)?
     else {
       return Ok(AuthenticationDecision::Reject);
     };

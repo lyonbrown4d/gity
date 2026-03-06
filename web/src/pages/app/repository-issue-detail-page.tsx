@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
+import { useCustom, useCustomMutation } from "@refinedev/core";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiRequest } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,45 +51,57 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   const organizationId = params.organizationId ?? "";
   const repoId = params.repoId ?? "";
   const issueNumber = Number.parseInt(params.issueNumber ?? "", 10);
+  const isIssueNumberValid = Number.isFinite(issueNumber) && issueNumber > 0;
 
-  const [issue, setIssue] = useState<RepositoryIssueView | null>(null);
-  const [comments, setComments] = useState<RepositoryIssueCommentView[]>([]);
-  const [isLoadingIssue, setLoadingIssue] = useState(false);
-  const [isLoadingComments, setLoadingComments] = useState(false);
-  const [isUpdatingIssue, setUpdatingIssue] = useState(false);
+  const issueQuery = useCustom<RepositoryIssueView>({
+    url: `/repos/${repoId}/issues/by-number/${issueNumber}`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId) && isIssueNumberValid,
+      refetchOnWindowFocus: false,
+    },
+  });
+  const issue = issueQuery.data?.data ?? null;
+  const commentsQuery = useCustom<RepositoryIssueCommentView[]>({
+    url: issue?.id ? `/repos/${repoId}/issues/${issue.id}/comments` : `/repos/${repoId}/issues/comments`,
+    method: "get",
+    config: { query: { limit: 200 } },
+    queryOptions: {
+      enabled: Boolean(repoId) && Boolean(issue?.id),
+      refetchOnWindowFocus: false,
+    },
+  });
+  const comments = commentsQuery.data?.data ?? [];
+  const isLoadingIssue = issueQuery.isFetching && !issueQuery.data;
+  const isLoadingComments = commentsQuery.isFetching && !commentsQuery.data;
+  const { mutateAsync: updateIssueStatus, isLoading: isUpdatingIssue } = useCustomMutation<RepositoryIssueView>();
+  const { mutateAsync: createIssueComment, isLoading: isCreatingComment } = useCustomMutation<RepositoryIssueCommentView>();
   const [newComment, setNewComment] = useState("");
-  const [isCreatingComment, setCreatingComment] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadIssue = async () => {
-    if (!Number.isFinite(issueNumber) || issueNumber <= 0) {
+  const loadIssue = async (): Promise<void> => {
+    if (!isIssueNumberValid) {
       setActionError(t("Invalid issue number"));
       return;
     }
-    setLoadingIssue(true);
-    try {
-      const data = await apiRequest<RepositoryIssueView>(`/repos/${repoId}/issues/by-number/${issueNumber}`);
-      setIssue(data);
-    } catch (error) {
-      setActionError(extractErrorMessage(error));
-    } finally {
-      setLoadingIssue(false);
+    const result = await issueQuery.refetch();
+    if (result.error) {
+      setActionError(extractErrorMessage(result.error));
+      return;
     }
+    setActionError(null);
   };
 
-  const loadComments = async (issueId: string) => {
-    setLoadingComments(true);
-    try {
-      const query = new URLSearchParams({ limit: "200" });
-      const data = await apiRequest<RepositoryIssueCommentView[]>(
-        `/repos/${repoId}/issues/${issueId}/comments?${query.toString()}`,
-      );
-      setComments(data);
-    } catch (error) {
-      setActionError(extractErrorMessage(error));
-    } finally {
-      setLoadingComments(false);
+  const loadComments = async (): Promise<void> => {
+    if (!issue?.id) {
+      return;
     }
+    const result = await commentsQuery.refetch();
+    if (result.error) {
+      setActionError(extractErrorMessage(result.error));
+      return;
+    }
+    setActionError(null);
   };
 
   const toggleIssueStatus = async () => {
@@ -98,17 +110,15 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
     }
     const nextStatus = issue.status === "open" ? "closed" : "open";
     setActionError(null);
-    setUpdatingIssue(true);
     try {
-      const updated = await apiRequest<RepositoryIssueView>(`/repos/${repoId}/issues/${issue.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: nextStatus }),
+      await updateIssueStatus({
+        url: `/repos/${repoId}/issues/${issue.id}`,
+        method: "patch",
+        values: { status: nextStatus },
       });
-      setIssue(updated);
+      await loadIssue();
     } catch (error) {
       setActionError(extractErrorMessage(error));
-    } finally {
-      setUpdatingIssue(false);
     }
   };
 
@@ -123,34 +133,40 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       return;
     }
     setActionError(null);
-    setCreatingComment(true);
     try {
-      await apiRequest<RepositoryIssueCommentView>(`/repos/${repoId}/issues/${issue.id}/comments`, {
-        method: "POST",
-        body: JSON.stringify({ content }),
+      await createIssueComment({
+        url: `/repos/${repoId}/issues/${issue.id}/comments`,
+        method: "post",
+        values: { content },
       });
       setNewComment("");
-      await loadComments(issue.id);
+      await loadComments();
     } catch (error) {
       setActionError(extractErrorMessage(error));
-    } finally {
-      setCreatingComment(false);
     }
   };
 
   useEffect(() => {
     setActionError(null);
-    setIssue(null);
-    setComments([]);
-    void loadIssue();
-  }, [repoId, issueNumber]);
+    setNewComment("");
+    if (!isIssueNumberValid) {
+      setActionError(t("Invalid issue number"));
+    }
+  }, [repoId, issueNumber, isIssueNumberValid, t]);
 
   useEffect(() => {
-    if (!issue?.id) {
+    if (!issueQuery.error) {
       return;
     }
-    void loadComments(issue.id);
-  }, [issue?.id]);
+    setActionError(extractErrorMessage(issueQuery.error));
+  }, [issueQuery.error]);
+
+  useEffect(() => {
+    if (!commentsQuery.error) {
+      return;
+    }
+    setActionError(extractErrorMessage(commentsQuery.error));
+  }, [commentsQuery.error]);
 
   return (
     <div className="space-y-4 page-enter">

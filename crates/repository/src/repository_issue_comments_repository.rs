@@ -1,15 +1,29 @@
+use crate::BaseRepository;
 use chrono::Utc;
 use entity::repository_issue_comments;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder,
+  ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, QueryOrder,
   QuerySelect,
 };
 
-pub struct RepositoryIssueCommentsRepository;
+#[derive(Clone)]
+pub struct RepositoryIssueCommentsRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl RepositoryIssueCommentsRepository {
-  pub async fn list_comments_by_issue<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> RepositoryIssueCommentsRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn list_comments_by_issue(
+    &self,
     issue_id: &str,
     limit: u64,
   ) -> Result<Vec<repository_issue_comments::Model>, DbErr> {
@@ -17,25 +31,25 @@ impl RepositoryIssueCommentsRepository {
       .filter(repository_issue_comments::Column::IssueId.eq(issue_id.to_string()))
       .order_by_asc(repository_issue_comments::Column::CreatedAt)
       .limit(limit)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn insert_comment<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_comment(
+    &self,
     active: repository_issue_comments::ActiveModel,
   ) -> Result<repository_issue_comments::Model, DbErr> {
-    active.insert(conn).await
+    self.base.insert(active).await
   }
 
-  pub async fn update_comment_content<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn update_comment_content(
+    &self,
     model: repository_issue_comments::Model,
     content: String,
   ) -> Result<repository_issue_comments::Model, DbErr> {
     let mut active: repository_issue_comments::ActiveModel = model.into();
     active.content = sea_orm::Set(content);
     active.updated_at = sea_orm::Set(Utc::now().into());
-    active.update(conn).await
+    self.base.update(active).await
   }
 }

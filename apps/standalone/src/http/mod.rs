@@ -14,6 +14,7 @@ pub mod git;
 pub mod middleware;
 pub mod openapi;
 pub mod organization;
+pub mod pagination;
 pub mod repo;
 pub mod user;
 

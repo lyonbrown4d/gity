@@ -1,10 +1,16 @@
-use crate::configuration::cfg::CacheType::MEMORY;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
 pub enum CacheType {
   REDIS,
-  MEMORY,
+  MOKA,
+}
+
+#[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
+pub enum DatabaseType {
+  SQLITE,
+  MYSQL,
+  POSTGRES,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
@@ -17,8 +23,9 @@ pub struct Server {
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
 pub struct Database {
+  pub database_type: DatabaseType,
   pub url: String,
-  pub max_connections: Option<usize>,
+  pub max_connections: Option<u32>,
 }
 
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
@@ -93,7 +100,8 @@ pub struct Config {
 #[derive(Deserialize, PartialEq, Debug, Serialize, Clone)]
 pub struct Cache {
   pub cache_type: CacheType,
-  pub url: String,
+  pub url: Option<String>,
+  pub moka_max_entries: Option<u64>,
 }
 
 impl Default for Config {
@@ -109,12 +117,14 @@ impl Default for Config {
         ]),
       },
       database: Database {
+        database_type: DatabaseType::POSTGRES,
         url: "postgres://user:pass@localhost:5432/gity".to_string(),
         max_connections: Some(10),
       },
       cache: Option::from(Cache {
-        cache_type: MEMORY,
-        url: "".to_string(),
+        cache_type: CacheType::MOKA,
+        url: None,
+        moka_max_entries: Some(10_000),
       }),
       storage: None,
       issue_attachments: None,

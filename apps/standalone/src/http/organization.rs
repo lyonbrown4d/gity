@@ -1,5 +1,6 @@
 use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
+use crate::http::pagination::{resolve_pagination, to_page, to_single_page};
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::{
   RequiredOrganizationRole, member_role_to_string, require_organization_role,
@@ -14,6 +15,8 @@ use domain::api::organization::{
   OrganizationMemberDetailView, OrganizationMemberView, OrganizationView,
   UpdateOrganizationRequest,
 };
+use domain::api::response::{ApiResponse, EmptyData};
+use domain::page::Page;
 use entity::organization_invitations;
 use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
 use sea_orm::DbErr;
@@ -60,36 +63,40 @@ pub struct InvitationCreateResponse {
 #[utoipa::path(
   get,
   path = "/",
+  tag = "Organizations",
   params(ListOrganizationsQuery),
   responses(
-    (status = 200, description = "Organizations visible to current user", body = [OrganizationView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Organizations visible to current user", body = ApiResponse<Page<OrganizationView>>),
+    (status = 400, description = "Bad request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_organizations(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Query(query): Query<ListOrganizationsQuery>,
-) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<Page<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
   list_organizations_internal(&state, &current_user, query).await
 }
 
 #[utoipa::path(
   get,
   path = "/me",
+  tag = "Organizations",
   params(ListOrganizationsQuery),
   responses(
-    (status = 200, description = "Organizations of current user", body = [OrganizationView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Organizations of current user", body = ApiResponse<Page<OrganizationView>>),
+    (status = 400, description = "Bad request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_my_organizations(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Query(query): Query<ListOrganizationsQuery>,
-) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<Page<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
   list_organizations_internal(&state, &current_user, query).await
 }
 
@@ -97,20 +104,46 @@ async fn list_organizations_internal(
   state: &AppState,
   current_user: &CurrentUser,
   query: ListOrganizationsQuery,
-) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<Page<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
   let ids = parse_csv_ids(query.ids.as_deref());
   let has_ids_filter = !ids.is_empty();
+  let pagination = if has_ids_filter {
+    None
+  } else {
+    Some(resolve_pagination(query.page, query.page_size, 50, 200)?)
+  };
 
   if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
-    let organizations = if has_ids_filter {
-      OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, ids.clone())
+    if has_ids_filter {
+      let organizations = OrganizationsRepository::new(state.db_conn.clone())
+        .list_active_organizations_by_ids(ids.clone())
         .await
-        .map_err(|err| internal_error("failed to load organizations", err))?
-    } else {
-      OrganizationsRepository::list_active_organizations(&state.db_conn)
-        .await
-        .map_err(|err| internal_error("failed to load organizations", err))?
-    };
+        .map_err(|err| internal_error("failed to load organizations", err))?;
+
+      let data = organizations
+        .into_iter()
+        .map(|organization| OrganizationView {
+          id: organization.id,
+          key: organization.key,
+          name: organization.name,
+          role: "super_admin".to_string(),
+        })
+        .collect();
+      return Ok((StatusCode::OK, Json(to_single_page(data))));
+    }
+
+    let pagination = pagination.ok_or_else(|| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: "pagination state is invalid".to_string(),
+        }),
+      )
+    })?;
+    let (organizations, total) = OrganizationsRepository::new(state.db_conn.clone())
+      .list_active_organizations_paginated(pagination.page, pagination.page_size)
+      .await
+      .map_err(|err| internal_error("failed to load organizations", err))?;
 
     let data = organizations
       .into_iter()
@@ -121,15 +154,13 @@ async fn list_organizations_internal(
         role: "super_admin".to_string(),
       })
       .collect();
-    return Ok((StatusCode::OK, Json(data)));
+    return Ok((StatusCode::OK, Json(to_page(data, total, pagination))));
   }
 
-  let memberships = OrganizationMembersRepository::list_active_memberships_by_user(
-    &state.db_conn,
-    &current_user.user_id,
-  )
-  .await
-  .map_err(|err| internal_error("failed to load organization memberships", err))?;
+  let memberships = OrganizationMembersRepository::new(state.db_conn.clone())
+    .list_active_memberships_by_user(&current_user.user_id)
+    .await
+    .map_err(|err| internal_error("failed to load organization memberships", err))?;
 
   let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
   let memberships = if has_ids_filter {
@@ -141,55 +172,122 @@ async fn list_organizations_internal(
     memberships
   };
 
-  if memberships.is_empty() {
-    return Ok((StatusCode::OK, Json(vec![])));
+  if has_ids_filter {
+    if memberships.is_empty() {
+      return Ok((StatusCode::OK, Json(to_single_page(Vec::new()))));
+    }
+
+    let organization_ids: Vec<String> = memberships
+      .iter()
+      .map(|membership| membership.organization_id.clone())
+      .collect();
+    let role_by_org: HashMap<String, String> = memberships
+      .into_iter()
+      .map(|membership| {
+        (
+          membership.organization_id.clone(),
+          member_role_to_string(membership.role),
+        )
+      })
+      .collect();
+
+    let organizations = OrganizationsRepository::new(state.db_conn.clone())
+      .list_active_organizations_by_ids(organization_ids)
+      .await
+      .map_err(|err| internal_error("failed to load organizations", err))?;
+    let data = organizations
+      .into_iter()
+      .map(|organization| OrganizationView {
+        role: role_by_org
+          .get(&organization.id)
+          .cloned()
+          .unwrap_or_else(|| "member".to_string()),
+        id: organization.id,
+        key: organization.key,
+        name: organization.name,
+      })
+      .collect();
+
+    return Ok((StatusCode::OK, Json(to_single_page(data))));
   }
 
-  let organization_ids: Vec<String> = memberships
+  let pagination = pagination.ok_or_else(|| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: "pagination state is invalid".to_string(),
+      }),
+    )
+  })?;
+  let total = memberships.len() as u64;
+  if memberships.is_empty() {
+    return Ok((StatusCode::OK, Json(to_page(Vec::new(), total, pagination))));
+  }
+
+  let offset = ((pagination.page - 1) * pagination.page_size) as usize;
+  let paged_memberships = memberships
+    .into_iter()
+    .skip(offset)
+    .take(pagination.page_size as usize)
+    .collect::<Vec<_>>();
+
+  if paged_memberships.is_empty() {
+    return Ok((StatusCode::OK, Json(to_page(Vec::new(), total, pagination))));
+  }
+
+  let role_by_org: HashMap<String, String> = paged_memberships
+    .iter()
+    .map(|membership| {
+      (
+        membership.organization_id.clone(),
+        member_role_to_string(membership.role.clone()),
+      )
+    })
+    .collect();
+  let organization_ids: Vec<String> = paged_memberships
     .iter()
     .map(|membership| membership.organization_id.clone())
     .collect();
 
-  let role_by_org: HashMap<String, String> = memberships
+  let organizations = OrganizationsRepository::new(state.db_conn.clone())
+    .list_active_organizations_by_ids(organization_ids)
+    .await
+    .map_err(|err| internal_error("failed to load organizations", err))?;
+  let organizations_by_id = organizations
     .into_iter()
-    .map(|membership| {
-      (
-        membership.organization_id.clone(),
-        member_role_to_string(membership.role),
-      )
+    .map(|organization| (organization.id.clone(), organization))
+    .collect::<HashMap<_, _>>();
+
+  let data = paged_memberships
+    .into_iter()
+    .filter_map(|membership| {
+      organizations_by_id
+        .get(membership.organization_id.as_str())
+        .map(|organization| OrganizationView {
+          role: role_by_org
+            .get(&organization.id)
+            .cloned()
+            .unwrap_or_else(|| "member".to_string()),
+          id: organization.id.clone(),
+          key: organization.key.clone(),
+          name: organization.name.clone(),
+        })
     })
     .collect();
 
-  let organizations =
-    OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, organization_ids)
-      .await
-      .map_err(|err| internal_error("failed to load organizations", err))?;
-
-  let data = organizations
-    .into_iter()
-    .map(|organization| OrganizationView {
-      role: role_by_org
-        .get(&organization.id)
-        .cloned()
-        .unwrap_or_else(|| "member".to_string()),
-      id: organization.id,
-      key: organization.key,
-      name: organization.name,
-    })
-    .collect();
-
-  Ok((StatusCode::OK, Json(data)))
+  Ok((StatusCode::OK, Json(to_page(data, total, pagination))))
 }
 
 #[utoipa::path(
   get,
   path = "/{organization_id}",
+  tag = "Organizations",
   responses(
-    (status = 200, description = "Get organization by id", body = OrganizationView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Organization not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Get organization by id", body = ApiResponse<OrganizationView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Organization not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn get_organization(
@@ -218,20 +316,18 @@ pub async fn get_organization(
     member_role_to_string(membership.role)
   };
 
-  let organization = OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    organization_id.as_str(),
-  )
-  .await
-  .map_err(|err| internal_error("failed to load organization", err))?
-  .ok_or_else(|| {
-    (
-      StatusCode::NOT_FOUND,
-      Json(ErrorResponse {
-        message: "organization not found".to_string(),
-      }),
-    )
-  })?;
+  let organization = OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(organization_id.as_str())
+    .await
+    .map_err(|err| internal_error("failed to load organization", err))?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
 
   Ok((
     StatusCode::OK,
@@ -247,12 +343,13 @@ pub async fn get_organization(
 #[utoipa::path(
   post,
   path = "/",
+  tag = "Organizations",
   request_body = CreateOrganizationRequest,
   responses(
-    (status = 201, description = "Organization created", body = OrganizationView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 409, description = "Organization key already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Organization created", body = ApiResponse<OrganizationView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Organization key already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_organization(
@@ -281,15 +378,16 @@ pub async fn create_organization(
 #[utoipa::path(
   patch,
   path = "/{organization_id}",
+  tag = "Organizations",
   request_body = UpdateOrganizationRequest,
   responses(
-    (status = 200, description = "Organization updated", body = OrganizationView),
-    (status = 400, description = "Bad request", body = ErrorResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Organization not found", body = ErrorResponse),
-    (status = 409, description = "Organization key already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Organization updated", body = ApiResponse<OrganizationView>),
+    (status = 400, description = "Bad request", body = ApiResponse<ErrorResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Organization not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Organization key already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn update_organization(
@@ -324,39 +422,41 @@ pub async fn update_organization(
 #[utoipa::path(
   delete,
   path = "/{organization_id}",
+  tag = "Organizations",
   responses(
-    (status = 204, description = "Organization deleted"),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Organization not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Organization deleted", body = ApiResponse<EmptyData>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Organization not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn delete_organization(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Path(organization_id): Path<String>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
   state
     .services
     .organization
     .delete_organization(current_user.user_id.as_str(), organization_id.as_str())
     .await
     .map_err(map_organization_service_error)?;
-  Ok(StatusCode::NO_CONTENT)
+  Ok((StatusCode::OK, Json(EmptyData {})))
 }
 
 #[utoipa::path(
   post,
   path = "/{organization_id}/members",
+  tag = "Organizations",
   request_body = AddOrganizationMemberRequest,
   responses(
-    (status = 201, description = "Member added to organization", body = OrganizationMemberView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "User not found", body = ErrorResponse),
-    (status = 409, description = "Member already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Member added to organization", body = ApiResponse<OrganizationMemberView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "User not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Member already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn add_organization_member(
@@ -390,12 +490,13 @@ pub async fn add_organization_member(
 #[utoipa::path(
   get,
   path = "/{organization_id}/members",
+  tag = "Organizations",
   responses(
-    (status = 200, description = "Organization members", body = [OrganizationMemberDetailView]),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Organization not found", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Organization members", body = ApiResponse<Vec<OrganizationMemberDetailView>>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Organization not found", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn list_organization_members(
@@ -404,20 +505,18 @@ pub async fn list_organization_members(
   Path(organization_id): Path<String>,
 ) -> Result<(StatusCode, Json<Vec<OrganizationMemberDetailView>>), (StatusCode, Json<ErrorResponse>)>
 {
-  let organization = OrganizationsRepository::find_active_organization_by_id(
-    &state.db_conn,
-    organization_id.as_str(),
-  )
-  .await
-  .map_err(|err| internal_error("failed to load organization", err))?
-  .ok_or_else(|| {
-    (
-      StatusCode::NOT_FOUND,
-      Json(ErrorResponse {
-        message: "organization not found".to_string(),
-      }),
-    )
-  })?;
+  let organization = OrganizationsRepository::new(state.db_conn.clone())
+    .find_active_organization_by_id(organization_id.as_str())
+    .await
+    .map_err(|err| internal_error("failed to load organization", err))?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
 
   require_org_member_or_super_admin(
     &state,
@@ -426,17 +525,16 @@ pub async fn list_organization_members(
   )
   .await?;
 
-  let members = OrganizationMembersRepository::list_active_memberships_by_organization(
-    &state.db_conn,
-    organization.id.as_str(),
-  )
-  .await
-  .map_err(|err| internal_error("failed to load organization members", err))?;
+  let members = OrganizationMembersRepository::new(state.db_conn.clone())
+    .list_active_memberships_by_organization(organization.id.as_str())
+    .await
+    .map_err(|err| internal_error("failed to load organization members", err))?;
   let user_ids = members
     .iter()
     .map(|member| member.user_id.clone())
     .collect::<Vec<_>>();
-  let users = UsersRepository::list_active_users_by_ids(&state.db_conn, user_ids)
+  let users = UsersRepository::new(state.db_conn.clone())
+    .list_active_users_by_ids(user_ids)
     .await
     .map_err(|err| internal_error("failed to load users", err))?;
   let user_map = users
@@ -464,13 +562,14 @@ pub async fn list_organization_members(
 #[utoipa::path(
   post,
   path = "/{organization_id}/invitations",
+  tag = "Organizations",
   request_body = CreateInvitationRequest,
   responses(
-    (status = 201, description = "Invitation created", body = InvitationCreateResponse),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 409, description = "Pending invitation already exists", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 201, description = "Invitation created", body = ApiResponse<InvitationCreateResponse>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Pending invitation already exists", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn create_organization_invitation(
@@ -509,13 +608,14 @@ pub async fn create_organization_invitation(
 #[utoipa::path(
   post,
   path = "/invitations/{invitation_id}/accept",
+  tag = "Organizations",
   responses(
-    (status = 200, description = "Invitation accepted", body = OrganizationMemberView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Invitation not found", body = ErrorResponse),
-    (status = 409, description = "Invitation already handled", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Invitation accepted", body = ApiResponse<OrganizationMemberView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Invitation not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Invitation already handled", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn accept_organization_invitation(
@@ -543,14 +643,15 @@ pub async fn accept_organization_invitation(
 #[utoipa::path(
   post,
   path = "/invitations/accept",
+  tag = "Organizations",
   request_body = AcceptInvitationByTokenRequest,
   responses(
-    (status = 200, description = "Invitation accepted by token", body = OrganizationMemberView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Invitation not found", body = ErrorResponse),
-    (status = 409, description = "Invitation already handled", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Invitation accepted by token", body = ApiResponse<OrganizationMemberView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Invitation not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Invitation already handled", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn accept_organization_invitation_by_token(
@@ -583,14 +684,15 @@ pub async fn accept_organization_invitation_by_token(
 #[utoipa::path(
   get,
   path = "/invitations/accept",
+  tag = "Organizations",
   params(AcceptInvitationByTokenQuery),
   responses(
-    (status = 200, description = "Invitation accepted by token query", body = OrganizationMemberView),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Invitation not found", body = ErrorResponse),
-    (status = 409, description = "Invitation already handled", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Invitation accepted by token query", body = ApiResponse<OrganizationMemberView>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Invitation not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Invitation already handled", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn accept_organization_invitation_by_token_query(
@@ -623,20 +725,21 @@ pub async fn accept_organization_invitation_by_token_query(
 #[utoipa::path(
   delete,
   path = "/{organization_id}/invitations/{invitation_id}",
+  tag = "Organizations",
   responses(
-    (status = 204, description = "Invitation revoked"),
-    (status = 401, description = "Unauthorized", body = ErrorResponse),
-    (status = 403, description = "Forbidden", body = ErrorResponse),
-    (status = 404, description = "Invitation not found", body = ErrorResponse),
-    (status = 409, description = "Invitation not pending", body = ErrorResponse),
-    (status = 500, description = "Internal server error", body = ErrorResponse)
+    (status = 200, description = "Invitation revoked", body = ApiResponse<EmptyData>),
+    (status = 401, description = "Unauthorized", body = ApiResponse<ErrorResponse>),
+    (status = 403, description = "Forbidden", body = ApiResponse<ErrorResponse>),
+    (status = 404, description = "Invitation not found", body = ApiResponse<ErrorResponse>),
+    (status = 409, description = "Invitation not pending", body = ApiResponse<ErrorResponse>),
+    (status = 500, description = "Internal server error", body = ApiResponse<ErrorResponse>)
   )
 )]
 pub async fn revoke_organization_invitation(
   State(state): State<AppState>,
   current_user: CurrentUser,
   Path((organization_id, invitation_id)): Path<(String, String)>,
-) -> Result<StatusCode, (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
   state
     .services
     .organization
@@ -648,7 +751,7 @@ pub async fn revoke_organization_invitation(
     .await
     .map_err(map_organization_service_error)?;
 
-  Ok(StatusCode::NO_CONTENT)
+  Ok((StatusCode::OK, Json(EmptyData {})))
 }
 
 pub fn organization_routes() -> OpenApiRouter<AppState> {

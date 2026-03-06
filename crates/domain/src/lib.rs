@@ -1,5 +1,5 @@
 pub mod api;
-mod page;
+pub mod page;
 pub mod user;
 
 #[cfg(test)]

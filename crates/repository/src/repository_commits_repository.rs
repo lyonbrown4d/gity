@@ -1,14 +1,28 @@
+use crate::BaseRepository;
 use entity::repository_commits;
 use sea_orm::{
-  ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DbErr, EntityTrait, QueryFilter,
+  ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter,
   QueryOrder, QuerySelect,
 };
 
-pub struct RepositoryCommitsRepository;
+#[derive(Clone)]
+pub struct RepositoryCommitsRepository<C: ConnectionTrait = DatabaseConnection> {
+  base: BaseRepository<C>,
+}
 
-impl RepositoryCommitsRepository {
-  pub async fn list_commits_by_repo<C: ConnectionTrait>(
-    conn: &C,
+impl<C: ConnectionTrait> RepositoryCommitsRepository<C> {
+  pub fn new(conn: C) -> Self {
+    Self {
+      base: BaseRepository::new(conn),
+    }
+  }
+
+  pub fn connection(&self) -> &C {
+    self.base.connection()
+  }
+
+  pub async fn list_commits_by_repo(
+    &self,
     repository_id: &str,
     branch_name: Option<String>,
     limit: u64,
@@ -22,12 +36,12 @@ impl RepositoryCommitsRepository {
     finder
       .order_by_desc(repository_commits::Column::CreatedAt)
       .limit(limit)
-      .all(conn)
+      .all(self.connection())
       .await
   }
 
-  pub async fn exists_commit_by_repo_and_sha<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn exists_commit_by_repo_and_sha(
+    &self,
     repository_id: &str,
     commit_sha: &str,
   ) -> Result<bool, DbErr> {
@@ -38,16 +52,16 @@ impl RepositoryCommitsRepository {
             .add(repository_commits::Column::RepositoryId.eq(repository_id.to_string()))
             .add(repository_commits::Column::CommitSha.eq(commit_sha.to_string())),
         )
-        .one(conn)
+        .one(self.connection())
         .await?
         .is_some(),
     )
   }
 
-  pub async fn insert_commit<C: ConnectionTrait>(
-    conn: &C,
+  pub async fn insert_commit(
+    &self,
     active: repository_commits::ActiveModel,
   ) -> Result<repository_commits::Model, DbErr> {
-    active.insert(conn).await
+    self.base.insert(active).await
   }
 }

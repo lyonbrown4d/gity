@@ -12,6 +12,7 @@ import type {
   RepositoryView,
 } from "@/pages/types";
 import type { RepositoryTreeNode } from "./repository-types";
+import { RepositoryEmptyState } from "./repository-empty-state";
 import { detectLanguage, formatBytes, formatTime, languageBarColor } from "./repository-utils";
 
 interface RepositoryCodeTabProps {
@@ -73,6 +74,8 @@ export const RepositoryCodeTab = ({
   onToggleTreeDirectory,
   onRefreshLanguages,
 }: RepositoryCodeTabProps): JSX.Element => {
+  const isEmptyRepository = !isLoadingTree && treeNodes.length === 0 && !selectedBlob && !readmePreview;
+
   const renderTreeNodes = (nodes: RepositoryTreeNode[], depth = 0): JSX.Element[] =>
     nodes.map((node) => (
       <div key={node.path}>
@@ -177,6 +180,13 @@ export const RepositoryCodeTab = ({
                   }}
                 />
               )
+            ) : isEmptyRepository ? (
+              <RepositoryEmptyState
+                t={t}
+                repositoryName={repository.name}
+                cloneHttpUrl={repository.clone_http_url}
+                defaultBranch={repository.default_branch || "main"}
+              />
             ) : readmePreview ? (
               <div className="p-4">
                 <div className="mb-3 flex items-center justify-between">

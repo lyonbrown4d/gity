@@ -3,6 +3,8 @@ use utoipa::{IntoParams, ToSchema};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, IntoParams, ToSchema)]
 pub struct ListRepositoriesQuery {
+  pub page: Option<u64>,
+  pub page_size: Option<u64>,
   pub organization_id: Option<String>,
   pub all: Option<bool>,
   pub ids: Option<String>,
@@ -23,6 +25,7 @@ pub struct CreateRepositoryRequest {
 #[derive(Debug, Clone, Deserialize, Serialize, ToSchema)]
 pub struct RepositoryView {
   pub id: String,
+  pub uuid: String,
   pub organization_id: String,
   pub key: String,
   pub name: String,

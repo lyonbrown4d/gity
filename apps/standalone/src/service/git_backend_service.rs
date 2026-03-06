@@ -2,7 +2,6 @@ use crate::configuration::cfg::Config;
 use chrono::Utc;
 use git::{object, rpc, storage};
 use repository::RepositoryBranchesRepository;
-use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path as FsPath, PathBuf};
@@ -45,14 +44,17 @@ impl fmt::Display for GitBackendError {
 
 #[derive(Clone)]
 pub struct GitBackendService {
-  db_conn: DatabaseConnection,
+  repository_branches_repository: RepositoryBranchesRepository,
   repo_root: Option<String>,
 }
 
 impl GitBackendService {
-  pub fn new(config: &Config, db_conn: DatabaseConnection) -> Self {
+  pub fn new(
+    config: &Config,
+    repository_branches_repository: RepositoryBranchesRepository,
+  ) -> Self {
     Self {
-      db_conn,
+      repository_branches_repository,
       repo_root: config
         .storage
         .as_ref()
@@ -99,13 +101,11 @@ impl GitBackendService {
     repo_path: &FsPath,
   ) -> Result<(), GitBackendError> {
     let refs = self.list_head_refs(repo_path).await?;
-    let existing = RepositoryBranchesRepository::list_repository_branches_by_repo_id(
-      &self.db_conn,
-      repository_id,
-      true,
-    )
-    .await
-    .map_err(|err| GitBackendError::Db(format!("failed to load repository branches: {err}")))?;
+    let existing = self
+      .repository_branches_repository
+      .list_repository_branches_by_repo_id(repository_id, true)
+      .await
+      .map_err(|err| GitBackendError::Db(format!("failed to load repository branches: {err}")))?;
 
     let mut existing_by_name: HashMap<String, entity::repository_branches::Model> = existing
       .into_iter()
@@ -115,30 +115,25 @@ impl GitBackendService {
     let now = Utc::now().into();
     for (branch_name, commit_sha) in refs {
       if let Some(model) = existing_by_name.remove(branch_name.as_str()) {
-        RepositoryBranchesRepository::update_branch(
-          &self.db_conn,
-          model,
-          None,
-          Some(Some(commit_sha)),
-          Some(None),
-        )
-        .await
-        .map_err(|err| GitBackendError::Db(format!("failed to update branch metadata: {err}")))?;
+        self
+          .repository_branches_repository
+          .update_branch(model, None, Some(Some(commit_sha)), Some(None))
+          .await
+          .map_err(|err| GitBackendError::Db(format!("failed to update branch metadata: {err}")))?;
         continue;
       }
 
-      RepositoryBranchesRepository::insert_branch(
-        &self.db_conn,
-        entity::repository_branches::ActiveModel {
+      self
+        .repository_branches_repository
+        .insert_branch(entity::repository_branches::ActiveModel {
           repository_id: sea_orm::Set(repository_id.to_string()),
           name: sea_orm::Set(branch_name),
           is_protected: sea_orm::Set(false),
           last_commit_sha: sea_orm::Set(Some(commit_sha)),
           ..Default::default()
-        },
-      )
-      .await
-      .map_err(|err| GitBackendError::Db(format!("failed to insert branch metadata: {err}")))?;
+        })
+        .await
+        .map_err(|err| GitBackendError::Db(format!("failed to insert branch metadata: {err}")))?;
     }
 
     for (_, model) in existing_by_name {
@@ -146,17 +141,13 @@ impl GitBackendService {
         continue;
       }
 
-      RepositoryBranchesRepository::update_branch(
-        &self.db_conn,
-        model,
-        None,
-        Some(None),
-        Some(Some(now)),
-      )
-      .await
-      .map_err(|err| {
-        GitBackendError::Db(format!("failed to mark deleted branch metadata: {err}"))
-      })?;
+      self
+        .repository_branches_repository
+        .update_branch(model, None, Some(None), Some(Some(now)))
+        .await
+        .map_err(|err| {
+          GitBackendError::Db(format!("failed to mark deleted branch metadata: {err}"))
+        })?;
     }
 
     Ok(())
@@ -418,10 +409,11 @@ impl GitBackendService {
   ) -> Result<Option<object::BlobObject>, GitBackendError> {
     let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
     let branch = branch.to_string();
-    let output =
-      tokio::task::spawn_blocking(move || object::read_root_readme(repo_path.as_path(), branch.as_str()))
-        .await
-        .map_err(|err| GitBackendError::Git(format!("failed to join git readme task: {err}")))?;
+    let output = tokio::task::spawn_blocking(move || {
+      object::read_root_readme(repo_path.as_path(), branch.as_str())
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git readme task: {err}")))?;
 
     output.map_err(|err| GitBackendError::Git(err.to_string()))
   }
