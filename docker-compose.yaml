@@ -21,7 +21,7 @@ services:
       - '9000:9000'
       - '9001:9001'
     volumes:
-      - './data/minio:/data'
+      - 'minio_data:/data'
   minio-init:
     image: 'minio/mc:latest'
     depends_on:
@@ -36,3 +36,6 @@ services:
       /usr/bin/mc anonymous set download local/gity-issues;
       echo 'minio bucket initialized';
       "
+
+volumes:
+  minio_data:

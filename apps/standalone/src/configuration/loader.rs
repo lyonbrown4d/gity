@@ -1,9 +1,9 @@
 use crate::configuration::cfg::{
   Auth, Cache, CacheType, Config, DatabaseType, IssueAttachments, S3IssueAttachments, Storage,
 };
-use figment::Figment;
-use figment::providers::{Env, Format, Serialized, Toml};
 use std::env;
+use figment2::Figment;
+use figment2::providers::{Env, Format, Serialized, Toml};
 
 pub fn load() -> Config {
   let mut cfg = Figment::new()
