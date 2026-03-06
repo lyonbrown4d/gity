@@ -19,7 +19,6 @@ import type { IssueAttachmentUploadView } from "@/pages/types";
 import { renderIssueMarkdown } from "./issue-markdown";
 import { IssueMarkdownToolbar, type IssueEditorToolbarAction } from "./issue-markdown-toolbar";
 import { appendMarkdown, resolveToolbarRequest } from "./issue-markdown-editor-actions";
-
 interface IssueMarkdownEditorProps {
   organizationId: string;
   repoId: string;
@@ -35,8 +34,7 @@ interface IssueMarkdownEditorProps {
 interface MilkdownEditorCoreProps extends IssueMarkdownEditorProps {
   onUploadFiles: (files: File[]) => Promise<void>;
 }
-
-function IssueMilkdownCore({
+const IssueMilkdownCore = ({
   organizationId,
   repoId,
   t,
@@ -46,7 +44,7 @@ function IssueMilkdownCore({
   onChange,
   onError,
   onUploadFiles,
-}: MilkdownEditorCoreProps): JSX.Element {
+}: MilkdownEditorCoreProps): JSX.Element => {
   const [mode, setMode] = useState<"write" | "preview">("write");
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [isRenderingPreview, setRenderingPreview] = useState(false);
@@ -248,9 +246,9 @@ function IssueMilkdownCore({
       )}
     </div>
   );
-}
+};
 
-export function IssueMarkdownEditor(props: IssueMarkdownEditorProps): JSX.Element {
+export const IssueMarkdownEditor = (props: IssueMarkdownEditorProps): JSX.Element => {
   const { repoId, issueId, onError, onChange, value } = props;
   const [uploadedFiles, setUploadedFiles] = useState<IssueAttachmentUploadView[]>([]);
 
@@ -299,4 +297,4 @@ export function IssueMarkdownEditor(props: IssueMarkdownEditorProps): JSX.Elemen
       ) : null}
     </MilkdownProvider>
   );
-}
+};

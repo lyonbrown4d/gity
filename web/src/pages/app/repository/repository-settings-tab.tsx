@@ -9,12 +9,12 @@ interface RepositorySettingsTabProps {
   onDelete: () => void;
 }
 
-export function RepositorySettingsTab({
+export const RepositorySettingsTab = ({
   repository,
   t,
   isDeleting,
   onDelete,
-}: RepositorySettingsTabProps): JSX.Element {
+}: RepositorySettingsTabProps): JSX.Element => {
   return (
     <Card className="card-enter">
       <CardHeader>
@@ -46,4 +46,4 @@ export function RepositorySettingsTab({
       </CardContent>
     </Card>
   );
-}
+};

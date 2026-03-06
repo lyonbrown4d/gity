@@ -17,15 +17,15 @@ export type ToolbarRequest =
   | { type: "insert_text"; text: string }
   | { type: "command"; key: MilkdownCommandKey; payload?: unknown };
 
-export function appendMarkdown(source: string, snippet: string): string {
+export const appendMarkdown = (source: string, snippet: string): string => {
   const prefix = source.trimEnd().length === 0 ? "" : "\n\n";
   return `${source}${prefix}${snippet}`;
-}
+};
 
-export function resolveToolbarRequest(
+export const resolveToolbarRequest = (
   action: IssueEditorToolbarAction,
   t: (text: string) => string,
-): ToolbarRequest | null {
+): ToolbarRequest | null => {
   if (action === "bold") {
     return { type: "command", key: "ToggleStrong" };
   }
@@ -72,4 +72,4 @@ export function resolveToolbarRequest(
   }
   const alt = window.prompt(t("Image description (optional)"), "")?.trim();
   return { type: "command", key: "InsertImage", payload: { src, alt } };
-}
+};

@@ -8,6 +8,12 @@ use crate::service::organization_service::OrganizationServiceError;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use domain::api::crud::parse_csv_ids;
+use domain::api::organization::{
+  AddOrganizationMemberRequest, CreateOrganizationRequest, ListOrganizationsQuery,
+  OrganizationMemberDetailView, OrganizationMemberView, OrganizationView,
+  UpdateOrganizationRequest,
+};
 use entity::organization_invitations;
 use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
 use sea_orm::DbErr;
@@ -16,48 +22,6 @@ use std::collections::HashMap;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct OrganizationView {
-  pub id: String,
-  pub key: String,
-  pub name: String,
-  pub role: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateOrganizationRequest {
-  pub key: String,
-  pub name: String,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateOrganizationRequest {
-  pub key: Option<String>,
-  pub name: Option<String>,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct AddOrganizationMemberRequest {
-  pub user_id: String,
-  pub role: Option<String>,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct OrganizationMemberView {
-  pub organization_id: String,
-  pub user_id: String,
-  pub role: String,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct OrganizationMemberDetailView {
-  pub organization_id: String,
-  pub user_id: String,
-  pub username: String,
-  pub email: String,
-  pub role: String,
-}
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateInvitationRequest {
@@ -96,6 +60,7 @@ pub struct InvitationCreateResponse {
 #[utoipa::path(
   get,
   path = "/",
+  params(ListOrganizationsQuery),
   responses(
     (status = 200, description = "Organizations visible to current user", body = [OrganizationView]),
     (status = 401, description = "Unauthorized", body = ErrorResponse),
@@ -105,13 +70,15 @@ pub struct InvitationCreateResponse {
 pub async fn list_organizations(
   State(state): State<AppState>,
   current_user: CurrentUser,
+  Query(query): Query<ListOrganizationsQuery>,
 ) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
-  list_organizations_internal(&state, &current_user).await
+  list_organizations_internal(&state, &current_user, query).await
 }
 
 #[utoipa::path(
   get,
   path = "/me",
+  params(ListOrganizationsQuery),
   responses(
     (status = 200, description = "Organizations of current user", body = [OrganizationView]),
     (status = 401, description = "Unauthorized", body = ErrorResponse),
@@ -121,18 +88,29 @@ pub async fn list_organizations(
 pub async fn list_my_organizations(
   State(state): State<AppState>,
   current_user: CurrentUser,
+  Query(query): Query<ListOrganizationsQuery>,
 ) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
-  list_organizations_internal(&state, &current_user).await
+  list_organizations_internal(&state, &current_user, query).await
 }
 
 async fn list_organizations_internal(
   state: &AppState,
   current_user: &CurrentUser,
+  query: ListOrganizationsQuery,
 ) -> Result<(StatusCode, Json<Vec<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
+  let ids = parse_csv_ids(query.ids.as_deref());
+  let has_ids_filter = !ids.is_empty();
+
   if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
-    let organizations = OrganizationsRepository::list_active_organizations(&state.db_conn)
-      .await
-      .map_err(|err| internal_error("failed to load organizations", err))?;
+    let organizations = if has_ids_filter {
+      OrganizationsRepository::list_active_organizations_by_ids(&state.db_conn, ids.clone())
+        .await
+        .map_err(|err| internal_error("failed to load organizations", err))?
+    } else {
+      OrganizationsRepository::list_active_organizations(&state.db_conn)
+        .await
+        .map_err(|err| internal_error("failed to load organizations", err))?
+    };
 
     let data = organizations
       .into_iter()
@@ -152,6 +130,16 @@ async fn list_organizations_internal(
   )
   .await
   .map_err(|err| internal_error("failed to load organization memberships", err))?;
+
+  let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
+  let memberships = if has_ids_filter {
+    memberships
+      .into_iter()
+      .filter(|membership| ids_filter.contains(&membership.organization_id))
+      .collect()
+  } else {
+    memberships
+  };
 
   if memberships.is_empty() {
     return Ok((StatusCode::OK, Json(vec![])));
@@ -191,6 +179,69 @@ async fn list_organizations_internal(
     .collect();
 
   Ok((StatusCode::OK, Json(data)))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{organization_id}",
+  responses(
+    (status = 200, description = "Get organization by id", body = OrganizationView),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Organization not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn get_organization(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(organization_id): Path<String>,
+) -> Result<(StatusCode, Json<OrganizationView>), (StatusCode, Json<ErrorResponse>)> {
+  let role = if current_user_is_super_admin(&state, current_user.user_id.as_str()).await? {
+    "super_admin".to_string()
+  } else {
+    let membership = require_organization_role(
+      &state.db_conn,
+      current_user.user_id.as_str(),
+      organization_id.as_str(),
+      RequiredOrganizationRole::Member,
+    )
+    .await
+    .map_err(|err| {
+      (
+        err.status,
+        Json(ErrorResponse {
+          message: err.message,
+        }),
+      )
+    })?;
+    member_role_to_string(membership.role)
+  };
+
+  let organization = OrganizationsRepository::find_active_organization_by_id(
+    &state.db_conn,
+    organization_id.as_str(),
+  )
+  .await
+  .map_err(|err| internal_error("failed to load organization", err))?
+  .ok_or_else(|| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
+      }),
+    )
+  })?;
+
+  Ok((
+    StatusCode::OK,
+    Json(OrganizationView {
+      id: organization.id,
+      key: organization.key,
+      name: organization.name,
+      role,
+    }),
+  ))
 }
 
 #[utoipa::path(
@@ -604,6 +655,7 @@ pub fn organization_routes() -> OpenApiRouter<AppState> {
   OpenApiRouter::new()
     .routes(routes![list_organizations])
     .routes(routes![list_my_organizations])
+    .routes(routes![get_organization])
     .routes(routes![create_organization])
     .routes(routes![update_organization])
     .routes(routes![delete_organization])
@@ -704,6 +756,9 @@ fn map_user_service_error_as_org_error(
     }
     crate::service::user_service::UserServiceError::Forbidden(message) => {
       (StatusCode::FORBIDDEN, message)
+    }
+    crate::service::user_service::UserServiceError::NotFound(message) => {
+      (StatusCode::NOT_FOUND, message)
     }
     crate::service::user_service::UserServiceError::Conflict(message) => {
       (StatusCode::CONFLICT, message)

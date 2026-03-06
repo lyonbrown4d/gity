@@ -62,11 +62,11 @@ const GROUPS: ToolbarItem[][] = [
   ],
 ];
 
-export function IssueMarkdownToolbar({
+export const IssueMarkdownToolbar = ({
   t,
   disabled,
   onAction,
-}: IssueMarkdownToolbarProps): JSX.Element {
+}: IssueMarkdownToolbarProps): JSX.Element => {
   return (
     <div className="issue-editor-toolbar">
       {GROUPS.map((group, groupIndex) => (
@@ -105,4 +105,4 @@ export function IssueMarkdownToolbar({
       </div>
     </div>
   );
-}
+};

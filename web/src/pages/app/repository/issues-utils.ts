@@ -11,7 +11,7 @@ export interface IssueTimelineEvent {
   updatedAt: string;
 }
 
-export function extractErrorMessage(error: unknown): string {
+export const extractErrorMessage = (error: unknown): string => {
   if (!(error instanceof Error)) {
     return "Unknown error";
   }
@@ -28,17 +28,17 @@ export function extractErrorMessage(error: unknown): string {
     // ignore json parse failure
   }
   return raw;
-}
+};
 
-export function toTimestamp(value: string): number {
+export const toTimestamp = (value: string): number => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return 0;
   }
   return date.getTime();
-}
+};
 
-export function formatRelativeTime(value: string): string {
+export const formatRelativeTime = (value: string): string => {
   const target = toTimestamp(value);
   if (!target) {
     return value;
@@ -63,9 +63,9 @@ export function formatRelativeTime(value: string): string {
   }
   const amount = Math.round(abs / day);
   return diff < 0 ? `${amount}d ago` : `in ${amount}d`;
-}
+};
 
-export function issueUserInitials(userId: string): string {
+export const issueUserInitials = (userId: string): string => {
   const value = userId.trim();
   if (!value) {
     return "U";
@@ -75,14 +75,14 @@ export function issueUserInitials(userId: string): string {
     return `${chunks[0][0]}${chunks[1][0]}`.toUpperCase();
   }
   return value.slice(0, 2).toUpperCase();
-}
+};
 
-export function filterAndSortIssues(
+export const filterAndSortIssues = (
   items: RepositoryIssueView[],
   status: "open" | "closed" | "all",
   query: string,
   sort: IssueSortMode,
-): RepositoryIssueView[] {
+): RepositoryIssueView[] => {
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = items.filter((item) => {
     if (status !== "all" && item.status !== status) {
@@ -114,12 +114,12 @@ export function filterAndSortIssues(
     return b.number - a.number;
   });
   return sorted;
-}
+};
 
-export function buildIssueTimeline(
+export const buildIssueTimeline = (
   issue: RepositoryIssueView | null,
   comments: RepositoryIssueCommentView[],
-): IssueTimelineEvent[] {
+): IssueTimelineEvent[] => {
   if (!issue) {
     return [];
   }
@@ -146,4 +146,4 @@ export function buildIssueTimeline(
   }
   events.sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt));
   return events;
-}
+};

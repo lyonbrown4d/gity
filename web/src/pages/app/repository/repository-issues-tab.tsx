@@ -18,12 +18,12 @@ interface RepositoryIssuesTabProps {
   onError: (message: string | null) => void;
 }
 
-export function RepositoryIssuesTab({
+export const RepositoryIssuesTab = ({
   organizationId,
   repoId,
   t,
   onError,
-}: RepositoryIssuesTabProps): JSX.Element {
+}: RepositoryIssuesTabProps): JSX.Element => {
   const navigate = useNavigate();
   const [issues, setIssues] = useState<RepositoryIssueView[]>([]);
   const [isLoadingIssues, setLoadingIssues] = useState(false);
@@ -237,4 +237,4 @@ export function RepositoryIssuesTab({
       </CardContent>
     </Card>
   );
-}
+};

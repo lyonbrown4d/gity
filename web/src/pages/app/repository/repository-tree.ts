@@ -1,7 +1,7 @@
 import type { RepositoryTreeEntryView } from "@/pages/types";
 import type { RepositoryTreeNode } from "./repository-types";
 
-export function toTreeNodes(entries: RepositoryTreeEntryView[]): RepositoryTreeNode[] {
+export const toTreeNodes = (entries: RepositoryTreeEntryView[]): RepositoryTreeNode[] => {
   return entries.map((entry) => ({
     name: entry.name,
     path: entry.path,
@@ -11,13 +11,13 @@ export function toTreeNodes(entries: RepositoryTreeEntryView[]): RepositoryTreeN
     loaded: entry.kind !== "tree",
     loading: false,
   }));
-}
+};
 
-export function patchTreeNode(
+export const patchTreeNode = (
   nodes: RepositoryTreeNode[],
   targetPath: string,
   updater: (node: RepositoryTreeNode) => RepositoryTreeNode,
-): RepositoryTreeNode[] {
+): RepositoryTreeNode[] => {
   return nodes.map((node) => {
     if (node.path === targetPath) {
       return updater(node);
@@ -30,9 +30,12 @@ export function patchTreeNode(
       children: patchTreeNode(node.children, targetPath, updater),
     };
   });
-}
+};
 
-export function findTreeNode(nodes: RepositoryTreeNode[], targetPath: string): RepositoryTreeNode | null {
+export const findTreeNode = (
+  nodes: RepositoryTreeNode[],
+  targetPath: string,
+): RepositoryTreeNode | null => {
   for (const node of nodes) {
     if (node.path === targetPath) {
       return node;
@@ -45,4 +48,4 @@ export function findTreeNode(nodes: RepositoryTreeNode[], targetPath: string): R
     }
   }
   return null;
-}
+};

@@ -4,13 +4,15 @@ use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::RequiredOrganizationRole;
 use crate::service::repository_service::{
   CreateBranchInput, CreateCommitInput, CreateFileCommitInput, CreateIssueCommentInput,
-  CreateIssueInput, CreateRepositoryInput, GetIssueByNumberInput, ListBranchesInput, ListCommitsInput,
-  ListIssueCommentsInput, ListIssuesInput, RepositoryServiceError, UpdateIssueInput,
-  UploadIssueAttachmentInput, UploadIssueAttachmentOutput,
+  CreateIssueInput, CreateRepositoryInput, GetIssueByNumberInput, ListBranchesInput,
+  ListCommitsInput, ListIssueCommentsInput, ListIssuesInput, RepositoryServiceError,
+  UpdateIssueInput, UploadIssueAttachmentInput, UploadIssueAttachmentOutput,
 };
 use axum::Json;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
+use domain::api::crud::parse_csv_ids;
+use domain::api::repository::{CreateRepositoryRequest, ListRepositoriesQuery, RepositoryView};
 use entity::{
   repositories, repository_branches, repository_commits, repository_issue_comments,
   repository_issues,
@@ -21,36 +23,6 @@ use tracing::warn;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct ListRepositoriesQuery {
-  pub organization_id: Option<String>,
-  pub all: Option<bool>,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateRepositoryRequest {
-  pub organization_id: Option<String>,
-  pub key: String,
-  pub name: String,
-  pub description: Option<String>,
-  pub visibility: Option<String>,
-  pub default_branch: Option<String>,
-  pub gitignore_template: Option<String>,
-  pub license_template: Option<String>,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct RepositoryView {
-  pub id: String,
-  pub organization_id: String,
-  pub key: String,
-  pub name: String,
-  pub description: Option<String>,
-  pub visibility: String,
-  pub default_branch: String,
-  pub clone_http_url: String,
-}
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateBranchRequest {
@@ -244,6 +216,10 @@ pub async fn list_repositories(
   current_user: CurrentUser,
   Query(query): Query<ListRepositoriesQuery>,
 ) -> Result<(StatusCode, Json<Vec<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
+  let ids = parse_csv_ids(query.ids.as_deref());
+  let has_ids_filter = !ids.is_empty();
+  let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
+
   let repositories = if query.all.unwrap_or(false) {
     state
       .services
@@ -262,6 +238,14 @@ pub async fn list_repositories(
       .list_repositories(current_user.user_id.as_str(), organization_id.as_str())
       .await
       .map_err(map_repository_service_error)?
+  };
+  let repositories = if has_ids_filter {
+    repositories
+      .into_iter()
+      .filter(|repo| ids_filter.contains(&repo.id))
+      .collect()
+  } else {
+    repositories
   };
 
   let organization_ids = repositories
@@ -296,6 +280,63 @@ pub async fn list_repositories(
     })
     .collect();
   Ok((StatusCode::OK, Json(data)))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{repo_id}",
+  responses(
+    (status = 200, description = "Get repository by id", body = RepositoryView),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "Repository not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn get_repository(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(repo_id): Path<String>,
+) -> Result<(StatusCode, Json<RepositoryView>), (StatusCode, Json<ErrorResponse>)> {
+  let repository = state
+    .services
+    .repository
+    .require_repo_access(
+      current_user.user_id.as_str(),
+      repo_id.as_str(),
+      RequiredOrganizationRole::Member,
+    )
+    .await
+    .map_err(map_repository_service_error)?;
+
+  let organization = OrganizationsRepository::find_active_organization_by_id(
+    &state.db_conn,
+    repository.organization_id.as_str(),
+  )
+  .await
+  .map_err(|err| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: format!("failed to load organization: {err}"),
+      }),
+    )
+  })?
+  .ok_or_else(|| {
+    (
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
+      }),
+    )
+  })?;
+
+  let view = repository_view(
+    repository,
+    organization.key.as_str(),
+    public_base_url(&state).as_str(),
+  );
+  Ok((StatusCode::OK, Json(view)))
 }
 
 #[utoipa::path(
@@ -1219,6 +1260,7 @@ pub async fn get_repository_languages(
 pub fn repo_routes() -> OpenApiRouter<AppState> {
   OpenApiRouter::new()
     .routes(routes![list_repositories])
+    .routes(routes![get_repository])
     .routes(routes![create_repository])
     .routes(routes![delete_repository])
     .routes(routes![list_branches])

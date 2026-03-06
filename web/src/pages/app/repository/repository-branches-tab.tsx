@@ -17,7 +17,7 @@ interface RepositoryBranchesTabProps {
   onToggleBranchProtection: (branch: RepositoryBranchView, protect: boolean) => void;
 }
 
-export function RepositoryBranchesTab({
+export const RepositoryBranchesTab = ({
   t,
   branches,
   newBranchName,
@@ -27,7 +27,7 @@ export function RepositoryBranchesTab({
   onChangeNewBranchName,
   onSubmitCreateBranch,
   onToggleBranchProtection,
-}: RepositoryBranchesTabProps): JSX.Element {
+}: RepositoryBranchesTabProps): JSX.Element => {
   return (
     <Card className="card-enter">
       <CardHeader>
@@ -80,4 +80,4 @@ export function RepositoryBranchesTab({
       </CardContent>
     </Card>
   );
-}
+};

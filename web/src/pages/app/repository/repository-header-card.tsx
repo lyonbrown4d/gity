@@ -16,14 +16,14 @@ interface RepositoryHeaderCardProps {
 
 const TABS: RepoTab[] = ["code", "issues", "commits", "branches", "settings"];
 
-export function RepositoryHeaderCard({
+export const RepositoryHeaderCard = ({
   activeTab,
   organizationName,
   repository,
   t,
   onChangeTab,
   onCopyCloneUrl,
-}: RepositoryHeaderCardProps): JSX.Element {
+}: RepositoryHeaderCardProps): JSX.Element => {
   return (
     <Card className="card-enter">
       <CardHeader>
@@ -71,4 +71,4 @@ export function RepositoryHeaderCard({
       </CardContent>
     </Card>
   );
-}
+};

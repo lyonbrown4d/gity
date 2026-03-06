@@ -1,3 +1,4 @@
+pub mod api;
 mod page;
 pub mod user;
 

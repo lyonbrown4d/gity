@@ -11,12 +11,12 @@ interface UseRepositoryMetaControllerArgs {
   onDeleted: () => void;
 }
 
-export function useRepositoryMetaController({
+export const useRepositoryMetaController = ({
   organizationId,
   repoId,
   t,
   onDeleted,
-}: UseRepositoryMetaControllerArgs) {
+}: UseRepositoryMetaControllerArgs) => {
   const [branchFilter, setBranchFilter] = useState("all");
   const [newBranchName, setNewBranchName] = useState("");
   const [branches, setBranches] = useState<RepositoryBranchView[]>([]);
@@ -175,4 +175,4 @@ export function useRepositoryMetaController({
     copyCloneUrl,
     submitDelete,
   };
-}
+};

@@ -34,7 +34,7 @@ interface RepositoryCodeTabProps {
   onRefreshLanguages: () => void;
 }
 
-function renderLanguageRows(items: RepositoryLanguageItemView[]): JSX.Element[] {
+const renderLanguageRows = (items: RepositoryLanguageItemView[]): JSX.Element[] => {
   return items.map((item) => (
     <div key={item.language} className="space-y-1">
       <div className="flex items-center justify-between gap-2 text-xs">
@@ -52,9 +52,9 @@ function renderLanguageRows(items: RepositoryLanguageItemView[]): JSX.Element[] 
       </div>
     </div>
   ));
-}
+};
 
-export function RepositoryCodeTab({
+export const RepositoryCodeTab = ({
   t,
   repository,
   branches,
@@ -72,7 +72,7 @@ export function RepositoryCodeTab({
   onOpenFile,
   onToggleTreeDirectory,
   onRefreshLanguages,
-}: RepositoryCodeTabProps): JSX.Element {
+}: RepositoryCodeTabProps): JSX.Element => {
   const renderTreeNodes = (nodes: RepositoryTreeNode[], depth = 0): JSX.Element[] =>
     nodes.map((node) => (
       <div key={node.path}>
@@ -225,4 +225,4 @@ export function RepositoryCodeTab({
       </CardContent>
     </Card>
   );
-}
+};

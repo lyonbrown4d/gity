@@ -17,19 +17,19 @@ const LANGUAGE_COLORS: Record<string, string> = {
   yaml: "#cb171e",
 };
 
-export function shortSha(value: string): string {
+export const shortSha = (value: string): string => {
   return value.slice(0, 8);
-}
+};
 
-export function formatTime(value: string): string {
+export const formatTime = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }
   return date.toLocaleString();
-}
+};
 
-export function extractErrorMessage(error: unknown): string {
+export const extractErrorMessage = (error: unknown): string => {
   if (!(error instanceof Error)) {
     return "Unknown error";
   }
@@ -46,9 +46,9 @@ export function extractErrorMessage(error: unknown): string {
     // ignore non-json message
   }
   return raw;
-}
+};
 
-export function detectLanguage(path: string): string {
+export const detectLanguage = (path: string): string => {
   const file = path.split("/").pop()?.toLowerCase() ?? "";
   if (file.endsWith(".rs")) {
     return "rust";
@@ -84,14 +84,14 @@ export function detectLanguage(path: string): string {
     return "shell";
   }
   return "plaintext";
-}
+};
 
-export function languageBarColor(language: string): string {
+export const languageBarColor = (language: string): string => {
   const normalized = language.trim().toLowerCase();
   return LANGUAGE_COLORS[normalized] ?? "#6b7280";
-}
+};
 
-export function formatBytes(value: number): string {
+export const formatBytes = (value: number): string => {
   if (!Number.isFinite(value) || value <= 0) {
     return "0 B";
   }
@@ -104,13 +104,13 @@ export function formatBytes(value: number): string {
   }
   const precision = size >= 100 || index === 0 ? 0 : 1;
   return `${size.toFixed(precision)} ${units[index]}`;
-}
+};
 
-export function normalizeRepoFilePath(path: string): string {
+export const normalizeRepoFilePath = (path: string): string => {
   return path.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-}
+};
 
-export async function renderMarkdown(content: string): Promise<string> {
+export const renderMarkdown = async (content: string): Promise<string> => {
   const html = await marked.parse(content);
   return DOMPurify.sanitize(html);
-}
+};

@@ -75,6 +75,30 @@ impl RepositoriesRepository {
       .await
   }
 
+  pub async fn list_active_repositories_by_ids<C: ConnectionTrait>(
+    conn: &C,
+    repository_ids: Vec<String>,
+    organization_id: Option<&str>,
+  ) -> Result<Vec<repositories::Model>, DbErr> {
+    if repository_ids.is_empty() {
+      return Ok(vec![]);
+    }
+
+    let mut condition = Condition::all()
+      .add(repositories::Column::Id.is_in(repository_ids))
+      .add(repositories::Column::DeletedAt.is_null());
+    if let Some(organization_id) = organization_id {
+      condition =
+        condition.add(repositories::Column::OrganizationId.eq(organization_id.to_string()));
+    }
+
+    repositories::Entity::find()
+      .filter(condition)
+      .order_by_desc(repositories::Column::CreatedAt)
+      .all(conn)
+      .await
+  }
+
   pub async fn insert_repository<C: ConnectionTrait>(
     conn: &C,
     active: repositories::ActiveModel,

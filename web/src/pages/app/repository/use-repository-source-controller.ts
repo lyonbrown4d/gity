@@ -21,7 +21,7 @@ interface UseRepositorySourceControllerArgs {
   refreshCommits: () => Promise<void>;
 }
 
-export function useRepositorySourceController({
+export const useRepositorySourceController = ({
   repoId,
   activeTab,
   defaultBranch,
@@ -30,7 +30,7 @@ export function useRepositorySourceController({
   onError,
   refreshBranches,
   refreshCommits,
-}: UseRepositorySourceControllerArgs) {
+}: UseRepositorySourceControllerArgs) => {
   const [codeBranch, setCodeBranch] = useState("");
   const [treeNodes, setTreeNodes] = useState<RepositoryTreeNode[]>([]);
   const [selectedBlob, setSelectedBlob] = useState<RepositoryBlobView | null>(null);
@@ -240,4 +240,4 @@ export function useRepositorySourceController({
     submitCreateFileCommit,
     changeCodeBranch,
   };
-}
+};

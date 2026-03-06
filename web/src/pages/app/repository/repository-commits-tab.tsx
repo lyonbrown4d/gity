@@ -13,14 +13,14 @@ interface RepositoryCommitsTabProps {
   onChangeBranchFilter: (branch: string) => void;
 }
 
-export function RepositoryCommitsTab({
+export const RepositoryCommitsTab = ({
   t,
   branches,
   commits,
   branchFilter,
   isLoadingCommits,
   onChangeBranchFilter,
-}: RepositoryCommitsTabProps): JSX.Element {
+}: RepositoryCommitsTabProps): JSX.Element => {
   return (
     <Card className="card-enter">
       <CardHeader>
@@ -67,4 +67,4 @@ export function RepositoryCommitsTab({
       </CardContent>
     </Card>
   );
-}
+};

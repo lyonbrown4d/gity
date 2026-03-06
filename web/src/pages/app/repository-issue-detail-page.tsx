@@ -16,7 +16,11 @@ interface MarkdownContentProps {
   repoId: string;
 }
 
-function MarkdownContent({ content, organizationId, repoId }: MarkdownContentProps): JSX.Element {
+const MarkdownContent = ({
+  content,
+  organizationId,
+  repoId,
+}: MarkdownContentProps): JSX.Element => {
   const [html, setHtml] = useState("");
 
   useEffect(() => {
@@ -38,9 +42,9 @@ function MarkdownContent({ content, organizationId, repoId }: MarkdownContentPro
   }, [content, organizationId, repoId]);
 
   return <article className="markdown-body text-sm" dangerouslySetInnerHTML={{ __html: html }} />;
-}
+};
 
-export function RepositoryIssueDetailPage(): JSX.Element {
+export const RepositoryIssueDetailPage = (): JSX.Element => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const params = useParams<{ organizationId: string; repoId: string; issueNumber: string }>();
@@ -246,4 +250,4 @@ export function RepositoryIssueDetailPage(): JSX.Element {
       ) : null}
     </div>
   );
-}
+};

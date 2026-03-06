@@ -24,7 +24,7 @@ interface RepositoryCreateFileModalProps {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export function RepositoryCreateFileModal({
+export const RepositoryCreateFileModal = ({
   open,
   t,
   editorTheme,
@@ -40,7 +40,7 @@ export function RepositoryCreateFileModal({
   onChangeNewFileMessage,
   onChangeNewFileContent,
   onSubmit,
-}: RepositoryCreateFileModalProps): JSX.Element {
+}: RepositoryCreateFileModalProps): JSX.Element => {
   return (
     <Modal open={open} onClose={onClose} title={t("Create file and commit")}>
       <form className="space-y-3" onSubmit={onSubmit}>
@@ -112,4 +112,4 @@ export function RepositoryCreateFileModal({
       </form>
     </Modal>
   );
-}
+};

@@ -1,19 +1,19 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
-export function buildIssueDetailPath(
+export const buildIssueDetailPath = (
   organizationId: string,
   repoId: string,
   issueNumber: number | string,
-): string {
+): string => {
   return `/app/repositories/${organizationId}/${repoId}/issues/${issueNumber}`;
-}
+};
 
-export function linkifyLocalIssueReferences(
+export const linkifyLocalIssueReferences = (
   markdown: string,
   organizationId: string,
   repoId: string,
-): string {
+): string => {
   if (!markdown.trim()) {
     return markdown;
   }
@@ -26,14 +26,14 @@ export function linkifyLocalIssueReferences(
     const path = buildIssueDetailPath(organizationId, repoId, number);
     return `${prefix}[#${number}](${path})`;
   });
-}
+};
 
-export async function renderIssueMarkdown(
+export const renderIssueMarkdown = async (
   markdown: string,
   organizationId: string,
   repoId: string,
-): Promise<string> {
+): Promise<string> => {
   const linked = linkifyLocalIssueReferences(markdown, organizationId, repoId);
   const html = await marked.parse(linked);
   return DOMPurify.sanitize(html);
-}
+};

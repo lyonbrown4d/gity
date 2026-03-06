@@ -3,40 +3,12 @@ use crate::http::auth::ErrorResponse;
 use crate::security::current_user::CurrentUser;
 use crate::service::user_service::{CreateUserInput, UpdateCurrentUserInput, UserServiceError};
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToSchema};
+use domain::api::crud::parse_csv_ids;
+use domain::api::user::{CreateUserRequest, ListUsersQuery, UpdateMeRequest, UserView};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-
-#[derive(Debug, Serialize, ToSchema)]
-pub struct UserView {
-  pub id: String,
-  pub username: String,
-  pub email: String,
-  pub status: String,
-  pub is_super_admin: bool,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct UpdateMeRequest {
-  pub username: Option<String>,
-  pub email: Option<String>,
-  pub password: Option<String>,
-}
-
-#[derive(Debug, Deserialize, ToSchema)]
-pub struct CreateUserRequest {
-  pub username: String,
-  pub email: String,
-  pub password: String,
-}
-
-#[derive(Debug, Deserialize, IntoParams)]
-pub struct ListUsersQuery {
-  pub limit: Option<u64>,
-}
 
 #[utoipa::path(
   get,
@@ -55,12 +27,22 @@ pub async fn list_users(
   current_user: CurrentUser,
   Query(query): Query<ListUsersQuery>,
 ) -> Result<(StatusCode, Json<Vec<UserView>>), (StatusCode, Json<ErrorResponse>)> {
-  let users = state
-    .services
-    .user
-    .list_users_for_admin(current_user.user_id.as_str(), query.limit)
-    .await
-    .map_err(map_user_service_error)?;
+  let ids = parse_csv_ids(query.ids.as_deref());
+  let users = if ids.is_empty() {
+    state
+      .services
+      .user
+      .list_users_for_admin(current_user.user_id.as_str(), query.limit)
+      .await
+      .map_err(map_user_service_error)?
+  } else {
+    state
+      .services
+      .user
+      .list_users_by_ids_for_admin(current_user.user_id.as_str(), ids)
+      .await
+      .map_err(map_user_service_error)?
+  };
 
   let data = users
     .iter()
@@ -89,6 +71,42 @@ pub async fn get_me(
     .get_current_user(current_user.user_id.as_str())
     .await
     .map_err(map_user_service_error)?;
+
+  let is_super_admin = state.services.user.is_super_admin(&user);
+  Ok((StatusCode::OK, Json(user_view(&user, is_super_admin))))
+}
+
+#[utoipa::path(
+  get,
+  path = "/{user_id}",
+  responses(
+    (status = 200, description = "Get user by id (super admin) or me", body = UserView),
+    (status = 401, description = "Unauthorized", body = ErrorResponse),
+    (status = 403, description = "Forbidden", body = ErrorResponse),
+    (status = 404, description = "User not found", body = ErrorResponse),
+    (status = 500, description = "Internal server error", body = ErrorResponse)
+  )
+)]
+pub async fn get_user(
+  State(state): State<AppState>,
+  current_user: CurrentUser,
+  Path(user_id): Path<String>,
+) -> Result<(StatusCode, Json<UserView>), (StatusCode, Json<ErrorResponse>)> {
+  let user = if user_id == "me" {
+    state
+      .services
+      .user
+      .get_current_user(current_user.user_id.as_str())
+      .await
+      .map_err(map_user_service_error)?
+  } else {
+    state
+      .services
+      .user
+      .get_user_by_id_for_admin(current_user.user_id.as_str(), user_id.as_str())
+      .await
+      .map_err(map_user_service_error)?
+  };
 
   let is_super_admin = state.services.user.is_super_admin(&user);
   Ok((StatusCode::OK, Json(user_view(&user, is_super_admin))))
@@ -175,6 +193,7 @@ pub fn user_routes() -> OpenApiRouter<AppState> {
     .routes(routes![list_users])
     .routes(routes![create_user])
     .routes(routes![get_me])
+    .routes(routes![get_user])
     .routes(routes![update_me])
 }
 
@@ -196,6 +215,7 @@ fn map_user_service_error(err: UserServiceError) -> (StatusCode, Json<ErrorRespo
     UserServiceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
     UserServiceError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
     UserServiceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+    UserServiceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
     UserServiceError::Conflict(message) => (StatusCode::CONFLICT, message),
     UserServiceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
   };

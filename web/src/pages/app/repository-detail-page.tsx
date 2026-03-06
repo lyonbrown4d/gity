@@ -13,7 +13,7 @@ import type { RepoTab } from "@/pages/app/repository/repository-types";
 import { useRepositoryMetaController } from "@/pages/app/repository/use-repository-meta-controller";
 import { useRepositorySourceController } from "@/pages/app/repository/use-repository-source-controller";
 
-export function RepositoryDetailPage(): JSX.Element {
+export const RepositoryDetailPage = (): JSX.Element => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -183,4 +183,4 @@ export function RepositoryDetailPage(): JSX.Element {
       />
     </div>
   );
-}
+};
