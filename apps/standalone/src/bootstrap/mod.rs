@@ -10,6 +10,8 @@ use fred::clients::Client;
 use fred::prelude::{Builder, ClientLike};
 use migration::{Migrator, MigratorTrait};
 use moka::sync::Cache;
+use platform::config::DatabaseConfig as ToastyDatabaseConfig;
+use platform::database::DatabaseRuntime;
 use repository::OrganizationInvitationsRepository;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use tokio::time::{Duration, interval};
@@ -21,6 +23,7 @@ pub async fn bootstrap() -> Result<AppState, String> {
   let cfg = load_config();
   validate_runtime_dependencies(&cfg)?;
   let db_conn = connect_database(&cfg).await?;
+  let project_space_runtime = connect_project_space_database(&cfg).await?;
 
   Migrator::up(&db_conn, None)
     .await
@@ -34,6 +37,7 @@ pub async fn bootstrap() -> Result<AppState, String> {
   let app_state = AppState::new(
     cfg,
     db_conn,
+    project_space_runtime,
     cache_store,
     redis_client,
     repository_language_jobs,
@@ -104,6 +108,16 @@ async fn connect_database(cfg: &Config) -> Result<DatabaseConnection, String> {
   Database::connect(options)
     .await
     .map_err(|err| format!("failed to connect database: {err}"))
+}
+
+async fn connect_project_space_database(cfg: &Config) -> Result<DatabaseRuntime, String> {
+  if cfg.database.database_type != DatabaseType::POSTGRES {
+    return Err(
+      "project space rewrite currently requires database.database_type=POSTGRES".to_string(),
+    );
+  }
+
+  DatabaseRuntime::connect(ToastyDatabaseConfig::new(cfg.database.url.clone())).await
 }
 
 fn init_moka_cache(cfg: &Config) -> Cache<String, String> {

@@ -3,12 +3,14 @@ use crate::http::auth::ErrorResponse;
 use crate::http::pagination::{resolve_pagination, to_page, to_single_page};
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::RequiredOrganizationRole;
+use crate::service::project_space_service::ProjectSpaceError;
 use crate::service::repository_service::{
   CreateBranchInput, CreateCommitInput, CreateFileCommitInput, CreateIssueCommentInput,
   CreateIssueInput, CreateRepositoryInput, GetIssueByNumberInput, ListBranchesInput,
   ListCommitsInput, ListIssueCommentsInput, ListIssuesInput, RepositoryServiceError,
   UpdateIssueInput, UploadIssueAttachmentInput, UploadIssueAttachmentOutput,
 };
+use application::project::CreateProjectCommand;
 use axum::Json;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
@@ -220,6 +222,14 @@ pub async fn list_repositories(
   current_user: CurrentUser,
   Query(query): Query<ListRepositoriesQuery>,
 ) -> Result<(StatusCode, Json<Page<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
+  if should_use_project_space_repo_api(
+    query.organization_id.as_deref(),
+    &current_user,
+    query.all.unwrap_or(false),
+  ) {
+    return list_project_repositories(state, current_user, query).await;
+  }
+
   let ids = parse_csv_ids(query.ids.as_deref());
   let has_ids_filter = !ids.is_empty();
   let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
@@ -353,7 +363,6 @@ pub async fn list_repositories(
   })?;
   Ok((StatusCode::OK, Json(to_page(data, total, pagination))))
 }
-
 #[utoipa::path(
   get,
   path = "/{repo_id}",
@@ -371,6 +380,11 @@ pub async fn get_repository(
   current_user: CurrentUser,
   Path(repo_id): Path<String>,
 ) -> Result<(StatusCode, Json<RepositoryView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let view = get_project_repository_view(&state, &current_user, project_id).await?;
+    return Ok((StatusCode::OK, Json(view)));
+  }
+
   let repository = state
     .services
     .repository
@@ -409,7 +423,6 @@ pub async fn get_repository(
   );
   Ok((StatusCode::OK, Json(view)))
 }
-
 #[utoipa::path(
   post,
   path = "/",
@@ -429,7 +442,12 @@ pub async fn create_repository(
   current_user: CurrentUser,
   Json(payload): Json<CreateRepositoryRequest>,
 ) -> Result<(StatusCode, Json<RepositoryView>), (StatusCode, Json<ErrorResponse>)> {
-  let organization_id = resolve_organization_id(payload.organization_id, &current_user)?;
+  let organization_id = resolve_organization_id(payload.organization_id.clone(), &current_user)?;
+  if let Ok(namespace_id) = organization_id.parse::<i64>() {
+    let view = create_project_repository(&state, &current_user, namespace_id, payload).await?;
+    return Ok((StatusCode::CREATED, Json(view)));
+  }
+
   let repository = state
     .services
     .repository
@@ -482,7 +500,6 @@ pub async fn create_repository(
     )),
   ))
 }
-
 #[utoipa::path(
   delete,
   path = "/{repo_id}",
@@ -1367,6 +1384,277 @@ pub fn repo_routes() -> OpenApiRouter<AppState> {
     .routes(routes![get_repository_languages])
 }
 
+async fn list_project_repositories(
+  state: AppState,
+  current_user: CurrentUser,
+  query: ListRepositoriesQuery,
+) -> Result<(StatusCode, Json<Page<RepositoryView>>), (StatusCode, Json<ErrorResponse>)> {
+  let ids = parse_csv_ids(query.ids.as_deref());
+  let has_ids_filter = !ids.is_empty();
+  let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
+  let pagination = if has_ids_filter {
+    None
+  } else {
+    Some(resolve_pagination(query.page, query.page_size, 50, 200)?)
+  };
+  let namespace_filter = query
+    .organization_id
+    .and_then(|value| value.parse::<i64>().ok());
+  let is_super_admin =
+    current_user_is_repo_super_admin(&state, current_user.user_id.as_str()).await?;
+
+  let mut data = Vec::new();
+  for project in state
+    .project_space
+    .list_projects()
+    .await
+    .map_err(map_project_space_error)?
+  {
+    if let Some(namespace_id) = namespace_filter
+      && project.namespace_id != namespace_id
+    {
+      continue;
+    }
+
+    let Some(namespace) = state
+      .project_space
+      .get_namespace(project.namespace_id)
+      .await
+      .map_err(map_project_space_error)?
+    else {
+      continue;
+    };
+
+    if !is_super_admin {
+      let role = state
+        .project_space
+        .get_namespace_role(namespace.id, current_user.user_id.as_str())
+        .await
+        .map_err(map_project_space_error)?;
+      let owns_namespace =
+        namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str());
+      if role.is_none() && !owns_namespace {
+        continue;
+      }
+    }
+
+    let view = project_repository_view(&project, &namespace, public_base_url(&state).as_str());
+    if has_ids_filter && !ids_filter.contains(&view.id) {
+      continue;
+    }
+    data.push(view);
+  }
+
+  if has_ids_filter {
+    return Ok((StatusCode::OK, Json(to_single_page(data))));
+  }
+
+  let pagination = pagination.ok_or_else(|| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: "pagination state is invalid".to_string(),
+      }),
+    )
+  })?;
+  let total = data.len() as u64;
+  let offset = ((pagination.page - 1) * pagination.page_size) as usize;
+  let data = data
+    .into_iter()
+    .skip(offset)
+    .take(pagination.page_size as usize)
+    .collect::<Vec<_>>();
+  Ok((StatusCode::OK, Json(to_page(data, total, pagination))))
+}
+
+async fn get_project_repository_view(
+  state: &AppState,
+  current_user: &CurrentUser,
+  project_id: i64,
+) -> Result<RepositoryView, (StatusCode, Json<ErrorResponse>)> {
+  let project = state
+    .project_space
+    .get_project(project_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "repository not found".to_string(),
+        }),
+      )
+    })?;
+  let namespace = state
+    .project_space
+    .get_namespace(project.namespace_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
+
+  if !current_user_is_repo_super_admin(state, current_user.user_id.as_str()).await? {
+    let role = state
+      .project_space
+      .get_namespace_role(namespace.id, current_user.user_id.as_str())
+      .await
+      .map_err(map_project_space_error)?;
+    let owns_namespace = namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str());
+    if role.is_none() && !owns_namespace {
+      return Err((
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse {
+          message: "you are not a member of this organization".to_string(),
+        }),
+      ));
+    }
+  }
+
+  Ok(project_repository_view(
+    &project,
+    &namespace,
+    public_base_url(state).as_str(),
+  ))
+}
+
+async fn create_project_repository(
+  state: &AppState,
+  current_user: &CurrentUser,
+  namespace_id: i64,
+  payload: CreateRepositoryRequest,
+) -> Result<RepositoryView, (StatusCode, Json<ErrorResponse>)> {
+  let namespace = state
+    .project_space
+    .get_namespace(namespace_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
+
+  let is_super_admin =
+    current_user_is_repo_super_admin(state, current_user.user_id.as_str()).await?;
+  if !is_super_admin {
+    let role = state
+      .project_space
+      .get_namespace_role(namespace.id, current_user.user_id.as_str())
+      .await
+      .map_err(map_project_space_error)?;
+    let owns_namespace = namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str());
+    let allowed = role
+      .as_deref()
+      .is_some_and(|value| matches!(value, "developer" | "maintainer" | "owner"));
+    if !allowed && !owns_namespace {
+      return Err((
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse {
+          message: "organization developer permission is required".to_string(),
+        }),
+      ));
+    }
+  }
+
+  let project = state
+    .project_space
+    .create_project(CreateProjectCommand {
+      namespace_id,
+      path_key: payload.key,
+      name: payload.name,
+      description: payload.description,
+      visibility: payload.visibility.unwrap_or_else(|| "private".to_string()),
+      default_branch: payload.default_branch,
+      actor_user_id: current_user.user_id.clone(),
+    })
+    .await
+    .map_err(map_project_space_error)?;
+
+  Ok(project_repository_view(
+    &project,
+    &namespace,
+    public_base_url(state).as_str(),
+  ))
+}
+
+fn should_use_project_space_repo_api(
+  requested_organization_id: Option<&str>,
+  current_user: &CurrentUser,
+  include_all: bool,
+) -> bool {
+  include_all
+    || requested_organization_id.is_some_and(|value| value.parse::<i64>().is_ok())
+    || current_user
+      .organization_id
+      .as_deref()
+      .is_some_and(|value| value.parse::<i64>().is_ok())
+}
+
+async fn current_user_is_repo_super_admin(
+  state: &AppState,
+  user_id: &str,
+) -> Result<bool, (StatusCode, Json<ErrorResponse>)> {
+  let user = state
+    .services
+    .user
+    .get_current_user(user_id)
+    .await
+    .map_err(map_user_service_error_as_repo_error)?;
+  Ok(state.services.user.is_super_admin(&user))
+}
+
+fn map_user_service_error_as_repo_error(
+  err: crate::service::user_service::UserServiceError,
+) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    crate::service::user_service::UserServiceError::BadRequest(message) => {
+      (StatusCode::BAD_REQUEST, message)
+    }
+    crate::service::user_service::UserServiceError::Unauthorized(message) => {
+      (StatusCode::UNAUTHORIZED, message)
+    }
+    crate::service::user_service::UserServiceError::Forbidden(message) => {
+      (StatusCode::FORBIDDEN, message)
+    }
+    crate::service::user_service::UserServiceError::NotFound(message) => {
+      (StatusCode::NOT_FOUND, message)
+    }
+    crate::service::user_service::UserServiceError::Conflict(message) => {
+      (StatusCode::CONFLICT, message)
+    }
+    crate::service::user_service::UserServiceError::Internal(message) => {
+      (StatusCode::INTERNAL_SERVER_ERROR, message)
+    }
+  };
+  (status, Json(ErrorResponse { message }))
+}
+
+fn project_repository_view(
+  project: &application::project::ProjectView,
+  namespace: &application::namespace::NamespaceView,
+  base_url: &str,
+) -> RepositoryView {
+  RepositoryView {
+    id: project.id.to_string(),
+    uuid: project.id.to_string(),
+    organization_id: namespace.id.to_string(),
+    key: project.path_key.clone(),
+    name: project.name.clone(),
+    description: project.description.clone(),
+    visibility: project.visibility.clone(),
+    default_branch: project.default_branch.clone(),
+    clone_http_url: format!("{base_url}/{}.git", project.full_path),
+  }
+}
 async fn set_branch_protection(
   state: &AppState,
   current_user: &CurrentUser,
@@ -1489,6 +1777,16 @@ fn issue_attachment_upload_view(output: UploadIssueAttachmentOutput) -> IssueAtt
   }
 }
 
+fn map_project_space_error(err: ProjectSpaceError) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    ProjectSpaceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+    ProjectSpaceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+    ProjectSpaceError::Conflict(message) => (StatusCode::CONFLICT, message),
+    ProjectSpaceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+    ProjectSpaceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+  };
+  (status, Json(ErrorResponse { message }))
+}
 fn map_repository_service_error(err: RepositoryServiceError) -> (StatusCode, Json<ErrorResponse>) {
   let (status, message) = match err {
     RepositoryServiceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),

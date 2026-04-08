@@ -15,6 +15,7 @@ pub mod middleware;
 pub mod openapi;
 pub mod organization;
 pub mod pagination;
+pub mod project_space;
 pub mod repo;
 pub mod user;
 
@@ -24,6 +25,8 @@ pub fn openapi_router() -> Router<AppState> {
     .nest("/api/v1/orgs", organization::organization_routes())
     .nest("/api/v1/repos", repo::repo_routes())
     .nest("/api/v1/users", user::user_routes())
+    .nest("/api/v1/namespaces", project_space::namespace_routes())
+    .nest("/api/v1/projects", project_space::project_routes())
     .route("/api-docs/openapi.json", get(openapi))
     .split_for_parts();
   // Swagger UI is disabled to avoid download during build

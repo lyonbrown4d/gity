@@ -63,7 +63,7 @@ impl GitBackendService {
   }
 
   pub fn resolve_repo_path(&self, owner: &str, repo: &str) -> Result<PathBuf, GitBackendError> {
-    if !is_safe_component(owner) || !is_safe_component(repo) {
+    if !is_safe_namespace_path(owner) || !is_safe_component(repo) {
       return Err(GitBackendError::InvalidRepositoryPath);
     }
 
@@ -159,7 +159,7 @@ impl GitBackendService {
     repository_key: &str,
     default_branch: &str,
   ) -> Result<(), GitBackendError> {
-    if !is_safe_component(organization_key) {
+    if !is_safe_namespace_path(organization_key) {
       return Err(GitBackendError::InvalidComponent(
         "organization key contains unsupported characters".to_string(),
       ));
@@ -223,7 +223,7 @@ impl GitBackendService {
     if files.is_empty() {
       return Ok(None);
     }
-    if !is_safe_component(organization_key) {
+    if !is_safe_namespace_path(organization_key) {
       return Err(GitBackendError::InvalidComponent(
         "organization key contains unsupported characters".to_string(),
       ));
@@ -270,7 +270,7 @@ impl GitBackendService {
     organization_key: &str,
     repository_key: &str,
   ) -> Result<(), GitBackendError> {
-    if !is_safe_component(organization_key) {
+    if !is_safe_namespace_path(organization_key) {
       return Err(GitBackendError::InvalidComponent(
         "organization key contains unsupported characters".to_string(),
       ));
@@ -308,7 +308,7 @@ impl GitBackendService {
     author_name: &str,
     author_email: &str,
   ) -> Result<String, GitBackendError> {
-    if !is_safe_component(organization_key) {
+    if !is_safe_namespace_path(organization_key) {
       return Err(GitBackendError::InvalidComponent(
         "organization key contains unsupported characters".to_string(),
       ));
@@ -456,9 +456,11 @@ impl GitBackendService {
 
 fn build_repo_path(root: &str, owner: &str, repo: &str) -> PathBuf {
   let repo_name = repo.strip_suffix(".git").unwrap_or(repo);
-  FsPath::new(root)
-    .join(owner)
-    .join(format!("{repo_name}.git"))
+  let mut path = FsPath::new(root).to_path_buf();
+  for segment in owner.split('/') {
+    path.push(segment);
+  }
+  path.join(format!("{repo_name}.git"))
 }
 
 fn is_safe_component(value: &str) -> bool {
@@ -469,4 +471,8 @@ fn is_safe_component(value: &str) -> bool {
     && value
       .chars()
       .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
+fn is_safe_namespace_path(value: &str) -> bool {
+  !value.is_empty() && value.split('/').all(is_safe_component)
 }

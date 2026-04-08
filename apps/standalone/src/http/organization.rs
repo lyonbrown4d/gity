@@ -2,10 +2,12 @@ use crate::http::app_state::AppState;
 use crate::http::auth::ErrorResponse;
 use crate::http::pagination::{resolve_pagination, to_page, to_single_page};
 use crate::security::current_user::CurrentUser;
-use crate::security::organization_acl::{
-  RequiredOrganizationRole, member_role_to_string, require_organization_role,
+use crate::security::jwt::{issue_invitation_token, verify_invitation_token};
+use crate::service::project_space_service::ProjectSpaceError;
+use application::namespace::{
+  CreateNamespaceCommand, NamespaceInvitationView, NamespaceView as ProjectSpaceNamespaceView,
+  UpdateNamespaceCommand,
 };
-use crate::service::organization_service::OrganizationServiceError;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -17,15 +19,14 @@ use domain::api::organization::{
 };
 use domain::api::response::{ApiResponse, EmptyData};
 use domain::page::Page;
-use entity::organization_invitations;
-use repository::{OrganizationMembersRepository, OrganizationsRepository, UsersRepository};
+use models::constants::{member_role, namespace_kind, visibility_level};
+use repository::UsersRepository;
 use sea_orm::DbErr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateInvitationRequest {
   pub email: String,
@@ -107,107 +108,26 @@ async fn list_organizations_internal(
 ) -> Result<(StatusCode, Json<Page<OrganizationView>>), (StatusCode, Json<ErrorResponse>)> {
   let ids = parse_csv_ids(query.ids.as_deref());
   let has_ids_filter = !ids.is_empty();
+  let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
   let pagination = if has_ids_filter {
     None
   } else {
     Some(resolve_pagination(query.page, query.page_size, 50, 200)?)
   };
 
-  if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
-    if has_ids_filter {
-      let organizations = OrganizationsRepository::new(state.db_conn.clone())
-        .list_active_organizations_by_ids(ids.clone())
-        .await
-        .map_err(|err| internal_error("failed to load organizations", err))?;
-
-      let data = organizations
-        .into_iter()
-        .map(|organization| OrganizationView {
-          id: organization.id,
-          key: organization.key,
-          name: organization.name,
-          role: "super_admin".to_string(),
-        })
-        .collect();
-      return Ok((StatusCode::OK, Json(to_single_page(data))));
-    }
-
-    let pagination = pagination.ok_or_else(|| {
-      (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(ErrorResponse {
-          message: "pagination state is invalid".to_string(),
-        }),
-      )
-    })?;
-    let (organizations, total) = OrganizationsRepository::new(state.db_conn.clone())
-      .list_active_organizations_paginated(pagination.page, pagination.page_size)
-      .await
-      .map_err(|err| internal_error("failed to load organizations", err))?;
-
-    let data = organizations
-      .into_iter()
-      .map(|organization| OrganizationView {
-        id: organization.id,
-        key: organization.key,
-        name: organization.name,
-        role: "super_admin".to_string(),
-      })
-      .collect();
-    return Ok((StatusCode::OK, Json(to_page(data, total, pagination))));
-  }
-
-  let memberships = OrganizationMembersRepository::new(state.db_conn.clone())
-    .list_active_memberships_by_user(&current_user.user_id)
+  let is_super_admin = current_user_is_super_admin(state, current_user.user_id.as_str()).await?;
+  let mut organizations = state
+    .project_space
+    .list_group_namespaces_for_user(current_user.user_id.as_str(), is_super_admin)
     .await
-    .map_err(|err| internal_error("failed to load organization memberships", err))?;
-
-  let ids_filter = ids.into_iter().collect::<std::collections::HashSet<_>>();
-  let memberships = if has_ids_filter {
-    memberships
-      .into_iter()
-      .filter(|membership| ids_filter.contains(&membership.organization_id))
-      .collect()
-  } else {
-    memberships
-  };
+    .map_err(map_project_space_error)?;
 
   if has_ids_filter {
-    if memberships.is_empty() {
-      return Ok((StatusCode::OK, Json(to_single_page(Vec::new()))));
-    }
-
-    let organization_ids: Vec<String> = memberships
-      .iter()
-      .map(|membership| membership.organization_id.clone())
-      .collect();
-    let role_by_org: HashMap<String, String> = memberships
-      .into_iter()
-      .map(|membership| {
-        (
-          membership.organization_id.clone(),
-          member_role_to_string(membership.role),
-        )
-      })
-      .collect();
-
-    let organizations = OrganizationsRepository::new(state.db_conn.clone())
-      .list_active_organizations_by_ids(organization_ids)
-      .await
-      .map_err(|err| internal_error("failed to load organizations", err))?;
+    organizations.retain(|(namespace, _)| ids_filter.contains(namespace.id.to_string().as_str()));
     let data = organizations
       .into_iter()
-      .map(|organization| OrganizationView {
-        role: role_by_org
-          .get(&organization.id)
-          .cloned()
-          .unwrap_or_else(|| "member".to_string()),
-        id: organization.id,
-        key: organization.key,
-        name: organization.name,
-      })
+      .map(|(namespace, role)| organization_view(namespace, role))
       .collect();
-
     return Ok((StatusCode::OK, Json(to_single_page(data))));
   }
 
@@ -219,60 +139,17 @@ async fn list_organizations_internal(
       }),
     )
   })?;
-  let total = memberships.len() as u64;
-  if memberships.is_empty() {
+  let total = organizations.len() as u64;
+  if organizations.is_empty() {
     return Ok((StatusCode::OK, Json(to_page(Vec::new(), total, pagination))));
   }
 
   let offset = ((pagination.page - 1) * pagination.page_size) as usize;
-  let paged_memberships = memberships
+  let data = organizations
     .into_iter()
     .skip(offset)
     .take(pagination.page_size as usize)
-    .collect::<Vec<_>>();
-
-  if paged_memberships.is_empty() {
-    return Ok((StatusCode::OK, Json(to_page(Vec::new(), total, pagination))));
-  }
-
-  let role_by_org: HashMap<String, String> = paged_memberships
-    .iter()
-    .map(|membership| {
-      (
-        membership.organization_id.clone(),
-        member_role_to_string(membership.role.clone()),
-      )
-    })
-    .collect();
-  let organization_ids: Vec<String> = paged_memberships
-    .iter()
-    .map(|membership| membership.organization_id.clone())
-    .collect();
-
-  let organizations = OrganizationsRepository::new(state.db_conn.clone())
-    .list_active_organizations_by_ids(organization_ids)
-    .await
-    .map_err(|err| internal_error("failed to load organizations", err))?;
-  let organizations_by_id = organizations
-    .into_iter()
-    .map(|organization| (organization.id.clone(), organization))
-    .collect::<HashMap<_, _>>();
-
-  let data = paged_memberships
-    .into_iter()
-    .filter_map(|membership| {
-      organizations_by_id
-        .get(membership.organization_id.as_str())
-        .map(|organization| OrganizationView {
-          role: role_by_org
-            .get(&organization.id)
-            .cloned()
-            .unwrap_or_else(|| "member".to_string()),
-          id: organization.id.clone(),
-          key: organization.key.clone(),
-          name: organization.name.clone(),
-        })
-    })
+    .map(|(namespace, role)| organization_view(namespace, role))
     .collect();
 
   Ok((StatusCode::OK, Json(to_page(data, total, pagination))))
@@ -295,49 +172,12 @@ pub async fn get_organization(
   current_user: CurrentUser,
   Path(organization_id): Path<String>,
 ) -> Result<(StatusCode, Json<OrganizationView>), (StatusCode, Json<ErrorResponse>)> {
-  let role = if current_user_is_super_admin(&state, current_user.user_id.as_str()).await? {
-    "super_admin".to_string()
-  } else {
-    let membership = require_organization_role(
-      &state.db_conn,
-      current_user.user_id.as_str(),
-      organization_id.as_str(),
-      RequiredOrganizationRole::Member,
-    )
-    .await
-    .map_err(|err| {
-      (
-        err.status,
-        Json(ErrorResponse {
-          message: err.message,
-        }),
-      )
-    })?;
-    member_role_to_string(membership.role)
-  };
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let organization = load_group_namespace(&state, namespace_id).await?;
+  let role =
+    require_namespace_member_role_or_super_admin(&state, &current_user, organization.id).await?;
 
-  let organization = OrganizationsRepository::new(state.db_conn.clone())
-    .find_active_organization_by_id(organization_id.as_str())
-    .await
-    .map_err(|err| internal_error("failed to load organization", err))?
-    .ok_or_else(|| {
-      (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse {
-          message: "organization not found".to_string(),
-        }),
-      )
-    })?;
-
-  Ok((
-    StatusCode::OK,
-    Json(OrganizationView {
-      id: organization.id,
-      key: organization.key,
-      name: organization.name,
-      role,
-    }),
-  ))
+  Ok((StatusCode::OK, Json(organization_view(organization, role))))
 }
 
 #[utoipa::path(
@@ -358,20 +198,22 @@ pub async fn create_organization(
   Json(payload): Json<CreateOrganizationRequest>,
 ) -> Result<(StatusCode, Json<OrganizationView>), (StatusCode, Json<ErrorResponse>)> {
   let created = state
-    .services
-    .organization
-    .create_organization(current_user.user_id.as_str(), payload.key, payload.name)
+    .project_space
+    .create_namespace(CreateNamespaceCommand {
+      parent_namespace_id: None,
+      owner_user_id: Some(current_user.user_id.clone()),
+      path_key: payload.key,
+      name: payload.name,
+      description: None,
+      kind: namespace_kind::GROUP.to_string(),
+      visibility: visibility_level::PRIVATE.to_string(),
+    })
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
 
   Ok((
     StatusCode::CREATED,
-    Json(OrganizationView {
-      id: created.id,
-      key: created.key,
-      name: created.name,
-      role: created.role,
-    }),
+    Json(organization_view(created, member_role::OWNER.to_string())),
   ))
 }
 
@@ -396,27 +238,24 @@ pub async fn update_organization(
   Path(organization_id): Path<String>,
   Json(payload): Json<UpdateOrganizationRequest>,
 ) -> Result<(StatusCode, Json<OrganizationView>), (StatusCode, Json<ErrorResponse>)> {
-  let updated = state
-    .services
-    .organization
-    .update_organization(
-      current_user.user_id.as_str(),
-      organization_id.as_str(),
-      payload.key,
-      payload.name,
-    )
-    .await
-    .map_err(map_organization_service_error)?;
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let role =
+    require_namespace_owner_role_or_super_admin(&state, &current_user, namespace_id).await?;
+  let _ = load_group_namespace(&state, namespace_id).await?;
 
-  Ok((
-    StatusCode::OK,
-    Json(OrganizationView {
-      id: updated.id,
-      key: updated.key,
-      name: updated.name,
-      role: updated.role,
-    }),
-  ))
+  let updated = state
+    .project_space
+    .update_namespace(UpdateNamespaceCommand {
+      namespace_id,
+      path_key: payload.key,
+      name: payload.name,
+      description: None,
+      visibility: None,
+    })
+    .await
+    .map_err(map_project_space_error)?;
+
+  Ok((StatusCode::OK, Json(organization_view(updated, role))))
 }
 
 #[utoipa::path(
@@ -436,12 +275,15 @@ pub async fn delete_organization(
   current_user: CurrentUser,
   Path(organization_id): Path<String>,
 ) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let _ = require_namespace_owner_role_or_super_admin(&state, &current_user, namespace_id).await?;
+  let _ = load_group_namespace(&state, namespace_id).await?;
+
   state
-    .services
-    .organization
-    .delete_organization(current_user.user_id.as_str(), organization_id.as_str())
+    .project_space
+    .delete_namespace(namespace_id)
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
   Ok((StatusCode::OK, Json(EmptyData {})))
 }
 
@@ -465,22 +307,39 @@ pub async fn add_organization_member(
   Path(organization_id): Path<String>,
   Json(payload): Json<AddOrganizationMemberRequest>,
 ) -> Result<(StatusCode, Json<OrganizationMemberView>), (StatusCode, Json<ErrorResponse>)> {
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let _ = require_namespace_owner_role_or_super_admin(&state, &current_user, namespace_id).await?;
+  let organization = load_group_namespace(&state, namespace_id).await?;
+
+  let user = UsersRepository::new(state.db_conn.clone())
+    .find_active_user_by_id(payload.user_id.as_str())
+    .await
+    .map_err(|err| internal_error("failed to load user", err))?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "user not found".to_string(),
+        }),
+      )
+    })?;
+
+  let member_role = normalize_organization_member_role(payload.role);
   let member = state
-    .services
-    .organization
-    .add_organization_member(
-      current_user.user_id.as_str(),
-      organization_id.as_str(),
-      payload.user_id,
-      payload.role,
+    .project_space
+    .add_namespace_member(
+      organization.id,
+      user.id.as_str(),
+      member_role.as_str(),
+      None,
     )
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
 
   Ok((
     StatusCode::CREATED,
     Json(OrganizationMemberView {
-      organization_id: member.organization_id,
+      organization_id: member.namespace_id.to_string(),
       user_id: member.user_id,
       role: member.role,
     }),
@@ -505,30 +364,16 @@ pub async fn list_organization_members(
   Path(organization_id): Path<String>,
 ) -> Result<(StatusCode, Json<Vec<OrganizationMemberDetailView>>), (StatusCode, Json<ErrorResponse>)>
 {
-  let organization = OrganizationsRepository::new(state.db_conn.clone())
-    .find_active_organization_by_id(organization_id.as_str())
-    .await
-    .map_err(|err| internal_error("failed to load organization", err))?
-    .ok_or_else(|| {
-      (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse {
-          message: "organization not found".to_string(),
-        }),
-      )
-    })?;
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let organization = load_group_namespace(&state, namespace_id).await?;
+  let _ =
+    require_namespace_member_role_or_super_admin(&state, &current_user, organization.id).await?;
 
-  require_org_member_or_super_admin(
-    &state,
-    current_user.user_id.as_str(),
-    organization.id.as_str(),
-  )
-  .await?;
-
-  let members = OrganizationMembersRepository::new(state.db_conn.clone())
-    .list_active_memberships_by_organization(organization.id.as_str())
+  let members = state
+    .project_space
+    .list_namespace_members(organization.id)
     .await
-    .map_err(|err| internal_error("failed to load organization members", err))?;
+    .map_err(map_project_space_error)?;
   let user_ids = members
     .iter()
     .map(|member| member.user_id.clone())
@@ -548,11 +393,11 @@ pub async fn list_organization_members(
       user_map
         .get(member.user_id.as_str())
         .map(|user| OrganizationMemberDetailView {
-          organization_id: member.organization_id,
+          organization_id: member.namespace_id.to_string(),
           user_id: member.user_id,
           username: user.username.clone(),
           email: user.email.clone(),
-          role: member_role_to_string(member.role),
+          role: member.role,
         })
     })
     .collect();
@@ -578,29 +423,61 @@ pub async fn create_organization_invitation(
   Path(organization_id): Path<String>,
   Json(payload): Json<CreateInvitationRequest>,
 ) -> Result<(StatusCode, Json<InvitationCreateResponse>), (StatusCode, Json<ErrorResponse>)> {
-  let invitation_secret = invitation_secret(&state);
-  let public_base_url = public_base_url(&state);
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let _ = require_namespace_owner_role_or_super_admin(&state, &current_user, namespace_id).await?;
+  let _ = load_group_namespace(&state, namespace_id).await?;
+
   let invitation = state
-    .services
-    .organization
-    .create_invitation(
-      current_user.user_id.as_str(),
-      organization_id.as_str(),
-      payload.email,
-      payload.role,
+    .project_space
+    .create_namespace_invitation(
+      namespace_id,
+      payload.email.as_str(),
+      normalize_organization_member_role(payload.role).as_str(),
       payload.expires_in_hours,
-      invitation_secret.as_str(),
-      public_base_url.as_str(),
+      current_user.user_id.as_str(),
     )
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
+
+  let invitation_secret = invitation_secret(&state);
+  let public_base_url = public_base_url(&state);
+  let expires_at = invitation
+    .expires_at_unix
+    .and_then(|value| chrono::DateTime::from_timestamp(value, 0))
+    .ok_or_else(|| {
+      (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(ErrorResponse {
+          message: "invitation expiry is missing".to_string(),
+        }),
+      )
+    })?;
+  let invitation_token = issue_invitation_token(
+    invitation_secret.as_str(),
+    invitation.id.to_string().as_str(),
+    organization_id.as_str(),
+    invitation.email.as_str(),
+    expires_at,
+  )
+  .map_err(|err| {
+    (
+      StatusCode::INTERNAL_SERVER_ERROR,
+      Json(ErrorResponse {
+        message: format!("failed to issue invitation token: {err}"),
+      }),
+    )
+  })?;
+  let acceptance_url = format!(
+    "{}/api/v1/orgs/invitations/accept?token={}",
+    public_base_url, invitation_token
+  );
 
   Ok((
     StatusCode::CREATED,
     Json(InvitationCreateResponse {
-      invitation: invitation_view(invitation.invitation),
-      invitation_token: invitation.invitation_token,
-      acceptance_url: invitation.acceptance_url,
+      invitation: invitation_view(invitation),
+      invitation_token,
+      acceptance_url,
     }),
   ))
 }
@@ -623,17 +500,24 @@ pub async fn accept_organization_invitation(
   current_user: CurrentUser,
   Path(invitation_id): Path<String>,
 ) -> Result<(StatusCode, Json<OrganizationMemberView>), (StatusCode, Json<ErrorResponse>)> {
+  let invitation_id = parse_invitation_id(invitation_id.as_str())?;
+  let user = current_user_model(&state, current_user.user_id.as_str()).await?;
   let member = state
-    .services
-    .organization
-    .accept_invitation(current_user.user_id.as_str(), invitation_id, None, None)
+    .project_space
+    .accept_namespace_invitation(
+      invitation_id,
+      current_user.user_id.as_str(),
+      user.email.as_str(),
+      None,
+      None,
+    )
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
 
   Ok((
     StatusCode::OK,
     Json(OrganizationMemberView {
-      organization_id: member.organization_id,
+      organization_id: member.namespace_id.to_string(),
       user_id: member.user_id,
       role: member.role,
     }),
@@ -659,26 +543,7 @@ pub async fn accept_organization_invitation_by_token(
   current_user: CurrentUser,
   Json(payload): Json<AcceptInvitationByTokenRequest>,
 ) -> Result<(StatusCode, Json<OrganizationMemberView>), (StatusCode, Json<ErrorResponse>)> {
-  let invitation_secret = invitation_secret(&state);
-  let member = state
-    .services
-    .organization
-    .accept_invitation_with_token(
-      current_user.user_id.as_str(),
-      payload.token.as_str(),
-      invitation_secret.as_str(),
-    )
-    .await
-    .map_err(map_organization_service_error)?;
-
-  Ok((
-    StatusCode::OK,
-    Json(OrganizationMemberView {
-      organization_id: member.organization_id,
-      user_id: member.user_id,
-      role: member.role,
-    }),
-  ))
+  accept_organization_invitation_by_token_impl(&state, &current_user, payload.token.as_str()).await
 }
 
 #[utoipa::path(
@@ -700,26 +565,7 @@ pub async fn accept_organization_invitation_by_token_query(
   current_user: CurrentUser,
   Query(query): Query<AcceptInvitationByTokenQuery>,
 ) -> Result<(StatusCode, Json<OrganizationMemberView>), (StatusCode, Json<ErrorResponse>)> {
-  let invitation_secret = invitation_secret(&state);
-  let member = state
-    .services
-    .organization
-    .accept_invitation_with_token(
-      current_user.user_id.as_str(),
-      query.token.as_str(),
-      invitation_secret.as_str(),
-    )
-    .await
-    .map_err(map_organization_service_error)?;
-
-  Ok((
-    StatusCode::OK,
-    Json(OrganizationMemberView {
-      organization_id: member.organization_id,
-      user_id: member.user_id,
-      role: member.role,
-    }),
-  ))
+  accept_organization_invitation_by_token_impl(&state, &current_user, query.token.as_str()).await
 }
 
 #[utoipa::path(
@@ -740,16 +586,15 @@ pub async fn revoke_organization_invitation(
   current_user: CurrentUser,
   Path((organization_id, invitation_id)): Path<(String, String)>,
 ) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
+  let namespace_id = parse_namespace_id(organization_id.as_str())?;
+  let invitation_id = parse_invitation_id(invitation_id.as_str())?;
+  let _ = require_namespace_owner_role_or_super_admin(&state, &current_user, namespace_id).await?;
+
   state
-    .services
-    .organization
-    .revoke_invitation(
-      current_user.user_id.as_str(),
-      organization_id.as_str(),
-      invitation_id,
-    )
+    .project_space
+    .revoke_namespace_invitation(namespace_id, invitation_id, current_user.user_id.as_str())
     .await
-    .map_err(map_organization_service_error)?;
+    .map_err(map_project_space_error)?;
 
   Ok((StatusCode::OK, Json(EmptyData {})))
 }
@@ -771,6 +616,205 @@ pub fn organization_routes() -> OpenApiRouter<AppState> {
     .routes(routes![revoke_organization_invitation])
 }
 
+fn organization_view(namespace: ProjectSpaceNamespaceView, role: String) -> OrganizationView {
+  OrganizationView {
+    id: namespace.id.to_string(),
+    key: namespace.path_key,
+    name: namespace.name,
+    role,
+  }
+}
+
+fn parse_namespace_id(organization_id: &str) -> Result<i64, (StatusCode, Json<ErrorResponse>)> {
+  organization_id.parse::<i64>().map_err(|_| {
+    (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
+        message: "organization id must be an integer namespace id".to_string(),
+      }),
+    )
+  })
+}
+
+async fn load_group_namespace(
+  state: &AppState,
+  namespace_id: i64,
+) -> Result<ProjectSpaceNamespaceView, (StatusCode, Json<ErrorResponse>)> {
+  let namespace = state
+    .project_space
+    .get_namespace(namespace_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
+
+  if namespace.kind != namespace_kind::GROUP {
+    return Err((
+      StatusCode::NOT_FOUND,
+      Json(ErrorResponse {
+        message: "organization not found".to_string(),
+      }),
+    ));
+  }
+
+  Ok(namespace)
+}
+
+async fn require_namespace_member_role_or_super_admin(
+  state: &AppState,
+  current_user: &CurrentUser,
+  namespace_id: i64,
+) -> Result<String, (StatusCode, Json<ErrorResponse>)> {
+  require_namespace_role_or_super_admin(
+    state,
+    current_user,
+    namespace_id,
+    &[
+      member_role::GUEST,
+      member_role::REPORTER,
+      member_role::DEVELOPER,
+      member_role::MAINTAINER,
+      member_role::OWNER,
+    ],
+    "you are not a member of this organization",
+  )
+  .await
+}
+
+async fn require_namespace_owner_role_or_super_admin(
+  state: &AppState,
+  current_user: &CurrentUser,
+  namespace_id: i64,
+) -> Result<String, (StatusCode, Json<ErrorResponse>)> {
+  require_namespace_role_or_super_admin(
+    state,
+    current_user,
+    namespace_id,
+    &[member_role::OWNER],
+    "organization owner permission is required",
+  )
+  .await
+}
+
+async fn require_namespace_role_or_super_admin(
+  state: &AppState,
+  current_user: &CurrentUser,
+  namespace_id: i64,
+  accepted_roles: &[&str],
+  forbidden_message: &str,
+) -> Result<String, (StatusCode, Json<ErrorResponse>)> {
+  if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
+    return Ok("super_admin".to_string());
+  }
+
+  let role = state
+    .project_space
+    .get_namespace_role(namespace_id, current_user.user_id.as_str())
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse {
+          message: forbidden_message.to_string(),
+        }),
+      )
+    })?;
+
+  if accepted_roles.iter().any(|item| *item == role) {
+    Ok(role)
+  } else {
+    Err((
+      StatusCode::FORBIDDEN,
+      Json(ErrorResponse {
+        message: forbidden_message.to_string(),
+      }),
+    ))
+  }
+}
+
+fn normalize_organization_member_role(role: Option<String>) -> String {
+  match role.map(|value| value.trim().to_ascii_lowercase()) {
+    None => member_role::DEVELOPER.to_string(),
+    Some(value) if value.is_empty() => member_role::DEVELOPER.to_string(),
+    Some(value) if value == "member" => member_role::DEVELOPER.to_string(),
+    Some(value) => value,
+  }
+}
+
+async fn accept_organization_invitation_by_token_impl(
+  state: &AppState,
+  current_user: &CurrentUser,
+  token: &str,
+) -> Result<(StatusCode, Json<OrganizationMemberView>), (StatusCode, Json<ErrorResponse>)> {
+  let invitation_secret = invitation_secret(state);
+  let claims = verify_invitation_token(invitation_secret.as_str(), token).map_err(|_| {
+    (
+      StatusCode::UNAUTHORIZED,
+      Json(ErrorResponse {
+        message: "invalid or expired invitation token".to_string(),
+      }),
+    )
+  })?;
+  let invitation_id = parse_invitation_id(claims.sub.as_str())?;
+  let namespace_id = parse_namespace_id(claims.org.as_str())?;
+  let user = current_user_model(state, current_user.user_id.as_str()).await?;
+  let member = state
+    .project_space
+    .accept_namespace_invitation(
+      invitation_id,
+      current_user.user_id.as_str(),
+      user.email.as_str(),
+      Some(claims.email.as_str()),
+      Some(namespace_id),
+    )
+    .await
+    .map_err(map_project_space_error)?;
+
+  Ok((
+    StatusCode::OK,
+    Json(OrganizationMemberView {
+      organization_id: member.namespace_id.to_string(),
+      user_id: member.user_id,
+      role: member.role,
+    }),
+  ))
+}
+
+async fn current_user_model(
+  state: &AppState,
+  user_id: &str,
+) -> Result<entity::users::Model, (StatusCode, Json<ErrorResponse>)> {
+  UsersRepository::new(state.db_conn.clone())
+    .find_active_user_by_id(user_id)
+    .await
+    .map_err(|err| internal_error("failed to load current user", err))?
+    .ok_or_else(|| {
+      (
+        StatusCode::UNAUTHORIZED,
+        Json(ErrorResponse {
+          message: "current user not found".to_string(),
+        }),
+      )
+    })
+}
+
+fn parse_invitation_id(invitation_id: &str) -> Result<i64, (StatusCode, Json<ErrorResponse>)> {
+  invitation_id.parse::<i64>().map_err(|_| {
+    (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
+        message: "invitation id must be an integer namespace invitation id".to_string(),
+      }),
+    )
+  })
+}
 fn invitation_secret(state: &AppState) -> String {
   state.services.auth.jwt_secret().to_string()
 }
@@ -779,25 +823,19 @@ fn public_base_url(state: &AppState) -> String {
   format!("http://localhost:{}", state.config.server.port)
 }
 
-fn invitation_view(invitation: organization_invitations::Model) -> InvitationView {
+fn invitation_view(invitation: NamespaceInvitationView) -> InvitationView {
   InvitationView {
-    id: invitation.id,
-    organization_id: invitation.organization_id,
+    id: invitation.id.to_string(),
+    organization_id: invitation.namespace_id.to_string(),
     email: invitation.email,
-    role: match invitation.role {
-      organization_invitations::InvitationRole::Owner => "owner".to_string(),
-      organization_invitations::InvitationRole::Member => "member".to_string(),
-    },
-    status: match invitation.status {
-      organization_invitations::InvitationStatus::Pending => "pending".to_string(),
-      organization_invitations::InvitationStatus::Accepted => "accepted".to_string(),
-      organization_invitations::InvitationStatus::Revoked => "revoked".to_string(),
-      organization_invitations::InvitationStatus::Expired => "expired".to_string(),
-    },
-    expires_at: invitation.expires_at.map(|dt| dt.to_rfc3339()),
+    role: invitation.role,
+    status: invitation.state,
+    expires_at: invitation
+      .expires_at_unix
+      .and_then(|value| chrono::DateTime::from_timestamp(value, 0))
+      .map(|dt| dt.to_rfc3339()),
   }
 }
-
 fn internal_error(message: &str, err: DbErr) -> (StatusCode, Json<ErrorResponse>) {
   (
     StatusCode::INTERNAL_SERVER_ERROR,
@@ -805,6 +843,17 @@ fn internal_error(message: &str, err: DbErr) -> (StatusCode, Json<ErrorResponse>
       message: format!("{message}: {err}"),
     }),
   )
+}
+
+fn map_project_space_error(err: ProjectSpaceError) -> (StatusCode, Json<ErrorResponse>) {
+  let (status, message) = match err {
+    ProjectSpaceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+    ProjectSpaceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+    ProjectSpaceError::Conflict(message) => (StatusCode::CONFLICT, message),
+    ProjectSpaceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+    ProjectSpaceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+  };
+  (status, Json(ErrorResponse { message }))
 }
 
 async fn current_user_is_super_admin(
@@ -818,33 +867,6 @@ async fn current_user_is_super_admin(
     .await
     .map_err(map_user_service_error_as_org_error)?;
   Ok(state.services.user.is_super_admin(&user))
-}
-
-async fn require_org_member_or_super_admin(
-  state: &AppState,
-  user_id: &str,
-  organization_id: &str,
-) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
-  if current_user_is_super_admin(state, user_id).await? {
-    return Ok(());
-  }
-
-  require_organization_role(
-    &state.db_conn,
-    user_id,
-    organization_id,
-    RequiredOrganizationRole::Member,
-  )
-  .await
-  .map_err(|err| {
-    (
-      err.status,
-      Json(ErrorResponse {
-        message: err.message,
-      }),
-    )
-  })?;
-  Ok(())
 }
 
 fn map_user_service_error_as_org_error(
@@ -869,20 +891,6 @@ fn map_user_service_error_as_org_error(
     crate::service::user_service::UserServiceError::Internal(message) => {
       (StatusCode::INTERNAL_SERVER_ERROR, message)
     }
-  };
-  (status, Json(ErrorResponse { message }))
-}
-
-fn map_organization_service_error(
-  err: OrganizationServiceError,
-) -> (StatusCode, Json<ErrorResponse>) {
-  let (status, message) = match err {
-    OrganizationServiceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
-    OrganizationServiceError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
-    OrganizationServiceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
-    OrganizationServiceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
-    OrganizationServiceError::Conflict(message) => (StatusCode::CONFLICT, message),
-    OrganizationServiceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
   };
   (status, Json(ErrorResponse { message }))
 }

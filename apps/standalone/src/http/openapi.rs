@@ -8,8 +8,10 @@ use utoipa::OpenApi;
     (name = "System", description = "System and documentation endpoints"),
     (name = "Auth", description = "Authentication and token flows"),
     (name = "Users", description = "User profile and admin user management"),
-    (name = "Organizations", description = "Organization and membership management"),
-    (name = "Repositories", description = "Repository, source, issue, and branch operations")
+    (name = "Organizations", description = "Legacy organization and membership management endpoints"),
+    (name = "Repositories", description = "Legacy repository, source, issue, and branch endpoints"),
+    (name = "Namespaces", description = "GitLab-like namespace management on the new project-centric model"),
+    (name = "Projects", description = "GitLab-like project management on the new project-centric model")
   )
 )]
 pub struct ApiDoc;

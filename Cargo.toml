@@ -2,10 +2,13 @@
 members = [
   "apps/ci-runner",
   "apps/standalone",
+  "crates/application",
   "crates/domain",
   "crates/entity",
   "crates/git",
   "crates/migration",
+  "crates/models",
+  "crates/platform",
   "crates/repository",
 ]
 resolver = "3"
@@ -23,9 +26,12 @@ serde_json = "1.0.147"
 clap = "4.5.53"
 sea-orm = "2.0.0-rc.34"
 sea-orm-migration = "2.0.0-rc.34"
+toasty = "0.3.0"
+toasty-driver-postgresql = "0.3.0"
 validator = "0.20.0"
 validator_derive = "0.20.0"
 chrono = "0.4.42"
 mr-ulid = "2.0.0"
 utoipa = "5.4.0"
-argon2 = "0.6.0-rc.5"
+argon2 = "0.5.3"
+

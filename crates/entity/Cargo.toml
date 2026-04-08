@@ -9,5 +9,6 @@ sea-orm = { workspace = true, features = ["sqlx"] }
 mr-ulid = { workspace = true }
 chrono = { workspace = true }
 domain = { path = "../domain" }
-argon2 = { workspace = true, features = ["password-hash", "parallel"] }
+argon2 = { workspace = true, features = ["password-hash"] }
 uuid = "1.22.0"
+

@@ -2,6 +2,7 @@ use crate::http::app_state::AppState;
 use crate::security::current_user::CurrentUser;
 use crate::security::organization_acl::{RequiredOrganizationRole, require_organization_role};
 use crate::service::git_backend_service::GitBackendError;
+use crate::service::project_space_service::ProjectSpaceError;
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
@@ -10,6 +11,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use entity::{organizations, repositories};
 use git::http;
+use models::constants::member_role;
 use repository::{OrganizationsRepository, RepositoriesRepository};
 use serde::Deserialize;
 use tracing::warn;
@@ -21,11 +23,15 @@ pub struct InfoRefsParams {
 
 /// GET /git/:owner/:repo/info/refs?service=git-<name>
 pub async fn info_refs(
-  Path((owner, repo)): Path<(String, String)>,
+  Path(namespace_and_repo): Path<String>,
   Query(params): Query<InfoRefsParams>,
   State(app_state): State<AppState>,
   headers: HeaderMap,
 ) -> impl IntoResponse {
+  let (owner, repo) = match parse_namespace_and_repo(namespace_and_repo.as_str()) {
+    Some(parts) => parts,
+    None => return (StatusCode::BAD_REQUEST, "invalid repository path").into_response(),
+  };
   let service = match parse_git_service(params.service.as_str()) {
     Some(service) => service,
     None => {
@@ -37,7 +43,39 @@ pub async fn info_refs(
     }
   };
 
-  if service == "receive-pack" {
+  if owner.contains('/') {
+    if service == "receive-pack" {
+      let current_user = match resolve_current_user_from_headers(&app_state, &headers).await {
+        Ok(user) => user,
+        Err(err) => return err.into_response(),
+      };
+      if let Err(err) = require_namespace_project_write_access(
+        &app_state,
+        &current_user,
+        owner.as_str(),
+        repo.as_str(),
+      )
+      .await
+      {
+        return err.into_response();
+      }
+    } else if !allow_anonymous_read(&app_state) {
+      let current_user = match resolve_current_user_from_headers(&app_state, &headers).await {
+        Ok(user) => user,
+        Err(err) => return err.into_response(),
+      };
+      if let Err(err) = require_namespace_project_read_access(
+        &app_state,
+        &current_user,
+        owner.as_str(),
+        repo.as_str(),
+      )
+      .await
+      {
+        return err.into_response();
+      }
+    }
+  } else if service == "receive-pack" {
     let current_user = match resolve_current_user_from_headers(&app_state, &headers).await {
       Ok(user) => user,
       Err(err) => return err.into_response(),
@@ -111,12 +149,34 @@ pub async fn info_refs(
 
 /// POST /git/:owner/:repo/git-upload-pack
 pub async fn upload_pack(
-  Path((owner, repo)): Path<(String, String)>,
+  Path(namespace_and_repo): Path<String>,
   State(app_state): State<AppState>,
   headers: HeaderMap,
   body: Bytes,
 ) -> impl IntoResponse {
-  if !allow_anonymous_read(&app_state) {
+  let (owner, repo) = match parse_namespace_and_repo(namespace_and_repo.as_str()) {
+    Some(parts) => parts,
+    None => return (StatusCode::BAD_REQUEST, "invalid repository path").into_response(),
+  };
+
+  if owner.contains('/') {
+    if !allow_anonymous_read(&app_state) {
+      let current_user = match resolve_current_user_from_headers(&app_state, &headers).await {
+        Ok(user) => user,
+        Err(err) => return err.into_response(),
+      };
+      if let Err(err) = require_namespace_project_read_access(
+        &app_state,
+        &current_user,
+        owner.as_str(),
+        repo.as_str(),
+      )
+      .await
+      {
+        return err.into_response();
+      }
+    }
+  } else if !allow_anonymous_read(&app_state) {
     let current_user = match resolve_current_user_from_headers(&app_state, &headers).await {
       Ok(user) => user,
       Err(err) => return err.into_response(),
@@ -146,11 +206,56 @@ pub async fn upload_pack(
 
 /// POST /git/:owner/:repo/git-receive-pack
 pub async fn receive_pack(
-  Path((owner, repo)): Path<(String, String)>,
+  Path(namespace_and_repo): Path<String>,
   State(app_state): State<AppState>,
   current_user: CurrentUser,
   body: Bytes,
 ) -> impl IntoResponse {
+  let (owner, repo) = match parse_namespace_and_repo(namespace_and_repo.as_str()) {
+    Some(parts) => parts,
+    None => return (StatusCode::BAD_REQUEST, "invalid repository path").into_response(),
+  };
+
+  if owner.contains('/') {
+    if let Err(err) = require_namespace_project_write_access(
+      &app_state,
+      &current_user,
+      owner.as_str(),
+      repo.as_str(),
+    )
+    .await
+    {
+      return err.into_response();
+    }
+
+    let repo_path = match app_state
+      .services
+      .git_backend
+      .resolve_repo_path(owner.as_str(), repo.as_str())
+    {
+      Ok(path) => path,
+      Err(err) => {
+        let (status, message) = map_git_backend_error(err);
+        return (status, message).into_response();
+      }
+    };
+
+    let output = match app_state
+      .services
+      .git_backend
+      .run_stateless_rpc(repo_path.as_path(), "receive-pack", &body)
+      .await
+    {
+      Ok(output) => output,
+      Err(err) => {
+        let (status, message) = map_git_backend_error(err);
+        return (status, message).into_response();
+      }
+    };
+
+    return build_service_response("receive-pack", output);
+  }
+
   let (organization, repository) =
     match require_receive_pack_permission(&app_state, &current_user, owner.as_str(), repo.as_str())
       .await
@@ -223,6 +328,22 @@ fn parse_git_service(input: &str) -> Option<&str> {
     "upload-pack" | "receive-pack" => Some(normalized),
     _ => None,
   }
+}
+
+fn parse_namespace_and_repo(value: &str) -> Option<(String, String)> {
+  let trimmed = value.trim_matches('/');
+  if trimmed.is_empty() {
+    return None;
+  }
+
+  let mut parts = trimmed.rsplitn(2, '/');
+  let repo = parts.next()?.trim();
+  let owner = parts.next()?.trim();
+  if owner.is_empty() || repo.is_empty() {
+    return None;
+  }
+
+  Some((owner.to_string(), repo.to_string()))
 }
 
 async fn service_pack_inner(
@@ -335,6 +456,133 @@ async fn require_repository_permission(
   Ok((organization, repository))
 }
 
+async fn require_namespace_project_read_access(
+  state: &AppState,
+  current_user: &CurrentUser,
+  owner: &str,
+  repo: &str,
+) -> Result<(), (StatusCode, String)> {
+  require_namespace_project_access(
+    state,
+    current_user,
+    owner,
+    repo,
+    &[
+      member_role::GUEST,
+      member_role::REPORTER,
+      member_role::DEVELOPER,
+      member_role::MAINTAINER,
+      member_role::OWNER,
+    ],
+    "you are not a member of this project namespace",
+  )
+  .await
+}
+
+async fn require_namespace_project_write_access(
+  state: &AppState,
+  current_user: &CurrentUser,
+  owner: &str,
+  repo: &str,
+) -> Result<(), (StatusCode, String)> {
+  require_namespace_project_access(
+    state,
+    current_user,
+    owner,
+    repo,
+    &[
+      member_role::DEVELOPER,
+      member_role::MAINTAINER,
+      member_role::OWNER,
+    ],
+    "project developer permission is required",
+  )
+  .await
+}
+
+async fn require_namespace_project_access(
+  state: &AppState,
+  current_user: &CurrentUser,
+  owner: &str,
+  repo: &str,
+  accepted_roles: &[&str],
+  forbidden_message: &str,
+) -> Result<(), (StatusCode, String)> {
+  if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
+    return Ok(());
+  }
+
+  let repo_key = repo.strip_suffix(".git").unwrap_or(repo);
+  let project_full_path = format!("{owner}/{repo_key}");
+  let project = state
+    .project_space
+    .get_project_by_full_path(project_full_path.as_str())
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| (StatusCode::NOT_FOUND, "project not found".to_string()))?;
+
+  let role = state
+    .project_space
+    .get_namespace_role(project.namespace_id, current_user.user_id.as_str())
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| (StatusCode::FORBIDDEN, forbidden_message.to_string()))?;
+
+  if accepted_roles.iter().any(|item| *item == role) {
+    Ok(())
+  } else {
+    Err((StatusCode::FORBIDDEN, forbidden_message.to_string()))
+  }
+}
+
+async fn current_user_is_super_admin(
+  state: &AppState,
+  user_id: &str,
+) -> Result<bool, (StatusCode, String)> {
+  let user = state
+    .services
+    .user
+    .get_current_user(user_id)
+    .await
+    .map_err(map_user_service_error)?;
+  Ok(state.services.user.is_super_admin(&user))
+}
+
+fn map_user_service_error(
+  err: crate::service::user_service::UserServiceError,
+) -> (StatusCode, String) {
+  match err {
+    crate::service::user_service::UserServiceError::BadRequest(message) => {
+      (StatusCode::BAD_REQUEST, message)
+    }
+    crate::service::user_service::UserServiceError::Unauthorized(message) => {
+      (StatusCode::UNAUTHORIZED, message)
+    }
+    crate::service::user_service::UserServiceError::Forbidden(message) => {
+      (StatusCode::FORBIDDEN, message)
+    }
+    crate::service::user_service::UserServiceError::NotFound(message) => {
+      (StatusCode::NOT_FOUND, message)
+    }
+    crate::service::user_service::UserServiceError::Conflict(message) => {
+      (StatusCode::CONFLICT, message)
+    }
+    crate::service::user_service::UserServiceError::Internal(message) => {
+      (StatusCode::INTERNAL_SERVER_ERROR, message)
+    }
+  }
+}
+
+fn map_project_space_error(err: ProjectSpaceError) -> (StatusCode, String) {
+  match err {
+    ProjectSpaceError::BadRequest(message) => (StatusCode::BAD_REQUEST, message),
+    ProjectSpaceError::NotFound(message) => (StatusCode::NOT_FOUND, message),
+    ProjectSpaceError::Conflict(message) => (StatusCode::CONFLICT, message),
+    ProjectSpaceError::Forbidden(message) => (StatusCode::FORBIDDEN, message),
+    ProjectSpaceError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
+  }
+}
+
 async fn resolve_current_user_from_headers(
   state: &AppState,
   headers: &HeaderMap,
@@ -393,7 +641,10 @@ fn map_git_backend_error(err: GitBackendError) -> (StatusCode, String) {
 
 pub fn git_routes() -> Router<AppState> {
   Router::new()
-    .route("/{owner}/{repo}/info/refs", get(info_refs))
-    .route("/{owner}/{repo}/git-upload-pack", post(upload_pack))
-    .route("/{owner}/{repo}/git-receive-pack", post(receive_pack))
+    .route("/{*namespace_and_repo}/info/refs", get(info_refs))
+    .route("/{*namespace_and_repo}/git-upload-pack", post(upload_pack))
+    .route(
+      "/{*namespace_and_repo}/git-receive-pack",
+      post(receive_pack),
+    )
 }
