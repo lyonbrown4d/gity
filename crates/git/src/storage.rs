@@ -78,6 +78,48 @@ pub fn list_head_refs(repo_path: &Path) -> Result<Vec<(String, String)>, Storage
   Ok(refs)
 }
 
+pub fn create_branch(
+  repo_path: &Path,
+  source_branch: &str,
+  branch_name: &str,
+) -> Result<String, StorageError> {
+  let normalized_source_branch = source_branch.trim();
+  if !is_valid_default_branch(normalized_source_branch) {
+    return Err(StorageError::InvalidDefaultBranch(
+      "source branch cannot be empty or contain unsupported characters".to_string(),
+    ));
+  }
+
+  let normalized_branch = branch_name.trim();
+  if !is_valid_default_branch(normalized_branch) {
+    return Err(StorageError::InvalidDefaultBranch(
+      "branch cannot be empty or contain unsupported characters".to_string(),
+    ));
+  }
+
+  let repo =
+    git2::Repository::open_bare(repo_path).map_err(|err| StorageError::Open(err.to_string()))?;
+  let source_ref_name = format!("refs/heads/{normalized_source_branch}");
+  let source_oid = repo
+    .refname_to_id(source_ref_name.as_str())
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+  let target_ref_name = format!("refs/heads/{normalized_branch}");
+  if repo.find_reference(target_ref_name.as_str()).is_ok() {
+    return Err(StorageError::Refs("branch already exists".to_string()));
+  }
+
+  repo
+    .reference(
+      target_ref_name.as_str(),
+      source_oid,
+      false,
+      "gity create branch",
+    )
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+
+  Ok(source_oid.to_string())
+}
+
 pub fn seed_initial_commit(
   repo_path: &Path,
   default_branch: &str,
@@ -142,6 +184,59 @@ pub fn seed_initial_commit(
     .map_err(|err| StorageError::CommitWrite(err.to_string()))?;
 
   Ok(Some(commit_id.to_string()))
+}
+
+pub fn create_empty_commit(
+  repo_path: &Path,
+  branch: &str,
+  commit_message: &str,
+  author_name: &str,
+  author_email: &str,
+) -> Result<String, StorageError> {
+  let normalized_branch = branch.trim();
+  if !is_valid_default_branch(normalized_branch) {
+    return Err(StorageError::InvalidDefaultBranch(
+      "branch cannot be empty or contain unsupported characters".to_string(),
+    ));
+  }
+
+  let message = commit_message.trim();
+  if message.is_empty() {
+    return Err(StorageError::CommitWrite(
+      "commit message cannot be empty".to_string(),
+    ));
+  }
+
+  let repo = Repository::open_bare(repo_path).map_err(|err| StorageError::Open(err.to_string()))?;
+  let ref_name = format!("refs/heads/{normalized_branch}");
+  let parent_oid = repo
+    .refname_to_id(ref_name.as_str())
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+  let parent_commit = repo
+    .find_commit(parent_oid)
+    .map_err(|err| StorageError::Refs(err.to_string()))?;
+  let parent_tree = parent_commit
+    .tree()
+    .map_err(|err| StorageError::TreeLookup(err.to_string()))?;
+
+  let signature = git2::Signature::now(
+    normalize_author_name(author_name).as_str(),
+    normalize_author_email(author_email).as_str(),
+  )
+  .map_err(|err| StorageError::Signature(err.to_string()))?;
+
+  let commit_id = repo
+    .commit(
+      Some(ref_name.as_str()),
+      &signature,
+      &signature,
+      message,
+      &parent_tree,
+      &[&parent_commit],
+    )
+    .map_err(|err| StorageError::CommitWrite(err.to_string()))?;
+
+  Ok(commit_id.to_string())
 }
 
 pub fn commit_file(

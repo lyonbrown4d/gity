@@ -6,6 +6,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -166,6 +167,19 @@ pub async fn create_project(
     })
     .await
     .map_err(map_error)?;
+
+  if let Some(job_client) = state.repository_language_jobs.as_ref()
+    && let Err(err) = job_client
+      .enqueue_project_branch(project.id, Some(project.default_branch.as_str()))
+      .await
+  {
+    warn!(
+      project_id = project.id,
+      branch = project.default_branch.as_str(),
+      error = err,
+      "failed to enqueue initial project language job"
+    );
+  }
 
   Ok((StatusCode::CREATED, Json(project.into())))
 }

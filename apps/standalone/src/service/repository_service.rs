@@ -1335,6 +1335,55 @@ impl RepositoryService {
       .map_err(|err| Self::internal_error("failed to list issue comments", err))
   }
 
+  pub async fn upload_project_issue_attachment(
+    &self,
+    namespace_path: &str,
+    project_path: &str,
+    issue_id: Option<&str>,
+    file_name: Option<String>,
+    content_type: Option<String>,
+    bytes: Vec<u8>,
+  ) -> Result<UploadIssueAttachmentOutput, RepositoryServiceError> {
+    if !self.issue_attachment.is_enabled() {
+      return Err(RepositoryServiceError::BadRequest(
+        "issue attachment storage is not configured".to_string(),
+      ));
+    }
+
+    if bytes.is_empty() {
+      return Err(RepositoryServiceError::BadRequest(
+        "attachment file is required".to_string(),
+      ));
+    }
+
+    if bytes.len() > self.issue_attachment.max_file_size {
+      return Err(RepositoryServiceError::BadRequest(format!(
+        "attachment exceeds max_file_size ({} bytes)",
+        self.issue_attachment.max_file_size
+      )));
+    }
+
+    let file_name = sanitize_attachment_file_name(file_name.as_deref()).ok_or_else(|| {
+      RepositoryServiceError::BadRequest("invalid attachment file name".to_string())
+    })?;
+    let issue_segment = issue_id.unwrap_or("draft");
+    let object_key = format!(
+      "issues/{}/{}/{}/{}-{}",
+      namespace_path,
+      project_path,
+      issue_segment,
+      Ulid::new(),
+      file_name
+    );
+    let uploaded = self
+      .issue_attachment
+      .upload(object_key, bytes, content_type.as_deref())
+      .await
+      .map_err(RepositoryServiceError::BadRequest)?;
+
+    Ok(upload_output_from_result(uploaded, file_name))
+  }
+
   pub async fn upload_issue_attachment(
     &self,
     input: UploadIssueAttachmentInput,

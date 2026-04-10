@@ -10,7 +10,14 @@ use crate::service::repository_service::{
   ListCommitsInput, ListIssueCommentsInput, ListIssuesInput, RepositoryServiceError,
   UpdateIssueInput, UploadIssueAttachmentInput, UploadIssueAttachmentOutput,
 };
-use application::project::CreateProjectCommand;
+use application::project::{
+  CreateProjectBranchCommand, CreateProjectCommand, CreateProjectIssueCommand,
+  CreateProjectIssueCommentCommand, ProjectBranchView as ProjectSpaceBranchView,
+  ProjectIssueCommentView as ProjectSpaceIssueCommentView,
+  ProjectIssueView as ProjectSpaceIssueView,
+  ProjectLanguageSnapshotView as ProjectSpaceLanguageSnapshotView,
+  SetProjectBranchProtectionCommand, UpdateProjectIssueCommand,
+};
 use axum::Json;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
@@ -517,6 +524,64 @@ pub async fn delete_repository(
   current_user: CurrentUser,
   Path(repo_id): Path<String>,
 ) -> Result<(StatusCode, Json<EmptyData>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let project = state
+      .project_space
+      .get_project(project_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "repository not found".to_string(),
+          }),
+        )
+      })?;
+    let namespace = state
+      .project_space
+      .get_namespace(project.namespace_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "organization not found".to_string(),
+          }),
+        )
+      })?;
+
+    if !current_user_is_repo_super_admin(&state, current_user.user_id.as_str()).await? {
+      let allowed = state
+        .project_space
+        .user_has_namespace_role(
+          namespace.id,
+          current_user.user_id.as_str(),
+          &["owner", "maintainer"],
+        )
+        .await
+        .map_err(map_project_space_error)?;
+      let owns_namespace =
+        namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str());
+      if !allowed && !owns_namespace {
+        return Err((
+          StatusCode::FORBIDDEN,
+          Json(ErrorResponse {
+            message: "organization owner or maintainer permission is required".to_string(),
+          }),
+        ));
+      }
+    }
+
+    state
+      .project_space
+      .delete_project(project_id)
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((StatusCode::OK, Json(EmptyData {})));
+  }
+
   state
     .services
     .repository
@@ -543,6 +608,31 @@ pub async fn list_branches(
   current_user: CurrentUser,
   Path(repo_id): Path<String>,
 ) -> Result<(StatusCode, Json<Vec<BranchView>>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let branches = state
+      .project_space
+      .list_project_branches(project_id)
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::OK,
+      Json(
+        branches
+          .into_iter()
+          .map(|branch| project_branch_api_view(repo_id.as_str(), branch))
+          .collect::<Vec<_>>(),
+      ),
+    ));
+  }
+
   let branches = state
     .services
     .repository
@@ -579,6 +669,30 @@ pub async fn create_branch(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateBranchRequest>,
 ) -> Result<(StatusCode, Json<BranchView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      Some(&["developer", "maintainer", "owner"]),
+      "organization developer permission is required",
+    )
+    .await?;
+    let branch = state
+      .project_space
+      .create_project_branch(CreateProjectBranchCommand {
+        project_id,
+        name: payload.name,
+        source_branch: None,
+      })
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::CREATED,
+      Json(project_branch_api_view(repo_id.as_str(), branch)),
+    ));
+  }
+
   let branch = state
     .services
     .repository
@@ -730,6 +844,86 @@ pub async fn create_commit(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateCommitRequest>,
 ) -> Result<(StatusCode, Json<CommitView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let (project, namespace) = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      Some(&["developer", "maintainer", "owner"]),
+      "organization developer permission is required",
+    )
+    .await?;
+
+    if payload
+      .commit_sha
+      .as_deref()
+      .is_some_and(|value| !value.trim().is_empty())
+    {
+      return Err((
+        StatusCode::BAD_REQUEST,
+        Json(ErrorResponse {
+          message: "commit_sha is generated by git for project-backed repositories".to_string(),
+        }),
+      ));
+    }
+
+    if let Some(branch) = state
+      .project_space
+      .get_project_branch(project.id, payload.branch_name.as_str())
+      .await
+      .map_err(map_project_space_error)?
+      && branch.is_protected
+      && namespace.owner_user_id.as_deref() != Some(current_user.user_id.as_str())
+    {
+      return Err((
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse {
+          message: "only organization owner can commit to protected branch".to_string(),
+        }),
+      ));
+    }
+
+    let author = state
+      .services
+      .user
+      .get_current_user(current_user.user_id.as_str())
+      .await
+      .map_err(map_user_service_error_as_repo_error)?;
+    let commit_sha = state
+      .services
+      .git_backend
+      .create_empty_commit(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        payload.branch_name.as_str(),
+        payload.message.as_str(),
+        author.username.as_str(),
+        author.email.as_str(),
+      )
+      .await
+      .map_err(map_repository_content_error)?;
+
+    let _ = state
+      .project_space
+      .list_project_branches(project.id)
+      .await
+      .map_err(map_project_space_error)?;
+    enqueue_repository_language_job(&state, repo_id.as_str(), Some(payload.branch_name.as_str()))
+      .await;
+
+    return Ok((
+      StatusCode::CREATED,
+      Json(CommitView {
+        repository_id: repo_id,
+        branch_name: payload.branch_name,
+        commit_sha,
+        message: payload.message,
+        author_user_id: current_user.user_id,
+        created_at: chrono::Utc::now().to_rfc3339(),
+      }),
+    ));
+  }
+
   let commit = state
     .services
     .repository
@@ -766,6 +960,110 @@ pub async fn create_file_commit(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateFileCommitRequest>,
 ) -> Result<(StatusCode, Json<CommitView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let project = state
+      .project_space
+      .get_project(project_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "repository not found".to_string(),
+          }),
+        )
+      })?;
+    let namespace = state
+      .project_space
+      .get_namespace(project.namespace_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "organization not found".to_string(),
+          }),
+        )
+      })?;
+
+    if !current_user_is_repo_super_admin(&state, current_user.user_id.as_str()).await? {
+      let allowed = state
+        .project_space
+        .user_has_namespace_role(
+          namespace.id,
+          current_user.user_id.as_str(),
+          &["developer", "maintainer", "owner"],
+        )
+        .await
+        .map_err(map_project_space_error)?;
+      let owns_namespace =
+        namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str());
+      if !allowed && !owns_namespace {
+        return Err((
+          StatusCode::FORBIDDEN,
+          Json(ErrorResponse {
+            message: "organization developer permission is required".to_string(),
+          }),
+        ));
+      }
+    }
+
+    if let Some(branch) = state
+      .project_space
+      .get_project_branch(project.id, payload.branch_name.as_str())
+      .await
+      .map_err(map_project_space_error)?
+      && branch.is_protected
+      && namespace.owner_user_id.as_deref() != Some(current_user.user_id.as_str())
+    {
+      return Err((
+        StatusCode::FORBIDDEN,
+        Json(ErrorResponse {
+          message: "only organization owner can commit to protected branch".to_string(),
+        }),
+      ));
+    }
+
+    let author = state
+      .services
+      .user
+      .get_current_user(current_user.user_id.as_str())
+      .await
+      .map_err(map_user_service_error_as_repo_error)?;
+    let commit_sha = state
+      .services
+      .git_backend
+      .commit_file(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        payload.branch_name.as_str(),
+        payload.path.as_str(),
+        payload.content.as_str(),
+        payload.message.as_str(),
+        author.username.as_str(),
+        author.email.as_str(),
+      )
+      .await
+      .map_err(map_repository_content_error)?;
+
+    enqueue_repository_language_job(&state, repo_id.as_str(), Some(payload.branch_name.as_str()))
+      .await;
+
+    return Ok((
+      StatusCode::CREATED,
+      Json(CommitView {
+        repository_id: repo_id,
+        branch_name: payload.branch_name,
+        commit_sha,
+        message: payload.message,
+        author_user_id: current_user.user_id,
+        created_at: chrono::Utc::now().to_rfc3339(),
+      }),
+    ));
+  }
+
   let commit = state
     .services
     .repository
@@ -809,6 +1107,31 @@ pub async fn list_issues(
   Path(repo_id): Path<String>,
   Query(query): Query<ListIssuesQuery>,
 ) -> Result<(StatusCode, Json<Vec<IssueView>>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let issues = state
+      .project_space
+      .list_project_issues(project_id, query.status.as_deref(), query.limit)
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::OK,
+      Json(
+        issues
+          .into_iter()
+          .map(project_issue_api_view)
+          .collect::<Vec<_>>(),
+      ),
+    ));
+  }
+
   let issues = state
     .services
     .repository
@@ -847,6 +1170,29 @@ pub async fn create_issue(
   Path(repo_id): Path<String>,
   Json(payload): Json<CreateIssueRequest>,
 ) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "organization member permission is required",
+    )
+    .await?;
+    let issue = state
+      .project_space
+      .create_project_issue(CreateProjectIssueCommand {
+        project_id,
+        title: payload.title,
+        description: payload.description,
+        assignee_user_id: payload.assignee_user_id,
+        author_user_id: current_user.user_id,
+      })
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((StatusCode::CREATED, Json(project_issue_api_view(issue))));
+  }
+
   let issue = state
     .services
     .repository
@@ -881,6 +1227,31 @@ pub async fn get_issue_by_number(
   current_user: CurrentUser,
   Path((repo_id, number)): Path<(String, i32)>,
 ) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let issue = state
+      .project_space
+      .get_project_issue_by_iid(project_id, number as i64)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "issue not found".to_string(),
+          }),
+        )
+      })?;
+    return Ok((StatusCode::OK, Json(project_issue_api_view(issue))));
+  }
+
   let issue = state
     .services
     .repository
@@ -915,6 +1286,65 @@ pub async fn update_issue(
   Path((repo_id, issue_id)): Path<(String, String)>,
   Json(payload): Json<UpdateIssueRequest>,
 ) -> Result<(StatusCode, Json<IssueView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let (_, namespace) = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let issue_id = parse_project_issue_id(issue_id.as_str())?;
+    let existing = state
+      .project_space
+      .get_project_issue(project_id, issue_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "issue not found".to_string(),
+          }),
+        )
+      })?;
+
+    if !current_user_is_repo_super_admin(&state, current_user.user_id.as_str()).await? {
+      let can_manage = state
+        .project_space
+        .user_has_namespace_role(
+          namespace.id,
+          current_user.user_id.as_str(),
+          &["maintainer", "owner"],
+        )
+        .await
+        .map_err(map_project_space_error)?;
+      if !can_manage && existing.author_user_id != current_user.user_id {
+        return Err((
+          StatusCode::FORBIDDEN,
+          Json(ErrorResponse {
+            message: "issue author or organization maintainer permission is required".to_string(),
+          }),
+        ));
+      }
+    }
+
+    let issue = state
+      .project_space
+      .update_project_issue(UpdateProjectIssueCommand {
+        project_id,
+        issue_id,
+        title: payload.title,
+        description: payload.description,
+        state: payload.status,
+        assignee_user_id: payload.assignee_user_id,
+      })
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((StatusCode::OK, Json(project_issue_api_view(issue))));
+  }
+
   let issue = state
     .services
     .repository
@@ -952,6 +1382,32 @@ pub async fn list_issue_comments(
   Path((repo_id, issue_id)): Path<(String, String)>,
   Query(query): Query<ListIssueCommentsQuery>,
 ) -> Result<(StatusCode, Json<Vec<IssueCommentView>>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let issue_id = parse_project_issue_id(issue_id.as_str())?;
+    let comments = state
+      .project_space
+      .list_project_issue_comments(project_id, issue_id, query.limit)
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::OK,
+      Json(
+        comments
+          .into_iter()
+          .map(project_issue_comment_api_view)
+          .collect::<Vec<_>>(),
+      ),
+    ));
+  }
+
   let comments = state
     .services
     .repository
@@ -990,6 +1446,32 @@ pub async fn create_issue_comment(
   Path((repo_id, issue_id)): Path<(String, String)>,
   Json(payload): Json<CreateIssueCommentRequest>,
 ) -> Result<(StatusCode, Json<IssueCommentView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "organization member permission is required",
+    )
+    .await?;
+    let issue_id = parse_project_issue_id(issue_id.as_str())?;
+    let comment = state
+      .project_space
+      .create_project_issue_comment(CreateProjectIssueCommentCommand {
+        project_id,
+        issue_id,
+        body: payload.content,
+        author_user_id: current_user.user_id,
+      })
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::CREATED,
+      Json(project_issue_comment_api_view(comment)),
+    ));
+  }
+
   let comment = state
     .services
     .repository
@@ -1063,6 +1545,56 @@ pub async fn upload_issue_attachment(
       }),
     )
   })?;
+
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let (project, namespace) = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "organization member permission is required",
+    )
+    .await?;
+
+    let issue_id = if let Some(issue_id) = query.issue_id.as_deref() {
+      let issue_id = parse_project_issue_id(issue_id)?;
+      state
+        .project_space
+        .get_project_issue(project.id, issue_id)
+        .await
+        .map_err(map_project_space_error)?
+        .ok_or_else(|| {
+          (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse {
+              message: "issue not found".to_string(),
+            }),
+          )
+        })?;
+      Some(issue_id.to_string())
+    } else {
+      None
+    };
+
+    let uploaded = state
+      .services
+      .repository
+      .upload_project_issue_attachment(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        issue_id.as_deref(),
+        file_name,
+        content_type,
+        bytes,
+      )
+      .await
+      .map_err(map_repository_service_error)?;
+
+    return Ok((
+      StatusCode::CREATED,
+      Json(issue_attachment_upload_view(uploaded)),
+    ));
+  }
 
   let uploaded = state
     .services
@@ -1271,6 +1803,93 @@ pub async fn get_repository_languages(
   Path(repo_id): Path<String>,
   Query(query): Query<RepositoryLanguagesQuery>,
 ) -> Result<(StatusCode, Json<RepositoryLanguagesView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let (project, namespace) = require_project_repository_access(
+      &state,
+      current_user.user_id.as_str(),
+      project_id,
+      None,
+      "you are not a member of this organization",
+    )
+    .await?;
+    let branch_name = query
+      .branch_name
+      .unwrap_or_else(|| project.default_branch.clone());
+
+    if let Some(snapshot) = state
+      .project_space
+      .get_project_language_snapshot(project_id, branch_name.as_str())
+      .await
+      .map_err(map_project_space_error)?
+    {
+      return Ok((
+        StatusCode::OK,
+        Json(project_language_snapshot_api_view(
+          repo_id.as_str(),
+          snapshot,
+        )),
+      ));
+    }
+
+    if state.repository_language_jobs.is_some() {
+      enqueue_repository_language_job(&state, repo_id.as_str(), Some(branch_name.as_str())).await;
+      return Ok((
+        StatusCode::OK,
+        Json(RepositoryLanguagesView {
+          repository_id: repo_id,
+          branch_name,
+          status: "pending".to_string(),
+          revision: None,
+          analyzed_at: None,
+          total_bytes: 0,
+          languages: Vec::new(),
+        }),
+      ));
+    }
+
+    let stats = state
+      .services
+      .git_backend
+      .analyze_languages(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        branch_name.as_str(),
+      )
+      .await
+      .map_err(map_repository_content_error)?;
+
+    let total_bytes = stats.iter().map(|item| item.bytes).sum::<u64>();
+    let languages = stats
+      .into_iter()
+      .map(|item| {
+        let percentage = if total_bytes == 0 {
+          0.0
+        } else {
+          let raw = (item.bytes as f64) * 100.0 / (total_bytes as f64);
+          (raw * 100.0).round() / 100.0
+        };
+        RepositoryLanguageItemView {
+          language: item.language,
+          bytes: item.bytes,
+          percentage,
+        }
+      })
+      .collect::<Vec<_>>();
+
+    return Ok((
+      StatusCode::OK,
+      Json(RepositoryLanguagesView {
+        repository_id: repo_id,
+        branch_name,
+        status: "ready".to_string(),
+        revision: None,
+        analyzed_at: Some(chrono::Utc::now().to_rfc3339()),
+        total_bytes,
+        languages,
+      }),
+    ));
+  }
+
   let repository = state
     .services
     .repository
@@ -1579,11 +2198,99 @@ async fn create_project_repository(
     .await
     .map_err(map_project_space_error)?;
 
+  let project_repo_id = project.id.to_string();
+  enqueue_repository_language_job(
+    state,
+    project_repo_id.as_str(),
+    Some(project.default_branch.as_str()),
+  )
+  .await;
+
   Ok(project_repository_view(
     &project,
     &namespace,
     public_base_url(state).as_str(),
   ))
+}
+
+async fn require_project_repository_access(
+  state: &AppState,
+  user_id: &str,
+  project_id: i64,
+  accepted_roles: Option<&[&str]>,
+  denied_message: &str,
+) -> Result<
+  (
+    application::project::ProjectView,
+    application::namespace::NamespaceView,
+  ),
+  (StatusCode, Json<ErrorResponse>),
+> {
+  let project = state
+    .project_space
+    .get_project(project_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "repository not found".to_string(),
+        }),
+      )
+    })?;
+  let namespace = state
+    .project_space
+    .get_namespace(project.namespace_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| {
+      (
+        StatusCode::NOT_FOUND,
+        Json(ErrorResponse {
+          message: "organization not found".to_string(),
+        }),
+      )
+    })?;
+
+  if current_user_is_repo_super_admin(state, user_id).await? {
+    return Ok((project, namespace));
+  }
+
+  let role = state
+    .project_space
+    .get_namespace_role(namespace.id, user_id)
+    .await
+    .map_err(map_project_space_error)?;
+  let owns_namespace = namespace.owner_user_id.as_deref() == Some(user_id);
+  let allowed = match accepted_roles {
+    Some(accepted_roles) => role
+      .as_deref()
+      .is_some_and(|value| accepted_roles.iter().any(|item| *item == value)),
+    None => role.is_some(),
+  };
+
+  if !allowed && !owns_namespace {
+    return Err((
+      StatusCode::FORBIDDEN,
+      Json(ErrorResponse {
+        message: denied_message.to_string(),
+      }),
+    ));
+  }
+
+  Ok((project, namespace))
+}
+
+fn parse_project_issue_id(issue_id: &str) -> Result<i64, (StatusCode, Json<ErrorResponse>)> {
+  issue_id.parse::<i64>().map_err(|_| {
+    (
+      StatusCode::BAD_REQUEST,
+      Json(ErrorResponse {
+        message: "issue_id must be a numeric id for project-backed repositories".to_string(),
+      }),
+    )
+  })
 }
 
 fn should_use_project_space_repo_api(
@@ -1662,6 +2369,30 @@ async fn set_branch_protection(
   branch_name: String,
   is_protected: bool,
 ) -> Result<(StatusCode, Json<BranchView>), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let _ = require_project_repository_access(
+      state,
+      current_user.user_id.as_str(),
+      project_id,
+      Some(&["owner"]),
+      "organization owner permission is required",
+    )
+    .await?;
+    let branch = state
+      .project_space
+      .set_project_branch_protection(SetProjectBranchProtectionCommand {
+        project_id,
+        branch_name,
+        is_protected,
+      })
+      .await
+      .map_err(map_project_space_error)?;
+    return Ok((
+      StatusCode::OK,
+      Json(project_branch_api_view(repo_id.as_str(), branch)),
+    ));
+  }
+
   let branch = state
     .services
     .repository
@@ -1766,6 +2497,76 @@ fn issue_comment_view(model: repository_issue_comments::Model) -> IssueCommentVi
   }
 }
 
+fn project_branch_api_view(repo_id: &str, model: ProjectSpaceBranchView) -> BranchView {
+  BranchView {
+    repository_id: repo_id.to_string(),
+    name: model.name,
+    is_protected: model.is_protected,
+    last_commit_sha: model.last_commit_sha,
+  }
+}
+
+fn project_issue_api_view(model: ProjectSpaceIssueView) -> IssueView {
+  IssueView {
+    id: model.id.to_string(),
+    repository_id: model.project_id.to_string(),
+    number: i32::try_from(model.iid).unwrap_or(i32::MAX),
+    title: model.title,
+    description: model.description,
+    status: model.state,
+    author_user_id: model.author_user_id,
+    assignee_user_id: model.assignee_user_id,
+    created_at: unix_seconds_to_rfc3339(model.created_at_unix),
+    updated_at: unix_seconds_to_rfc3339(model.updated_at_unix),
+    closed_at: model.closed_at_unix.map(unix_seconds_to_rfc3339),
+  }
+}
+
+fn project_issue_comment_api_view(model: ProjectSpaceIssueCommentView) -> IssueCommentView {
+  IssueCommentView {
+    id: model.id.to_string(),
+    issue_id: model.project_issue_id.to_string(),
+    author_user_id: model.author_user_id,
+    content: model.body,
+    created_at: unix_seconds_to_rfc3339(model.created_at_unix),
+    updated_at: unix_seconds_to_rfc3339(model.updated_at_unix),
+  }
+}
+
+fn project_language_snapshot_api_view(
+  repo_id: &str,
+  snapshot: ProjectSpaceLanguageSnapshotView,
+) -> RepositoryLanguagesView {
+  let total_bytes = snapshot.total_bytes;
+  let languages = snapshot
+    .items
+    .into_iter()
+    .map(|item| {
+      let percentage = if total_bytes == 0 {
+        0.0
+      } else {
+        let raw = (item.bytes as f64) * 100.0 / (total_bytes as f64);
+        (raw * 100.0).round() / 100.0
+      };
+      RepositoryLanguageItemView {
+        language: item.language,
+        bytes: item.bytes,
+        percentage,
+      }
+    })
+    .collect::<Vec<_>>();
+
+  RepositoryLanguagesView {
+    repository_id: repo_id.to_string(),
+    branch_name: snapshot.branch_name,
+    status: "ready".to_string(),
+    revision: Some(snapshot.revision),
+    analyzed_at: Some(unix_seconds_to_rfc3339(snapshot.analyzed_at_unix)),
+    total_bytes,
+    languages,
+  }
+}
+
 fn issue_attachment_upload_view(output: UploadIssueAttachmentOutput) -> IssueAttachmentUploadView {
   IssueAttachmentUploadView {
     url: output.url,
@@ -1811,10 +2612,17 @@ async fn enqueue_repository_language_job(
     return;
   };
 
-  if let Err(err) = job_client
-    .enqueue_repository_branch(repository_id, branch_name)
-    .await
-  {
+  let enqueue_result = if let Ok(project_id) = repository_id.parse::<i64>() {
+    job_client
+      .enqueue_project_branch(project_id, branch_name)
+      .await
+  } else {
+    job_client
+      .enqueue_repository_branch(repository_id, branch_name)
+      .await
+  };
+
+  if let Err(err) = enqueue_result {
     warn!(
       repository_id = repository_id,
       branch = branch_name.unwrap_or(""),
@@ -1830,6 +2638,55 @@ async fn resolve_repo_storage_context(
   repo_id: &str,
   branch_name: Option<String>,
 ) -> Result<(String, String, String), (StatusCode, Json<ErrorResponse>)> {
+  if let Ok(project_id) = repo_id.parse::<i64>() {
+    let project = state
+      .project_space
+      .get_project(project_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "repository not found".to_string(),
+          }),
+        )
+      })?;
+    let namespace = state
+      .project_space
+      .get_namespace(project.namespace_id)
+      .await
+      .map_err(map_project_space_error)?
+      .ok_or_else(|| {
+        (
+          StatusCode::NOT_FOUND,
+          Json(ErrorResponse {
+            message: "organization not found".to_string(),
+          }),
+        )
+      })?;
+
+    if !current_user_is_repo_super_admin(state, user_id).await? {
+      let role = state
+        .project_space
+        .get_namespace_role(namespace.id, user_id)
+        .await
+        .map_err(map_project_space_error)?;
+      let owns_namespace = namespace.owner_user_id.as_deref() == Some(user_id);
+      if role.is_none() && !owns_namespace {
+        return Err((
+          StatusCode::FORBIDDEN,
+          Json(ErrorResponse {
+            message: "you are not a member of this organization".to_string(),
+          }),
+        ));
+      }
+    }
+
+    let branch = branch_name.unwrap_or(project.default_branch);
+    return Ok((namespace.full_path, project.path_key, branch));
+  }
+
   let repository = state
     .services
     .repository

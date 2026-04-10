@@ -3,12 +3,20 @@ use application::namespace::{
   CreateNamespaceCommand, NamespaceInvitationView, NamespaceMemberView, NamespaceView,
   UpdateNamespaceCommand,
 };
-use application::project::{CreateProjectCommand, ProjectView};
+use application::project::{
+  CreateProjectBranchCommand, CreateProjectCommand, CreateProjectIssueCommand,
+  CreateProjectIssueCommentCommand, ProjectBranchView, ProjectIssueCommentView, ProjectIssueView,
+  ProjectLanguageSnapshotItemView, ProjectLanguageSnapshotView, ProjectView,
+  SetProjectBranchProtectionCommand, UpdateProjectIssueCommand,
+};
 use chrono::{Duration, Utc};
 use models::constants::{
-  invitation_state, member_role, namespace_kind, record_state, visibility_level,
+  invitation_state, issue_state, member_role, namespace_kind, record_state, visibility_level,
 };
-use models::gitlab::{Namespace, NamespaceInvitation, NamespaceMember, Project};
+use models::gitlab::{
+  Namespace, NamespaceInvitation, NamespaceMember, Project, ProjectBranch, ProjectIssue,
+  ProjectIssueComment, ProjectLanguageSnapshot, ProjectLanguageSnapshotItem,
+};
 use toasty::Db;
 #[derive(Clone)]
 pub struct ProjectSpaceService {
@@ -658,6 +666,463 @@ impl ProjectSpaceService {
     )
   }
 
+  pub async fn get_project_language_snapshot(
+    &self,
+    project_id: i64,
+    branch_name: &str,
+  ) -> Result<Option<ProjectLanguageSnapshotView>, ProjectSpaceError> {
+    self
+      .get_project_model(project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let branch_name = normalize_branch_name(branch_name)?;
+
+    let Some(snapshot) = self
+      .find_project_language_snapshot(project_id, branch_name.as_str())
+      .await?
+    else {
+      return Ok(None);
+    };
+
+    let items = self
+      .list_project_language_snapshot_items(snapshot.id)
+      .await?;
+    Ok(Some(project_language_snapshot_to_view(snapshot, items)))
+  }
+
+  pub async fn list_project_branches(
+    &self,
+    project_id: i64,
+  ) -> Result<Vec<ProjectBranchView>, ProjectSpaceError> {
+    let project = self
+      .get_project_model(project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let namespace = self
+      .get_namespace_model(project.namespace_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("namespace not found".to_string()))?;
+
+    self
+      .sync_project_branch_metadata(&project, &namespace)
+      .await?;
+    let refs = self
+      .git_backend
+      .list_branch_refs(namespace.full_path.as_str(), project.path_key.as_str())
+      .await
+      .map_err(map_git_backend_error)?;
+    let branches = self.list_project_branch_models(project.id).await?;
+
+    Ok(
+      refs
+        .into_iter()
+        .filter_map(|(branch_name, _)| {
+          branches
+            .iter()
+            .find(|item| item.name == branch_name)
+            .cloned()
+            .map(project_branch_to_view)
+        })
+        .collect(),
+    )
+  }
+
+  pub async fn get_project_branch(
+    &self,
+    project_id: i64,
+    branch_name: &str,
+  ) -> Result<Option<ProjectBranchView>, ProjectSpaceError> {
+    let branch_name = normalize_branch_name(branch_name)?;
+    let project = self
+      .get_project_model(project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let namespace = self
+      .get_namespace_model(project.namespace_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("namespace not found".to_string()))?;
+
+    self
+      .sync_project_branch_metadata(&project, &namespace)
+      .await?;
+    let refs = self
+      .git_backend
+      .list_branch_refs(namespace.full_path.as_str(), project.path_key.as_str())
+      .await
+      .map_err(map_git_backend_error)?;
+    if !refs.iter().any(|(name, _)| name == branch_name.as_str()) {
+      return Ok(None);
+    }
+
+    Ok(
+      self
+        .find_project_branch_by_name(project.id, branch_name.as_str())
+        .await?
+        .map(project_branch_to_view),
+    )
+  }
+
+  pub async fn create_project_branch(
+    &self,
+    mut command: CreateProjectBranchCommand,
+  ) -> Result<ProjectBranchView, ProjectSpaceError> {
+    command.name = normalize_branch_name(command.name.as_str())?;
+    let project = self
+      .get_project_model(command.project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let namespace = self
+      .get_namespace_model(project.namespace_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("namespace not found".to_string()))?;
+    let source_branch = command
+      .source_branch
+      .take()
+      .map(|value| normalize_branch_name(value.as_str()))
+      .transpose()?
+      .unwrap_or_else(|| project.default_branch.clone());
+    let commit_sha = self
+      .git_backend
+      .create_branch(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        source_branch.as_str(),
+        command.name.as_str(),
+      )
+      .await
+      .map_err(map_git_backend_error)?;
+
+    let branch = self
+      .upsert_project_branch(project.id, command.name.as_str(), Some(commit_sha), None)
+      .await?;
+    Ok(project_branch_to_view(branch))
+  }
+
+  pub async fn set_project_branch_protection(
+    &self,
+    command: SetProjectBranchProtectionCommand,
+  ) -> Result<ProjectBranchView, ProjectSpaceError> {
+    let branch_name = normalize_branch_name(command.branch_name.as_str())?;
+    let project = self
+      .get_project_model(command.project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let namespace = self
+      .get_namespace_model(project.namespace_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("namespace not found".to_string()))?;
+
+    self
+      .sync_project_branch_metadata(&project, &namespace)
+      .await?;
+    let branch = self
+      .upsert_project_branch(
+        project.id,
+        branch_name.as_str(),
+        None,
+        Some(command.is_protected),
+      )
+      .await?;
+    Ok(project_branch_to_view(branch))
+  }
+
+  pub async fn list_project_issues(
+    &self,
+    project_id: i64,
+    state: Option<&str>,
+    limit: Option<u64>,
+  ) -> Result<Vec<ProjectIssueView>, ProjectSpaceError> {
+    self
+      .get_project_model(project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+
+    let normalized_state = state.map(normalize_issue_state).transpose()?;
+    let mut db = self.db.clone();
+    let mut query = ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project_id))
+      .order_by(ProjectIssue::fields().iid().asc());
+    if let Some(state) = normalized_state {
+      query = query.filter(ProjectIssue::fields().state().eq(state));
+    }
+
+    let mut items = query.exec(&mut db).await.map_err(map_db_error)?;
+    let resolved_limit = limit.unwrap_or(100).clamp(1, 200) as usize;
+    if items.len() > resolved_limit {
+      items.truncate(resolved_limit);
+    }
+    Ok(items.into_iter().map(project_issue_to_view).collect())
+  }
+
+  pub async fn create_project_issue(
+    &self,
+    mut command: CreateProjectIssueCommand,
+  ) -> Result<ProjectIssueView, ProjectSpaceError> {
+    let project = self
+      .get_project_model(command.project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    command.title = normalize_non_empty(command.title.as_str(), "title")?;
+    command.description = normalize_optional(command.description);
+    command.author_user_id =
+      normalize_non_empty(command.author_user_id.as_str(), "author_user_id")?;
+    command.assignee_user_id = normalize_optional(command.assignee_user_id);
+
+    let iid = self.next_project_issue_iid(project.id).await?;
+    let now = Utc::now().timestamp();
+    let mut db = self.db.clone();
+    let issue = toasty::create!(ProjectIssue {
+      project_id: project.id,
+      iid: iid,
+      title: command.title,
+      description: command.description,
+      state: issue_state::OPEN,
+      author_user_id: command.author_user_id,
+      assignee_user_id: command.assignee_user_id,
+      created_at_unix: now,
+      updated_at_unix: now,
+      closed_at_unix: None,
+    })
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?;
+
+    Ok(project_issue_to_view(issue))
+  }
+
+  pub async fn get_project_issue(
+    &self,
+    project_id: i64,
+    issue_id: i64,
+  ) -> Result<Option<ProjectIssueView>, ProjectSpaceError> {
+    Ok(
+      self
+        .get_project_issue_model(project_id, issue_id)
+        .await?
+        .map(project_issue_to_view),
+    )
+  }
+
+  pub async fn get_project_issue_by_iid(
+    &self,
+    project_id: i64,
+    iid: i64,
+  ) -> Result<Option<ProjectIssueView>, ProjectSpaceError> {
+    Ok(
+      self
+        .find_project_issue_by_iid(project_id, iid)
+        .await?
+        .map(project_issue_to_view),
+    )
+  }
+
+  pub async fn update_project_issue(
+    &self,
+    command: UpdateProjectIssueCommand,
+  ) -> Result<ProjectIssueView, ProjectSpaceError> {
+    let mut issue = self
+      .get_project_issue_model(command.project_id, command.issue_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("issue not found".to_string()))?;
+
+    let title = command
+      .title
+      .map(|value| normalize_non_empty(value.as_str(), "title"))
+      .transpose()?;
+    let description = command
+      .description
+      .map(|value| value.and_then(normalize_optional_value));
+    let state = command
+      .state
+      .map(|value| normalize_issue_state(value.as_str()))
+      .transpose()?;
+    let assignee_user_id = command
+      .assignee_user_id
+      .map(|value| value.and_then(normalize_optional_value));
+
+    let resolved_title = title.unwrap_or_else(|| issue.title.clone());
+    let resolved_description = description.unwrap_or(issue.description.clone());
+    let resolved_state = state.unwrap_or_else(|| issue.state.clone());
+    let resolved_assignee_user_id = assignee_user_id.unwrap_or(issue.assignee_user_id.clone());
+    let now = Utc::now().timestamp();
+    let resolved_closed_at_unix = if resolved_state == issue_state::CLOSED {
+      issue.closed_at_unix.or(Some(now))
+    } else {
+      None
+    };
+
+    let mut db = self.db.clone();
+    issue
+      .update()
+      .title(resolved_title)
+      .description(resolved_description)
+      .state(resolved_state)
+      .assignee_user_id(resolved_assignee_user_id)
+      .updated_at_unix(now)
+      .closed_at_unix(resolved_closed_at_unix)
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+
+    let updated = self
+      .get_project_issue_model(command.project_id, command.issue_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("issue not found".to_string()))?;
+    Ok(project_issue_to_view(updated))
+  }
+
+  pub async fn list_project_issue_comments(
+    &self,
+    project_id: i64,
+    issue_id: i64,
+    limit: Option<u64>,
+  ) -> Result<Vec<ProjectIssueCommentView>, ProjectSpaceError> {
+    self
+      .get_project_issue_model(project_id, issue_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("issue not found".to_string()))?;
+
+    let mut db = self.db.clone();
+    let mut items = ProjectIssueComment::filter(
+      ProjectIssueComment::fields()
+        .project_issue_id()
+        .eq(issue_id),
+    )
+    .order_by(ProjectIssueComment::fields().id().asc())
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?;
+    let resolved_limit = limit.unwrap_or(100).clamp(1, 200) as usize;
+    if items.len() > resolved_limit {
+      items.truncate(resolved_limit);
+    }
+    Ok(
+      items
+        .into_iter()
+        .map(project_issue_comment_to_view)
+        .collect(),
+    )
+  }
+
+  pub async fn create_project_issue_comment(
+    &self,
+    mut command: CreateProjectIssueCommentCommand,
+  ) -> Result<ProjectIssueCommentView, ProjectSpaceError> {
+    self
+      .get_project_issue_model(command.project_id, command.issue_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("issue not found".to_string()))?;
+    command.body = normalize_non_empty(command.body.as_str(), "body")?;
+    command.author_user_id =
+      normalize_non_empty(command.author_user_id.as_str(), "author_user_id")?;
+
+    let now = Utc::now().timestamp();
+    let mut db = self.db.clone();
+    let comment = toasty::create!(ProjectIssueComment {
+      project_issue_id: command.issue_id,
+      author_user_id: command.author_user_id,
+      body: command.body,
+      created_at_unix: now,
+      updated_at_unix: now,
+    })
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?;
+
+    Ok(project_issue_comment_to_view(comment))
+  }
+
+  pub async fn delete_project(&self, project_id: i64) -> Result<(), ProjectSpaceError> {
+    let project = self
+      .get_project_model(project_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("project not found".to_string()))?;
+    let namespace = self
+      .get_namespace_model(project.namespace_id)
+      .await?
+      .ok_or_else(|| ProjectSpaceError::NotFound("namespace not found".to_string()))?;
+
+    match self
+      .git_backend
+      .remove_repository_storage(namespace.full_path.as_str(), project.path_key.as_str())
+      .await
+    {
+      Ok(()) | Err(GitBackendError::StorageNotConfigured) => {}
+      Err(err) => return Err(map_git_backend_error(err)),
+    }
+
+    let mut db = self.db.clone();
+    let issue_ids = ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project.id))
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?
+      .into_iter()
+      .map(|issue| issue.id)
+      .collect::<Vec<_>>();
+
+    for issue_id in issue_ids {
+      ProjectIssueComment::filter(
+        ProjectIssueComment::fields()
+          .project_issue_id()
+          .eq(issue_id),
+      )
+      .delete()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+    }
+
+    let snapshot_ids = ProjectLanguageSnapshot::filter(
+      ProjectLanguageSnapshot::fields()
+        .project_id()
+        .eq(project.id),
+    )
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?
+    .into_iter()
+    .map(|snapshot| snapshot.id)
+    .collect::<Vec<_>>();
+
+    for snapshot_id in snapshot_ids {
+      ProjectLanguageSnapshotItem::filter(
+        ProjectLanguageSnapshotItem::fields()
+          .snapshot_id()
+          .eq(snapshot_id),
+      )
+      .delete()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+    }
+
+    ProjectLanguageSnapshot::filter(
+      ProjectLanguageSnapshot::fields()
+        .project_id()
+        .eq(project.id),
+    )
+    .delete()
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?;
+    ProjectBranch::filter(ProjectBranch::fields().project_id().eq(project.id))
+      .delete()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+    ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project.id))
+      .delete()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+    Project::filter(Project::fields().id().eq(project.id))
+      .delete()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+
+    Ok(())
+  }
+
   async fn get_namespace_model(
     &self,
     namespace_id: i64,
@@ -770,6 +1235,173 @@ impl ProjectSpaceService {
       .exec(&mut db)
       .await
       .map_err(map_db_error)
+  }
+
+  async fn list_project_branch_models(
+    &self,
+    project_id: i64,
+  ) -> Result<Vec<ProjectBranch>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    ProjectBranch::filter(ProjectBranch::fields().project_id().eq(project_id))
+      .order_by(ProjectBranch::fields().name().asc())
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)
+  }
+
+  async fn find_project_branch_by_name(
+    &self,
+    project_id: i64,
+    branch_name: &str,
+  ) -> Result<Option<ProjectBranch>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    ProjectBranch::filter(ProjectBranch::fields().project_id().eq(project_id))
+      .filter(ProjectBranch::fields().name().eq(branch_name))
+      .first()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)
+  }
+
+  async fn upsert_project_branch(
+    &self,
+    project_id: i64,
+    branch_name: &str,
+    last_commit_sha: Option<String>,
+    is_protected: Option<bool>,
+  ) -> Result<ProjectBranch, ProjectSpaceError> {
+    let now = Utc::now().timestamp();
+    if let Some(mut branch) = self
+      .find_project_branch_by_name(project_id, branch_name)
+      .await?
+    {
+      let resolved_last_commit_sha = last_commit_sha.or(branch.last_commit_sha.clone());
+      let resolved_is_protected = is_protected.unwrap_or(branch.is_protected);
+      let mut db = self.db.clone();
+      branch
+        .update()
+        .last_commit_sha(resolved_last_commit_sha)
+        .is_protected(resolved_is_protected)
+        .updated_at_unix(now)
+        .exec(&mut db)
+        .await
+        .map_err(map_db_error)?;
+      return self
+        .find_project_branch_by_name(project_id, branch_name)
+        .await?
+        .ok_or_else(|| ProjectSpaceError::NotFound("branch not found".to_string()));
+    }
+
+    let mut db = self.db.clone();
+    toasty::create!(ProjectBranch {
+      project_id: project_id,
+      name: branch_name.to_string(),
+      is_protected: is_protected.unwrap_or(false),
+      last_commit_sha: last_commit_sha,
+      created_at_unix: now,
+      updated_at_unix: now,
+    })
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)
+  }
+
+  async fn sync_project_branch_metadata(
+    &self,
+    project: &Project,
+    namespace: &Namespace,
+  ) -> Result<(), ProjectSpaceError> {
+    let refs = self
+      .git_backend
+      .list_branch_refs(namespace.full_path.as_str(), project.path_key.as_str())
+      .await
+      .map_err(map_git_backend_error)?;
+    for (branch_name, commit_sha) in refs {
+      let _ = self
+        .upsert_project_branch(project.id, branch_name.as_str(), Some(commit_sha), None)
+        .await?;
+    }
+    Ok(())
+  }
+
+  async fn find_project_language_snapshot(
+    &self,
+    project_id: i64,
+    branch_name: &str,
+  ) -> Result<Option<ProjectLanguageSnapshot>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    let items = ProjectLanguageSnapshot::filter(
+      ProjectLanguageSnapshot::fields()
+        .project_id()
+        .eq(project_id),
+    )
+    .filter(
+      ProjectLanguageSnapshot::fields()
+        .branch_name()
+        .eq(branch_name),
+    )
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)?;
+    Ok(
+      items
+        .into_iter()
+        .max_by_key(|item| (item.analyzed_at_unix, item.id)),
+    )
+  }
+
+  async fn list_project_language_snapshot_items(
+    &self,
+    snapshot_id: i64,
+  ) -> Result<Vec<ProjectLanguageSnapshotItem>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    ProjectLanguageSnapshotItem::filter(
+      ProjectLanguageSnapshotItem::fields()
+        .snapshot_id()
+        .eq(snapshot_id),
+    )
+    .order_by(ProjectLanguageSnapshotItem::fields().language().asc())
+    .exec(&mut db)
+    .await
+    .map_err(map_db_error)
+  }
+
+  async fn get_project_issue_model(
+    &self,
+    project_id: i64,
+    issue_id: i64,
+  ) -> Result<Option<ProjectIssue>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project_id))
+      .filter(ProjectIssue::fields().id().eq(issue_id))
+      .first()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)
+  }
+
+  async fn find_project_issue_by_iid(
+    &self,
+    project_id: i64,
+    iid: i64,
+  ) -> Result<Option<ProjectIssue>, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project_id))
+      .filter(ProjectIssue::fields().iid().eq(iid))
+      .first()
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)
+  }
+
+  async fn next_project_issue_iid(&self, project_id: i64) -> Result<i64, ProjectSpaceError> {
+    let mut db = self.db.clone();
+    let items = ProjectIssue::filter(ProjectIssue::fields().project_id().eq(project_id))
+      .order_by(ProjectIssue::fields().iid().asc())
+      .exec(&mut db)
+      .await
+      .map_err(map_db_error)?;
+    Ok(items.last().map(|item| item.iid + 1).unwrap_or(1))
   }
 
   async fn initialize_project_storage(
@@ -890,6 +1522,32 @@ fn normalize_email(value: &str) -> Result<String, ProjectSpaceError> {
   Ok(normalized)
 }
 
+fn normalize_branch_name(value: &str) -> Result<String, ProjectSpaceError> {
+  let normalized = value.trim().to_string();
+  if normalized.is_empty()
+    || normalized.contains(' ')
+    || normalized.contains('\\')
+    || normalized.contains("..")
+    || normalized.starts_with('/')
+    || normalized.ends_with('/')
+  {
+    return Err(ProjectSpaceError::BadRequest(
+      "branch name contains unsupported characters".to_string(),
+    ));
+  }
+  Ok(normalized)
+}
+
+fn normalize_issue_state(value: &str) -> Result<String, ProjectSpaceError> {
+  let normalized = value.trim().to_ascii_lowercase();
+  match normalized.as_str() {
+    issue_state::OPEN | issue_state::CLOSED => Ok(normalized),
+    _ => Err(ProjectSpaceError::BadRequest(
+      "state must be open or closed".to_string(),
+    )),
+  }
+}
+
 fn normalize_member_role(value: &str) -> Result<String, ProjectSpaceError> {
   let normalized = value.trim().to_ascii_lowercase();
   match normalized.as_str() {
@@ -963,6 +1621,69 @@ fn project_to_view(value: Project) -> ProjectView {
   }
 }
 
+fn project_branch_to_view(value: ProjectBranch) -> ProjectBranchView {
+  ProjectBranchView {
+    id: value.id,
+    project_id: value.project_id,
+    name: value.name,
+    is_protected: value.is_protected,
+    last_commit_sha: value.last_commit_sha,
+    created_at_unix: value.created_at_unix,
+    updated_at_unix: value.updated_at_unix,
+  }
+}
+
+fn project_language_snapshot_to_view(
+  snapshot: ProjectLanguageSnapshot,
+  items: Vec<ProjectLanguageSnapshotItem>,
+) -> ProjectLanguageSnapshotView {
+  ProjectLanguageSnapshotView {
+    project_id: snapshot.project_id,
+    branch_name: snapshot.branch_name,
+    revision: snapshot.revision,
+    analyzed_at_unix: snapshot.analyzed_at_unix,
+    total_bytes: saturating_i64_to_u64(snapshot.total_bytes),
+    items: items
+      .into_iter()
+      .map(|item| ProjectLanguageSnapshotItemView {
+        language: item.language,
+        bytes: saturating_i64_to_u64(item.bytes),
+      })
+      .collect(),
+  }
+}
+
+fn project_issue_to_view(value: ProjectIssue) -> ProjectIssueView {
+  ProjectIssueView {
+    id: value.id,
+    project_id: value.project_id,
+    iid: value.iid,
+    title: value.title,
+    description: value.description,
+    state: value.state,
+    author_user_id: value.author_user_id,
+    assignee_user_id: value.assignee_user_id,
+    created_at_unix: value.created_at_unix,
+    updated_at_unix: value.updated_at_unix,
+    closed_at_unix: value.closed_at_unix,
+  }
+}
+
+fn project_issue_comment_to_view(value: ProjectIssueComment) -> ProjectIssueCommentView {
+  ProjectIssueCommentView {
+    id: value.id,
+    project_issue_id: value.project_issue_id,
+    author_user_id: value.author_user_id,
+    body: value.body,
+    created_at_unix: value.created_at_unix,
+    updated_at_unix: value.updated_at_unix,
+  }
+}
+
+fn saturating_i64_to_u64(value: i64) -> u64 {
+  value.max(0) as u64
+}
+
 fn map_db_error(err: toasty::Error) -> ProjectSpaceError {
   let message = err.to_string();
   let normalized = message.to_ascii_lowercase();
@@ -986,10 +1707,26 @@ fn map_git_backend_error(err: GitBackendError) -> ProjectSpaceError {
     GitBackendError::StorageNotConfigured => {
       ProjectSpaceError::Internal("storage.repo_root is not configured".to_string())
     }
+    GitBackendError::RepositoryNotFound => {
+      ProjectSpaceError::NotFound("repository not found".to_string())
+    }
+    GitBackendError::Git(message) => {
+      let normalized = message.to_ascii_lowercase();
+      if normalized.contains("already exists") {
+        ProjectSpaceError::Conflict(message)
+      } else if normalized.contains("not found") {
+        ProjectSpaceError::NotFound(message)
+      } else if normalized.contains("unsupported characters")
+        || normalized.contains("cannot be empty")
+        || normalized.contains("invalid")
+      {
+        ProjectSpaceError::BadRequest(message)
+      } else {
+        ProjectSpaceError::Internal(message)
+      }
+    }
     GitBackendError::InvalidRepositoryPath
-    | GitBackendError::RepositoryNotFound
     | GitBackendError::Io(_)
-    | GitBackendError::Git(_)
     | GitBackendError::Db(_)
     | GitBackendError::Utf8(_) => ProjectSpaceError::Internal(err.to_string()),
   }

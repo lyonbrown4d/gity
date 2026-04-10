@@ -227,6 +227,17 @@ pub async fn receive_pack(
     {
       return err.into_response();
     }
+    if let Err(err) = enforce_project_receive_pack_branch_protection(
+      &app_state,
+      &current_user,
+      owner.as_str(),
+      repo.as_str(),
+      body.as_ref(),
+    )
+    .await
+    {
+      return err.into_response();
+    }
 
     let repo_path = match app_state
       .services
@@ -252,6 +263,32 @@ pub async fn receive_pack(
         return (status, message).into_response();
       }
     };
+
+    let updated_branches = parse_receive_pack_branch_updates(body.as_ref()).unwrap_or_default();
+    if let Err(err) =
+      sync_project_receive_pack_metadata(&app_state, owner.as_str(), repo.as_str()).await
+    {
+      warn!(
+        project_owner = owner,
+        project_repo = repo,
+        error = err.1,
+        "receive-pack succeeded but failed to sync project branch metadata"
+      );
+    } else if let Err(err) = enqueue_project_receive_pack_language_jobs(
+      &app_state,
+      owner.as_str(),
+      repo.as_str(),
+      &updated_branches,
+    )
+    .await
+    {
+      warn!(
+        project_owner = owner,
+        project_repo = repo,
+        error = err.1,
+        "receive-pack succeeded but failed to enqueue project language jobs"
+      );
+    }
 
     return build_service_response("receive-pack", output);
   }
@@ -533,6 +570,193 @@ async fn require_namespace_project_access(
   } else {
     Err((StatusCode::FORBIDDEN, forbidden_message.to_string()))
   }
+}
+
+async fn enforce_project_receive_pack_branch_protection(
+  state: &AppState,
+  current_user: &CurrentUser,
+  owner: &str,
+  repo: &str,
+  body: &[u8],
+) -> Result<(), (StatusCode, String)> {
+  if current_user_is_super_admin(state, current_user.user_id.as_str()).await? {
+    return Ok(());
+  }
+
+  let repo_key = repo.strip_suffix(".git").unwrap_or(repo);
+  let project_full_path = format!("{owner}/{repo_key}");
+  let project = state
+    .project_space
+    .get_project_by_full_path(project_full_path.as_str())
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| (StatusCode::NOT_FOUND, "project not found".to_string()))?;
+  let namespace = state
+    .project_space
+    .get_namespace(project.namespace_id)
+    .await
+    .map_err(map_project_space_error)?
+    .ok_or_else(|| (StatusCode::NOT_FOUND, "namespace not found".to_string()))?;
+
+  let is_owner = namespace.owner_user_id.as_deref() == Some(current_user.user_id.as_str())
+    || state
+      .project_space
+      .get_namespace_role(namespace.id, current_user.user_id.as_str())
+      .await
+      .map_err(map_project_space_error)?
+      .as_deref()
+      == Some(member_role::OWNER);
+  if is_owner {
+    return Ok(());
+  }
+
+  for branch_name in parse_receive_pack_branch_updates(body)? {
+    let branch = state
+      .project_space
+      .get_project_branch(project.id, branch_name.as_str())
+      .await
+      .map_err(map_project_space_error)?;
+    if branch.is_some_and(|item| item.is_protected) {
+      return Err((
+        StatusCode::FORBIDDEN,
+        "only organization owner can push to protected branch".to_string(),
+      ));
+    }
+  }
+
+  Ok(())
+}
+
+async fn sync_project_receive_pack_metadata(
+  state: &AppState,
+  owner: &str,
+  repo: &str,
+) -> Result<(), (StatusCode, String)> {
+  let repo_key = repo.strip_suffix(".git").unwrap_or(repo);
+  let project_full_path = format!("{owner}/{repo_key}");
+  if let Some(project) = state
+    .project_space
+    .get_project_by_full_path(project_full_path.as_str())
+    .await
+    .map_err(map_project_space_error)?
+  {
+    let _ = state
+      .project_space
+      .list_project_branches(project.id)
+      .await
+      .map_err(map_project_space_error)?;
+  }
+  Ok(())
+}
+
+async fn enqueue_project_receive_pack_language_jobs(
+  state: &AppState,
+  owner: &str,
+  repo: &str,
+  updated_branches: &[String],
+) -> Result<(), (StatusCode, String)> {
+  let Some(job_client) = state.repository_language_jobs.as_ref() else {
+    return Ok(());
+  };
+
+  let repo_key = repo.strip_suffix(".git").unwrap_or(repo);
+  let project_full_path = format!("{owner}/{repo_key}");
+  let Some(project) = state
+    .project_space
+    .get_project_by_full_path(project_full_path.as_str())
+    .await
+    .map_err(map_project_space_error)?
+  else {
+    return Ok(());
+  };
+
+  let branch_names = if updated_branches.is_empty() {
+    vec![project.default_branch.clone()]
+  } else {
+    updated_branches.to_vec()
+  };
+
+  for branch_name in branch_names {
+    if let Err(err) = job_client
+      .enqueue_project_branch(project.id, Some(branch_name.as_str()))
+      .await
+    {
+      return Err((StatusCode::INTERNAL_SERVER_ERROR, err));
+    }
+  }
+
+  Ok(())
+}
+
+fn parse_receive_pack_branch_updates(body: &[u8]) -> Result<Vec<String>, (StatusCode, String)> {
+  let mut offset = 0usize;
+  let mut branches = std::collections::BTreeSet::new();
+
+  while offset + 4 <= body.len() {
+    let length = parse_pkt_line_length(&body[offset..offset + 4])?;
+    offset += 4;
+    if length == 0 {
+      break;
+    }
+    if length < 4 {
+      return Err((
+        StatusCode::BAD_REQUEST,
+        "invalid git receive-pack payload length".to_string(),
+      ));
+    }
+
+    let payload_len = length - 4;
+    if offset + payload_len > body.len() {
+      return Err((
+        StatusCode::BAD_REQUEST,
+        "truncated git receive-pack payload".to_string(),
+      ));
+    }
+
+    let payload = &body[offset..offset + payload_len];
+    offset += payload_len;
+    if payload.is_empty() {
+      continue;
+    }
+
+    let payload = if let Some(position) = payload.iter().position(|item| *item == 0) {
+      &payload[..position]
+    } else {
+      payload
+    };
+    let line = std::str::from_utf8(payload).map_err(|_| {
+      (
+        StatusCode::BAD_REQUEST,
+        "git receive-pack payload is not valid utf-8".to_string(),
+      )
+    })?;
+    let mut parts = line.split_whitespace();
+    let _old_oid = parts.next();
+    let _new_oid = parts.next();
+    let Some(ref_name) = parts.next() else {
+      continue;
+    };
+    if let Some(branch_name) = ref_name.strip_prefix("refs/heads/") {
+      branches.insert(branch_name.to_string());
+    }
+  }
+
+  Ok(branches.into_iter().collect())
+}
+
+fn parse_pkt_line_length(header: &[u8]) -> Result<usize, (StatusCode, String)> {
+  let value = std::str::from_utf8(header).map_err(|_| {
+    (
+      StatusCode::BAD_REQUEST,
+      "invalid git pkt-line header".to_string(),
+    )
+  })?;
+  usize::from_str_radix(value, 16).map_err(|_| {
+    (
+      StatusCode::BAD_REQUEST,
+      "invalid git pkt-line length".to_string(),
+    )
+  })
 }
 
 async fn current_user_is_super_admin(

@@ -31,7 +31,8 @@ pub async fn bootstrap() -> Result<AppState, String> {
 
   let cache_store = init_moka_cache(&cfg);
   let redis_client = init_redis_if_enabled(&cfg).await?;
-  let repository_language_jobs = init_repository_language_jobs(&cfg, db_conn.clone()).await?;
+  let repository_language_jobs =
+    init_repository_language_jobs(&cfg, db_conn.clone(), project_space_runtime.db()).await?;
   info!("bootstrap completed");
 
   let app_state = AppState::new(

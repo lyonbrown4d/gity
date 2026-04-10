@@ -95,6 +95,15 @@ impl GitBackendService {
     output.map_err(|err| GitBackendError::Git(err.to_string()))
   }
 
+  pub async fn list_branch_refs(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+  ) -> Result<Vec<(String, String)>, GitBackendError> {
+    let repo_path = self.resolve_repo_path(organization_key, repository_key)?;
+    self.list_head_refs(repo_path.as_path()).await
+  }
+
   pub async fn sync_branches_from_refs(
     &self,
     repository_id: &str,
@@ -295,6 +304,96 @@ impl GitBackendService {
       .map_err(|err| GitBackendError::Io(format!("failed to remove repository storage: {err}")))?;
 
     Ok(())
+  }
+
+  pub async fn create_branch(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    source_branch: &str,
+    branch_name: &str,
+  ) -> Result<String, GitBackendError> {
+    if !is_safe_namespace_path(organization_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "organization key contains unsupported characters".to_string(),
+      ));
+    }
+    if !is_safe_component(repository_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "repository key contains unsupported characters".to_string(),
+      ));
+    }
+
+    let root = self
+      .repo_root
+      .as_deref()
+      .ok_or(GitBackendError::StorageNotConfigured)?;
+    let repo_path = build_repo_path(root, organization_key, repository_key);
+    if !repo_path.exists() {
+      return Err(GitBackendError::RepositoryNotFound);
+    }
+
+    let source_branch = source_branch.to_string();
+    let branch_name = branch_name.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      storage::create_branch(
+        repo_path.as_path(),
+        source_branch.as_str(),
+        branch_name.as_str(),
+      )
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git branch task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
+  }
+
+  pub async fn create_empty_commit(
+    &self,
+    organization_key: &str,
+    repository_key: &str,
+    branch: &str,
+    commit_message: &str,
+    author_name: &str,
+    author_email: &str,
+  ) -> Result<String, GitBackendError> {
+    if !is_safe_namespace_path(organization_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "organization key contains unsupported characters".to_string(),
+      ));
+    }
+    if !is_safe_component(repository_key) {
+      return Err(GitBackendError::InvalidComponent(
+        "repository key contains unsupported characters".to_string(),
+      ));
+    }
+
+    let root = self
+      .repo_root
+      .as_deref()
+      .ok_or(GitBackendError::StorageNotConfigured)?;
+    let repo_path = build_repo_path(root, organization_key, repository_key);
+    if !repo_path.exists() {
+      return Err(GitBackendError::RepositoryNotFound);
+    }
+
+    let branch = branch.to_string();
+    let commit_message = commit_message.to_string();
+    let author_name = author_name.to_string();
+    let author_email = author_email.to_string();
+    let output = tokio::task::spawn_blocking(move || {
+      storage::create_empty_commit(
+        repo_path.as_path(),
+        branch.as_str(),
+        commit_message.as_str(),
+        author_name.as_str(),
+        author_email.as_str(),
+      )
+    })
+    .await
+    .map_err(|err| GitBackendError::Git(format!("failed to join git empty commit task: {err}")))?;
+
+    output.map_err(|err| GitBackendError::Git(err.to_string()))
   }
 
   pub async fn commit_file(

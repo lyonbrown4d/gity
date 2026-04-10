@@ -118,7 +118,75 @@ pub struct Project {
   pub created_by_user_id: String,
 
   #[has_many]
+  pub branches: toasty::HasMany<ProjectBranch>,
+
+  #[has_many]
+  pub language_snapshots: toasty::HasMany<ProjectLanguageSnapshot>,
+
+  #[has_many]
   pub issues: toasty::HasMany<ProjectIssue>,
+}
+
+#[derive(Debug, Clone, toasty::Model)]
+pub struct ProjectBranch {
+  #[key]
+  #[auto]
+  pub id: i64,
+
+  #[index]
+  pub project_id: i64,
+
+  #[belongs_to(key = project_id, references = id)]
+  pub project: toasty::BelongsTo<Project>,
+
+  #[index]
+  pub name: String,
+
+  pub is_protected: bool,
+  pub last_commit_sha: Option<String>,
+  pub created_at_unix: i64,
+  pub updated_at_unix: i64,
+}
+
+#[derive(Debug, Clone, toasty::Model)]
+pub struct ProjectLanguageSnapshot {
+  #[key]
+  #[auto]
+  pub id: i64,
+
+  #[index]
+  pub project_id: i64,
+
+  #[belongs_to(key = project_id, references = id)]
+  pub project: toasty::BelongsTo<Project>,
+
+  #[index]
+  pub branch_name: String,
+
+  pub revision: String,
+  pub total_bytes: i64,
+  pub analyzed_at_unix: i64,
+  pub created_at_unix: i64,
+
+  #[has_many]
+  pub items: toasty::HasMany<ProjectLanguageSnapshotItem>,
+}
+
+#[derive(Debug, Clone, toasty::Model)]
+pub struct ProjectLanguageSnapshotItem {
+  #[key]
+  #[auto]
+  pub id: i64,
+
+  #[index]
+  pub snapshot_id: i64,
+
+  #[belongs_to(key = snapshot_id, references = id)]
+  pub project_language_snapshot: toasty::BelongsTo<ProjectLanguageSnapshot>,
+
+  pub language: String,
+  pub bytes: i64,
+  pub created_at_unix: i64,
 }
 
 #[derive(Debug, Clone, toasty::Model)]
@@ -146,6 +214,10 @@ pub struct ProjectIssue {
   #[index]
   pub assignee_user_id: Option<String>,
 
+  pub created_at_unix: i64,
+  pub updated_at_unix: i64,
+  pub closed_at_unix: Option<i64>,
+
   #[has_many]
   pub comments: toasty::HasMany<ProjectIssueComment>,
 }
@@ -166,4 +238,6 @@ pub struct ProjectIssueComment {
   pub author_user_id: String,
 
   pub body: String,
+  pub created_at_unix: i64,
+  pub updated_at_unix: i64,
 }

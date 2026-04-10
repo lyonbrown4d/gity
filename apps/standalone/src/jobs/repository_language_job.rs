@@ -4,17 +4,27 @@ use apalis::prelude::{TaskSink, WorkerBuilder};
 use apalis_redis::{RedisConfig, RedisStorage};
 use chrono::Utc;
 use entity::{repository_language_snapshot_items, repository_language_snapshots};
+use models::gitlab::{
+  Namespace, Project, ProjectBranch, ProjectLanguageSnapshot, ProjectLanguageSnapshotItem,
+};
 use repository::{
   OrganizationsRepository, RepositoriesRepository, RepositoryBranchesRepository,
   RepositoryLanguageSnapshotsRepository,
 };
 use sea_orm::{DatabaseConnection, Set};
 use serde::{Deserialize, Serialize};
+use toasty::Db;
 use tracing::{info, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RepositoryLanguageJobTarget {
+  LegacyRepository { repository_id: String },
+  Project { project_id: i64 },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepositoryLanguageJob {
-  pub repository_id: String,
+  pub target: RepositoryLanguageJobTarget,
   pub branch_name: Option<String>,
 }
 
@@ -43,7 +53,22 @@ impl RepositoryLanguageJobClient {
   ) -> Result<(), String> {
     self
       .enqueue(RepositoryLanguageJob {
-        repository_id: repository_id.to_string(),
+        target: RepositoryLanguageJobTarget::LegacyRepository {
+          repository_id: repository_id.to_string(),
+        },
+        branch_name: branch_name.map(str::to_string),
+      })
+      .await
+  }
+
+  pub async fn enqueue_project_branch(
+    &self,
+    project_id: i64,
+    branch_name: Option<&str>,
+  ) -> Result<(), String> {
+    self
+      .enqueue(RepositoryLanguageJob {
+        target: RepositoryLanguageJobTarget::Project { project_id },
         branch_name: branch_name.map(str::to_string),
       })
       .await
@@ -53,12 +78,14 @@ impl RepositoryLanguageJobClient {
 #[derive(Clone)]
 struct RepositoryLanguageWorkerState {
   db_conn: DatabaseConnection,
+  project_db: Db,
   git_backend: GitBackendService,
 }
 
 pub async fn init_repository_language_jobs(
   config: &Config,
   db_conn: DatabaseConnection,
+  project_db: Db,
 ) -> Result<Option<RepositoryLanguageJobClient>, String> {
   let Some(cache) = config.cache.as_ref() else {
     return Ok(None);
@@ -84,6 +111,7 @@ pub async fn init_repository_language_jobs(
 
   let worker_state = RepositoryLanguageWorkerState {
     db_conn: db_conn.clone(),
+    project_db,
     git_backend: GitBackendService::new(config, RepositoryBranchesRepository::new(db_conn)),
   };
   tokio::spawn(async move {
@@ -114,15 +142,30 @@ async fn process_repository_language_job(
   job: RepositoryLanguageJob,
   state: RepositoryLanguageWorkerState,
 ) {
+  match job.target {
+    RepositoryLanguageJobTarget::LegacyRepository { repository_id } => {
+      process_legacy_repository_language_job(repository_id, job.branch_name, state).await;
+    }
+    RepositoryLanguageJobTarget::Project { project_id } => {
+      process_project_language_job(project_id, job.branch_name, state).await;
+    }
+  }
+}
+
+async fn process_legacy_repository_language_job(
+  repository_id: String,
+  branch_name: Option<String>,
+  state: RepositoryLanguageWorkerState,
+) {
   let repository = match RepositoriesRepository::new(state.db_conn.clone())
-    .find_active_repository_by_id(job.repository_id.as_str())
+    .find_active_repository_by_id(repository_id.as_str())
     .await
   {
     Ok(Some(repository)) => repository,
     Ok(None) => return,
     Err(err) => {
       warn!(
-        repository_id = job.repository_id,
+        repository_id = repository_id,
         error = err.to_string(),
         "failed to load repository for language job"
       );
@@ -146,9 +189,7 @@ async fn process_repository_language_job(
     }
   };
 
-  let branch_name = job
-    .branch_name
-    .unwrap_or_else(|| repository.default_branch.clone());
+  let branch_name = branch_name.unwrap_or_else(|| repository.default_branch.clone());
   let branch = match RepositoryBranchesRepository::new(state.db_conn.clone())
     .find_active_branch_by_repo_and_name(repository.id.as_str(), branch_name.as_str())
     .await
@@ -197,7 +238,7 @@ async fn process_repository_language_job(
     Vec::new()
   };
 
-  if let Err(err) = persist_snapshot(
+  if let Err(err) = persist_legacy_snapshot(
     &state.db_conn,
     repository.id.as_str(),
     branch_name.as_str(),
@@ -215,7 +256,115 @@ async fn process_repository_language_job(
   }
 }
 
-async fn persist_snapshot(
+async fn process_project_language_job(
+  project_id: i64,
+  branch_name: Option<String>,
+  state: RepositoryLanguageWorkerState,
+) {
+  let mut db = state.project_db.clone();
+  let project = match Project::filter(Project::fields().id().eq(project_id))
+    .first()
+    .exec(&mut db)
+    .await
+  {
+    Ok(Some(project)) => project,
+    Ok(None) => return,
+    Err(err) => {
+      warn!(
+        project_id = project_id,
+        error = err.to_string(),
+        "failed to load project for language job"
+      );
+      return;
+    }
+  };
+
+  let namespace = match Namespace::filter(Namespace::fields().id().eq(project.namespace_id))
+    .first()
+    .exec(&mut db)
+    .await
+  {
+    Ok(Some(namespace)) => namespace,
+    Ok(None) => return,
+    Err(err) => {
+      warn!(
+        project_id = project.id,
+        error = err.to_string(),
+        "failed to load namespace for language job"
+      );
+      return;
+    }
+  };
+
+  let branch_name = branch_name.unwrap_or_else(|| project.default_branch.clone());
+  let branch = match ProjectBranch::filter(ProjectBranch::fields().project_id().eq(project.id))
+    .filter(ProjectBranch::fields().name().eq(branch_name.as_str()))
+    .first()
+    .exec(&mut db)
+    .await
+  {
+    Ok(Some(branch)) => branch,
+    Ok(None) => return,
+    Err(err) => {
+      warn!(
+        project_id = project.id,
+        branch = branch_name,
+        error = err.to_string(),
+        "failed to load project branch for language job"
+      );
+      return;
+    }
+  };
+
+  let revision = branch
+    .last_commit_sha
+    .clone()
+    .unwrap_or_else(|| format!("refs/heads/{}:empty", branch_name));
+
+  let language_stats = if let Some(commit_sha) = branch.last_commit_sha.clone() {
+    match state
+      .git_backend
+      .analyze_languages(
+        namespace.full_path.as_str(),
+        project.path_key.as_str(),
+        commit_sha.as_str(),
+      )
+      .await
+    {
+      Ok(stats) => stats,
+      Err(err) => {
+        warn!(
+          project_id = project.id,
+          branch = branch_name,
+          error = err.to_string(),
+          "failed to analyze project languages"
+        );
+        return;
+      }
+    }
+  } else {
+    Vec::new()
+  };
+
+  if let Err(err) = persist_project_snapshot(
+    &state.project_db,
+    project.id,
+    branch_name.as_str(),
+    revision.as_str(),
+    &language_stats,
+  )
+  .await
+  {
+    warn!(
+      project_id = project.id,
+      branch = branch_name,
+      error = err.to_string(),
+      "failed to persist project language snapshot"
+    );
+  }
+}
+
+async fn persist_legacy_snapshot(
   db_conn: &DatabaseConnection,
   repository_id: &str,
   branch_name: &str,
@@ -252,6 +401,46 @@ async fn persist_snapshot(
       })
       .await
       .map_err(|err| format!("failed to insert language snapshot item: {err}"))?;
+  }
+
+  Ok(())
+}
+
+async fn persist_project_snapshot(
+  project_db: &Db,
+  project_id: i64,
+  branch_name: &str,
+  revision: &str,
+  stats: &[git::object::RepositoryLanguageStat],
+) -> Result<(), String> {
+  let analyzed_at = Utc::now().timestamp();
+  let total_bytes = stats.iter().fold(0_i64, |acc, stat| {
+    acc.saturating_add(saturating_u64_to_i64(stat.bytes))
+  });
+
+  let mut db = project_db.clone();
+  let snapshot = toasty::create!(ProjectLanguageSnapshot {
+    project_id: project_id,
+    branch_name: branch_name.to_string(),
+    revision: revision.to_string(),
+    total_bytes: total_bytes,
+    analyzed_at_unix: analyzed_at,
+    created_at_unix: analyzed_at,
+  })
+  .exec(&mut db)
+  .await
+  .map_err(|err| format!("failed to insert project language snapshot: {err}"))?;
+
+  for stat in stats {
+    toasty::create!(ProjectLanguageSnapshotItem {
+      snapshot_id: snapshot.id,
+      language: stat.language.clone(),
+      bytes: saturating_u64_to_i64(stat.bytes),
+      created_at_unix: analyzed_at,
+    })
+    .exec(&mut db)
+    .await
+    .map_err(|err| format!("failed to insert project language snapshot item: {err}"))?;
   }
 
   Ok(())
