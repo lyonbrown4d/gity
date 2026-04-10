@@ -1,4 +1,3 @@
-/target
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -7,9 +6,6 @@
 !.vscode/*.code-snippets
 .history/
 *.vsix
-debug/
-target/
-**/*.rs.bk
 *.pdb
 .idea/**/workspace.xml
 .idea/**/tasks.xml
@@ -50,7 +46,6 @@ fabric.properties
 *.iml
 out
 gen
-rust-project.json
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
@@ -83,8 +78,11 @@ Temporary Items
 .apdisk
 .env
 data
-target_alt
 .pnpm-store
 *.log
 .tmp-e2e
-.cargo-home
+bin/
+coverage.out
+
+node_modules/
+packages/
