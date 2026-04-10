@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,31 @@ func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin 
 	cmd.Dir = absRepo
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("run git %v: %w", args, err)
+	}
+	return nil
+}
+
+func (r *Runner) InitBare(ctx context.Context, repoPath string, initialBranch string) error {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return err
+	}
+	root, err := filepath.Abs(r.repoRoot)
+	if err != nil {
+		return fmt.Errorf("resolve repo root: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(absRepo), 0o755); err != nil {
+		return fmt.Errorf("create repo parent dir: %w", err)
+	}
+	args := []string{"init", "--bare"}
+	if strings.TrimSpace(initialBranch) != "" {
+		args = append(args, "--initial-branch", strings.TrimSpace(initialBranch))
+	}
+	args = append(args, absRepo)
+	cmd := exec.CommandContext(ctx, r.gitBin, args...)
+	cmd.Dir = root
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("init bare repo %s: %w", repoPath, err)
 	}
 	return nil
 }
