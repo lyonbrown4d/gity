@@ -7,11 +7,12 @@ This repository now uses a single Go module for the backend runtime and keeps th
 ## Current Backend Baseline
 
 - Go backend runtime with `arcgo/dix`
-- Typed HTTP surface with `arcgo/httpx` + Swagger/OpenAPI
+- Typed HTTP surface with `arcgo/httpx` + Fiber + Swagger/OpenAPI
 - Authentication foundation through `arcgo/authx`
 - Configuration loading through `arcgo/configx`
 - Logging through `arcgo/logx`
-- Database foundation through `arcgo/dbx`
+- Database foundation through `arcgo/dbx` repository mode
+- Snowflake `int64` IDs generated through `dbx`
 - Git process boundary through native `git` subprocesses
 - First domain chain online: `namespace -> project`
 
@@ -23,12 +24,12 @@ The old Rust backend has been removed so the repository can move forward on one 
 | --- | --- |
 | `cmd/server` | API server entrypoint |
 | `cmd/worker` | background worker entrypoint |
-| `internal/app` | `dix` composition root |
+| `internal/app` | thin `dix` composition root |
 | `internal/config` | runtime settings and config loading |
 | `internal/entity` | typed dbx entities and schema definitions |
-| `internal/repository` | persistence access on top of `dbx` |
+| `internal/repository` | package-local `dbx` repository mode persistence |
 | `internal/service` | application services |
-| `internal/http` | `httpx` server bootstrap and lifecycle |
+| `internal/http` | `httpx` + Fiber server bootstrap and lifecycle |
 | `internal/endpoint` | HTTP route registration |
 | `internal/platform` | auth, db, logging, and git infrastructure |
 | `web` | frontend app |
@@ -49,6 +50,7 @@ cp .env.example .env
 ```
 
 The current backend defaults to sqlite for the rewrite bootstrap, so Docker is optional for now.
+`GITY_DATABASE_NODE_ID` controls the Snowflake node id used by `dbx`.
 
 ### 3. Run the backend
 

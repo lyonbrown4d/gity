@@ -13,6 +13,7 @@ This repository is moving from the Rust workspace to a single Go module rooted a
 
 - `arcgo/dix`: typed modular application runtime and lifecycle wiring.
 - `arcgo/httpx`: typed HTTP server and OpenAPI surface.
+- `arcgo/httpx/adapter/fiber`: runtime bridge for the HTTP API host.
 - `arcgo/authx`: authentication and authorization engine.
 - `arcgo/configx`: layered config loading from `.env`, environment variables, and defaults.
 - `arcgo/logx`: structured logging.
@@ -24,14 +25,15 @@ This repository is moving from the Rust workspace to a single Go module rooted a
 - `cmd/server`: public API binary.
 - `cmd/worker`: background jobs and maintenance worker binary.
 - `internal/app`: `dix` composition root.
+- Each subpackage owns its own `Module()` declaration; `internal/app` only assembles them.
 - `internal/config`: typed runtime settings.
 - `internal/entity`: typed dbx entities and schema resources.
 - `internal/repository/core`: startup schema bootstrap and shared persistence utilities.
-- `internal/repository/namespace`: namespace persistence.
-- `internal/repository/project`: project persistence.
+- `internal/repository/namespace`: namespace persistence using `dbx` repository mode.
+- `internal/repository/project`: project persistence using `dbx` repository mode.
 - `internal/service/namespace`: namespace application service.
 - `internal/service/project`: project application service.
-- `internal/http`: `httpx` server bootstrap and lifecycle host.
+- `internal/http`: `httpx` + Fiber server bootstrap and lifecycle host.
 - `internal/endpoint/system`: health and rewrite metadata endpoints.
 - `internal/endpoint/namespace`: namespace CRUD endpoints.
 - `internal/endpoint/project`: project CRUD endpoints.
@@ -43,11 +45,12 @@ This repository is moving from the Rust workspace to a single Go module rooted a
 
 ## Current Runtime Shape
 
-The current composition root does three things:
+The current composition root does four things:
 
-1. Builds config, logger, db, auth, and git runtime dependencies.
-2. Runs `dbx.AutoMigrate(...)` for the first typed schemas at startup.
-3. Registers `system`, `namespace`, and `project` HTTP endpoints on one `httpx` server.
+1. Assembles package-local `dix` modules without centralizing provider declarations in one giant runtime module.
+2. Builds config, logger, db, auth, and git runtime dependencies.
+3. Runs `dbx.AutoMigrate(...)` for the first typed schemas at startup.
+4. Registers `system`, `namespace`, and `project` HTTP endpoints on one Fiber-backed `httpx` server.
 
 ## Current Domain Baseline
 
@@ -62,8 +65,15 @@ Current rules:
 - `project.full_path` is unique.
 - `project.namespace_id -> namespaces.id` is a foreign key with cascade delete.
 - `project.full_path` is derived from `namespace.full_path + "/" + project.path_key`.
+- `namespace.id` and `project.id` are Snowflake-generated `int64` values from `dbx`.
 
 This is the first GitLab-like business chain and is intended to become the base for issues, merge requests, package registry, and Git repository provisioning.
+
+## dbx Style
+
+- `dbx` repository mode is the default persistence style for the backend.
+- Active record mode is intentionally not used in the main application chain.
+- Domain write paths stay in services; repositories stay focused on schema-backed persistence.
 
 ## Git Boundary
 

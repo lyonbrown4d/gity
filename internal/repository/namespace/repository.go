@@ -8,12 +8,12 @@ import (
 
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/arcgo/dbx"
+	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
 	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 type Repository struct {
-	db     *dbx.DB
-	mapper dbx.StructMapper[entity.Namespace]
+	base *dbxrepo.Base[entity.Namespace, entity.NamespaceSchemaDef]
 }
 
 type CreateInput struct {
@@ -24,35 +24,20 @@ type CreateInput struct {
 }
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	mapper, err := dbx.NewStructMapper[entity.Namespace]()
-	if err != nil {
-		return nil, fmt.Errorf("new namespace mapper: %w", err)
-	}
-	return &Repository{db: db, mapper: mapper}, nil
+	return &Repository{
+		base: dbxrepo.NewWithOptions[entity.Namespace](db, entity.NamespaceSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+	}, nil
 }
 
 func (r *Repository) List(ctx context.Context) (collectionx.List[entity.Namespace], error) {
-	statement := dbx.NewSQLStatement("namespace.list", func(params any) (dbx.BoundQuery, error) {
-		_ = params
-		return dbx.BoundQuery{
-			SQL: "SELECT id, kind, name, path_key, full_path, description, created_at, updated_at FROM namespaces ORDER BY id DESC",
-		}, nil
-	})
-	return dbx.SQLList(ctx, r.db, statement, nil, r.mapper)
+	query := dbx.Select(entity.NamespaceSchema.AllColumns().Values()...).
+		From(entity.NamespaceSchema).
+		OrderBy(entity.NamespaceSchema.ID.Desc())
+	return r.base.List(ctx, query)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (entity.Namespace, error) {
-	statement := dbx.NewSQLStatement("namespace.get_by_id", func(params any) (dbx.BoundQuery, error) {
-		value, ok := params.(int64)
-		if !ok {
-			return dbx.BoundQuery{}, fmt.Errorf("namespace.get_by_id expects int64")
-		}
-		return dbx.BoundQuery{
-			SQL:  "SELECT id, kind, name, path_key, full_path, description, created_at, updated_at FROM namespaces WHERE id = ?",
-			Args: collectionx.NewList[any](value),
-		}, nil
-	})
-	return dbx.SQLGet(ctx, r.db, statement, id, r.mapper)
+	return r.base.GetByID(ctx, id)
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Namespace, error) {
@@ -60,23 +45,17 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Name
 	trimmedName := strings.TrimSpace(input.Name)
 	now := time.Now().UTC()
 
-	result, err := r.db.ExecContext(
-		ctx,
-		"INSERT INTO namespaces (kind, name, path_key, full_path, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		strings.TrimSpace(input.Kind),
-		trimmedName,
-		trimmedPath,
-		trimmedPath,
-		strings.TrimSpace(input.Description),
-		now,
-		now,
-	)
-	if err != nil {
+	item := entity.Namespace{
+		Kind:        strings.TrimSpace(input.Kind),
+		Name:        trimmedName,
+		PathKey:     trimmedPath,
+		FullPath:    trimmedPath,
+		Description: strings.TrimSpace(input.Description),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	if err := r.base.Create(ctx, &item); err != nil {
 		return entity.Namespace{}, fmt.Errorf("insert namespace: %w", err)
 	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return entity.Namespace{}, fmt.Errorf("read namespace id: %w", err)
-	}
-	return r.GetByID(ctx, id)
+	return item, nil
 }

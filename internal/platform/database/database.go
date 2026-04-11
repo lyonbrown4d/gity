@@ -32,6 +32,7 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		dbx.ApplyOptions(
 			dbx.WithLogger(logger),
 			dbx.WithDebug(settings.App.Environment == "development"),
+			dbx.WithNodeID(settings.Database.NodeID),
 		),
 	)
 	if err != nil {

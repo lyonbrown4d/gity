@@ -22,6 +22,7 @@ type HTTPSettings struct {
 type DatabaseSettings struct {
 	Driver string `mapstructure:"driver"`
 	DSN    string `mapstructure:"dsn"`
+	NodeID uint16 `mapstructure:"node_id"`
 }
 
 type GitSettings struct {
@@ -42,6 +43,7 @@ func DefaultSettings() Settings {
 		Database: DatabaseSettings{
 			Driver: "sqlite",
 			DSN:    "file:gity.db?_pragma=foreign_keys(1)",
+			NodeID: 1,
 		},
 		Git: GitSettings{
 			RepoRoot: "./data/repos",

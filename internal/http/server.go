@@ -8,8 +8,9 @@ import (
 
 	"github.com/DaiYuANg/arcgo/httpx"
 	"github.com/DaiYuANg/arcgo/httpx/adapter"
-	httpxstd "github.com/DaiYuANg/arcgo/httpx/adapter/std"
+	httpxfiber "github.com/DaiYuANg/arcgo/httpx/adapter/fiber"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/gofiber/fiber/v2"
 )
 
 type Host struct {
@@ -20,11 +21,15 @@ type Host struct {
 	done    chan error
 }
 
-func NewServer(settings config.Settings, logger *slog.Logger) (httpx.ServerRuntime, error) {
-	adapterRuntime := httpxstd.New(nil, adapter.HumaOptions{
+func NewFiberApp() *fiber.App {
+	return fiber.New()
+}
+
+func NewServer(app *fiber.App, settings config.Settings, logger *slog.Logger) (httpx.ServerRuntime, error) {
+	adapterRuntime := httpxfiber.New(app, adapter.HumaOptions{
 		Title:       settings.App.Name,
 		Version:     "0.1.0",
-		Description: "Gity Go rewrite API on arcgo/httpx",
+		Description: "Gity Go rewrite API on arcgo/httpx fiber",
 		DocsPath:    "/docs",
 		OpenAPIPath: "/openapi.json",
 	})

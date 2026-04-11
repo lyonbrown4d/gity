@@ -4,31 +4,34 @@ go 1.26.2
 
 require (
 	github.com/DaiYuANg/arcgo/authx v0.2.3
+	github.com/DaiYuANg/arcgo/collectionx v0.1.4
 	github.com/DaiYuANg/arcgo/configx v0.3.0
 	github.com/DaiYuANg/arcgo/dbx v0.2.3
 	github.com/DaiYuANg/arcgo/dix v0.5.0
 	github.com/DaiYuANg/arcgo/httpx v0.2.3
-	github.com/DaiYuANg/arcgo/httpx/adapter/std v0.1.3
+	github.com/DaiYuANg/arcgo/httpx/adapter/fiber v0.1.3
 	github.com/DaiYuANg/arcgo/logx v0.1.2
 	github.com/go-sql-driver/mysql v1.9.3
+	github.com/gofiber/fiber/v2 v2.52.12
 	modernc.org/sqlite v1.48.1
 )
 
 require (
 	ariga.io/atlas v1.1.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/DaiYuANg/arcgo/collectionx v0.1.4 // indirect
 	github.com/DaiYuANg/arcgo/httpx/adapter/echo v0.1.3 // indirect
-	github.com/DaiYuANg/arcgo/httpx/adapter/fiber v0.1.3 // indirect
 	github.com/DaiYuANg/arcgo/httpx/adapter/gin v0.1.3 // indirect
+	github.com/DaiYuANg/arcgo/httpx/adapter/std v0.1.3 // indirect
 	github.com/DaiYuANg/arcgo/observabilityx v0.2.0 // indirect
 	github.com/DaiYuANg/arcgo/pkg/option v0.0.2 // indirect
 	github.com/DmitriyVTitov/size v1.5.0 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
+	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmatcuk/doublestar v1.3.4 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/danielgtaylor/huma/v2 v2.37.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -44,6 +47,7 @@ require (
 	github.com/hashicorp/hcl/v2 v2.24.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/parsers/json v1.0.0 // indirect
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0 // indirect
@@ -55,6 +59,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect
+	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -82,6 +87,8 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stephenafamo/scan v0.7.0 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	github.com/valyala/fasthttp v1.70.0 // indirect
 	github.com/zclconf/go-cty v1.18.0 // indirect
 	github.com/zclconf/go-cty-yaml v1.2.0 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
