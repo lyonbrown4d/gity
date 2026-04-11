@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"service.namespace",
 		dix.Description("Namespace application services"),
 		dix.Providers(
-			dix.Provider2(NewService),
+			dix.Provider4(NewService),
 		),
 	)
 }

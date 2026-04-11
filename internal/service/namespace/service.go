@@ -2,29 +2,49 @@ package namespace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/DaiYuANg/arcgo/collectionx"
+	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
 	"github.com/DaiYuANg/gity/internal/entity"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
+	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
+	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 )
 
 type Service struct {
-	logger *slog.Logger
-	repo   *namespacerepo.Repository
+	logger     *slog.Logger
+	repo       *namespacerepo.Repository
+	memberRepo *namespacememberrepo.Repository
+	userRepo   *userrepo.Repository
 }
 
 type CreateInput struct {
 	Kind        string `json:"kind"`
 	Name        string `json:"name"`
 	PathKey     string `json:"path_key"`
+	OwnerUserID int64  `json:"owner_user_id"`
 	Description string `json:"description"`
 }
 
-func NewService(logger *slog.Logger, repo *namespacerepo.Repository) *Service {
-	return &Service{logger: logger, repo: repo}
+type AddMemberInput struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
+}
+
+type MemberView struct {
+	ID          int64  `json:"id"`
+	UserID      int64  `json:"user_id"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
+}
+
+func NewService(logger *slog.Logger, repo *namespacerepo.Repository, memberRepo *namespacememberrepo.Repository, userRepo *userrepo.Repository) *Service {
+	return &Service{logger: logger, repo: repo, memberRepo: memberRepo, userRepo: userRepo}
 }
 
 func (s *Service) List(ctx context.Context) (collectionx.List[entity.Namespace], error) {
@@ -45,10 +65,85 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (entity.Namespa
 	if strings.TrimSpace(input.Kind) == "" {
 		input.Kind = "group"
 	}
-	return s.repo.Create(ctx, namespacerepo.CreateInput{
+	item, err := s.repo.Create(ctx, namespacerepo.CreateInput{
 		Kind:        input.Kind,
 		Name:        input.Name,
 		PathKey:     input.PathKey,
 		Description: input.Description,
 	})
+	if err != nil {
+		return entity.Namespace{}, err
+	}
+	if input.OwnerUserID > 0 {
+		if _, err := s.AddMember(ctx, item.ID, AddMemberInput{UserID: input.OwnerUserID, Role: "owner"}); err != nil {
+			return entity.Namespace{}, err
+		}
+	}
+	return item, nil
+}
+
+func (s *Service) ListMembers(ctx context.Context, namespaceID int64) ([]MemberView, error) {
+	if _, err := s.repo.GetByID(ctx, namespaceID); err != nil {
+		return nil, fmt.Errorf("load namespace: %w", err)
+	}
+	members, err := s.memberRepo.ListByNamespaceID(ctx, namespaceID)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]MemberView, 0, members.Len())
+	members.Range(func(_ int, item entity.NamespaceMember) bool {
+		user, userErr := s.userRepo.GetByID(ctx, item.UserID)
+		if userErr != nil {
+			return true
+		}
+		views = append(views, MemberView{
+			ID:          item.ID,
+			UserID:      item.UserID,
+			Username:    user.Username,
+			DisplayName: user.DisplayName,
+			Role:        item.Role,
+		})
+		return true
+	})
+	return views, nil
+}
+
+func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMemberInput) (MemberView, error) {
+	if namespaceID <= 0 {
+		return MemberView{}, fmt.Errorf("namespace id is required")
+	}
+	if input.UserID <= 0 {
+		return MemberView{}, fmt.Errorf("user_id is required")
+	}
+	role := strings.TrimSpace(input.Role)
+	if role == "" {
+		role = "developer"
+	}
+	if _, err := s.repo.GetByID(ctx, namespaceID); err != nil {
+		return MemberView{}, fmt.Errorf("load namespace: %w", err)
+	}
+	user, err := s.userRepo.GetByID(ctx, input.UserID)
+	if err != nil {
+		return MemberView{}, fmt.Errorf("load user: %w", err)
+	}
+	if _, err := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); err == nil {
+		return MemberView{}, fmt.Errorf("namespace member already exists")
+	} else if err != nil && !errors.Is(err, dbxrepo.ErrNotFound) {
+		return MemberView{}, err
+	}
+	member, err := s.memberRepo.Create(ctx, namespacememberrepo.CreateInput{
+		NamespaceID: namespaceID,
+		UserID:      input.UserID,
+		Role:        role,
+	})
+	if err != nil {
+		return MemberView{}, err
+	}
+	return MemberView{
+		ID:          member.ID,
+		UserID:      user.ID,
+		Username:    user.Username,
+		DisplayName: user.DisplayName,
+		Role:        member.Role,
+	}, nil
 }

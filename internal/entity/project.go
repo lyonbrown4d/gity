@@ -12,6 +12,7 @@ type Project struct {
 	Name          string    `dbx:"name"`
 	PathKey       string    `dbx:"path_key"`
 	FullPath      string    `dbx:"full_path"`
+	Visibility    string    `dbx:"visibility"`
 	Description   string    `dbx:"description"`
 	DefaultBranch string    `dbx:"default_branch"`
 	CreatedAt     time.Time `dbx:"created_at"`
@@ -25,6 +26,7 @@ type ProjectSchemaDef struct {
 	Name          dbx.Column[Project, string]                   `dbx:"name"`
 	PathKey       dbx.Column[Project, string]                   `dbx:"path_key"`
 	FullPath      dbx.Column[Project, string]                   `dbx:"full_path,unique"`
+	Visibility    dbx.Column[Project, string]                   `dbx:"visibility,index"`
 	Description   dbx.Column[Project, string]                   `dbx:"description,null"`
 	DefaultBranch dbx.Column[Project, string]                   `dbx:"default_branch"`
 	CreatedAt     dbx.Column[Project, time.Time]                `dbx:"created_at,type=TIMESTAMP"`

@@ -1,13 +1,13 @@
-package project
+package user
 
 import "github.com/DaiYuANg/arcgo/dix"
 
 func Module() dix.Module {
 	return dix.NewModule(
-		"service.project",
-		dix.Description("Project application services"),
+		"service.user",
+		dix.Description("User application services"),
 		dix.Providers(
-			dix.Provider5(NewService),
+			dix.Provider2(NewService),
 		),
 	)
 }

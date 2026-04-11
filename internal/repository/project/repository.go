@@ -21,6 +21,7 @@ type CreateInput struct {
 	NamespaceID   int64
 	Name          string
 	PathKey       string
+	Visibility    string
 	Description   string
 	DefaultBranch string
 }
@@ -45,12 +46,22 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (entity.Project, err
 	return r.base.GetByID(ctx, id)
 }
 
+func (r *Repository) GetByFullPath(ctx context.Context, fullPath string) (entity.Project, error) {
+	return r.base.GetByKey(ctx, dbxrepo.Key{
+		"full_path": strings.TrimSpace(fullPath),
+	})
+}
+
 func (r *Repository) Create(ctx context.Context, input CreateInput, namespace entity.Namespace) (entity.Project, error) {
 	trimmedPath := strings.TrimSpace(input.PathKey)
 	trimmedName := strings.TrimSpace(input.Name)
 	defaultBranch := strings.TrimSpace(input.DefaultBranch)
 	if defaultBranch == "" {
 		defaultBranch = "main"
+	}
+	visibility := strings.TrimSpace(input.Visibility)
+	if visibility == "" {
+		visibility = "private"
 	}
 	fullPath := namespace.FullPath + "/" + trimmedPath
 	now := time.Now().UTC()
@@ -60,6 +71,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, namespace en
 		Name:          trimmedName,
 		PathKey:       trimmedPath,
 		FullPath:      fullPath,
+		Visibility:    visibility,
 		Description:   strings.TrimSpace(input.Description),
 		DefaultBranch: defaultBranch,
 		CreatedAt:     now,
