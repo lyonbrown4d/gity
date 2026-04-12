@@ -26,3 +26,7 @@ func (s *Service) AdvertiseUploadPack(ctx context.Context, repoPath string, stdo
 func (s *Service) ReceivePack(ctx context.Context, repoPath string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	return s.runner.Run(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "."}, stdin, stdout, stderr)
 }
+
+func (s *Service) AdvertiseReceivePack(ctx context.Context, repoPath string, stdout io.Writer, stderr io.Writer) error {
+	return s.runner.Run(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "--advertise-refs", "."}, nil, stdout, stderr)
+}

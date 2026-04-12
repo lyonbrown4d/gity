@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"platform.auth",
 		dix.Description("Authentication runtime"),
 		dix.Providers(
-			dix.Provider0(NewRuntime),
+			dix.Provider3(NewRuntime),
 		),
 	)
 }

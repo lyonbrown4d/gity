@@ -7,6 +7,7 @@ type Settings struct {
 	HTTP     HTTPSettings     `mapstructure:"http"`
 	Database DatabaseSettings `mapstructure:"database"`
 	Git      GitSettings      `mapstructure:"git"`
+	Storage  StorageSettings  `mapstructure:"storage"`
 }
 
 type AppSettings struct {
@@ -30,6 +31,18 @@ type GitSettings struct {
 	Bin      string `mapstructure:"bin"`
 }
 
+type StorageSettings struct {
+	Driver             string `mapstructure:"driver"`
+	Root               string `mapstructure:"root"`
+	S3Bucket           string `mapstructure:"s3_bucket"`
+	S3Region           string `mapstructure:"s3_region"`
+	S3Endpoint         string `mapstructure:"s3_endpoint"`
+	S3AccessKey        string `mapstructure:"s3_access_key"`
+	S3SecretKey        string `mapstructure:"s3_secret_key"`
+	S3UsePathStyle     bool   `mapstructure:"s3_use_path_style"`
+	S3AutoCreateBucket bool   `mapstructure:"s3_auto_create_bucket"`
+}
+
 func DefaultSettings() Settings {
 	return Settings{
 		App: AppSettings{
@@ -48,6 +61,13 @@ func DefaultSettings() Settings {
 		Git: GitSettings{
 			RepoRoot: "./data/repos",
 			Bin:      "git",
+		},
+		Storage: StorageSettings{
+			Driver:             "local",
+			Root:               "./data/storage",
+			S3Region:           "us-east-1",
+			S3UsePathStyle:     true,
+			S3AutoCreateBucket: false,
 		},
 	}
 }

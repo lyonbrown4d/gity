@@ -13,8 +13,12 @@ This repository now uses a single Go module for the backend runtime and keeps th
 - Logging through `arcgo/logx`
 - Database foundation through `arcgo/dbx` repository mode
 - Snowflake `int64` IDs generated through `dbx`
+- Versioned schema bootstrap through a `schema_migrations` table plus `dbx` migration execution
 - Git process boundary through native `git` subprocesses
-- First domain chain online: `namespace -> project`
+- Git read model through `go-git`
+- Current business chains online:
+  - `namespace -> project`
+  - `project -> issue -> comment -> attachment`
 
 The old Rust backend has been removed so the repository can move forward on one backend stack.
 
@@ -31,7 +35,7 @@ The old Rust backend has been removed so the repository can move forward on one 
 | `internal/service` | application services |
 | `internal/http` | `httpx` + Fiber server bootstrap and lifecycle |
 | `internal/endpoint` | HTTP route registration |
-| `internal/platform` | auth, db, logging, and git infrastructure |
+| `internal/platform` | auth, db, logging, storage, and git infrastructure |
 | `web` | frontend app |
 
 ## Quick Start
@@ -51,6 +55,7 @@ cp .env.example .env
 
 The current backend defaults to sqlite for the rewrite bootstrap, so Docker is optional for now.
 `GITY_DATABASE_NODE_ID` controls the Snowflake node id used by `dbx`.
+`GITY_STORAGE_ROOT` controls where issue attachments are stored on local disk.
 
 ### 3. Run the backend
 
@@ -82,15 +87,46 @@ System:
 - `GET /health`
 - `GET /v1/rewrite/info`
 
+Users:
+- `GET /v1/users`
+- `GET /v1/users/{id}`
+- `POST /v1/users`
+- `GET /v1/users/{id}/tokens`
+- `POST /v1/users/{id}/tokens`
+
 Namespaces:
 - `GET /v1/namespaces`
 - `GET /v1/namespaces/{id}`
 - `POST /v1/namespaces`
+- `GET /v1/namespaces/{id}/members`
+- `POST /v1/namespaces/{id}/members`
 
 Projects:
 - `GET /v1/projects`
 - `GET /v1/projects/{id}`
 - `POST /v1/projects`
+- `GET /v1/projects/{id}/repository/branches`
+- `GET /v1/projects/{id}/repository/commits`
+- `GET /v1/projects/{id}/repository/tree`
+- `GET /v1/projects/{id}/repository/blob`
+- `GET /v1/projects/{id}/repository/readme`
+
+Issues:
+- `GET /v1/projects/{id}/issues`
+- `GET /v1/projects/{id}/issues/{issue_iid}`
+- `POST /v1/projects/{id}/issues`
+- `PATCH /v1/projects/{id}/issues/{issue_iid}`
+- `GET /v1/projects/{id}/issues/{issue_iid}/comments`
+- `POST /v1/projects/{id}/issues/{issue_iid}/comments`
+- `GET /v1/projects/{id}/issues/{issue_iid}/attachments`
+- `POST /v1/projects/{id}/issues/{issue_iid}/attachments`
+- `GET /v1/projects/{id}/issues/{issue_iid}/attachments/{attachment_id}`
+
+Git Smart HTTP:
+- `/<namespace>/<project>.git/info/refs?service=git-upload-pack`
+- `/<namespace>/<project>.git/git-upload-pack`
+- `/<namespace>/<project>.git/info/refs?service=git-receive-pack`
+- `/<namespace>/<project>.git/git-receive-pack`
 
 ## Development Notes
 

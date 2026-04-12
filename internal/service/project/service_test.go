@@ -20,6 +20,7 @@ import (
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
@@ -62,6 +63,10 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new user repo: %v", err)
 	}
+	userTokenRepository, err := usertokenrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new user token repo: %v", err)
+	}
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	runner := gitexec.NewRunner(config.Settings{
 		Git: config.GitSettings{
@@ -75,7 +80,7 @@ func TestNamespaceProjectFlow(t *testing.T) {
 		},
 	})
 
-	userSvc := userservice.NewService(logger, userRepository)
+	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository)
 

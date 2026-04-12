@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"endpoint.gittransport",
 		dix.Description("Raw Git Smart HTTP routes"),
 		dix.Invokes(
-			dix.Invoke4(RegisterRoutes),
+			dix.Invoke5(RegisterRoutes),
 		),
 	)
 }

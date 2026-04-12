@@ -2,6 +2,8 @@ package user
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,11 +11,13 @@ import (
 	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/gity/internal/entity"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 )
 
 type Service struct {
-	logger *slog.Logger
-	repo   *userrepo.Repository
+	logger    *slog.Logger
+	repo      *userrepo.Repository
+	tokenRepo *usertokenrepo.Repository
 }
 
 type CreateInput struct {
@@ -22,8 +26,12 @@ type CreateInput struct {
 	Email       string `json:"email"`
 }
 
-func NewService(logger *slog.Logger, repo *userrepo.Repository) *Service {
-	return &Service{logger: logger, repo: repo}
+type CreateTokenInput struct {
+	Name string `json:"name"`
+}
+
+func NewService(logger *slog.Logger, repo *userrepo.Repository, tokenRepo *usertokenrepo.Repository) *Service {
+	return &Service{logger: logger, repo: repo, tokenRepo: tokenRepo}
 }
 
 func (s *Service) List(ctx context.Context) (collectionx.List[entity.User], error) {
@@ -46,4 +54,42 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (entity.User, e
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
 	})
+}
+
+func (s *Service) ListTokens(ctx context.Context, userID int64) ([]entity.UserAccessToken, error) {
+	if _, err := s.repo.GetByID(ctx, userID); err != nil {
+		return nil, fmt.Errorf("load user: %w", err)
+	}
+	items, err := s.tokenRepo.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return items.Values(), nil
+}
+
+func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTokenInput) (entity.UserAccessToken, error) {
+	if _, err := s.repo.GetByID(ctx, userID); err != nil {
+		return entity.UserAccessToken{}, fmt.Errorf("load user: %w", err)
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		name = "default"
+	}
+	token, err := generateToken()
+	if err != nil {
+		return entity.UserAccessToken{}, err
+	}
+	return s.tokenRepo.Create(ctx, usertokenrepo.CreateInput{
+		UserID: userID,
+		Name:   name,
+		Token:  token,
+	})
+}
+
+func generateToken() (string, error) {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("generate token: %w", err)
+	}
+	return "gity_" + hex.EncodeToString(buf), nil
 }

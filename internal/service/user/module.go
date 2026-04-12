@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"service.user",
 		dix.Description("User application services"),
 		dix.Providers(
-			dix.Provider2(NewService),
+			dix.Provider3(NewService),
 		),
 	)
 }
