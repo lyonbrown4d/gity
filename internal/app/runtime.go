@@ -20,7 +20,6 @@ import (
 	"github.com/DaiYuANg/gity/internal/platform/gittransport"
 	platformlogger "github.com/DaiYuANg/gity/internal/platform/logger"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
-	coredb "github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
@@ -44,28 +43,60 @@ import (
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
 )
 
+func NewMigrationApp() *dix.App {
+	return newApp(
+		"gity-migration",
+		"Gity database migration runtime",
+		migrationModules(),
+	)
+}
+
 func NewServerApp() *dix.App {
-	return dix.New(
+	return newApp(
 		"gity-server",
-		dix.WithVersion("0.1.0"),
-		dix.WithAppDescription("Gity backend rewrite on arcgo dix + dbx + httpx + authx"),
-		dix.WithModules(serverModules()...),
+		"Gity HTTP server runtime",
+		append(sharedModules(), serverAugmentModules()...),
 	)
 }
 
 func NewWorkerApp() *dix.App {
-	return dix.New(
+	return newApp(
 		"gity-worker",
-		dix.WithVersion("0.1.0"),
-		dix.WithAppDescription("Gity background worker runtime on arcgo dix"),
-		dix.WithModules(coreModules()...),
+		"Gity background worker runtime",
+		append(sharedModules(), workerAugmentModules()...),
 	)
 }
 
-func coreModules() []dix.Module {
+func NewStandaloneApp() *dix.App {
+	modules := append(sharedModules(), serverAugmentModules()...)
+	modules = append(modules, workerAugmentModules()...)
+	return newApp(
+		"gity-standalone",
+		"Gity standalone runtime with server and worker components",
+		modules,
+	)
+}
+
+func newApp(name string, description string, modules []dix.Module) *dix.App {
+	return dix.New(
+		name,
+		dix.WithVersion("0.1.0"),
+		dix.WithAppDescription(description),
+		dix.UseLoggerErr1(platformlogger.NewLogger),
+		dix.WithModules(modules...),
+	)
+}
+
+func migrationModules() []dix.Module {
 	return []dix.Module{
 		config.Module(),
-		platformlogger.Module(),
+		database.Module(),
+	}
+}
+
+func sharedModules() []dix.Module {
+	return []dix.Module{
+		config.Module(),
 		database.Module(),
 		userrepo.Module(),
 		usertokenrepo.Module(),
@@ -86,7 +117,6 @@ func coreModules() []dix.Module {
 		gitrepo.Module(),
 		gittransport.Module(),
 		platformstorage.Module(),
-		coredb.Module(),
 		userservice.Module(),
 		namespaceservice.Module(),
 		projectservice.Module(),
@@ -97,10 +127,8 @@ func coreModules() []dix.Module {
 	}
 }
 
-func serverModules() []dix.Module {
-	modules := append([]dix.Module{}, coreModules()...)
-	modules = append(
-		modules,
+func serverAugmentModules() []dix.Module {
+	return []dix.Module{
 		httpapp.Module(),
 		systemendpoint.Module(),
 		gittransportendpoint.Module(),
@@ -111,6 +139,9 @@ func serverModules() []dix.Module {
 		issueendpoint.Module(),
 		mergerequestendpoint.Module(),
 		packageregistryendpoint.Module(),
-	)
-	return modules
+	}
+}
+
+func workerAugmentModules() []dix.Module {
+	return []dix.Module{}
 }

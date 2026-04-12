@@ -8,7 +8,7 @@ import (
 )
 
 type createUserInput struct {
-	Body userservice.CreateInput `json:"body"`
+	Body createUserBody `json:"body"`
 }
 
 type userByIDInput struct {
@@ -20,12 +20,22 @@ type userTokenInput struct {
 }
 
 type createUserTokenInput struct {
-	ID   int64                        `path:"id"`
-	Body userservice.CreateTokenInput `json:"body"`
+	ID   int64               `path:"id"`
+	Body createUserTokenBody `json:"body"`
 }
 
 type userOutput struct {
 	Body any `json:"body"`
+}
+
+type createUserBody struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+}
+
+type createUserTokenBody struct {
+	Name string `json:"name"`
 }
 
 func RegisterRoutes(server httpx.ServerRuntime, service *userservice.Service) {
@@ -49,7 +59,11 @@ func RegisterRoutes(server httpx.ServerRuntime, service *userservice.Service) {
 	})
 
 	httpx.MustGroupPost(v1, "/users", func(ctx context.Context, in *createUserInput) (*userOutput, error) {
-		item, err := service.Create(ctx, in.Body)
+		item, err := service.Create(ctx, userservice.CreateInput{
+			Username:    in.Body.Username,
+			DisplayName: in.Body.DisplayName,
+			Email:       in.Body.Email,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +79,9 @@ func RegisterRoutes(server httpx.ServerRuntime, service *userservice.Service) {
 	})
 
 	httpx.MustGroupPost(v1, "/users/{id}/tokens", func(ctx context.Context, in *createUserTokenInput) (*userOutput, error) {
-		item, err := service.CreateToken(ctx, in.ID, in.Body)
+		item, err := service.CreateToken(ctx, in.ID, userservice.CreateTokenInput{
+			Name: in.Body.Name,
+		})
 		if err != nil {
 			return nil, err
 		}

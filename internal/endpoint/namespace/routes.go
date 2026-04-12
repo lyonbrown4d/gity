@@ -8,7 +8,7 @@ import (
 )
 
 type createNamespaceInput struct {
-	Body namespaceservice.CreateInput `json:"body"`
+	Body createNamespaceBody `json:"body"`
 }
 
 type namespaceByIDInput struct {
@@ -20,12 +20,25 @@ type namespaceMemberInput struct {
 }
 
 type addNamespaceMemberInput struct {
-	ID   int64                           `path:"id"`
-	Body namespaceservice.AddMemberInput `json:"body"`
+	ID   int64                  `path:"id"`
+	Body addNamespaceMemberBody `json:"body"`
 }
 
 type namespaceOutput struct {
 	Body any `json:"body"`
+}
+
+type createNamespaceBody struct {
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	PathKey     string `json:"path_key"`
+	OwnerUserID int64  `json:"owner_user_id"`
+	Description string `json:"description"`
+}
+
+type addNamespaceMemberBody struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
 }
 
 func RegisterRoutes(server httpx.ServerRuntime, service *namespaceservice.Service) {
@@ -49,7 +62,13 @@ func RegisterRoutes(server httpx.ServerRuntime, service *namespaceservice.Servic
 	})
 
 	httpx.MustGroupPost(v1, "/namespaces", func(ctx context.Context, in *createNamespaceInput) (*namespaceOutput, error) {
-		item, err := service.Create(ctx, in.Body)
+		item, err := service.Create(ctx, namespaceservice.CreateInput{
+			Kind:        in.Body.Kind,
+			Name:        in.Body.Name,
+			PathKey:     in.Body.PathKey,
+			OwnerUserID: in.Body.OwnerUserID,
+			Description: in.Body.Description,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +84,10 @@ func RegisterRoutes(server httpx.ServerRuntime, service *namespaceservice.Servic
 	})
 
 	httpx.MustGroupPost(v1, "/namespaces/{id}/members", func(ctx context.Context, in *addNamespaceMemberInput) (*namespaceOutput, error) {
-		item, err := service.AddMember(ctx, in.ID, in.Body)
+		item, err := service.AddMember(ctx, in.ID, namespaceservice.AddMemberInput{
+			UserID: in.Body.UserID,
+			Role:   in.Body.Role,
+		})
 		if err != nil {
 			return nil, err
 		}

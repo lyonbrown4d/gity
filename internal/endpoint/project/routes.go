@@ -8,7 +8,7 @@ import (
 )
 
 type createProjectInput struct {
-	Body projectservice.CreateInput `json:"body"`
+	Body createProjectBody `json:"body"`
 }
 
 type projectByIDInput struct {
@@ -22,19 +22,25 @@ type projectRepositoryInput struct {
 	Limit int    `query:"limit"`
 }
 
-type listProjectsInput struct {
-	NamespaceID *int64 `query:"namespace_id"`
-}
-
 type projectOutput struct {
 	Body any `json:"body"`
+}
+
+type createProjectBody struct {
+	NamespaceID   int64  `json:"namespace_id"`
+	Name          string `json:"name"`
+	PathKey       string `json:"path_key"`
+	Visibility    string `json:"visibility"`
+	Description   string `json:"description"`
+	DefaultBranch string `json:"default_branch"`
 }
 
 func RegisterRoutes(server httpx.ServerRuntime, service *projectservice.Service) {
 	v1 := server.Group("/v1")
 
-	httpx.MustGroupGet(v1, "/projects", func(ctx context.Context, in *listProjectsInput) (*projectOutput, error) {
-		items, err := service.List(ctx, in.NamespaceID)
+	httpx.MustGroupGet(v1, "/projects", func(ctx context.Context, in *struct{}) (*projectOutput, error) {
+		_ = in
+		items, err := service.List(ctx, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +56,14 @@ func RegisterRoutes(server httpx.ServerRuntime, service *projectservice.Service)
 	})
 
 	httpx.MustGroupPost(v1, "/projects", func(ctx context.Context, in *createProjectInput) (*projectOutput, error) {
-		item, err := service.Create(ctx, in.Body)
+		item, err := service.Create(ctx, projectservice.CreateInput{
+			NamespaceID:   in.Body.NamespaceID,
+			Name:          in.Body.Name,
+			PathKey:       in.Body.PathKey,
+			Visibility:    in.Body.Visibility,
+			Description:   in.Body.Description,
+			DefaultBranch: in.Body.DefaultBranch,
+		})
 		if err != nil {
 			return nil, err
 		}
