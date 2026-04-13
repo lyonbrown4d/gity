@@ -6,7 +6,7 @@ require (
 	github.com/DaiYuANg/arcgo/authx v0.2.5
 	github.com/DaiYuANg/arcgo/collectionx v0.1.5
 	github.com/DaiYuANg/arcgo/configx v0.3.1
-	github.com/DaiYuANg/arcgo/dbx v0.2.6
+	github.com/DaiYuANg/arcgo/dbx v0.2.7
 	github.com/DaiYuANg/arcgo/dix v0.5.1
 	github.com/DaiYuANg/arcgo/httpx v0.2.5
 	github.com/DaiYuANg/arcgo/httpx/adapter/fiber v0.1.4
