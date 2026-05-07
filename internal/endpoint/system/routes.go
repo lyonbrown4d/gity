@@ -36,10 +36,6 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 	return httpapi.EndpointSpec("", "System", "System", "System and runtime APIs.")
 }
 
-func RegisterRoutes(server httpx.ServerRuntime, settings config.Settings) {
-	server.RegisterOnly(NewEndpoint(settings))
-}
-
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	settings := e.settings
 

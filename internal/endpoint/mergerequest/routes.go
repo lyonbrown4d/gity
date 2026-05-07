@@ -75,10 +75,6 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 	return httpapi.EndpointSpec("/v1", "Merge Requests", "Merge Requests", "Project merge request APIs.")
 }
 
-func RegisterRoutes(server httpx.ServerRuntime, service *mergerequestservice.Service, authRuntime *platformauth.Runtime) {
-	server.RegisterOnly(NewEndpoint(service, authRuntime))
-}
-
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	service := e.service
 	authRuntime := e.authRuntime

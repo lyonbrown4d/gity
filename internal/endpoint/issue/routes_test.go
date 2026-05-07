@@ -10,7 +10,7 @@ import (
 func TestEndpointRegistersCanonicalIssueRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	RegisterRoutes(server, nil, nil)
+	server.RegisterOnly(NewEndpoint(nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/issues")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/issues")
@@ -21,7 +21,7 @@ func TestEndpointRegistersCanonicalIssueRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoIssueAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	RegisterRoutes(server, nil, nil)
+	server.RegisterOnly(NewEndpoint(nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/issues")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/issues")

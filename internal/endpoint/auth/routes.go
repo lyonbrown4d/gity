@@ -65,10 +65,6 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 	return httpapi.EndpointSpec("/v1", "Auth", "Auth", "Authentication APIs.")
 }
 
-func RegisterRoutes(server httpx.ServerRuntime, service *userservice.Service) {
-	server.RegisterOnly(NewEndpoint(service))
-}
-
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	service := e.service
 

@@ -65,10 +65,6 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 	return httpapi.EndpointSpec("/v1", "Wiki", "Wiki", "Project wiki APIs.")
 }
 
-func RegisterRoutes(server httpx.ServerRuntime, service *wikiservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) {
-	server.RegisterOnly(NewEndpoint(service, projectService, authRuntime))
-}
-
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	service := e.service
 	authRuntime := e.authRuntime
