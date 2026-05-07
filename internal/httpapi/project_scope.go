@@ -2,15 +2,14 @@ package httpapi
 
 import (
 	"context"
-	"net/http"
-
-	"github.com/DaiYuANg/gity/internal/entity"
+	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
 	"github.com/arcgolabs/httpx"
+	"net/http"
 )
 
 type ProjectLookup interface {
-	GetByID(context.Context, int64) (entity.Project, error)
+	GetByID(context.Context, int64) (projectdomain.Project, error)
 }
 
 func ProjectScopeResolverFrom(lookup ProjectLookup) ProjectScopeResolver {

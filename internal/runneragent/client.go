@@ -6,11 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 type Client struct {
@@ -20,8 +19,8 @@ type Client struct {
 }
 
 type ClaimResponse struct {
-	Claimed bool              `json:"claimed"`
-	Job     entity.ProjectJob `json:"job"`
+	Claimed bool                `json:"claimed"`
+	Job     cidomain.ProjectJob `json:"job"`
 }
 
 type SourceArchiveResponse struct {
@@ -52,14 +51,14 @@ func (c *Client) ClaimJob(ctx context.Context, leaseSeconds int) (ClaimResponse,
 	return out, err
 }
 
-func (c *Client) GetProjectJob(ctx context.Context, projectID int64, jobID int64) (entity.ProjectJob, error) {
-	var out entity.ProjectJob
+func (c *Client) GetProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
+	var out cidomain.ProjectJob
 	err := c.get(ctx, fmt.Sprintf("/projects/%d/jobs/%d", projectID, jobID), &out)
 	return out, err
 }
 
 func (c *Client) CompleteJob(ctx context.Context, jobID int64, result string) error {
-	var out entity.ProjectJob
+	var out cidomain.ProjectJob
 	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/complete", jobID), map[string]any{
 		"token":  c.token,
 		"result": result,
@@ -67,7 +66,7 @@ func (c *Client) CompleteJob(ctx context.Context, jobID int64, result string) er
 }
 
 func (c *Client) FailJob(ctx context.Context, jobID int64, message string, result string, retryAfterSeconds int) error {
-	var out entity.ProjectJob
+	var out cidomain.ProjectJob
 	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/fail", jobID), map[string]any{
 		"token":               c.token,
 		"error":               message,
@@ -104,7 +103,7 @@ func (c *Client) DownloadSourceArchive(ctx context.Context, jobID int64) ([]byte
 }
 
 func (c *Client) UploadArtifact(ctx context.Context, jobID int64, artifact ArtifactFile) error {
-	var out entity.ProjectJobArtifact
+	var out cidomain.ProjectJobArtifact
 	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/artifacts", jobID), map[string]any{
 		"token":          c.token,
 		"name":           artifact.Name,

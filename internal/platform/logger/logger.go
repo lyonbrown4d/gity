@@ -3,8 +3,8 @@ package logger
 import (
 	"log/slog"
 
-	"github.com/arcgolabs/logx"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/arcgolabs/logx"
 )
 
 func NewLogger(settings config.Settings) (*slog.Logger, error) {

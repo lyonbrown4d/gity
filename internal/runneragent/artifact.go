@@ -3,15 +3,14 @@ package runneragent
 import (
 	"encoding/json"
 	"fmt"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/bmatcuk/doublestar/v4"
 	"io/fs"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/DaiYuANg/gity/internal/entity"
-	"github.com/bmatcuk/doublestar/v4"
 )
 
 type ArtifactFile struct {
@@ -22,7 +21,7 @@ type ArtifactFile struct {
 	Content     []byte
 }
 
-func CollectArtifacts(job entity.ProjectJob, result string) ([]ArtifactFile, error) {
+func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, error) {
 	var payload ScriptPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
 		return nil, fmt.Errorf("decode script job payload: %w", err)

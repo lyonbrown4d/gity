@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,8 +14,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 func TestExecuteScriptJob(t *testing.T) {
@@ -36,7 +35,7 @@ func TestExecuteScriptJob(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        42,
 		ProjectID: 7,
 		Kind:      "script",
@@ -76,7 +75,7 @@ func TestExecuteScriptJobStreamsTrace(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        45,
 		ProjectID: 7,
 		Kind:      "script",
@@ -128,13 +127,13 @@ func TestExecuteScriptJobDownloadsSourceArchive(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        46,
 		ProjectID: 7,
 		Kind:      "script",
 		Payload:   string(payload),
 		Attempts:  1,
-	}, nil, nil, func(_ context.Context, _ entity.ProjectJob, _ ScriptPayload, workDir string) error {
+	}, nil, nil, func(_ context.Context, _ cidomain.ProjectJob, _ ScriptPayload, workDir string) error {
 		return ExtractSourceArchive(archive, workDir)
 	})
 	if err != nil {
@@ -209,7 +208,7 @@ func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 		RepoRoot:       repoRoot,
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        44,
 		ProjectID: 7,
 		Kind:      "script",
@@ -266,7 +265,7 @@ func TestExecuteScriptJobFailure(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        43,
 		ProjectID: 7,
 		Kind:      "script",
@@ -305,7 +304,7 @@ func TestExecuteScriptJobCancellation(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	}, entity.ProjectJob{
+	}, cidomain.ProjectJob{
 		ID:        101,
 		ProjectID: 7,
 		Kind:      "script",

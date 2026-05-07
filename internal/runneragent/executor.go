@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"io"
 	"os"
 	"os/exec"
@@ -15,8 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 type ScriptPayload struct {
@@ -42,21 +41,21 @@ type ScriptCancellationChecker func(ctx context.Context) (bool, error)
 
 type ScriptTraceStreamer func(ctx context.Context, output string, outputTruncated bool, durationMillis int64) error
 
-type ScriptSourceFetcher func(ctx context.Context, job entity.ProjectJob, payload ScriptPayload, workDir string) error
+type ScriptSourceFetcher func(ctx context.Context, job cidomain.ProjectJob, payload ScriptPayload, workDir string) error
 
-func ExecuteScriptJob(ctx context.Context, cfg Config, job entity.ProjectJob) (string, error) {
+func ExecuteScriptJob(ctx context.Context, cfg Config, job cidomain.ProjectJob) (string, error) {
 	return ExecuteScriptJobWithChecker(ctx, cfg, job, nil)
 }
 
-func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker) (string, error) {
+func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job cidomain.ProjectJob, checker ScriptCancellationChecker) (string, error) {
 	return ExecuteScriptJobWithTrace(ctx, cfg, job, checker, nil)
 }
 
-func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer) (string, error) {
+func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job cidomain.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer) (string, error) {
 	return ExecuteScriptJobWithSource(ctx, cfg, job, checker, traceStreamer, nil)
 }
 
-func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer, sourceFetcher ScriptSourceFetcher) (string, error) {
+func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer, sourceFetcher ScriptSourceFetcher) (string, error) {
 	var payload ScriptPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
 		return "", fmt.Errorf("decode script job payload: %w", err)
@@ -201,7 +200,7 @@ func scriptCommand(ctx context.Context, shell string, script string) *exec.Cmd {
 	}
 }
 
-func checkoutProjectSource(ctx context.Context, cfg Config, job entity.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {
+func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {
 	repoRoot := strings.TrimSpace(cfg.RepoRoot)
 	projectFullPath := strings.TrimSpace(payload.ProjectFullPath)
 	if projectFullPath == "" {

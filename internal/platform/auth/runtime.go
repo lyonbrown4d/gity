@@ -1,10 +1,10 @@
 package auth
 
 import (
+	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespacemember"
+	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
+	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/usertoken"
 	"github.com/arcgolabs/authx"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
-	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
-	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 )
 
 type Runtime struct {

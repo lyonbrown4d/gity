@@ -2,11 +2,10 @@ package runneragent
 
 import (
 	"encoding/json"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 func TestCollectArtifacts(t *testing.T) {
@@ -27,7 +26,7 @@ func TestCollectArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal result: %v", err)
 	}
-	artifacts, err := CollectArtifacts(entity.ProjectJob{Payload: string(payload)}, string(result))
+	artifacts, err := CollectArtifacts(cidomain.ProjectJob{Payload: string(payload)}, string(result))
 	if err != nil {
 		t.Fatalf("collect artifacts: %v", err)
 	}

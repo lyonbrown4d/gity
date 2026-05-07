@@ -3,12 +3,11 @@ package runneragent
 import (
 	"context"
 	"fmt"
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 const (
@@ -66,7 +65,7 @@ func (a *Agent) RunOnce(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) error {
+func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) error {
 	expectedLocker := job.LockedBy
 	switch job.Kind {
 	case "script":
@@ -91,7 +90,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 				return nil
 			}
 			return nil
-		}, func(sourceCtx context.Context, job entity.ProjectJob, _ ScriptPayload, workDir string) error {
+		}, func(sourceCtx context.Context, job cidomain.ProjectJob, _ ScriptPayload, workDir string) error {
 			content, err := a.client.DownloadSourceArchive(sourceCtx, job.ID)
 			if err != nil {
 				return err
@@ -132,7 +131,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 	}
 }
 
-func (a *Agent) uploadArtifacts(ctx context.Context, job entity.ProjectJob, result string) error {
+func (a *Agent) uploadArtifacts(ctx context.Context, job cidomain.ProjectJob, result string) error {
 	if strings.TrimSpace(result) == "" {
 		return nil
 	}
