@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/DaiYuANg/gity/internal/platform/gitexec"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitexec"
 )
 
 type Service struct {

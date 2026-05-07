@@ -6,9 +6,9 @@ import (
 
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	runnerservice "github.com/DaiYuANg/gity/internal/application/runner"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/mapperx"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 )
@@ -102,11 +102,11 @@ type runnerOutput struct {
 type Endpoint struct {
 	service        *runnerservice.Service
 	projectService *projectservice.Service
-	authRuntime    *platformauth.Runtime
+	authRuntime    *infraauth.Runtime
 	mapper         *mapper.Mapper
 }
 
-func NewEndpoint(service *runnerservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+func NewEndpoint(service *runnerservice.Service, projectService *projectservice.Service, authRuntime *infraauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
 	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 

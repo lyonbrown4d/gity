@@ -4,9 +4,9 @@ import (
 	"context"
 
 	mergerequestservice "github.com/DaiYuANg/gity/internal/application/mergerequest"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/mapperx"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 )
@@ -66,11 +66,11 @@ type mergeMergeRequestBody struct {
 
 type Endpoint struct {
 	service     *mergerequestservice.Service
-	authRuntime *platformauth.Runtime
+	authRuntime *infraauth.Runtime
 	mapper      *mapper.Mapper
 }
 
-func NewEndpoint(service *mergerequestservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+func NewEndpoint(service *mergerequestservice.Service, authRuntime *infraauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
 	return &Endpoint{service: service, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 

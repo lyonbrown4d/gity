@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 )
 
@@ -85,7 +85,7 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	logout := func(ctx context.Context, in *logoutInput) (*logoutOutput, error) {
-		if token, ok := platformauth.TokenFromAuthorizationHeader(in.Authorization); ok {
+		if token, ok := infraauth.TokenFromAuthorizationHeader(in.Authorization); ok {
 			if err := service.RevokeToken(ctx, token); err != nil {
 				return nil, err
 			}

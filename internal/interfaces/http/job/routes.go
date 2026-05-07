@@ -6,9 +6,9 @@ import (
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/mapperx"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 )
@@ -49,12 +49,12 @@ type jobOutput struct {
 type Endpoint struct {
 	service         *jobservice.Service
 	projectService  *projectservice.Service
-	authRuntime     *platformauth.Runtime
+	authRuntime     *infraauth.Runtime
 	pipelineService *pipelineservice.Service
 	mapper          *mapper.Mapper
 }
 
-func NewEndpoint(service *jobservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, pipelineService *pipelineservice.Service, requestMapper *mapper.Mapper) *Endpoint {
+func NewEndpoint(service *jobservice.Service, projectService *projectservice.Service, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service, requestMapper *mapper.Mapper) *Endpoint {
 	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, pipelineService: pipelineService, mapper: mapperx.Ensure(requestMapper)}
 }
 

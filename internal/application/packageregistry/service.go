@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	packagedomain "github.com/DaiYuANg/gity/internal/domain/packageregistry"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpackage"
 	projectpackagefilerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpackagefile"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpackageversion"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
@@ -22,7 +22,7 @@ type Service struct {
 	packageRepo *projectpackagerepo.Repository
 	versionRepo *projectpackageversionrepo.Repository
 	fileRepo    *projectpackagefilerepo.Repository
-	storage     *platformstorage.Service
+	storage     storageports.ObjectStorage
 }
 
 type UploadFileInput struct {
@@ -50,7 +50,7 @@ type PackageFileContent struct {
 	Content string                           `json:"content_base64"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, packageRepo *projectpackagerepo.Repository, versionRepo *projectpackageversionrepo.Repository, fileRepo *projectpackagefilerepo.Repository, storage *platformstorage.Service) *Service {
+func NewService(projectRepo *projectrepo.Repository, packageRepo *projectpackagerepo.Repository, versionRepo *projectpackageversionrepo.Repository, fileRepo *projectpackagefilerepo.Repository, storage storageports.ObjectStorage) *Service {
 	return &Service{projectRepo: projectRepo, packageRepo: packageRepo, versionRepo: versionRepo, fileRepo: fileRepo, storage: storage}
 }
 
@@ -134,7 +134,7 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = platformstorage.DetectContentType(fileName)
+		contentType = storageports.DetectContentType(fileName)
 	}
 	storedPath := filePath
 	if strings.TrimSpace(storedPath) == "" {

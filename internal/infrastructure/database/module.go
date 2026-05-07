@@ -9,7 +9,7 @@ import (
 
 func Module() dix.Module {
 	return dix.NewModule(
-		"platform.database",
+		"infrastructure.database",
 		dix.Description("Database runtime"),
 		dix.Providers(
 			dix.ProviderErr2(NewDatabase),

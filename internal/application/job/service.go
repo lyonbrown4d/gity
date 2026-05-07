@@ -5,12 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjobartifact"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjoblog"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
@@ -33,7 +33,7 @@ type Service struct {
 	jobRepo      *projectjobrepo.Repository
 	logRepo      *projectjoblogrepo.Repository
 	artifactRepo *projectjobartifactrepo.Repository
-	storage      *platformstorage.Service
+	storage      storageports.ObjectStorage
 }
 
 type CreateInput struct {
@@ -85,7 +85,7 @@ func NewService(
 	jobRepo *projectjobrepo.Repository,
 	logRepo *projectjoblogrepo.Repository,
 	artifactRepo *projectjobartifactrepo.Repository,
-	storage *platformstorage.Service,
+	storage storageports.ObjectStorage,
 ) *Service {
 	if logger == nil {
 		logger = slog.Default()
@@ -246,7 +246,7 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = platformstorage.DetectContentType(fileName)
+		contentType = storageports.DetectContentType(fileName)
 	}
 	artifact, err := s.artifactRepo.Create(ctx, projectjobartifactrepo.CreateInput{
 		ProjectID:    projectID,

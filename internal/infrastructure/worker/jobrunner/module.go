@@ -8,7 +8,7 @@ import (
 
 func Module() dix.Module {
 	return dix.NewModule(
-		"worker.jobrunner",
+		"infrastructure.worker.jobrunner",
 		dix.Description("Project job worker runtime"),
 		dix.Providers(
 			dix.Provider3(NewRunner),

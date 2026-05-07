@@ -1,7 +1,7 @@
 package httpapi
 
 import (
-	"github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
 )

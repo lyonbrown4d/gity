@@ -14,6 +14,8 @@ import (
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitexec"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespacemember"
@@ -21,8 +23,6 @@ import (
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectbranchprotection"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/usertoken"
-	"github.com/DaiYuANg/gity/internal/platform/gitexec"
-	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"

@@ -9,12 +9,12 @@ import (
 	"strings"
 
 	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
 	"github.com/gofiber/fiber/v2"
 )
 
-func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) {
+func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) {
 	app.Use(func(c *fiber.Ctx) error {
 		if !isLFSPath(c.Path(), c.Method()) {
 			return c.Next()
@@ -32,7 +32,7 @@ func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformau
 	})
 }
 
-func handlePost(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handlePost(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	switch {
 	case strings.HasSuffix(path, "/info/lfs/objects/batch"):
@@ -48,7 +48,7 @@ func handlePost(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Run
 	}
 }
 
-func handleGet(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleGet(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	if strings.HasSuffix(path, "/info/lfs/locks") {
 		return handleListLocks(c, logger, authRuntime, repo, service)
@@ -56,7 +56,7 @@ func handleGet(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runt
 	return handleDownload(c, logger, authRuntime, repo, service)
 }
 
-func handleBatch(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleBatch(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	repoPath := strings.TrimSuffix(path, "/info/lfs/objects/batch")
 	project, err := loadProject(c.UserContext(), repo, repoPath)
@@ -81,7 +81,7 @@ func handleBatch(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Ru
 	return c.Status(http.StatusOK).JSON(response)
 }
 
-func handleUpload(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleUpload(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	project, oid, err := loadLFSObjectTarget(c, repo)
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func handleUpload(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.R
 	return c.SendStatus(http.StatusOK)
 }
 
-func handleDownload(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleDownload(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	project, oid, err := loadLFSObjectTarget(c, repo)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ func handleDownload(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth
 	return c.Send(result.Content)
 }
 
-func handleCreateLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleCreateLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	repoPath := strings.TrimSuffix(path, "/info/lfs/locks")
 	project, err := loadProject(c.UserContext(), repo, repoPath)
@@ -143,7 +143,7 @@ func handleCreateLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformau
 	return c.Status(http.StatusCreated).JSON(response)
 }
 
-func handleListLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleListLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	repoPath := strings.TrimSuffix(path, "/info/lfs/locks")
 	project, err := loadProject(c.UserContext(), repo, repoPath)
@@ -166,7 +166,7 @@ func handleListLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformaut
 	return c.Status(http.StatusOK).JSON(response)
 }
 
-func handleVerifyLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleVerifyLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	path := normalizeRequestPath(c.Path())
 	repoPath := strings.TrimSuffix(path, "/info/lfs/locks/verify")
 	project, err := loadProject(c.UserContext(), repo, repoPath)
@@ -195,7 +195,7 @@ func handleVerifyLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *platforma
 	return c.Status(http.StatusOK).JSON(response)
 }
 
-func handleUnlockLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
+func handleUnlockLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {
 	project, lockID, err := loadLFSUnlockTarget(c, repo)
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func loadLFSUnlockTarget(c *fiber.Ctx, repo *projectrepo.Repository) (projectVie
 	return project, lockID, nil
 }
 
-func authorizeLFSOperation(c *fiber.Ctx, authRuntime *platformauth.Runtime, project projectView, operation string) error {
+func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, operation string) error {
 	readOperation := strings.EqualFold(strings.TrimSpace(operation), "download")
 	if readOperation && strings.TrimSpace(project.Visibility) == "public" {
 		return nil
@@ -270,7 +270,7 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *platformauth.Runtime, proj
 		return fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 
-	scope := platformauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
 	allowed := false
 	if readOperation {
 		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
@@ -286,21 +286,21 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *platformauth.Runtime, proj
 	return nil
 }
 
-func requireProjectWritePrincipal(c *fiber.Ctx, authRuntime *platformauth.Runtime, project projectView) (platformauth.Principal, error) {
+func requireProjectWritePrincipal(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView) (infraauth.Principal, error) {
 	principal, ok, err := authRuntime.AuthenticateHeader(c.UserContext(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
-		return platformauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
+		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
 	}
 	if !ok {
-		return platformauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
+		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
-	scope := platformauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
 	allowed, err := authRuntime.CanWriteProject(c.UserContext(), principal, scope)
 	if err != nil {
-		return platformauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
+		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
 	}
 	if !allowed {
-		return platformauth.Principal{}, fiber.NewError(http.StatusForbidden, "forbidden")
+		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "forbidden")
 	}
 	return principal, nil
 }

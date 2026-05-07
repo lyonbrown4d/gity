@@ -13,11 +13,11 @@ import (
 
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	"github.com/DaiYuANg/gity/internal/ci/plandsl"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpipeline"
 	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpipelinejob"
-	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
 )

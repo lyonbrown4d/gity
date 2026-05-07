@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/DaiYuANg/gity/internal/runneragent"
+	"github.com/DaiYuANg/gity/internal/infrastructure/runneragent"
 )
 
 func main() {

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 )
 
@@ -81,10 +81,10 @@ type userView struct {
 
 type Endpoint struct {
 	service     *userservice.Service
-	authRuntime *platformauth.Runtime
+	authRuntime *infraauth.Runtime
 }
 
-func NewEndpoint(service *userservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
+func NewEndpoint(service *userservice.Service, authRuntime *infraauth.Runtime) *Endpoint {
 	return &Endpoint{service: service, authRuntime: authRuntime}
 }
 
@@ -213,7 +213,7 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	)
 }
 
-func currentUser(ctx context.Context, service *userservice.Service, authRuntime *platformauth.Runtime, authorization string) (identity.User, error) {
+func currentUser(ctx context.Context, service *userservice.Service, authRuntime *infraauth.Runtime, authorization string) (identity.User, error) {
 	principal, ok, err := authRuntime.AuthenticateHeader(ctx, authorization)
 	if err != nil {
 		return identity.User{}, err

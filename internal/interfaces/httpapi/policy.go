@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/arcgolabs/httpx"
 )
 
@@ -18,9 +18,9 @@ type ProjectInput interface {
 	ProjectIDValue() int64
 }
 
-type ProjectScopeResolver func(context.Context, int64) (platformauth.ProjectScope, error)
+type ProjectScopeResolver func(context.Context, int64) (infraauth.ProjectScope, error)
 
-func ActorUserID(ctx context.Context, authRuntime *platformauth.Runtime, authorization string, fallback int64) (int64, error) {
+func ActorUserID(ctx context.Context, authRuntime *infraauth.Runtime, authorization string, fallback int64) (int64, error) {
 	if fallback > 0 {
 		return fallback, nil
 	}
@@ -34,7 +34,7 @@ func ActorUserID(ctx context.Context, authRuntime *platformauth.Runtime, authori
 	return principal.UserID, nil
 }
 
-func RequireUser[I AuthorizationInput, O any](authRuntime *platformauth.Runtime) httpx.RoutePolicy[I, O] {
+func RequireUser[I AuthorizationInput, O any](authRuntime *infraauth.Runtime) httpx.RoutePolicy[I, O] {
 	return httpx.RoutePolicy[I, O]{
 		Name:      "require_user",
 		Operation: markBearerProtected,
@@ -54,15 +54,15 @@ func RequireUser[I AuthorizationInput, O any](authRuntime *platformauth.Runtime)
 	}
 }
 
-func RequireProjectRead[I ProjectInput, O any](authRuntime *platformauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
+func RequireProjectRead[I ProjectInput, O any](authRuntime *infraauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
 	return projectPolicy[I, O]("require_project_read", authRuntime, resolver, true)
 }
 
-func RequireProjectWrite[I ProjectInput, O any](authRuntime *platformauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
+func RequireProjectWrite[I ProjectInput, O any](authRuntime *infraauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
 	return projectPolicy[I, O]("require_project_write", authRuntime, resolver, false)
 }
 
-func projectPolicy[I ProjectInput, O any](name string, authRuntime *platformauth.Runtime, resolver ProjectScopeResolver, read bool) httpx.RoutePolicy[I, O] {
+func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, read bool) httpx.RoutePolicy[I, O] {
 	return httpx.RoutePolicy[I, O]{
 		Name:      name,
 		Operation: markBearerProtected,
@@ -107,13 +107,13 @@ func projectPolicy[I ProjectInput, O any](name string, authRuntime *platformauth
 	}
 }
 
-func authenticateHeader(ctx context.Context, authRuntime *platformauth.Runtime, authorization string) (platformauth.Principal, bool, error) {
+func authenticateHeader(ctx context.Context, authRuntime *infraauth.Runtime, authorization string) (infraauth.Principal, bool, error) {
 	if authRuntime == nil {
-		return platformauth.Principal{}, false, httpx.NewError(http.StatusInternalServerError, "auth runtime is not configured")
+		return infraauth.Principal{}, false, httpx.NewError(http.StatusInternalServerError, "auth runtime is not configured")
 	}
 	principal, ok, err := authRuntime.AuthenticateHeader(ctx, authorization)
 	if err != nil {
-		return platformauth.Principal{}, false, httpx.NewError(http.StatusUnauthorized, "invalid credentials", err)
+		return infraauth.Principal{}, false, httpx.NewError(http.StatusUnauthorized, "invalid credentials", err)
 	}
 	return principal, ok, nil
 }

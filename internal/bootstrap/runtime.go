@@ -13,7 +13,13 @@ import (
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	wikiservice "github.com/DaiYuANg/gity/internal/application/wiki"
 	"github.com/DaiYuANg/gity/internal/config"
-	httpapp "github.com/DaiYuANg/gity/internal/http"
+	"github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/database"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitexec"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gittransport"
+	infralogger "github.com/DaiYuANg/gity/internal/infrastructure/logger"
+	inframapper "github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
 	coredb "github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespacemember"
@@ -37,6 +43,8 @@ import (
 	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectwikipage"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/usertoken"
+	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
+	jobrunner "github.com/DaiYuANg/gity/internal/infrastructure/worker/jobrunner"
 	authendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/auth"
 	gittransportendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/gittransport"
 	issueendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/issue"
@@ -51,15 +59,7 @@ import (
 	systemendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/system"
 	userendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/user"
 	wikiendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/wiki"
-	"github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/database"
-	"github.com/DaiYuANg/gity/internal/platform/gitexec"
-	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
-	"github.com/DaiYuANg/gity/internal/platform/gittransport"
-	platformlogger "github.com/DaiYuANg/gity/internal/platform/logger"
-	platformmapper "github.com/DaiYuANg/gity/internal/platform/mapperx"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
-	jobrunner "github.com/DaiYuANg/gity/internal/worker/jobrunner"
+	httpapp "github.com/DaiYuANg/gity/internal/interfaces/httpserver"
 	"github.com/arcgolabs/dix"
 )
 
@@ -102,7 +102,7 @@ func newApp(name string, description string, modules []dix.Module) *dix.App {
 		name,
 		dix.WithVersion("0.1.0"),
 		dix.WithAppDescription(description),
-		dix.UseLoggerErr1(platformlogger.NewLogger),
+		dix.UseLoggerErr1(infralogger.NewLogger),
 		dix.WithModules(modules...),
 	)
 }
@@ -146,8 +146,8 @@ func sharedModules() []dix.Module {
 		gitexec.Module(),
 		gitrepo.Module(),
 		gittransport.Module(),
-		platformmapper.Module(),
-		platformstorage.Module(),
+		inframapper.Module(),
+		infrastorage.Module(),
 		userservice.Module(),
 		namespaceservice.Module(),
 		projectservice.Module(),

@@ -4,7 +4,7 @@ import (
 	"context"
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
-	"github.com/DaiYuANg/gity/internal/httpapi"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 	"strconv"
 	"strings"

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
 	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/mapperx"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 	"github.com/gofiber/fiber/v2"
@@ -125,11 +125,11 @@ type issueAttachmentUploadView struct {
 
 type Endpoint struct {
 	service     *issueservice.Service
-	authRuntime *platformauth.Runtime
+	authRuntime *infraauth.Runtime
 	mapper      *mapper.Mapper
 }
 
-func NewEndpoint(service *issueservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+func NewEndpoint(service *issueservice.Service, authRuntime *infraauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
 	return &Endpoint{service: service, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
@@ -294,7 +294,7 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	)
 }
 
-func RegisterMultipartRoutes(app *fiber.App, service *issueservice.Service, authRuntime *platformauth.Runtime) {
+func RegisterMultipartRoutes(app *fiber.App, service *issueservice.Service, authRuntime *infraauth.Runtime) {
 	registerMultipartUpload := func(prefix string) {
 		app.Post(prefix+"/:id/issues/attachments", func(c *fiber.Ctx) error {
 			projectID, err := strconv.ParseInt(c.Params("id"), 10, 64)

@@ -1,13 +1,13 @@
-package mapperx
+package auth
 
 import "github.com/arcgolabs/dix"
 
 func Module() dix.Module {
 	return dix.NewModule(
-		"platform.mapper",
-		dix.Description("Shared object mapper"),
+		"infrastructure.auth",
+		dix.Description("Authentication runtime"),
 		dix.Providers(
-			dix.Provider0(NewMapper),
+			dix.Provider3(NewRuntime),
 		),
 	)
 }

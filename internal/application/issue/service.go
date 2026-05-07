@@ -6,13 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissue"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissueattachment"
 	projectissuecommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissuecomment"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
 	"log/slog"
@@ -27,7 +27,7 @@ type Service struct {
 	commentRepo    *projectissuecommentrepo.Repository
 	attachmentRepo *projectissueattachmentrepo.Repository
 	userRepo       *userrepo.Repository
-	storage        *platformstorage.Service
+	storage        storageports.ObjectStorage
 }
 
 type CreateIssueInput struct {
@@ -81,7 +81,7 @@ type AttachmentRawContent struct {
 	Content     []byte
 }
 
-func NewService(projectRepo *projectrepo.Repository, issueRepo *projectissuerepo.Repository, commentRepo *projectissuecommentrepo.Repository, attachmentRepo *projectissueattachmentrepo.Repository, userRepo *userrepo.Repository, storage *platformstorage.Service) *Service {
+func NewService(projectRepo *projectrepo.Repository, issueRepo *projectissuerepo.Repository, commentRepo *projectissuecommentrepo.Repository, attachmentRepo *projectissueattachmentrepo.Repository, userRepo *userrepo.Repository, storage storageports.ObjectStorage) *Service {
 	return &Service{
 		logger:         slog.Default(),
 		projectRepo:    projectRepo,
@@ -224,7 +224,7 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = platformstorage.DetectContentType(input.FileName)
+		contentType = storageports.DetectContentType(input.FileName)
 	}
 
 	if input.IssueIID <= 0 {
@@ -232,7 +232,7 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 		if err != nil {
 			return AttachmentUploadView{}, err
 		}
-		storageKey := platformstorage.BuildIssueDraftStorageKey(project.FullPath, token, input.FileName)
+		storageKey := storageports.BuildIssueDraftStorageKey(project.FullPath, token, input.FileName)
 		if err := s.storage.SaveObject(ctx, storageKey, input.Content, contentType); err != nil {
 			return AttachmentUploadView{}, err
 		}
@@ -292,7 +292,7 @@ func (s *Service) GetDraftAttachmentRaw(ctx context.Context, projectID int64, ob
 		return AttachmentRawContent{}, httpx.NewError(http.StatusNotFound, "project not found", err)
 	}
 	normalizedKey := strings.Trim(strings.ReplaceAll(objectKey, "\\", "/"), "/")
-	prefix := platformstorage.BuildIssueDraftStoragePrefix(project.FullPath) + "/"
+	prefix := storageports.BuildIssueDraftStoragePrefix(project.FullPath) + "/"
 	if !strings.HasPrefix(normalizedKey, prefix) {
 		return AttachmentRawContent{}, httpx.NewError(http.StatusBadRequest, "invalid attachment object key", nil)
 	}
@@ -303,7 +303,7 @@ func (s *Service) GetDraftAttachmentRaw(ctx context.Context, projectID int64, ob
 	}
 	return AttachmentRawContent{
 		FileName:    storageKeyFileName(normalizedKey),
-		ContentType: platformstorage.DetectContentType(normalizedKey),
+		ContentType: storageports.DetectContentType(normalizedKey),
 		Content:     content,
 	}, nil
 }

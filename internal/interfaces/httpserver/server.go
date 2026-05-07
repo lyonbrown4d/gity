@@ -1,4 +1,4 @@
-package http
+package httpserver
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	"github.com/DaiYuANg/gity/internal/httpapi"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/httpx/adapter"

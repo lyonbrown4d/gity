@@ -17,7 +17,7 @@ import (
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjobartifact"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjoblog"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
+	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -127,7 +127,7 @@ func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new artifact repo: %v", err)
 	}
-	storageSvc, err := platformstorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: filepath.Join(t.TempDir(), "storage")}})
+	storageSvc, err := infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: filepath.Join(t.TempDir(), "storage")}})
 	if err != nil {
 		t.Fatalf("new storage service: %v", err)
 	}

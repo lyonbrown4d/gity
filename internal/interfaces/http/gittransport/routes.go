@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	infragittransport "github.com/DaiYuANg/gity/internal/infrastructure/gittransport"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectbranchprotection"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	platformgittransport "github.com/DaiYuANg/gity/internal/platform/gittransport"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
@@ -46,7 +46,7 @@ func NewRouteServices(branchProtectionRepo *projectbranchprotectionrepo.Reposito
 	return &RouteServices{branchProtectionRepo: branchProtectionRepo, pipelineService: pipelineService}
 }
 
-func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, transport *platformgittransport.Service, services *RouteServices) {
+func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service, services *RouteServices) {
 	app.Use(func(c *fiber.Ctx) error {
 		if !isGitProtocolPath(c.Path(), c.Method()) {
 			return c.Next()
@@ -62,7 +62,7 @@ func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformau
 	})
 }
 
-func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, transport *platformgittransport.Service) error {
+func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	if !strings.HasSuffix(path, "/info/refs") {
 		return c.Next()
@@ -100,7 +100,7 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth
 	return c.Send(body)
 }
 
-func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *platformgittransport.Service) error {
+func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *infragittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	service := ""
 	repoPath := ""
@@ -162,7 +162,7 @@ func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo
 	return nil
 }
 
-func authorizeProject(c *fiber.Ctx, authRuntime *platformauth.Runtime, project projectView, service string) error {
+func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, service string) error {
 	if service == serviceUploadPack && strings.TrimSpace(project.Visibility) == "public" {
 		return nil
 	}
@@ -174,7 +174,7 @@ func authorizeProject(c *fiber.Ctx, authRuntime *platformauth.Runtime, project p
 		return fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 	allowed := false
-	scope := platformauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
 	switch service {
 	case serviceUploadPack:
 		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)

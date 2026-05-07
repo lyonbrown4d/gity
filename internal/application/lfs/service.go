@@ -3,13 +3,13 @@ package lfs
 import (
 	"context"
 	"fmt"
+	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfslock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfsobject"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
@@ -32,7 +32,7 @@ type Service struct {
 	objectRepo  *projectlfsobjectrepo.Repository
 	lockRepo    *projectlfslockrepo.Repository
 	userRepo    *userrepo.Repository
-	storage     *platformstorage.Service
+	storage     storageports.ObjectStorage
 }
 
 type BatchRequest struct {
@@ -115,7 +115,7 @@ type VerifyLocksResult struct {
 	NextCursor string     `json:"next_cursor,omitempty"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, objectRepo *projectlfsobjectrepo.Repository, lockRepo *projectlfslockrepo.Repository, userRepo *userrepo.Repository, storage *platformstorage.Service) *Service {
+func NewService(projectRepo *projectrepo.Repository, objectRepo *projectlfsobjectrepo.Repository, lockRepo *projectlfslockrepo.Repository, userRepo *userrepo.Repository, storage storageports.ObjectStorage) *Service {
 	return &Service{projectRepo: projectRepo, objectRepo: objectRepo, lockRepo: lockRepo, userRepo: userRepo, storage: storage}
 }
 
@@ -174,7 +174,7 @@ func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string,
 	if err := validateOID(oid); err != nil {
 		return lfsdomain.ProjectLFSObject{}, httpx.NewError(http.StatusBadRequest, "invalid lfs oid", err)
 	}
-	storageKey := platformstorage.BuildLFSStorageKey(project.FullPath, oid)
+	storageKey := storageports.BuildLFSStorageKey(project.FullPath, oid)
 	if err := s.storage.SaveObject(ctx, storageKey, content, "application/octet-stream"); err != nil {
 		return lfsdomain.ProjectLFSObject{}, err
 	}

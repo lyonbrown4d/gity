@@ -10,9 +10,9 @@ import (
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	"github.com/DaiYuANg/gity/internal/config"
-	"github.com/DaiYuANg/gity/internal/httpapi"
-	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
-	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
+	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
+	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
 	"github.com/arcgolabs/httpx"
 )
 
@@ -157,11 +157,11 @@ type repositoryLanguagesView struct {
 type Endpoint struct {
 	service         *projectservice.Service
 	settings        config.Settings
-	authRuntime     *platformauth.Runtime
+	authRuntime     *infraauth.Runtime
 	pipelineService *pipelineservice.Service
 }
 
-func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *platformauth.Runtime, pipelineService *pipelineservice.Service) *Endpoint {
+func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service) *Endpoint {
 	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService}
 }
 
@@ -459,12 +459,12 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	)
 }
 
-func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (platformauth.ProjectScope, error) {
+func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (infraauth.ProjectScope, error) {
 	item, err := e.service.GetByID(ctx, projectID)
 	if err != nil {
-		return platformauth.ProjectScope{}, err
+		return infraauth.ProjectScope{}, err
 	}
-	return platformauth.ProjectScope{ID: item.ID, NamespaceID: item.NamespaceID, Visibility: item.Visibility}, nil
+	return infraauth.ProjectScope{ID: item.ID, NamespaceID: item.NamespaceID, Visibility: item.Visibility}, nil
 }
 
 func toRepositoryView(item projectdomain.Project, settings config.Settings) repositoryView {
