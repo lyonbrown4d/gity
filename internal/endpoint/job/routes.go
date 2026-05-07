@@ -2,13 +2,15 @@ package job
 
 import (
 	"context"
-	"time"
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type projectJobsInput struct {
@@ -45,13 +47,15 @@ type jobOutput struct {
 }
 
 type Endpoint struct {
-	service        *jobservice.Service
-	projectService *projectservice.Service
-	authRuntime    *platformauth.Runtime
+	service         *jobservice.Service
+	projectService  *projectservice.Service
+	authRuntime     *platformauth.Runtime
+	pipelineService *pipelineservice.Service
+	mapper          *mapper.Mapper
 }
 
-func NewEndpoint(service *jobservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+func NewEndpoint(service *jobservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, pipelineService *pipelineservice.Service, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, pipelineService: pipelineService, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -72,16 +76,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createJob := func(ctx context.Context, in *createJobInput) (*jobOutput, error) {
-		runAfter, err := parseRunAfter(in.Body.RunAfter)
+		input, err := mapperx.MapStrict[jobservice.CreateInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.EnqueueProjectJob(ctx, in.ProjectID, jobservice.CreateInput{
-			Kind:        in.Body.Kind,
-			Payload:     in.Body.Payload,
-			MaxAttempts: in.Body.MaxAttempts,
-			RunAfter:    runAfter,
-		})
+		item, err := service.EnqueueProjectJob(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -101,12 +100,18 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
+		if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
+			return nil, err
+		}
 		return &jobOutput{Body: item}, nil
 	}
 
 	retryProjectJob := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
 		item, err := service.RetryProjectJob(ctx, in.ProjectID, in.JobID)
 		if err != nil {
+			return nil, err
+		}
+		if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
 			return nil, err
 		}
 		return &jobOutput{Body: item}, nil
@@ -181,9 +186,9 @@ func (in createJobInput) ProjectIDValue() int64 {
 	return in.ProjectID
 }
 
-func parseRunAfter(value string) (time.Time, error) {
-	if value == "" {
-		return time.Time{}, nil
+func (e *Endpoint) refreshPipelineForJob(ctx context.Context, projectID int64, jobID int64) error {
+	if e.pipelineService == nil {
+		return nil
 	}
-	return time.Parse(time.RFC3339, value)
+	return e.pipelineService.RefreshProjectJob(ctx, projectID, jobID)
 }

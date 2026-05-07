@@ -10,7 +10,7 @@ func Module() dix.Module {
 		"endpoint.job",
 		dix.Description("Project job routes"),
 		dix.Providers(
-			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(110))),
+			dix.Provider5(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(110))),
 		),
 	)
 }

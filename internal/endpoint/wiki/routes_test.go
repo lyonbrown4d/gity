@@ -10,7 +10,7 @@ import (
 func TestEndpointRegistersCanonicalWikiRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/wiki/pages")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/wiki/pages")
@@ -21,7 +21,7 @@ func TestEndpointRegistersCanonicalWikiRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoWikiAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/wiki/pages")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/wiki/pages")

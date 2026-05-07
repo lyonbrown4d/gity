@@ -15,6 +15,14 @@ type targetDTO struct {
 	CreatedAt string `json:"created_at"`
 }
 
+type timeSourceDTO struct {
+	RunAfter string `json:"run_after"`
+}
+
+type timeTargetDTO struct {
+	RunAfter time.Time `json:"run_after"`
+}
+
 func TestMapStrictUsesJSONFallbackTagsAndConverters(t *testing.T) {
 	createdAt := time.Date(2026, 5, 7, 12, 0, 0, 0, time.FixedZone("CST", 8*60*60))
 
@@ -30,5 +38,15 @@ func TestMapStrictUsesJSONFallbackTagsAndConverters(t *testing.T) {
 	}
 	if target.CreatedAt != "2026-05-07T04:00:00Z" {
 		t.Fatalf("created at = %q", target.CreatedAt)
+	}
+}
+
+func TestMapStrictParsesRFC3339Time(t *testing.T) {
+	target, err := MapStrict[timeTargetDTO](NewMapper(), timeSourceDTO{RunAfter: "2026-05-07T04:00:00Z"})
+	if err != nil {
+		t.Fatalf("map strict: %v", err)
+	}
+	if target.RunAfter.UTC().Format(time.RFC3339) != "2026-05-07T04:00:00Z" {
+		t.Fatalf("run after = %s", target.RunAfter.UTC().Format(time.RFC3339))
 	}
 }

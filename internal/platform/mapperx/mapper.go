@@ -1,6 +1,7 @@
 package mapperx
 
 import (
+	"strings"
 	"time"
 
 	"github.com/arcgolabs/mapper"
@@ -14,6 +15,12 @@ func NewMapper() *mapper.Mapper {
 				return ""
 			}
 			return value.UTC().Format(time.RFC3339)
+		}),
+		mapper.ConverterE(func(value string) (time.Time, error) {
+			if strings.TrimSpace(value) == "" {
+				return time.Time{}, nil
+			}
+			return time.Parse(time.RFC3339, value)
 		}),
 	)
 }

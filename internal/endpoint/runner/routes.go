@@ -6,9 +6,11 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	runnerservice "github.com/DaiYuANg/gity/internal/service/runner"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type projectRunnersInput struct {
@@ -101,10 +103,11 @@ type Endpoint struct {
 	service        *runnerservice.Service
 	projectService *projectservice.Service
 	authRuntime    *platformauth.Runtime
+	mapper         *mapper.Mapper
 }
 
-func NewEndpoint(service *runnerservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+func NewEndpoint(service *runnerservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -125,11 +128,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	registerProjectRunner := func(ctx context.Context, in *registerRunnerInput) (*runnerOutput, error) {
-		item, err := service.RegisterProjectRunner(ctx, in.ProjectID, runnerservice.RegisterInput{
-			Name:        in.Body.Name,
-			Description: in.Body.Description,
-			Tags:        in.Body.Tags,
-		})
+		input, err := mapperx.MapStrict[runnerservice.RegisterInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.RegisterProjectRunner(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -177,11 +180,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	appendTrace := func(ctx context.Context, in *runnerTraceInput) (*runnerOutput, error) {
-		item, err := service.AppendTrace(ctx, in.Body.Token, in.JobID, runnerservice.AppendTraceInput{
-			Output:          in.Body.Output,
-			OutputTruncated: in.Body.OutputTruncated,
-			DurationMillis:  in.Body.DurationMillis,
-		})
+		input, err := mapperx.MapStrict[runnerservice.AppendTraceInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.AppendTrace(ctx, in.Body.Token, in.JobID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -197,13 +200,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	uploadArtifact := func(ctx context.Context, in *runnerArtifactInput) (*runnerOutput, error) {
-		item, err := service.UploadArtifact(ctx, in.Body.Token, in.JobID, runnerservice.UploadArtifactInput{
-			Name:          in.Body.Name,
-			FileName:      in.Body.FileName,
-			FilePath:      in.Body.FilePath,
-			ContentType:   in.Body.ContentType,
-			ContentBase64: in.Body.ContentBase64,
-		})
+		input, err := mapperx.MapStrict[runnerservice.UploadArtifactInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.UploadArtifact(ctx, in.Body.Token, in.JobID, input)
 		if err != nil {
 			return nil, err
 		}

@@ -157,6 +157,32 @@ export interface RepositoryJobView {
   finished_at?: string | null;
 }
 
+export interface RepositoryJobTraceView {
+  job: RepositoryJobView;
+  trace: string;
+  exit_code: number;
+  output_truncated: boolean;
+  duration_millis: number;
+}
+
+export interface RepositoryJobArtifactView {
+  id: string;
+  project_id: string;
+  project_job_id: string;
+  name: string;
+  file_name: string;
+  file_path?: string | null;
+  content_type?: string | null;
+  byte_size: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryJobArtifactContentView {
+  artifact: RepositoryJobArtifactView;
+  content_base64: string;
+}
+
 export interface RepositoryPipelineJobLinkView {
   id: string;
   project_id: string;

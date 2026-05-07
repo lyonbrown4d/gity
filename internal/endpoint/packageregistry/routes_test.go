@@ -10,7 +10,7 @@ import (
 func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages/{package_id}")
@@ -21,7 +21,7 @@ func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoPackageRegistryAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/packages")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/packages/{package_id}")

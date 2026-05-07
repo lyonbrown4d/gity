@@ -5,9 +5,11 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	packageregistryservice "github.com/DaiYuANg/gity/internal/service/packageregistry"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type projectPackagesInput struct {
@@ -48,10 +50,11 @@ type Endpoint struct {
 	service        *packageregistryservice.Service
 	projectService *projectservice.Service
 	authRuntime    *platformauth.Runtime
+	mapper         *mapper.Mapper
 }
 
-func NewEndpoint(service *packageregistryservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+func NewEndpoint(service *packageregistryservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -80,15 +83,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	uploadPackageFile := func(ctx context.Context, in *uploadPackageFileInput) (*packageOutput, error) {
-		item, err := service.UploadFile(ctx, in.ProjectID, packageregistryservice.UploadFileInput{
-			Type:          in.Body.Type,
-			Name:          in.Body.Name,
-			Version:       in.Body.Version,
-			FileName:      in.Body.FileName,
-			FilePath:      in.Body.FilePath,
-			ContentType:   in.Body.ContentType,
-			ContentBase64: in.Body.ContentBase64,
-		})
+		input, err := mapperx.MapStrict[packageregistryservice.UploadFileInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.UploadFile(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}

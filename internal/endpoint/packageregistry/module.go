@@ -10,7 +10,7 @@ func Module() dix.Module {
 		"endpoint.packageregistry",
 		dix.Description("Package registry routes"),
 		dix.Providers(
-			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(80))),
+			dix.Provider4(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(80))),
 		),
 	)
 }

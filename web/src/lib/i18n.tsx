@@ -412,6 +412,20 @@ const zhDict: Record<string, string> = {
   "Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/{id}/complete, and /runners/jobs/{id}/fail.":
     "\u4f7f\u7528 token \u8c03\u7528 /runners/heartbeat\u3001/runners/jobs/claim\u3001/runners/jobs/{id}/complete \u548c /runners/jobs/{id}/fail\u3002",
   online: "\u5728\u7ebf",
+  "Artifact download is not available.": "\u65e0\u6cd5\u4e0b\u8f7d\u4ea7\u7269\u3002",
+  Logs: "\u65e5\u5fd7",
+  Retry: "\u91cd\u8bd5",
+  "Job detail": "\u4efb\u52a1\u8be6\u60c5",
+  "Job ID": "\u4efb\u52a1 ID",
+  Duration: "\u8017\u65f6",
+  "Exit code": "\u9000\u51fa\u7801",
+  "Reload job": "\u91cd\u65b0\u52a0\u8f7d\u4efb\u52a1",
+  Trace: "\u8f93\u51fa\u8ffd\u8e2a",
+  "Loading trace...": "\u65e5\u5fd7\u52a0\u8f7d\u4e2d...",
+  "No trace output.": "\u6682\u65e0\u65e5\u5fd7\u8f93\u51fa\u3002",
+  "Loading artifacts...": "\u4ea7\u7269\u52a0\u8f7d\u4e2d...",
+  "No artifacts uploaded.": "\u6682\u65e0\u4ea7\u7269\u3002",
+  Download: "\u4e0b\u8f7d",
   offline: "\u79bb\u7ebf",
 };
 

@@ -5,9 +5,11 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	wikiservice "github.com/DaiYuANg/gity/internal/service/wiki"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type wikiPagesInput struct {
@@ -55,10 +57,11 @@ type Endpoint struct {
 	service        *wikiservice.Service
 	projectService *projectservice.Service
 	authRuntime    *platformauth.Runtime
+	mapper         *mapper.Mapper
 }
 
-func NewEndpoint(service *wikiservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+func NewEndpoint(service *wikiservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -79,17 +82,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createPage := func(ctx context.Context, in *createWikiPageInput) (*wikiOutput, error) {
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
+		input, err := mapperx.MapStrict[wikiservice.CreatePageInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.CreatePage(ctx, in.ProjectID, wikiservice.CreatePageInput{
-			Slug:         in.Body.Slug,
-			Title:        in.Body.Title,
-			Content:      in.Body.Content,
-			Format:       in.Body.Format,
-			AuthorUserID: authorUserID,
-		})
+		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
+		if err != nil {
+			return nil, err
+		}
+		input.AuthorUserID = authorUserID
+		item, err := service.CreatePage(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -105,15 +107,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	updatePage := func(ctx context.Context, in *updateWikiPageInput) (*wikiOutput, error) {
-		editorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.EditorUserID)
+		input, err := mapperx.MapStrict[wikiservice.UpdatePageInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.UpdatePage(ctx, in.ProjectID, in.Slug, wikiservice.UpdatePageInput{
-			Title:        in.Body.Title,
-			Content:      in.Body.Content,
-			EditorUserID: editorUserID,
-		})
+		editorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.EditorUserID)
+		if err != nil {
+			return nil, err
+		}
+		input.EditorUserID = editorUserID
+		item, err := service.UpdatePage(ctx, in.ProjectID, in.Slug, input)
 		if err != nil {
 			return nil, err
 		}

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Clock3, GitBranch, Loader2, RefreshCw, Repeat2, XCircle } from "lucide-react";
-import { useCustom, useCustomMutation } from "@refinedev/core";
+import { Ban, CheckCircle2, Clock3, Download, FileArchive, GitBranch, Loader2, RefreshCw, Repeat2, ScrollText, XCircle } from "lucide-react";
+import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
+  RepositoryJobArtifactContentView,
+  RepositoryJobArtifactView,
   RepositoryJobStatus,
+  RepositoryJobTraceView,
   RepositoryJobView,
   RepositoryPipelineDetailView,
   RepositoryPipelineJobStatus,
@@ -24,8 +27,11 @@ interface RepositoryPipelinesTabProps {
 type RawRecord = Record<string, unknown>;
 
 const terminalPipelineStatuses: RepositoryPipelineStatus[] = ["succeeded", "failed", "cancelled"];
+const terminalJobStatuses: RepositoryJobStatus[] = ["succeeded", "failed", "cancelled"];
+const emptyPipelineJobs: RepositoryPipelineJobView[] = [];
 
 export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelinesTabProps): JSX.Element => {
+  const dataProvider = useDataProvider();
   const pipelinesQuery = useCustom<RawRecord[]>({
     url: `/projects/${repoId}/pipelines`,
     method: "get",
@@ -35,6 +41,7 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
     },
   });
   const [selectedPipelineID, setSelectedPipelineID] = useState<string | null>(null);
+  const [selectedJobID, setSelectedJobID] = useState<string | null>(null);
   const detailQuery = useCustom<RawRecord>({
     url: selectedPipelineID ? `/projects/${repoId}/pipelines/${selectedPipelineID}` : `/projects/${repoId}/pipelines/0`,
     method: "get",
@@ -43,8 +50,26 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
       refetchOnWindowFocus: false,
     },
   });
+  const traceQuery = useCustom<RawRecord>({
+    url: selectedJobID ? `/projects/${repoId}/jobs/${selectedJobID}/trace` : `/projects/${repoId}/jobs/0/trace`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId && selectedJobID),
+      refetchOnWindowFocus: false,
+    },
+  });
+  const artifactsQuery = useCustom<RawRecord[]>({
+    url: selectedJobID ? `/projects/${repoId}/jobs/${selectedJobID}/artifacts` : `/projects/${repoId}/jobs/0/artifacts`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId && selectedJobID),
+      refetchOnWindowFocus: false,
+    },
+  });
   const { mutateAsync: cancelPipeline, isLoading: isCancelling } = useCustomMutation<RawRecord>();
   const { mutateAsync: retryPipeline, isLoading: isRetrying } = useCustomMutation<RawRecord>();
+  const { mutateAsync: cancelJob, isLoading: isCancellingJob } = useCustomMutation<RawRecord>();
+  const { mutateAsync: retryJob, isLoading: isRetryingJob } = useCustomMutation<RawRecord>();
 
   const pipelines = useMemo(
     () => resolvePipelineList(pipelinesQuery.data?.data).map(normalizePipeline).sort((a, b) => b.iid - a.iid),
@@ -58,7 +83,21 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
     () => normalizePipelineDetail(detailQuery.data?.data),
     [detailQuery.data?.data],
   );
-  const visiblePipeline = detail?.pipeline.id ? detail.pipeline : selectedPipeline;
+  const visibleDetail = detail?.pipeline.id === selectedPipelineID ? detail : null;
+  const pipelineJobs = visibleDetail?.jobs ?? emptyPipelineJobs;
+  const visiblePipeline = visibleDetail?.pipeline ?? selectedPipeline;
+  const selectedJob = useMemo(
+    () => pipelineJobs.find((item) => item.project_job.id === selectedJobID) ?? null,
+    [pipelineJobs, selectedJobID],
+  );
+  const trace = useMemo(
+    () => normalizeJobTrace(traceQuery.data?.data),
+    [traceQuery.data?.data],
+  );
+  const artifacts = useMemo(
+    () => resolveArtifactList(artifactsQuery.data?.data).map(normalizeArtifact),
+    [artifactsQuery.data?.data],
+  );
   const stats = useMemo(
     () => ({
       pending: pipelines.filter((item) => item.status === "pending").length,
@@ -86,6 +125,22 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
     const result = await detailQuery.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
+      return;
+    }
+    onError(null);
+  };
+
+  const loadJobDetail = async () => {
+    if (!selectedJobID) {
+      return;
+    }
+    const [traceResult, artifactsResult] = await Promise.all([traceQuery.refetch(), artifactsQuery.refetch()]);
+    if (traceResult.error) {
+      onError(extractErrorMessage(traceResult.error));
+      return;
+    }
+    if (artifactsResult.error) {
+      onError(extractErrorMessage(artifactsResult.error));
       return;
     }
     onError(null);
@@ -125,6 +180,65 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
     }
   };
 
+  const submitCancelJob = async (job: RepositoryPipelineJobView) => {
+    onError(null);
+    try {
+      await cancelJob({
+        url: `/projects/${repoId}/jobs/${job.project_job.id}/cancel`,
+        method: "post",
+        values: {},
+      });
+      await Promise.all([loadPipelines(), loadDetail(), loadJobDetail()]);
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
+  const submitRetryJob = async (job: RepositoryPipelineJobView) => {
+    onError(null);
+    try {
+      await retryJob({
+        url: `/projects/${repoId}/jobs/${job.project_job.id}/retry`,
+        method: "post",
+        values: {},
+      });
+      await Promise.all([loadPipelines(), loadDetail(), loadJobDetail()]);
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
+  const downloadArtifact = async (artifact: RepositoryJobArtifactView) => {
+    if (!selectedJob) {
+      return;
+    }
+    const custom = dataProvider().custom;
+    if (!custom) {
+      onError(t("Artifact download is not available."));
+      return;
+    }
+    onError(null);
+    try {
+      const response = await custom<RawRecord>({
+        url: `/projects/${repoId}/jobs/${selectedJob.project_job.id}/artifacts/${artifact.id}`,
+        method: "get",
+      });
+      const content = normalizeArtifactContent(response.data);
+      const bytes = decodeBase64(content.content_base64);
+      const blob = new Blob([bytes], { type: content.artifact.content_type || "application/octet-stream" });
+      const objectURL = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectURL;
+      link.download = content.artifact.file_name || artifact.file_name || "artifact";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectURL);
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
   useEffect(() => {
     if (!repoId) {
       return;
@@ -138,6 +252,21 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
     }
     setSelectedPipelineID(pipelines[0].id);
   }, [pipelines, selectedPipelineID]);
+
+  useEffect(() => {
+    setSelectedJobID(null);
+  }, [selectedPipelineID]);
+
+  useEffect(() => {
+    if (pipelineJobs.length === 0) {
+      setSelectedJobID(null);
+      return;
+    }
+    if (selectedJobID && pipelineJobs.some((item) => item.project_job.id === selectedJobID)) {
+      return;
+    }
+    setSelectedJobID(pipelineJobs[0].project_job.id);
+  }, [pipelineJobs, selectedJobID]);
 
   useEffect(() => {
     if (!pipelinesQuery.error) {
@@ -256,13 +385,36 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
                   {detailQuery.isFetching ? (
                     <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading jobs...")}</p>
                   ) : null}
-                  {!detailQuery.isFetching && (!detail || detail.jobs.length === 0) ? (
+                  {!detailQuery.isFetching && pipelineJobs.length === 0 ? (
                     <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No pipeline jobs found.")}</p>
                   ) : null}
-                  {detail?.jobs.map((job) => (
-                    <PipelineJobCard key={job.pipeline_job.id || job.project_job.id} item={job} t={t} />
+                  {pipelineJobs.map((job) => (
+                    <PipelineJobCard
+                      key={job.pipeline_job.id || job.project_job.id}
+                      item={job}
+                      active={selectedJobID === job.project_job.id}
+                      isCancelling={isCancellingJob}
+                      isRetrying={isRetryingJob}
+                      t={t}
+                      onInspect={() => setSelectedJobID(job.project_job.id)}
+                      onCancel={() => void submitCancelJob(job)}
+                      onRetry={() => void submitRetryJob(job)}
+                    />
                   ))}
                 </div>
+
+                {selectedJob ? (
+                  <JobDetailPanel
+                    item={selectedJob}
+                    trace={trace}
+                    artifacts={artifacts}
+                    loadingTrace={traceQuery.isFetching}
+                    loadingArtifacts={artifactsQuery.isFetching}
+                    t={t}
+                    onReload={() => void loadJobDetail()}
+                    onDownloadArtifact={(artifact) => void downloadArtifact(artifact)}
+                  />
+                ) : null}
               </div>
             )}
           </div>
@@ -295,8 +447,26 @@ const PipelineMeta = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const PipelineJobCard = ({ item, t }: { item: RepositoryPipelineJobView; t: (text: string) => string }) => (
-  <div className="rounded-md border p-3">
+const PipelineJobCard = ({
+  item,
+  active,
+  isCancelling,
+  isRetrying,
+  t,
+  onInspect,
+  onCancel,
+  onRetry,
+}: {
+  item: RepositoryPipelineJobView;
+  active: boolean;
+  isCancelling: boolean;
+  isRetrying: boolean;
+  t: (text: string) => string;
+  onInspect: () => void;
+  onCancel: () => void;
+  onRetry: () => void;
+}) => (
+  <div className={`rounded-md border p-3 ${active ? "border-primary/60 bg-primary/5" : ""}`}>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -309,7 +479,25 @@ const PipelineJobCard = ({ item, t }: { item: RepositoryPipelineJobView; t: (tex
           {item.project_job.updated_at ? ` · ${formatRelativeTime(item.project_job.updated_at)}` : ""}
         </p>
       </div>
-      <Badge variant="outline">{item.pipeline_job.stage || t("N/A")}</Badge>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline">{item.pipeline_job.stage || t("N/A")}</Badge>
+        <Button type="button" size="sm" variant="ghost" onClick={onInspect}>
+          <ScrollText className="size-4" />
+          {t("Logs")}
+        </Button>
+        {!terminalJobStatuses.includes(item.project_job.status) ? (
+          <Button type="button" size="sm" variant="outline" disabled={isCancelling} onClick={onCancel}>
+            <Ban className="size-4" />
+            {isCancelling ? t("Cancelling...") : t("Cancel")}
+          </Button>
+        ) : null}
+        {item.project_job.status !== "running" ? (
+          <Button type="button" size="sm" variant="outline" disabled={isRetrying} onClick={onRetry}>
+            <Repeat2 className="size-4" />
+            {isRetrying ? t("Retrying...") : t("Retry")}
+          </Button>
+        ) : null}
+      </div>
     </div>
     {item.needs.length > 0 ? (
       <p className="mt-2 text-xs text-muted-foreground">
@@ -329,6 +517,84 @@ const PipelineJobCard = ({ item, t }: { item: RepositoryPipelineJobView; t: (tex
         {item.project_job.last_error}
       </p>
     ) : null}
+  </div>
+);
+
+const JobDetailPanel = ({
+  item,
+  trace,
+  artifacts,
+  loadingTrace,
+  loadingArtifacts,
+  t,
+  onReload,
+  onDownloadArtifact,
+}: {
+  item: RepositoryPipelineJobView;
+  trace: RepositoryJobTraceView | null;
+  artifacts: RepositoryJobArtifactView[];
+  loadingTrace: boolean;
+  loadingArtifacts: boolean;
+  t: (text: string) => string;
+  onReload: () => void;
+  onDownloadArtifact: (artifact: RepositoryJobArtifactView) => void;
+}) => (
+  <div className="rounded-md border bg-muted/10 p-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <ScrollText className="size-4 text-muted-foreground" />
+          <p className="font-medium">
+            {t("Job detail")}: {item.pipeline_job.name || item.pipeline_job.stage || item.project_job.id}
+          </p>
+          <PipelineJobStatusBadge status={item.status} t={t} />
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("Job ID")}: {item.project_job.id} · {t("Duration")}: {trace?.duration_millis ?? 0}ms · {t("Exit code")}: {trace?.exit_code ?? 0}
+        </p>
+      </div>
+      <Button type="button" size="sm" variant="ghost" onClick={onReload}>
+        <RefreshCw className="size-4" />
+        {t("Reload job")}
+      </Button>
+    </div>
+
+    <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="min-w-0">
+        <p className="mb-2 text-sm font-medium">{t("Trace")}</p>
+        {loadingTrace ? (
+          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading trace...")}</p>
+        ) : (
+          <pre className="max-h-96 overflow-auto rounded-md bg-background p-3 text-xs">
+            {trace?.trace || item.project_job.last_error || t("No trace output.")}
+          </pre>
+        )}
+      </div>
+      <div>
+        <p className="mb-2 flex items-center gap-2 text-sm font-medium">
+          <FileArchive className="size-4" />
+          {t("Artifacts")}
+        </p>
+        {loadingArtifacts ? (
+          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading artifacts...")}</p>
+        ) : null}
+        {!loadingArtifacts && artifacts.length === 0 ? (
+          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No artifacts uploaded.")}</p>
+        ) : null}
+        <div className="space-y-2">
+          {artifacts.map((artifact) => (
+            <div key={artifact.id} className="rounded-md border bg-background p-2">
+              <p className="truncate text-sm font-medium">{artifact.file_name || artifact.name || "artifact"}</p>
+              <p className="text-xs text-muted-foreground">{formatBytes(artifact.byte_size)}</p>
+              <Button type="button" size="sm" variant="ghost" className="mt-2 w-full justify-start" onClick={() => onDownloadArtifact(artifact)}>
+                <Download className="size-4" />
+                {t("Download")}
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   </div>
 );
 
@@ -418,6 +684,59 @@ const normalizePipelineJob = (rawValue: unknown): RepositoryPipelineJobView => {
   };
 };
 
+const normalizeJobTrace = (payload: unknown): RepositoryJobTraceView | null => {
+  const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : null;
+  if (!isRecord(raw)) {
+    return null;
+  }
+  return {
+    job: normalizeJob(raw.job ?? raw.Job),
+    trace: normalizeString(raw.trace ?? raw.Trace),
+    exit_code: normalizeNumber(raw.exit_code ?? raw.ExitCode),
+    output_truncated: normalizeBoolean(raw.output_truncated ?? raw.OutputTruncated),
+    duration_millis: normalizeNumber(raw.duration_millis ?? raw.DurationMillis),
+  };
+};
+
+const resolveArtifactList = (payload: unknown): RawRecord[] => {
+  if (Array.isArray(payload)) {
+    return payload.filter(isRecord);
+  }
+  const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : null;
+  if (Array.isArray(raw)) {
+    return raw.filter(isRecord);
+  }
+  if (!isRecord(raw)) {
+    return [];
+  }
+  return resolveRecordArray(raw.artifacts ?? raw.Artifacts);
+};
+
+const normalizeArtifact = (rawValue: unknown): RepositoryJobArtifactView => {
+  const raw = isRecord(rawValue) ? rawValue : {};
+  return {
+    id: normalizeString(raw.id ?? raw.ID),
+    project_id: normalizeString(raw.project_id ?? raw.ProjectID),
+    project_job_id: normalizeString(raw.project_job_id ?? raw.ProjectJobID),
+    name: normalizeString(raw.name ?? raw.Name),
+    file_name: normalizeString(raw.file_name ?? raw.FileName),
+    file_path: normalizeOptionalString(raw.file_path ?? raw.FilePath),
+    content_type: normalizeOptionalString(raw.content_type ?? raw.ContentType),
+    byte_size: normalizeNumber(raw.byte_size ?? raw.ByteSize),
+    created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
+    updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
+  };
+};
+
+const normalizeArtifactContent = (payload: unknown): RepositoryJobArtifactContentView => {
+  const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : {};
+  const record = isRecord(raw) ? raw : {};
+  return {
+    artifact: normalizeArtifact(record.artifact ?? record.Artifact),
+    content_base64: normalizeString(record.content_base64 ?? record.ContentBase64),
+  };
+};
+
 const normalizePipelineJobLink = (rawValue: unknown) => {
   const raw = isRecord(rawValue) ? rawValue : {};
   return {
@@ -503,6 +822,14 @@ const normalizeNumber = (value: unknown): number => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const normalizeBoolean = (value: unknown): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = normalizeString(value).trim().toLowerCase();
+  return normalized === "true" || normalized === "1";
+};
+
 const normalizePipelineStatus = (value: unknown): RepositoryPipelineStatus => {
   const normalized = normalizeString(value);
   if (normalized === "pending" || normalized === "running" || normalized === "succeeded" || normalized === "failed" || normalized === "cancelled") {
@@ -530,4 +857,24 @@ const normalizeJobStatus = (value: unknown): RepositoryJobStatus => {
 const shortSHA = (value: string): string => {
   const normalized = value.trim();
   return normalized ? normalized.slice(0, 8) : "unknown";
+};
+
+const decodeBase64 = (value: string): ArrayBuffer => {
+  const binary = window.atob(value);
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return buffer;
+};
+
+const formatBytes = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const amount = value / 1024 ** exponent;
+  return `${amount >= 10 || exponent === 0 ? amount.toFixed(0) : amount.toFixed(1)} ${units[exponent]}`;
 };

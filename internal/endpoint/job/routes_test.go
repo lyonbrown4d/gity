@@ -10,7 +10,7 @@ import (
 func TestEndpointRegistersCanonicalJobRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/jobs")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/jobs")
@@ -21,7 +21,7 @@ func TestEndpointRegistersCanonicalJobRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoJobAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/jobs")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/jobs")

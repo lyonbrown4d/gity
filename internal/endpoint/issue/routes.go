@@ -13,8 +13,10 @@ import (
 	"github.com/DaiYuANg/gity/internal/entity"
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	issueservice "github.com/DaiYuANg/gity/internal/service/issue"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -125,10 +127,11 @@ type issueAttachmentUploadView struct {
 type Endpoint struct {
 	service     *issueservice.Service
 	authRuntime *platformauth.Runtime
+	mapper      *mapper.Mapper
 }
 
-func NewEndpoint(service *issueservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, authRuntime: authRuntime}
+func NewEndpoint(service *issueservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -160,15 +163,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createIssue := func(ctx context.Context, in *createIssueInput) (*issueOutput, error) {
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
+		input, err := mapperx.MapStrict[issueservice.CreateIssueInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.CreateIssue(ctx, in.ProjectID, issueservice.CreateIssueInput{
-			AuthorUserID: authorUserID,
-			Title:        in.Body.Title,
-			Description:  in.Body.Description,
-		})
+		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
+		if err != nil {
+			return nil, err
+		}
+		input.AuthorUserID = authorUserID
+		item, err := service.CreateIssue(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -176,16 +180,15 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	updateIssue := func(ctx context.Context, in *updateIssueInput) (*issueOutput, error) {
-		state := in.Body.State
-		if state == nil && in.Body.Status != nil {
-			mapped := statusToState(*in.Body.Status)
-			state = &mapped
+		input, err := mapperx.MapStrict[issueservice.UpdateIssueInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
 		}
-		item, err := service.UpdateIssue(ctx, in.ProjectID, in.IssueIID, issueservice.UpdateIssueInput{
-			Title:       in.Body.Title,
-			Description: in.Body.Description,
-			State:       state,
-		})
+		if input.State == nil && in.Body.Status != nil {
+			mapped := statusToState(*in.Body.Status)
+			input.State = &mapped
+		}
+		item, err := service.UpdateIssue(ctx, in.ProjectID, in.IssueIID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -205,18 +208,19 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createComment := func(ctx context.Context, in *createCommentInput) (*issueOutput, error) {
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
+		input, err := mapperx.MapStrict[issueservice.CreateCommentInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		body := in.Body.Body
-		if body == "" {
-			body = in.Body.Content
+		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
+		if err != nil {
+			return nil, err
 		}
-		item, err := service.CreateComment(ctx, in.ProjectID, in.IssueIID, issueservice.CreateCommentInput{
-			AuthorUserID: authorUserID,
-			Body:         body,
-		})
+		input.AuthorUserID = authorUserID
+		if input.Body == "" {
+			input.Body = in.Body.Content
+		}
+		item, err := service.CreateComment(ctx, in.ProjectID, in.IssueIID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -232,16 +236,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createAttachment := func(ctx context.Context, in *createAttachmentInput) (*issueOutput, error) {
-		uploadedByUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.UploadedByUserID)
+		input, err := mapperx.MapStrict[issueservice.CreateAttachmentInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.CreateAttachment(ctx, in.ProjectID, in.IssueIID, issueservice.CreateAttachmentInput{
-			UploadedByUserID: uploadedByUserID,
-			FileName:         in.Body.FileName,
-			ContentType:      in.Body.ContentType,
-			ContentBase64:    in.Body.ContentBase64,
-		})
+		uploadedByUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.UploadedByUserID)
+		if err != nil {
+			return nil, err
+		}
+		input.UploadedByUserID = uploadedByUserID
+		item, err := service.CreateAttachment(ctx, in.ProjectID, in.IssueIID, input)
 		if err != nil {
 			return nil, err
 		}

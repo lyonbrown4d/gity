@@ -38,10 +38,10 @@ type Service struct {
 }
 
 type CreateInput struct {
-	Kind        string
-	Payload     string
-	MaxAttempts int
-	RunAfter    time.Time
+	Kind        string    `json:"kind"`
+	Payload     string    `json:"payload"`
+	MaxAttempts int       `json:"max_attempts"`
+	RunAfter    time.Time `json:"run_after"`
 }
 
 type UploadArtifactInput struct {
