@@ -1,6 +1,8 @@
 package runneragent
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -104,6 +106,49 @@ func TestExecuteScriptJobStreamsTrace(t *testing.T) {
 	}
 }
 
+func TestExecuteScriptJobDownloadsSourceArchive(t *testing.T) {
+	t.Parallel()
+
+	script := []string{"cat README.md"}
+	if runtime.GOOS == "windows" {
+		script = []string{`Get-Content README.md`}
+	}
+	payload, err := json.Marshal(ScriptPayload{
+		ProjectFullPath: "core/gity",
+		RefName:         "main",
+		Script:          script,
+		TimeoutSeconds:  5,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	archive := testSourceArchive(t, map[string]string{"README.md": "hello remote source\n"})
+
+	resultJSON, err := ExecuteScriptJobWithSource(context.Background(), Config{
+		WorkDir:        t.TempDir(),
+		LeaseSeconds:   30,
+		MaxOutputBytes: 1024,
+	}, entity.ProjectJob{
+		ID:        46,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	}, nil, nil, func(_ context.Context, _ entity.ProjectJob, _ ScriptPayload, workDir string) error {
+		return ExtractSourceArchive(archive, workDir)
+	})
+	if err != nil {
+		t.Fatalf("execute remote source script job: %v", err)
+	}
+	var result ScriptResult
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if !strings.Contains(result.Output, "hello remote source") {
+		t.Fatalf("expected remote source content in output: %+v", result)
+	}
+}
+
 func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 	t.Parallel()
 
@@ -181,6 +226,25 @@ func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 	if !strings.Contains(result.Output, "hello checkout") {
 		t.Fatalf("expected repository content in output: %+v", result)
 	}
+}
+
+func testSourceArchive(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for name, content := range files {
+		file, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("create archive file: %v", err)
+		}
+		if _, err := file.Write([]byte(content)); err != nil {
+			t.Fatalf("write archive file: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	return buffer.Bytes()
 }
 
 func TestExecuteScriptJobFailure(t *testing.T) {

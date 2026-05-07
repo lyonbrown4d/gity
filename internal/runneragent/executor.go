@@ -1,11 +1,13 @@
 package runneragent
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +42,8 @@ type ScriptCancellationChecker func(ctx context.Context) (bool, error)
 
 type ScriptTraceStreamer func(ctx context.Context, output string, outputTruncated bool, durationMillis int64) error
 
+type ScriptSourceFetcher func(ctx context.Context, job entity.ProjectJob, payload ScriptPayload, workDir string) error
+
 func ExecuteScriptJob(ctx context.Context, cfg Config, job entity.ProjectJob) (string, error) {
 	return ExecuteScriptJobWithChecker(ctx, cfg, job, nil)
 }
@@ -49,6 +53,10 @@ func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.Pro
 }
 
 func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer) (string, error) {
+	return ExecuteScriptJobWithSource(ctx, cfg, job, checker, traceStreamer, nil)
+}
+
+func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer, sourceFetcher ScriptSourceFetcher) (string, error) {
 	var payload ScriptPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
 		return "", fmt.Errorf("decode script job payload: %w", err)
@@ -101,7 +109,7 @@ func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job entity.Proje
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		return "", fmt.Errorf("create job workspace: %w", err)
 	}
-	if err := checkoutProjectSource(ctx, cfg, payload, workDir); err != nil {
+	if err := checkoutProjectSource(ctx, cfg, job, payload, workDir, sourceFetcher); err != nil {
 		return "", err
 	}
 
@@ -193,11 +201,17 @@ func scriptCommand(ctx context.Context, shell string, script string) *exec.Cmd {
 	}
 }
 
-func checkoutProjectSource(ctx context.Context, cfg Config, payload ScriptPayload, workDir string) error {
+func checkoutProjectSource(ctx context.Context, cfg Config, job entity.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {
 	repoRoot := strings.TrimSpace(cfg.RepoRoot)
 	projectFullPath := strings.TrimSpace(payload.ProjectFullPath)
-	if repoRoot == "" || projectFullPath == "" {
+	if projectFullPath == "" {
 		return nil
+	}
+	if repoRoot == "" {
+		if sourceFetcher == nil {
+			return nil
+		}
+		return sourceFetcher(ctx, job, payload, workDir)
 	}
 	repoPath, err := resolveLocalBareRepo(repoRoot, projectFullPath)
 	if err != nil {
@@ -223,6 +237,81 @@ func checkoutProjectSource(ctx context.Context, cfg Config, payload ScriptPayloa
 		return nil
 	}
 	return runGit(ctx, workDir, "checkout", "-B", refName, "origin/"+refName)
+}
+
+func ExtractSourceArchive(content []byte, workDir string) error {
+	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
+	if err != nil {
+		return fmt.Errorf("open source archive: %w", err)
+	}
+	root, err := filepath.Abs(workDir)
+	if err != nil {
+		return fmt.Errorf("resolve source archive target: %w", err)
+	}
+	for _, file := range reader.File {
+		target, err := archiveTargetPath(root, file.Name)
+		if err != nil {
+			return err
+		}
+		info := file.FileInfo()
+		if info.IsDir() {
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return fmt.Errorf("create source directory: %w", err)
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("create source parent directory: %w", err)
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("open source archive entry: %w", err)
+		}
+		if err := writeArchiveFile(target, rc, info.Mode().Perm()); err != nil {
+			_ = rc.Close()
+			return err
+		}
+		if err := rc.Close(); err != nil {
+			return fmt.Errorf("close source archive entry: %w", err)
+		}
+	}
+	return nil
+}
+
+func archiveTargetPath(root string, name string) (string, error) {
+	normalized := strings.Trim(strings.ReplaceAll(name, "\\", "/"), "/")
+	if normalized == "" || normalized == "." || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") || filepath.IsAbs(normalized) {
+		return "", fmt.Errorf("invalid source archive path: %s", name)
+	}
+	target, err := filepath.Abs(filepath.Join(root, filepath.FromSlash(normalized)))
+	if err != nil {
+		return "", fmt.Errorf("resolve source archive path: %w", err)
+	}
+	if target != root && !strings.HasPrefix(target, root+string(filepath.Separator)) {
+		return "", fmt.Errorf("source archive path escapes workspace: %s", name)
+	}
+	return target, nil
+}
+
+func writeArchiveFile(target string, reader io.Reader, mode os.FileMode) error {
+	if mode == 0 {
+		mode = 0o644
+	}
+	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+	if err != nil {
+		return fmt.Errorf("create source archive file: %w", err)
+	}
+	if _, err := io.Copy(file, reader); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write source archive file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close source archive file: %w", err)
+	}
+	return nil
 }
 
 func resolveLocalBareRepo(repoRoot string, projectFullPath string) (string, error) {

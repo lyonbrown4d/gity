@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"service.runner",
 		dix.Description("Project runner application services"),
 		dix.Providers(
-			dix.Provider4(NewService),
+			dix.Provider5(NewService),
 		),
 	)
 }

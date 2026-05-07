@@ -24,6 +24,12 @@ type ClaimResponse struct {
 	Job     entity.ProjectJob `json:"job"`
 }
 
+type SourceArchiveResponse struct {
+	FileName      string `json:"file_name"`
+	Encoding      string `json:"encoding"`
+	ContentBase64 string `json:"content_base64"`
+}
+
 func NewClient(baseURL string, token string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
@@ -78,6 +84,23 @@ func (c *Client) AppendTrace(ctx context.Context, jobID int64, output string, ou
 		"output_truncated": outputTruncated,
 		"duration_millis":  durationMillis,
 	}, &out)
+}
+
+func (c *Client) DownloadSourceArchive(ctx context.Context, jobID int64) ([]byte, error) {
+	var out SourceArchiveResponse
+	if err := c.post(ctx, fmt.Sprintf("/runners/jobs/%d/source-archive", jobID), map[string]any{
+		"token": c.token,
+	}, &out); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(out.Encoding) != "" && strings.TrimSpace(out.Encoding) != "base64" {
+		return nil, fmt.Errorf("unsupported source archive encoding: %s", out.Encoding)
+	}
+	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(out.ContentBase64))
+	if err != nil {
+		return nil, fmt.Errorf("decode source archive: %w", err)
+	}
+	return content, nil
 }
 
 func (c *Client) UploadArtifact(ctx context.Context, jobID int64, artifact ArtifactFile) error {

@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/entity"
+	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectrunnerrepo "github.com/DaiYuANg/gity/internal/repository/projectrunner"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
@@ -23,6 +25,7 @@ type Service struct {
 	runnerRepo  *projectrunnerrepo.Repository
 	jobService  *jobservice.Service
 	pipelineSvc *pipelineservice.Service
+	gitRunner   *gitexec.Runner
 }
 
 type RegisterInput struct {
@@ -43,6 +46,18 @@ type AppendTraceInput struct {
 	Output          string `json:"output"`
 	OutputTruncated bool   `json:"output_truncated"`
 	DurationMillis  int64  `json:"duration_millis"`
+}
+
+type SourceArchiveView struct {
+	FileName      string `json:"file_name"`
+	Encoding      string `json:"encoding"`
+	ContentBase64 string `json:"content_base64"`
+}
+
+type scriptSourcePayload struct {
+	ProjectFullPath string `json:"project_full_path"`
+	RefName         string `json:"ref_name"`
+	CommitSHA       string `json:"commit_sha"`
 }
 
 type RunnerView struct {
@@ -69,8 +84,8 @@ type ClaimView struct {
 	Job     entity.ProjectJob `json:"job,omitempty"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, runnerRepo *projectrunnerrepo.Repository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service) *Service {
-	return &Service{projectRepo: projectRepo, runnerRepo: runnerRepo, jobService: jobService, pipelineSvc: pipelineSvc}
+func NewService(projectRepo *projectrepo.Repository, runnerRepo *projectrunnerrepo.Repository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner *gitexec.Runner) *Service {
+	return &Service{projectRepo: projectRepo, runnerRepo: runnerRepo, jobService: jobService, pipelineSvc: pipelineSvc, gitRunner: gitRunner}
 }
 
 func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]RunnerView, error) {
@@ -262,6 +277,50 @@ func (s *Service) AppendTrace(ctx context.Context, token string, jobID int64, in
 	})
 }
 
+func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID int64) (SourceArchiveView, error) {
+	runner, err := s.authenticateRunner(ctx, token)
+	if err != nil {
+		return SourceArchiveView{}, err
+	}
+	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
+	if err != nil {
+		return SourceArchiveView{}, err
+	}
+	if err := ensureRunnerOwnsJob(runner, job); err != nil {
+		return SourceArchiveView{}, err
+	}
+	if s.gitRunner == nil {
+		return SourceArchiveView{}, httpx.NewError(http.StatusInternalServerError, "git runner is not configured")
+	}
+	project, err := s.projectRepo.GetByID(ctx, runner.ProjectID)
+	if err != nil {
+		return SourceArchiveView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+	}
+	payload, err := decodeScriptSourcePayload(job)
+	if err != nil {
+		return SourceArchiveView{}, err
+	}
+	if payload.ProjectFullPath != "" && payload.ProjectFullPath != project.FullPath {
+		return SourceArchiveView{}, httpx.NewError(http.StatusBadRequest, "job project path does not match runner project", fmt.Errorf("payload project=%q expected=%q", payload.ProjectFullPath, project.FullPath))
+	}
+	revision := firstNonEmpty(payload.CommitSHA, payload.RefName)
+	if revision == "" {
+		return SourceArchiveView{}, httpx.NewError(http.StatusBadRequest, "job source revision is required", fmt.Errorf("job source revision is required"))
+	}
+	if err := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); err != nil {
+		return SourceArchiveView{}, err
+	}
+	content, err := s.gitRunner.Archive(ctx, project.FullPath+".git", revision)
+	if err != nil {
+		return SourceArchiveView{}, err
+	}
+	return SourceArchiveView{
+		FileName:      fmt.Sprintf("project-%d-job-%d-source.zip", project.ID, job.ID),
+		Encoding:      "base64",
+		ContentBase64: base64.StdEncoding.EncodeToString(content),
+	}, nil
+}
+
 func (s *Service) authenticateRunner(ctx context.Context, token string) (entity.ProjectRunner, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -278,6 +337,29 @@ func (s *Service) authenticateRunner(ctx context.Context, token string) (entity.
 		return entity.ProjectRunner{}, httpx.NewError(http.StatusForbidden, "runner is disabled", fmt.Errorf("runner is disabled"))
 	}
 	return runner, nil
+}
+
+func decodeScriptSourcePayload(job entity.ProjectJob) (scriptSourcePayload, error) {
+	if strings.TrimSpace(job.Kind) != jobservice.KindScript {
+		return scriptSourcePayload{}, httpx.NewError(http.StatusBadRequest, "job source archive is only available for script jobs", fmt.Errorf("job kind: %s", job.Kind))
+	}
+	var payload scriptSourcePayload
+	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
+		return scriptSourcePayload{}, httpx.NewError(http.StatusBadRequest, "invalid script job payload", err)
+	}
+	payload.ProjectFullPath = strings.Trim(strings.ReplaceAll(payload.ProjectFullPath, "\\", "/"), "/")
+	payload.RefName = strings.TrimSpace(payload.RefName)
+	payload.CommitSHA = strings.TrimSpace(payload.CommitSHA)
+	return payload, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func ensureRunnerOwnsJob(runner entity.ProjectRunner, job entity.ProjectJob) error {

@@ -17,6 +17,7 @@ func TestEndpointRegistersCanonicalRunnerRoutes(t *testing.T) {
 	assertRoute(t, server, http.MethodDelete, "/api/v1/projects/{id}/runners/{runner_id}")
 	assertRoute(t, server, http.MethodPost, "/api/v1/runners/jobs/claim")
 	assertRoute(t, server, http.MethodPost, "/api/v1/runners/jobs/{job_id}/trace")
+	assertRoute(t, server, http.MethodPost, "/api/v1/runners/jobs/{job_id}/source-archive")
 }
 
 func TestEndpointRegistersDeprecatedRepoRunnerAliases(t *testing.T) {

@@ -71,7 +71,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 	switch job.Kind {
 	case "script":
 		var traceWarned atomic.Bool
-		result, err := ExecuteScriptJobWithTrace(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
+		result, err := ExecuteScriptJobWithSource(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
 			current, err := a.client.GetProjectJob(checkCtx, job.ProjectID, job.ID)
 			if err != nil {
 				return false, nil
@@ -91,6 +91,12 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 				return nil
 			}
 			return nil
+		}, func(sourceCtx context.Context, job entity.ProjectJob, _ ScriptPayload, workDir string) error {
+			content, err := a.client.DownloadSourceArchive(sourceCtx, job.ID)
+			if err != nil {
+				return err
+			}
+			return ExtractSourceArchive(content, workDir)
 		})
 		artifactErr := a.uploadArtifacts(ctx, job, result)
 		if err != nil {

@@ -1,6 +1,7 @@
 package gitexec
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -194,6 +195,27 @@ func (r *Runner) DiffBranches(ctx context.Context, repoPath string, targetBranch
 		return "", fmt.Errorf("%w: diff %s...%s", ErrSourceReferenceNotFound, targetBranch, sourceBranch)
 	}
 	return output, nil
+}
+
+func (r *Runner) Archive(ctx context.Context, repoPath string, revision string) ([]byte, error) {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return nil, err
+	}
+	revision = strings.TrimSpace(revision)
+	if revision == "" || strings.HasPrefix(revision, "-") {
+		return nil, ErrSourceReferenceNotFound
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, r.gitBin, "archive", "--format=zip", revision)
+	cmd.Dir = absRepo
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%w: archive %s: %v: %s", ErrSourceReferenceNotFound, revision, err, strings.TrimSpace(stderr.String()))
+	}
+	return stdout.Bytes(), nil
 }
 
 type MergeBranchesInput struct {

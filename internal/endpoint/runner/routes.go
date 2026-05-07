@@ -50,6 +50,11 @@ type runnerTokenBody struct {
 	Token string `json:"token"`
 }
 
+type runnerSourceArchiveInput struct {
+	JobID int64           `path:"job_id"`
+	Body  runnerTokenBody `json:"body"`
+}
+
 type claimJobBody struct {
 	Token        string `json:"token"`
 	LeaseSeconds int    `json:"lease_seconds"`
@@ -183,6 +188,14 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		return &runnerOutput{Body: item}, nil
 	}
 
+	downloadSourceArchive := func(ctx context.Context, in *runnerSourceArchiveInput) (*runnerOutput, error) {
+		item, err := service.DownloadSourceArchive(ctx, in.Body.Token, in.JobID)
+		if err != nil {
+			return nil, err
+		}
+		return &runnerOutput{Body: item}, nil
+	}
+
 	uploadArtifact := func(ctx context.Context, in *runnerArtifactInput) (*runnerOutput, error) {
 		item, err := service.UploadArtifact(ctx, in.Body.Token, in.JobID, runnerservice.UploadArtifactInput{
 			Name:          in.Body.Name,
@@ -215,6 +228,7 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Post("/runners/jobs/{job_id}/complete", completeJob),
 		httpapi.Post("/runners/jobs/{job_id}/fail", failJob),
 		httpapi.Post("/runners/jobs/{job_id}/trace", appendTrace),
+		httpapi.Post("/runners/jobs/{job_id}/source-archive", downloadSourceArchive),
 		httpapi.Post("/runners/jobs/{job_id}/artifacts", uploadArtifact),
 	)
 }
