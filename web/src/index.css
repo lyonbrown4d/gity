@@ -211,6 +211,15 @@
   .issue-milkdown .ProseMirror pre {
     @apply my-3 overflow-x-auto rounded-md border bg-muted/40 p-3 text-xs;
   }
+
+  .search-jump-line-decoration {
+    background: rgba(250, 204, 21, 0.22);
+  }
+
+  .search-jump-match-decoration {
+    background: rgba(251, 191, 36, 0.4);
+    border-radius: 2px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

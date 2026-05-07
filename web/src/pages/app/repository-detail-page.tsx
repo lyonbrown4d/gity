@@ -8,7 +8,10 @@ import { RepositoryCommitsTab } from "@/pages/app/repository/repository-commits-
 import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-create-file-modal";
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
 import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-tab";
+import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
+import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
+import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
 import type { RepoTab } from "@/pages/app/repository/repository-types";
 import { useRepositoryMetaController } from "@/pages/app/repository/use-repository-meta-controller";
 import { useRepositorySourceController } from "@/pages/app/repository/use-repository-source-controller";
@@ -21,11 +24,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const organizationId = params.organizationId ?? "";
   const repoId = params.repoId ?? "";
   const initialTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<RepoTab>(
-    initialTab === "issues" || initialTab === "commits" || initialTab === "branches" || initialTab === "settings"
-      ? initialTab
-      : "code",
-  );
+  const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
 
   const meta = useRepositoryMetaController({
@@ -50,7 +49,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
     if (!tab) {
       return;
     }
-    if (tab === "issues" || tab === "commits" || tab === "branches" || tab === "settings" || tab === "code") {
+    if (isRepoTab(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -112,11 +111,28 @@ export const RepositoryDetailPage = (): JSX.Element => {
           languages={source.languages}
           isLoadingTree={source.isLoadingTree}
           isLoadingLanguages={source.isLoadingLanguages}
+          searchQuery={source.searchQuery}
+          searchPath={source.searchPath}
+          isLoadingSearch={source.isLoadingSearch}
+          searchMatchCase={source.searchMatchCase}
+          searchLine={source.searchLine}
+          searchColumn={source.searchColumn}
+          searchMatchLength={source.searchMatchLength}
+          searchJumpRequest={source.searchJumpRequest}
+          searchTargetPath={source.searchTargetPath}
+          searchRegex={source.searchRegex}
+          searchResults={source.searchResults}
           editorTheme={editorTheme}
           onChangeCodeBranch={source.changeCodeBranch}
           onOpenCreateFile={source.openCreateFileModal}
           onOpenFile={(path) => void source.openFile(path)}
           onToggleTreeDirectory={(path) => void source.toggleTreeDirectory(path)}
+          onOpenFileAtLine={(path, lineNumber, column, matchLength) => source.openFileAtLine(path, lineNumber, column, matchLength)}
+          onSearch={(query) => void source.searchCode(query)}
+          setSearchQuery={source.setSearchQuery}
+          setSearchPath={source.setSearchPath}
+          setSearchMatchCase={source.setSearchMatchCase}
+          setSearchRegex={source.setSearchRegex}
           onRefreshLanguages={() => void source.loadLanguages(source.codeBranch)}
         />
       ) : null}
@@ -124,6 +140,30 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "issues" ? (
         <RepositoryIssuesTab
           organizationId={organizationId}
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
+      {meta.repository && activeTab === "jobs" ? (
+        <RepositoryJobsTab
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
+      {meta.repository && activeTab === "wiki" ? (
+        <RepositoryWikiTab
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
+      {meta.repository && activeTab === "runners" ? (
+        <RepositoryRunnersTab
           repoId={repoId}
           t={t}
           onError={meta.setActionError}
@@ -184,3 +224,13 @@ export const RepositoryDetailPage = (): JSX.Element => {
     </div>
   );
 };
+
+const isRepoTab = (value: string | null): value is RepoTab =>
+  value === "code"
+  || value === "issues"
+  || value === "wiki"
+  || value === "jobs"
+  || value === "runners"
+  || value === "commits"
+  || value === "branches"
+  || value === "settings";

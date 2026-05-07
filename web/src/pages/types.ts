@@ -49,6 +49,14 @@ export interface RepositoryBlobView {
   encoding: string;
 }
 
+export interface RepositorySearchResultView {
+  path: string;
+  line_number: number;
+  column: number;
+  match_length: number;
+  line_content: string;
+}
+
 export interface RepositoryLanguageItemView {
   language: string;
   bytes: number;
@@ -86,6 +94,53 @@ export interface RepositoryIssueCommentView {
   content: string;
   created_at: string;
   updated_at: string;
+}
+
+export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface RepositoryJobView {
+  id: string;
+  project_id: string;
+  kind: string;
+  status: RepositoryJobStatus;
+  payload?: string | null;
+  result?: string | null;
+  attempts: number;
+  max_attempts: number;
+  run_after?: string | null;
+  locked_by?: string | null;
+  locked_until?: string | null;
+  last_error?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface RepositoryWikiPageView {
+  id: string;
+  project_id: string;
+  slug: string;
+  title: string;
+  content: string;
+  format: string;
+  author_user_id: string;
+  last_edited_by_user_id: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryRunnerView {
+  id: string;
+  project_id: string;
+  name: string;
+  description?: string | null;
+  tags?: string | null;
+  status: "online" | "offline";
+  active: boolean;
+  last_contact_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface IssueAttachmentUploadView {

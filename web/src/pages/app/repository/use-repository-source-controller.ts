@@ -5,14 +5,16 @@ import type {
   RepositoryBranchView,
   RepositoryLanguagesView,
   RepositoryTreeEntryView,
+  RepositorySearchResultView,
 } from "@/pages/types";
 import { findTreeNode, patchTreeNode, toTreeNodes } from "./repository-tree";
 import type { RepositoryTreeNode } from "./repository-types";
+import type { RepoTab } from "./repository-types";
 import { extractErrorMessage, normalizeRepoFilePath, renderMarkdown } from "./repository-utils";
 
 interface UseRepositorySourceControllerArgs {
   repoId: string;
-  activeTab: "code" | "issues" | "commits" | "branches" | "settings";
+  activeTab: RepoTab;
   defaultBranch: string | null;
   branches: RepositoryBranchView[];
   t: (text: string) => string;
@@ -39,6 +41,7 @@ export const useRepositorySourceController = ({
   const [readmePreview, setReadmePreview] = useState<string | null>(null);
   const [readmePath, setReadmePath] = useState<string | null>(null);
   const [isLoadingTree, setLoadingTree] = useState(false);
+  const [isLoadingSearch, setLoadingSearch] = useState(false);
   const [isCreateFileModalOpen, setCreateFileModalOpen] = useState(false);
   const [newFileBranch, setNewFileBranch] = useState("");
   const [newFilePath, setNewFilePath] = useState("");
@@ -46,6 +49,16 @@ export const useRepositorySourceController = ({
   const [newFileContent, setNewFileContent] = useState("");
   const [languages, setLanguages] = useState<RepositoryLanguagesView | null>(null);
   const [isLoadingLanguages, setLoadingLanguages] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchPath, setSearchPath] = useState("");
+  const [searchMatchCase, setSearchMatchCase] = useState(false);
+  const [searchRegex, setSearchRegex] = useState(false);
+  const [searchResults, setSearchResults] = useState<RepositorySearchResultView[]>([]);
+  const [searchLine, setSearchLine] = useState(1);
+  const [searchColumn, setSearchColumn] = useState(1);
+  const [searchMatchLength, setSearchMatchLength] = useState(0);
+  const [searchJumpRequest, setSearchJumpRequest] = useState(0);
+  const [searchTargetPath, setSearchTargetPath] = useState("");
 
   const request = async <T extends BaseRecord = BaseRecord>(
     url: string,
@@ -72,7 +85,7 @@ export const useRepositorySourceController = ({
     }
     setLoadingLanguages(true);
     try {
-      setLanguages(await request<RepositoryLanguagesView>(`/repos/${repoId}/languages`, "get", {
+      setLanguages(await request<RepositoryLanguagesView>(`/projects/${repoId}/languages`, "get", {
         query: { branch_name: branchName },
       }));
     } catch (error) {
@@ -87,7 +100,7 @@ export const useRepositorySourceController = ({
     if (path) {
       query.path = path;
     }
-    return request<RepositoryTreeEntryView[]>(`/repos/${repoId}/tree`, "get", { query });
+    return request<RepositoryTreeEntryView[]>(`/projects/${repoId}/repository/tree`, "get", { query });
   };
 
   const loadTreeRoot = async (branchName: string) => {
@@ -132,7 +145,7 @@ export const useRepositorySourceController = ({
 
   const loadReadmePreview = async (branchName: string) => {
     try {
-      const blob = await request<RepositoryBlobView>(`/repos/${repoId}/readme`, "get", {
+      const blob = await request<RepositoryBlobView>(`/projects/${repoId}/repository/readme`, "get", {
         query: { branch_name: branchName },
       });
       setReadmePath(blob.path);
@@ -152,17 +165,64 @@ export const useRepositorySourceController = ({
     }
   };
 
-  const openFile = async (path: string) => {
+  const openFile = async (path: string, keepSearchPosition = false) => {
     if (!codeBranch) {
       return;
     }
     onError(null);
+    if (!keepSearchPosition) {
+      setSearchTargetPath("");
+      setSearchLine(1);
+      setSearchColumn(1);
+      setSearchMatchLength(0);
+      setSearchJumpRequest(0);
+    }
     try {
-      setSelectedBlob(await request<RepositoryBlobView>(`/repos/${repoId}/blob`, "get", {
+      setSelectedBlob(await request<RepositoryBlobView>(`/projects/${repoId}/repository/blob`, "get", {
         query: { branch_name: codeBranch, path },
       }));
     } catch (error) {
       onError(extractErrorMessage(error));
+    }
+  };
+
+  const openFileAtLine = async (path: string, lineNumber = 1, column = 1, matchLength = 0) => {
+    setSearchTargetPath(path);
+    setSearchLine(Math.max(lineNumber, 1));
+    setSearchColumn(Math.max(column, 1));
+    setSearchMatchLength(Math.max(matchLength, 0));
+    setSearchJumpRequest((current) => current + 1);
+    await openFile(path, true);
+  };
+
+  const searchCode = async (query: string) => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) {
+      setSearchResults([]);
+      return;
+    }
+    if (!codeBranch) {
+      return;
+    }
+    setLoadingSearch(true);
+    try {
+      const filters: Record<string, string> = {
+        branch_name: codeBranch,
+        query: trimmedQuery,
+        match_case: String(searchMatchCase),
+        regex: String(searchRegex),
+      };
+      const normalizedPath = normalizeRepoFilePath(searchPath);
+      if (normalizedPath) {
+        filters.path = normalizedPath;
+      }
+      setSearchResults(await request<RepositorySearchResultView[]>(`/projects/${repoId}/repository/search`, "get", {
+        query: filters,
+      }));
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    } finally {
+      setLoadingSearch(false);
     }
   };
 
@@ -173,6 +233,16 @@ export const useRepositorySourceController = ({
     setReadmePreview(null);
     setReadmePath(null);
     setLanguages(null);
+    setSearchResults([]);
+    setSearchQuery("");
+    setSearchPath("");
+    setSearchMatchCase(false);
+    setSearchRegex(false);
+    setSearchLine(1);
+    setSearchColumn(1);
+    setSearchMatchLength(0);
+    setSearchTargetPath("");
+    setSearchJumpRequest(0);
   };
 
   const openCreateFileModal = () => {
@@ -196,14 +266,15 @@ export const useRepositorySourceController = ({
     onError(null);
     try {
       await createFileCommit({
-        url: `/repos/${repoId}/file-commits`,
+        url: `/projects/${repoId}/file-commits`,
         method: "post",
         values: { branch_name: branchName, path: filePath, content: newFileContent, message },
       });
       setCreateFileModalOpen(false);
       setCodeBranch(branchName);
       await Promise.all([refreshBranches(), refreshCommits(), loadTreeRoot(branchName), loadLanguages(branchName)]);
-      setSelectedBlob(await request<RepositoryBlobView>(`/repos/${repoId}/blob`, "get", {
+      setSearchLine(1);
+      setSelectedBlob(await request<RepositoryBlobView>(`/projects/${repoId}/repository/blob`, "get", {
         query: { branch_name: branchName, path: filePath },
       }));
     } catch (error) {
@@ -250,6 +321,9 @@ export const useRepositorySourceController = ({
     isCreatingFile,
     languages,
     isLoadingLanguages,
+    searchJumpRequest,
+    searchColumn,
+    searchTargetPath,
     setCreateFileModalOpen,
     setNewFileBranch,
     setNewFilePath,
@@ -257,9 +331,23 @@ export const useRepositorySourceController = ({
     setNewFileContent,
     loadLanguages,
     openFile,
+    openFileAtLine,
     toggleTreeDirectory,
     openCreateFileModal,
     submitCreateFileCommit,
     changeCodeBranch,
+    searchQuery,
+    setSearchQuery,
+    searchPath,
+    setSearchPath,
+    searchMatchCase,
+    setSearchMatchCase,
+    searchRegex,
+    setSearchRegex,
+    searchLine,
+    isLoadingSearch,
+    searchResults,
+    searchMatchLength,
+    searchCode,
   };
 };

@@ -1,6 +1,7 @@
 package gitrepo
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -11,9 +12,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"regexp"
 	"unicode/utf8"
 
 	"github.com/DaiYuANg/gity/internal/config"
+	setx "github.com/arcgolabs/collectionx/set"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
@@ -26,6 +29,8 @@ var (
 	ErrPathNotFound       = errors.New("git path not found")
 	ErrReadmeNotFound     = errors.New("git readme not found")
 	ErrEmptyRepository    = errors.New("git repository is empty")
+	ErrInvalidSearchQuery  = errors.New("invalid search query")
+	ErrInvalidSearchRegexp = errors.New("invalid search regex")
 	errStopIteration      = errors.New("stop iteration")
 )
 
@@ -62,6 +67,24 @@ type Commit struct {
 	AuthorEmail string `json:"author_email"`
 	Message     string `json:"message"`
 	CommittedAt string `json:"committed_at"`
+}
+
+type SearchResult struct {
+	Path        string `json:"path"`
+	LineNumber  int    `json:"line_number"`
+	Column      int    `json:"column"`
+	MatchLength int    `json:"match_length"`
+	LineContent string `json:"line_content"`
+}
+
+type SearchParams struct {
+	Query       string `json:"query"`
+	Path        string `json:"path"`
+	Limit       int    `json:"limit"`
+	MaxFiles    int    `json:"max_files"`
+	MaxFileSize int64  `json:"max_file_size"`
+	MatchCase   bool   `json:"match_case"`
+	UseRegex    bool   `json:"regex"`
 }
 
 func NewService(settings config.Settings) *Service {
@@ -260,6 +283,193 @@ func (s *Service) ListCommits(ctx context.Context, repoPath string, refName stri
 	return commits, nil
 }
 
+func (s *Service) Search(ctx context.Context, repoPath string, refName string, defaultBranch string, input SearchParams) ([]SearchResult, error) {
+	query := strings.TrimSpace(input.Query)
+	if query == "" {
+		return nil, fmt.Errorf("%w: query is required", ErrInvalidSearchQuery)
+	}
+
+	repository, err := s.openRepository(repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	commit, err := s.resolveCommit(ctx, repository, refName, defaultBranch)
+	if err != nil {
+		if errors.Is(err, ErrEmptyRepository) {
+			return []SearchResult{}, nil
+		}
+		return nil, err
+	}
+
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, fmt.Errorf("load commit tree: %w", err)
+	}
+
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	maxFiles := input.MaxFiles
+	if maxFiles <= 0 {
+		maxFiles = 300
+	}
+	if maxFiles > 5000 {
+		maxFiles = 5000
+	}
+
+	maxFileSize := input.MaxFileSize
+	if maxFileSize <= 0 {
+		maxFileSize = 256 * 1024
+	}
+	if maxFileSize > 10*1024*1024 {
+		maxFileSize = 10 * 1024 * 1024
+	}
+
+	matcher, err := buildSearchMatcher(query, input.MatchCase, input.UseRegex)
+	if err != nil {
+		return nil, err
+	}
+
+	pathPrefix := normalizePathPrefix(input.Path)
+	results := make([]SearchResult, 0, limit)
+	fileCount := 0
+
+	err = tree.Files().ForEach(func(file *object.File) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if fileCount >= maxFiles {
+			return errStopIteration
+		}
+		if pathPrefix != "" {
+			if !isPathInScope(file.Name, pathPrefix) {
+				return nil
+			}
+		}
+		if file.Blob.Size > maxFileSize {
+			return nil
+		}
+		content, readErr := readBlobContent(file)
+		if readErr != nil {
+			return nil
+		}
+		if !isReadableContent(content) {
+			return nil
+		}
+
+		for lineNumber, line := range strings.Split(string(content), "\n") {
+			column, matchLength, matched := matchLine(line, matcher)
+			if !matched {
+				continue
+			}
+			results = append(results, SearchResult{
+				Path:        file.Name,
+				LineNumber:  lineNumber + 1,
+				Column:      column,
+				MatchLength: matchLength,
+				LineContent: line,
+			})
+			if len(results) >= limit {
+				return errStopIteration
+			}
+		}
+
+		fileCount++
+		return nil
+	})
+	if err != nil && !errors.Is(err, errStopIteration) {
+		return nil, fmt.Errorf("search repository: %w", err)
+	}
+	return results, nil
+}
+
+type searchMatcher struct {
+	regex  *regexp.Regexp
+	query  string
+	raw    string
+}
+
+func buildSearchMatcher(query string, matchCase bool, useRegex bool) (searchMatcher, error) {
+	if !useRegex {
+		pattern := query
+		if !matchCase {
+			pattern = strings.ToLower(pattern)
+		}
+		return searchMatcher{query: pattern, raw: query}, nil
+	}
+
+	expression := query
+	if !matchCase && !strings.HasPrefix(expression, "(?i)") {
+		expression = "(?i)" + expression
+	}
+	re, err := regexp.Compile(expression)
+	if err != nil {
+		return searchMatcher{}, fmt.Errorf("%w: %v", ErrInvalidSearchRegexp, err)
+	}
+	return searchMatcher{regex: re, raw: query}, nil
+}
+
+func matchLine(line string, matcher searchMatcher) (int, int, bool) {
+	if matcher.regex != nil {
+		index := matcher.regex.FindStringIndex(line)
+		if index == nil {
+			return 0, 0, false
+		}
+		start := utf8.RuneCountInString(line[:index[0]]) + 1
+		length := utf8.RuneCountInString(line[index[0]:index[1]])
+		return start, length, true
+	}
+	lineText := line
+	target := matcher.query
+	if matcher.query != matcher.raw {
+		lineText = strings.ToLower(line)
+	}
+	idx := strings.Index(lineText, target)
+	if idx < 0 {
+		return 0, 0, false
+	}
+	match := target
+	if matcher.query == matcher.raw {
+		match = target
+	}
+	end := idx + len(match)
+	start := utf8.RuneCountInString(line[:idx]) + 1
+	length := utf8.RuneCountInString(line[idx:end])
+	return start, length, true
+}
+
+func isPathInScope(filePath string, prefix string) bool {
+	if filePath == prefix {
+		return true
+	}
+	return strings.HasPrefix(filePath, prefix+"/")
+}
+
+func readBlobContent(file *object.File) ([]byte, error) {
+	reader, err := file.Reader()
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	return io.ReadAll(reader)
+}
+
+func normalizePathPrefix(value string) string {
+	return strings.Trim(strings.ReplaceAll(value, "\\", "/"), "/")
+}
+
+func isReadableContent(data []byte) bool {
+	if !utf8.Valid(data) {
+		return false
+	}
+	return !bytes.Contains(data, []byte("\x00"))
+}
+
 func (s *Service) openRepository(repoPath string) (*git.Repository, error) {
 	absRepo, err := s.resolveRepoPath(repoPath)
 	if err != nil {
@@ -352,18 +562,13 @@ func (s *Service) resolveRepoPath(repoPath string) (string, error) {
 
 func resolveRevisionCandidates(refName string, defaultBranch string) []string {
 	normalizedRef := strings.TrimSpace(refName)
-	candidates := make([]string, 0, 5)
+	candidates := setx.NewOrderedSetWithCapacity[string](5)
 	add := func(value string) {
 		value = strings.TrimSpace(value)
 		if value == "" {
 			return
 		}
-		for _, existing := range candidates {
-			if existing == value {
-				return
-			}
-		}
-		candidates = append(candidates, value)
+		candidates.Add(value)
 	}
 	if normalizedRef == "" {
 		if strings.TrimSpace(defaultBranch) != "" {
@@ -371,12 +576,12 @@ func resolveRevisionCandidates(refName string, defaultBranch string) []string {
 			add(strings.TrimSpace(defaultBranch))
 		}
 		add("HEAD")
-		return candidates
+		return candidates.Values()
 	}
 	add("refs/heads/" + normalizedRef)
 	add("refs/tags/" + normalizedRef)
 	add(normalizedRef)
-	return candidates
+	return candidates.Values()
 }
 
 func buildBlob(file *object.File) (Blob, error) {

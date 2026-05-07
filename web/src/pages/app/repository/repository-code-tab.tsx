@@ -1,14 +1,16 @@
+import { useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
-import { ChevronDown, ChevronRight, FileCode2, FolderTree } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight, FileCode2, FolderTree, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
   RepositoryBlobView,
   RepositoryBranchView,
   RepositoryLanguageItemView,
   RepositoryLanguagesView,
+  RepositorySearchResultView,
   RepositoryView,
 } from "@/pages/types";
 import type { RepositoryTreeNode } from "./repository-types";
@@ -27,12 +29,53 @@ interface RepositoryCodeTabProps {
   languages: RepositoryLanguagesView | null;
   isLoadingTree: boolean;
   isLoadingLanguages: boolean;
+  searchQuery: string;
+  searchPath: string;
+  searchMatchCase: boolean;
+  searchRegex: boolean;
+  isLoadingSearch: boolean;
+  searchLine: number;
+  searchColumn: number;
+  searchMatchLength: number;
+  searchJumpRequest: number;
+  searchTargetPath: string;
+  searchResults: RepositorySearchResultView[];
   editorTheme: string;
   onChangeCodeBranch: (branchName: string) => void;
   onOpenCreateFile: () => void;
   onOpenFile: (path: string) => void;
   onToggleTreeDirectory: (path: string) => void;
   onRefreshLanguages: () => void;
+  onOpenFileAtLine: (path: string, lineNumber: number, column: number, matchLength?: number) => void;
+  onSearch: (query: string) => void;
+  setSearchQuery: (value: string) => void;
+  setSearchPath: (value: string) => void;
+  setSearchMatchCase: (value: boolean) => void;
+  setSearchRegex: (value: boolean) => void;
+}
+
+interface SearchableEditor {
+  setPosition: (position: {
+    lineNumber: number;
+    column: number;
+  }) => void;
+  revealLineInCenter: (lineNumber: number) => void;
+  focus: () => void;
+  deltaDecorations: (
+    oldDecorations: string[],
+    newDecorations: Array<{
+      range: {
+        startLineNumber: number;
+        startColumn: number;
+        endLineNumber: number;
+        endColumn: number;
+      };
+      options: {
+        isWholeLine?: boolean;
+        className: string;
+      };
+    }>,
+  ) => string[];
 }
 
 const renderLanguageRows = (items: RepositoryLanguageItemView[]): JSX.Element[] => {
@@ -67,14 +110,97 @@ export const RepositoryCodeTab = ({
   languages,
   isLoadingTree,
   isLoadingLanguages,
+  searchQuery,
+  searchPath,
+  searchMatchCase,
+  searchRegex,
+  isLoadingSearch,
+  searchLine,
+  searchColumn,
+  searchMatchLength,
+  searchJumpRequest,
+  searchTargetPath,
+  searchResults,
   editorTheme,
   onChangeCodeBranch,
   onOpenCreateFile,
   onOpenFile,
   onToggleTreeDirectory,
+  onOpenFileAtLine,
+  onSearch,
+  setSearchQuery,
+  setSearchPath,
+  setSearchMatchCase,
+  setSearchRegex,
   onRefreshLanguages,
 }: RepositoryCodeTabProps): JSX.Element => {
   const isEmptyRepository = !isLoadingTree && treeNodes.length === 0 && !selectedBlob && !readmePreview;
+  const editorRef = useRef<SearchableEditor | null>(null);
+  const searchLineDecorationsRef = useRef<string[]>([]);
+
+  const jumpToSearchLine = () => {
+    if (!editorRef.current) {
+      searchLineDecorationsRef.current = [];
+      return;
+    }
+    if (!selectedBlob || !searchTargetPath || selectedBlob.path !== searchTargetPath) {
+      if (searchLineDecorationsRef.current.length > 0) {
+        searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, []);
+      }
+      return;
+    }
+    const lines = selectedBlob.content.split("\n");
+    const totalLines = lines.length;
+    const targetLine = Math.min(Math.max(searchLine, 1), totalLines > 0 ? totalLines : 1);
+    const targetText = lines[targetLine - 1] ?? "";
+    const targetColumn = Math.min(Math.max(searchColumn, 1), targetText.length + 1);
+    const targetMatchLength = Math.max(0, Math.floor(searchMatchLength));
+    editorRef.current.setPosition({
+      lineNumber: targetLine,
+      column: targetColumn,
+    });
+    editorRef.current.revealLineInCenter(targetLine);
+    editorRef.current.focus();
+    const decorations = [
+      {
+        range: {
+          startLineNumber: targetLine,
+          startColumn: 1,
+          endLineNumber: targetLine,
+          endColumn: Math.max(targetText.length + 1, 1),
+        },
+        options: {
+          isWholeLine: true,
+          className: "search-jump-line-decoration",
+        },
+      },
+    ];
+    if (targetMatchLength > 0) {
+      decorations.push({
+        range: {
+          startLineNumber: targetLine,
+          startColumn: targetColumn,
+          endLineNumber: targetLine,
+          endColumn: Math.max(targetColumn + targetMatchLength, targetColumn + 1),
+        },
+        options: {
+          isWholeLine: false,
+          className: "search-jump-match-decoration",
+        },
+      });
+    }
+    searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, decorations);
+  };
+
+  useEffect(() => {
+    jumpToSearchLine();
+  }, [searchJumpRequest, searchLine, searchColumn, searchMatchLength, searchTargetPath, selectedBlob?.path, selectedBlob?.content]);
+
+  useEffect(() => () => {
+    if (editorRef.current && searchLineDecorationsRef.current.length > 0) {
+      searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, []);
+    }
+  }, []);
 
   const renderTreeNodes = (nodes: RepositoryTreeNode[], depth = 0): JSX.Element[] =>
     nodes.map((node) => (
@@ -112,6 +238,10 @@ export const RepositoryCodeTab = ({
         ) : null}
       </div>
     ));
+
+  const handleSearch = () => {
+    onSearch(searchQuery);
+  };
 
   return (
     <Card className="card-enter">
@@ -152,6 +282,86 @@ export const RepositoryCodeTab = ({
 
         <div className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
           <div className="space-y-2 rounded-md border p-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{t("Search in repository")}</p>
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-8"
+                    placeholder={t("Search text")}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        handleSearch();
+                      }
+                    }}
+                  />
+                </div>
+                <Input
+                  placeholder={t("Path (optional)")}
+                  value={searchPath}
+                  onChange={(event) => setSearchPath(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      handleSearch();
+                    }
+                  }}
+                />
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={searchMatchCase}
+                    onChange={(event) => setSearchMatchCase(event.target.checked)}
+                  />
+                  <span>{t("Match case")}</span>
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={searchRegex}
+                    onChange={(event) => setSearchRegex(event.target.checked)}
+                  />
+                  <span>{t("Regular expression")}</span>
+                </label>
+                <Button type="button" size="sm" className="w-full" variant="outline" onClick={handleSearch} disabled={isLoadingSearch}>
+                  {isLoadingSearch ? t("Searching...") : t("Search")}
+                </Button>
+              </div>
+              {isLoadingSearch ? <p className="px-1 text-xs text-muted-foreground">{t("Searching...")}</p> : null}
+              {!isLoadingSearch && searchResults.length === 0 && searchQuery.trim() ? (
+                <p className="px-1 text-xs text-muted-foreground">{t("No matches found.")}</p>
+              ) : null}
+            </div>
+            {searchResults.length > 0 ? (
+              <div className="space-y-1 rounded border p-1">
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  {searchResults.length} {t("result(s)")}
+                </p>
+                <div className="max-h-56 space-y-1 overflow-y-auto">
+                  {searchResults.map((result, index) => (
+                    <button
+                      key={`${result.path}-${result.line_number}-${result.column}-${result.match_length}-${index}`}
+                      type="button"
+                      className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
+                      onClick={() => onOpenFileAtLine(result.path, result.line_number, result.column, result.match_length)}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-mono">{result.path}</span>
+                        <span className="text-muted-foreground">
+                          {result.line_number}:{result.column}
+                        </span>
+                      </div>
+                      <p className="line-clamp-2 text-xs text-muted-foreground">
+                        {result.line_content || t("No content")}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="border-t pt-2" />
             {isLoadingTree ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
             {!isLoadingTree ? renderTreeNodes(treeNodes) : null}
             {!isLoadingTree && treeNodes.length === 0 ? (
@@ -163,7 +373,7 @@ export const RepositoryCodeTab = ({
             {selectedBlob ? (
               selectedBlob.is_binary ? (
                 <div className="p-4 text-sm text-muted-foreground">
-                  {t("This file is binary and cannot be shown in Monaco.")}
+                  {t("This file is binary cannot be shown in Monaco.")}
                 </div>
               ) : (
                 <Editor
@@ -171,6 +381,10 @@ export const RepositoryCodeTab = ({
                   language={detectLanguage(selectedBlob.path)}
                   value={selectedBlob.content}
                   theme={editorTheme}
+                  onMount={(instance) => {
+                    editorRef.current = instance;
+                    jumpToSearchLine();
+                  }}
                   options={{
                     readOnly: true,
                     minimap: { enabled: false },
