@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -38,9 +40,9 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[entity.ProjectJobArtifact], error) {
-	query := dbx.Select(entity.ProjectJobArtifactSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobArtifactSchema.AllColumns().Values()...).
 		From(entity.ProjectJobArtifactSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobArtifactSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobArtifactSchema.ProjectJobID.Eq(projectJobID),
 		)).
@@ -49,9 +51,9 @@ func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, pr
 }
 
 func (r *Repository) GetByProjectJobAndID(ctx context.Context, projectID int64, projectJobID int64, artifactID int64) (entity.ProjectJobArtifact, error) {
-	query := dbx.Select(entity.ProjectJobArtifactSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobArtifactSchema.AllColumns().Values()...).
 		From(entity.ProjectJobArtifactSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobArtifactSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobArtifactSchema.ProjectJobID.Eq(projectJobID),
 			entity.ProjectJobArtifactSchema.ID.Eq(artifactID),

@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type Namespace struct {
@@ -18,15 +20,15 @@ type Namespace struct {
 }
 
 type NamespaceSchemaDef struct {
-	dbx.Schema[Namespace]
-	ID          dbx.IDColumn[Namespace, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	Kind        dbx.Column[Namespace, string]                   `dbx:"kind,index"`
-	Name        dbx.Column[Namespace, string]                   `dbx:"name"`
-	PathKey     dbx.Column[Namespace, string]                   `dbx:"path_key,unique"`
-	FullPath    dbx.Column[Namespace, string]                   `dbx:"full_path,unique"`
-	Description dbx.Column[Namespace, string]                   `dbx:"description,null"`
-	CreatedAt   dbx.Column[Namespace, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt   dbx.Column[Namespace, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[Namespace]
+	ID          column.IDColumn[Namespace, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	Kind        column.Column[Namespace, string]                     `dbx:"kind,index"`
+	Name        column.Column[Namespace, string]                     `dbx:"name"`
+	PathKey     column.Column[Namespace, string]                     `dbx:"path_key,unique"`
+	FullPath    column.Column[Namespace, string]                     `dbx:"full_path,unique"`
+	Description column.Column[Namespace, string]                     `dbx:"description,null"`
+	CreatedAt   column.Column[Namespace, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt   column.Column[Namespace, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var NamespaceSchema = dbx.MustSchema("namespaces", NamespaceSchemaDef{})
+var NamespaceSchema = schema.MustSchema("namespaces", NamespaceSchemaDef{})

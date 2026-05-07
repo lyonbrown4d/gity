@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dix"
 )
 

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -23,7 +25,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectBranchProtection], error) {
-	query := dbx.Select(entity.ProjectBranchProtectionSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectBranchProtectionSchema.AllColumns().Values()...).
 		From(entity.ProjectBranchProtectionSchema).
 		Where(entity.ProjectBranchProtectionSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectBranchProtectionSchema.BranchName.Asc())
@@ -31,9 +33,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndBranch(ctx context.Context, projectID int64, branchName string) (entity.ProjectBranchProtection, error) {
-	query := dbx.Select(entity.ProjectBranchProtectionSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectBranchProtectionSchema.AllColumns().Values()...).
 		From(entity.ProjectBranchProtectionSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectBranchProtectionSchema.ProjectID.Eq(projectID),
 			entity.ProjectBranchProtectionSchema.BranchName.Eq(normalizeBranchName(branchName)),
 		)).

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -34,12 +36,12 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (entity.ProjectLFSLock, error) {
-	query := dbx.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(dbx.And(entity.ProjectLFSLockSchema.ProjectID.Eq(projectID), entity.ProjectLFSLockSchema.ID.Eq(id))).Limit(1)
+	query := querydsl.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(querydsl.And(entity.ProjectLFSLockSchema.ProjectID.Eq(projectID), entity.ProjectLFSLockSchema.ID.Eq(id))).Limit(1)
 	return r.base.First(ctx, query)
 }
 
 func (r *Repository) GetByProjectAndPath(ctx context.Context, projectID int64, path string) (entity.ProjectLFSLock, error) {
-	query := dbx.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(dbx.And(entity.ProjectLFSLockSchema.ProjectID.Eq(projectID), entity.ProjectLFSLockSchema.Path.Eq(strings.TrimSpace(path)))).Limit(1)
+	query := querydsl.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(querydsl.And(entity.ProjectLFSLockSchema.ProjectID.Eq(projectID), entity.ProjectLFSLockSchema.Path.Eq(strings.TrimSpace(path)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 
@@ -48,14 +50,14 @@ func (r *Repository) ListByProjectID(ctx context.Context, input ListInput) (*col
 	if limit <= 0 {
 		limit = 100
 	}
-	predicates := []dbx.Predicate{entity.ProjectLFSLockSchema.ProjectID.Eq(input.ProjectID)}
+	predicates := []querydsl.Predicate{entity.ProjectLFSLockSchema.ProjectID.Eq(input.ProjectID)}
 	if strings.TrimSpace(input.Path) != "" {
 		predicates = append(predicates, entity.ProjectLFSLockSchema.Path.Eq(strings.TrimSpace(input.Path)))
 	}
 	if input.AfterID > 0 {
 		predicates = append(predicates, entity.ProjectLFSLockSchema.ID.Gt(input.AfterID))
 	}
-	query := dbx.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(dbx.And(predicates...)).OrderBy(entity.ProjectLFSLockSchema.ID.Asc()).Limit(limit)
+	query := querydsl.Select(entity.ProjectLFSLockSchema.AllColumns().Values()...).From(entity.ProjectLFSLockSchema).Where(querydsl.And(predicates...)).OrderBy(entity.ProjectLFSLockSchema.ID.Asc()).Limit(limit)
 	return r.base.List(ctx, query)
 }
 

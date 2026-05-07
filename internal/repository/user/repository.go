@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -35,7 +37,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) List(ctx context.Context) (*collectionx.List[entity.User], error) {
-	query := dbx.Select(entity.UserSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.UserSchema.AllColumns().Values()...).
 		From(entity.UserSchema).
 		OrderBy(entity.UserSchema.ID.Desc())
 	return r.base.List(ctx, query)
@@ -67,7 +69,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.User
 }
 
 func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
-	assignments := []dbx.Assignment{}
+	assignments := []querydsl.Assignment{}
 	if input.Username != nil {
 		assignments = append(assignments, entity.UserSchema.Username.Set(strings.TrimSpace(*input.Username)))
 	}

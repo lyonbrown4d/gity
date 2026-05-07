@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -36,9 +38,9 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByPipelineID(ctx context.Context, projectID int64, pipelineID int64) (*collectionx.List[entity.ProjectPipelineJob], error) {
-	query := dbx.Select(entity.ProjectPipelineJobSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineJobSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineJobSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectPipelineJobSchema.ProjectID.Eq(projectID),
 			entity.ProjectPipelineJobSchema.PipelineID.Eq(pipelineID),
 		)).
@@ -47,9 +49,9 @@ func (r *Repository) ListByPipelineID(ctx context.Context, projectID int64, pipe
 }
 
 func (r *Repository) GetByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (entity.ProjectPipelineJob, error) {
-	query := dbx.Select(entity.ProjectPipelineJobSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineJobSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineJobSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectPipelineJobSchema.ProjectID.Eq(projectID),
 			entity.ProjectPipelineJobSchema.ProjectJobID.Eq(projectJobID),
 		)).

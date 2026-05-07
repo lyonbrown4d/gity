@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectJob struct {
@@ -26,23 +28,23 @@ type ProjectJob struct {
 }
 
 type ProjectJobSchemaDef struct {
-	dbx.Schema[ProjectJob]
-	ID          dbx.IDColumn[ProjectJob, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID   dbx.Column[ProjectJob, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	Kind        dbx.Column[ProjectJob, string]                   `dbx:"kind,index"`
-	Status      dbx.Column[ProjectJob, string]                   `dbx:"status,index"`
-	Payload     dbx.Column[ProjectJob, string]                   `dbx:"payload,type=TEXT,null"`
-	Result      dbx.Column[ProjectJob, string]                   `dbx:"result,type=TEXT,null"`
-	Attempts    dbx.Column[ProjectJob, int]                      `dbx:"attempts"`
-	MaxAttempts dbx.Column[ProjectJob, int]                      `dbx:"max_attempts"`
-	RunAfter    dbx.Column[ProjectJob, time.Time]                `dbx:"run_after,type=TIMESTAMP,index"`
-	LockedBy    dbx.Column[ProjectJob, string]                   `dbx:"locked_by,index,null"`
-	LockedUntil dbx.Column[ProjectJob, time.Time]                `dbx:"locked_until,type=TIMESTAMP,index"`
-	LastError   dbx.Column[ProjectJob, string]                   `dbx:"last_error,type=TEXT,null"`
-	CreatedAt   dbx.Column[ProjectJob, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt   dbx.Column[ProjectJob, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
-	StartedAt   dbx.Column[ProjectJob, time.Time]                `dbx:"started_at,type=TIMESTAMP"`
-	FinishedAt  dbx.Column[ProjectJob, time.Time]                `dbx:"finished_at,type=TIMESTAMP"`
+	schema.Schema[ProjectJob]
+	ID          column.IDColumn[ProjectJob, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID   column.Column[ProjectJob, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	Kind        column.Column[ProjectJob, string]                     `dbx:"kind,index"`
+	Status      column.Column[ProjectJob, string]                     `dbx:"status,index"`
+	Payload     column.Column[ProjectJob, string]                     `dbx:"payload,type=TEXT,null"`
+	Result      column.Column[ProjectJob, string]                     `dbx:"result,type=TEXT,null"`
+	Attempts    column.Column[ProjectJob, int]                        `dbx:"attempts"`
+	MaxAttempts column.Column[ProjectJob, int]                        `dbx:"max_attempts"`
+	RunAfter    column.Column[ProjectJob, time.Time]                  `dbx:"run_after,type=TIMESTAMP,index"`
+	LockedBy    column.Column[ProjectJob, string]                     `dbx:"locked_by,index,null"`
+	LockedUntil column.Column[ProjectJob, time.Time]                  `dbx:"locked_until,type=TIMESTAMP,index"`
+	LastError   column.Column[ProjectJob, string]                     `dbx:"last_error,type=TEXT,null"`
+	CreatedAt   column.Column[ProjectJob, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt   column.Column[ProjectJob, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
+	StartedAt   column.Column[ProjectJob, time.Time]                  `dbx:"started_at,type=TIMESTAMP"`
+	FinishedAt  column.Column[ProjectJob, time.Time]                  `dbx:"finished_at,type=TIMESTAMP"`
 }
 
-var ProjectJobSchema = dbx.MustSchema("project_jobs", ProjectJobSchemaDef{})
+var ProjectJobSchema = schema.MustSchema("project_jobs", ProjectJobSchemaDef{})

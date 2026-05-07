@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type User struct {
@@ -16,13 +18,13 @@ type User struct {
 }
 
 type UserSchemaDef struct {
-	dbx.Schema[User]
-	ID          dbx.IDColumn[User, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	Username    dbx.Column[User, string]                   `dbx:"username,unique"`
-	DisplayName dbx.Column[User, string]                   `dbx:"display_name"`
-	Email       dbx.Column[User, string]                   `dbx:"email,unique,null"`
-	CreatedAt   dbx.Column[User, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt   dbx.Column[User, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[User]
+	ID          column.IDColumn[User, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	Username    column.Column[User, string]                     `dbx:"username,unique"`
+	DisplayName column.Column[User, string]                     `dbx:"display_name"`
+	Email       column.Column[User, string]                     `dbx:"email,unique,null"`
+	CreatedAt   column.Column[User, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt   column.Column[User, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var UserSchema = dbx.MustSchema("users", UserSchemaDef{})
+var UserSchema = schema.MustSchema("users", UserSchemaDef{})

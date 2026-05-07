@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -37,7 +39,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectWikiPage], error) {
-	query := dbx.Select(entity.ProjectWikiPageSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectWikiPageSchema.AllColumns().Values()...).
 		From(entity.ProjectWikiPageSchema).
 		Where(entity.ProjectWikiPageSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectWikiPageSchema.UpdatedAt.Desc(), entity.ProjectWikiPageSchema.ID.Desc())
@@ -45,9 +47,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndSlug(ctx context.Context, projectID int64, slug string) (entity.ProjectWikiPage, error) {
-	query := dbx.Select(entity.ProjectWikiPageSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectWikiPageSchema.AllColumns().Values()...).
 		From(entity.ProjectWikiPageSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectWikiPageSchema.ProjectID.Eq(projectID),
 			entity.ProjectWikiPageSchema.Slug.Eq(strings.TrimSpace(slug)),
 		)).
@@ -83,7 +85,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 }
 
 func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
-	assignments := make([]dbx.Assignment, 0, 4)
+	assignments := make([]querydsl.Assignment, 0, 4)
 	if input.Title != nil {
 		assignments = append(assignments, entity.ProjectWikiPageSchema.Title.Set(strings.TrimSpace(*input.Title)))
 	}

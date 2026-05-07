@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectWikiPage struct {
@@ -20,18 +22,18 @@ type ProjectWikiPage struct {
 }
 
 type ProjectWikiPageSchemaDef struct {
-	dbx.Schema[ProjectWikiPage]
-	ID                 dbx.IDColumn[ProjectWikiPage, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID          dbx.Column[ProjectWikiPage, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	Slug               dbx.Column[ProjectWikiPage, string]                   `dbx:"slug,index"`
-	Title              dbx.Column[ProjectWikiPage, string]                   `dbx:"title"`
-	Content            dbx.Column[ProjectWikiPage, string]                   `dbx:"content,type=TEXT,null"`
-	Format             dbx.Column[ProjectWikiPage, string]                   `dbx:"format,index"`
-	AuthorUserID       dbx.Column[ProjectWikiPage, int64]                    `dbx:"author_user_id,index,ref=users.id,ondelete=restrict"`
-	LastEditedByUserID dbx.Column[ProjectWikiPage, int64]                    `dbx:"last_edited_by_user_id,index,ref=users.id,ondelete=restrict"`
-	CreatedAt          dbx.Column[ProjectWikiPage, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt          dbx.Column[ProjectWikiPage, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
-	ProjectSlugUnique  dbx.Unique[ProjectWikiPage]                           `idx:"columns=project_id,slug"`
+	schema.Schema[ProjectWikiPage]
+	ID                 column.IDColumn[ProjectWikiPage, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID          column.Column[ProjectWikiPage, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	Slug               column.Column[ProjectWikiPage, string]                     `dbx:"slug,index"`
+	Title              column.Column[ProjectWikiPage, string]                     `dbx:"title"`
+	Content            column.Column[ProjectWikiPage, string]                     `dbx:"content,type=TEXT,null"`
+	Format             column.Column[ProjectWikiPage, string]                     `dbx:"format,index"`
+	AuthorUserID       column.Column[ProjectWikiPage, int64]                      `dbx:"author_user_id,index,ref=users.id,ondelete=restrict"`
+	LastEditedByUserID column.Column[ProjectWikiPage, int64]                      `dbx:"last_edited_by_user_id,index,ref=users.id,ondelete=restrict"`
+	CreatedAt          column.Column[ProjectWikiPage, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt          column.Column[ProjectWikiPage, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
+	ProjectSlugUnique  schema.Unique[ProjectWikiPage]                             `idx:"columns=project_id,slug"`
 }
 
-var ProjectWikiPageSchema = dbx.MustSchema("project_wiki_pages", ProjectWikiPageSchemaDef{})
+var ProjectWikiPageSchema = schema.MustSchema("project_wiki_pages", ProjectWikiPageSchemaDef{})

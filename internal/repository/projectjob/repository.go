@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -39,7 +41,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectJob], error) {
-	query := dbx.Select(entity.ProjectJobSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobSchema.AllColumns().Values()...).
 		From(entity.ProjectJobSchema).
 		Where(entity.ProjectJobSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectJobSchema.ID.Desc())
@@ -47,9 +49,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (entity.ProjectJob, error) {
-	query := dbx.Select(entity.ProjectJobSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobSchema.AllColumns().Values()...).
 		From(entity.ProjectJobSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobSchema.ID.Eq(id),
 		)).
@@ -109,7 +111,7 @@ func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []str
 		lease = time.Minute
 	}
 	now := time.Now().UTC()
-	predicates := []dbx.Predicate{
+	predicates := []querydsl.Predicate{
 		entity.ProjectJobSchema.Status.Eq(StatusPending),
 		entity.ProjectJobSchema.RunAfter.Le(now),
 	}
@@ -119,9 +121,9 @@ func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []str
 	if len(kinds) > 0 {
 		predicates = append(predicates, entity.ProjectJobSchema.Kind.In(kinds...))
 	}
-	query := dbx.Select(entity.ProjectJobSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobSchema.AllColumns().Values()...).
 		From(entity.ProjectJobSchema).
-		Where(dbx.And(predicates...)).
+		Where(querydsl.And(predicates...)).
 		OrderBy(entity.ProjectJobSchema.RunAfter.Asc(), entity.ProjectJobSchema.ID.Asc()).
 		Limit(1)
 	item, err := r.base.First(ctx, query)

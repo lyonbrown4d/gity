@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectIssueAttachment struct {
@@ -19,16 +21,16 @@ type ProjectIssueAttachment struct {
 }
 
 type ProjectIssueAttachmentSchemaDef struct {
-	dbx.Schema[ProjectIssueAttachment]
-	ID               dbx.IDColumn[ProjectIssueAttachment, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectIssueID   dbx.Column[ProjectIssueAttachment, int64]                    `dbx:"project_issue_id,index,ref=project_issues.id,ondelete=cascade"`
-	UploadedByUserID dbx.Column[ProjectIssueAttachment, int64]                    `dbx:"uploaded_by_user_id,index,ref=users.id,ondelete=restrict"`
-	FileName         dbx.Column[ProjectIssueAttachment, string]                   `dbx:"file_name"`
-	ContentType      dbx.Column[ProjectIssueAttachment, string]                   `dbx:"content_type,null"`
-	ByteSize         dbx.Column[ProjectIssueAttachment, int64]                    `dbx:"byte_size"`
-	StorageKey       dbx.Column[ProjectIssueAttachment, string]                   `dbx:"storage_key,unique"`
-	CreatedAt        dbx.Column[ProjectIssueAttachment, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt        dbx.Column[ProjectIssueAttachment, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectIssueAttachment]
+	ID               column.IDColumn[ProjectIssueAttachment, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectIssueID   column.Column[ProjectIssueAttachment, int64]                      `dbx:"project_issue_id,index,ref=project_issues.id,ondelete=cascade"`
+	UploadedByUserID column.Column[ProjectIssueAttachment, int64]                      `dbx:"uploaded_by_user_id,index,ref=users.id,ondelete=restrict"`
+	FileName         column.Column[ProjectIssueAttachment, string]                     `dbx:"file_name"`
+	ContentType      column.Column[ProjectIssueAttachment, string]                     `dbx:"content_type,null"`
+	ByteSize         column.Column[ProjectIssueAttachment, int64]                      `dbx:"byte_size"`
+	StorageKey       column.Column[ProjectIssueAttachment, string]                     `dbx:"storage_key,unique"`
+	CreatedAt        column.Column[ProjectIssueAttachment, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt        column.Column[ProjectIssueAttachment, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectIssueAttachmentSchema = dbx.MustSchema("project_issue_attachments", ProjectIssueAttachmentSchemaDef{})
+var ProjectIssueAttachmentSchema = schema.MustSchema("project_issue_attachments", ProjectIssueAttachmentSchemaDef{})

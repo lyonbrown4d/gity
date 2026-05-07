@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -29,7 +31,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByUserID(ctx context.Context, userID int64) (*collectionx.List[entity.UserAccessToken], error) {
-	query := dbx.Select(entity.UserAccessTokenSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.UserAccessTokenSchema.AllColumns().Values()...).
 		From(entity.UserAccessTokenSchema).
 		Where(entity.UserAccessTokenSchema.UserID.Eq(userID)).
 		OrderBy(entity.UserAccessTokenSchema.ID.Desc())

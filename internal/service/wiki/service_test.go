@@ -7,13 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectwikipagerepo "github.com/DaiYuANg/gity/internal/repository/projectwikipage"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	wikiservice "github.com/DaiYuANg/gity/internal/service/wiki"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

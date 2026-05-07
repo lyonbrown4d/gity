@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectJobLog struct {
@@ -20,17 +22,17 @@ type ProjectJobLog struct {
 }
 
 type ProjectJobLogSchemaDef struct {
-	dbx.Schema[ProjectJobLog]
-	ID              dbx.IDColumn[ProjectJobLog, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID       dbx.Column[ProjectJobLog, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	ProjectJobID    dbx.Column[ProjectJobLog, int64]                    `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
-	Attempt         dbx.Column[ProjectJobLog, int]                      `dbx:"attempt,index"`
-	ExitCode        dbx.Column[ProjectJobLog, int]                      `dbx:"exit_code"`
-	Output          dbx.Column[ProjectJobLog, string]                   `dbx:"output,type=TEXT"`
-	OutputTruncated dbx.Column[ProjectJobLog, int]                      `dbx:"output_truncated"`
-	DurationMillis  dbx.Column[ProjectJobLog, int64]                    `dbx:"duration_millis"`
-	CreatedAt       dbx.Column[ProjectJobLog, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt       dbx.Column[ProjectJobLog, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectJobLog]
+	ID              column.IDColumn[ProjectJobLog, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID       column.Column[ProjectJobLog, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	ProjectJobID    column.Column[ProjectJobLog, int64]                      `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
+	Attempt         column.Column[ProjectJobLog, int]                        `dbx:"attempt,index"`
+	ExitCode        column.Column[ProjectJobLog, int]                        `dbx:"exit_code"`
+	Output          column.Column[ProjectJobLog, string]                     `dbx:"output,type=TEXT"`
+	OutputTruncated column.Column[ProjectJobLog, int]                        `dbx:"output_truncated"`
+	DurationMillis  column.Column[ProjectJobLog, int64]                      `dbx:"duration_millis"`
+	CreatedAt       column.Column[ProjectJobLog, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt       column.Column[ProjectJobLog, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectJobLogSchema = dbx.MustSchema("project_job_logs", ProjectJobLogSchemaDef{})
+var ProjectJobLogSchema = schema.MustSchema("project_job_logs", ProjectJobLogSchemaDef{})

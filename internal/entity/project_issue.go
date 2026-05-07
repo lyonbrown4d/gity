@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectIssue struct {
@@ -19,16 +21,16 @@ type ProjectIssue struct {
 }
 
 type ProjectIssueSchemaDef struct {
-	dbx.Schema[ProjectIssue]
-	ID           dbx.IDColumn[ProjectIssue, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID    dbx.Column[ProjectIssue, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	IID          dbx.Column[ProjectIssue, int64]                    `dbx:"iid,index"`
-	AuthorUserID dbx.Column[ProjectIssue, int64]                    `dbx:"author_user_id,index,ref=users.id,ondelete=restrict"`
-	Title        dbx.Column[ProjectIssue, string]                   `dbx:"title"`
-	Description  dbx.Column[ProjectIssue, string]                   `dbx:"description,null"`
-	State        dbx.Column[ProjectIssue, string]                   `dbx:"state,index"`
-	CreatedAt    dbx.Column[ProjectIssue, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt    dbx.Column[ProjectIssue, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectIssue]
+	ID           column.IDColumn[ProjectIssue, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID    column.Column[ProjectIssue, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	IID          column.Column[ProjectIssue, int64]                      `dbx:"iid,index"`
+	AuthorUserID column.Column[ProjectIssue, int64]                      `dbx:"author_user_id,index,ref=users.id,ondelete=restrict"`
+	Title        column.Column[ProjectIssue, string]                     `dbx:"title"`
+	Description  column.Column[ProjectIssue, string]                     `dbx:"description,null"`
+	State        column.Column[ProjectIssue, string]                     `dbx:"state,index"`
+	CreatedAt    column.Column[ProjectIssue, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt    column.Column[ProjectIssue, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectIssueSchema = dbx.MustSchema("project_issues", ProjectIssueSchemaDef{})
+var ProjectIssueSchema = schema.MustSchema("project_issues", ProjectIssueSchemaDef{})

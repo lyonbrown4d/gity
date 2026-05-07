@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
-	"github.com/arcgolabs/dix"
 	coredb "github.com/DaiYuANg/gity/internal/repository/core"
+
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dix"
 )
 
 func RunMigration(ctx context.Context) error {

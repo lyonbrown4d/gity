@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectLFSObject struct {
@@ -17,14 +19,14 @@ type ProjectLFSObject struct {
 }
 
 type ProjectLFSObjectSchemaDef struct {
-	dbx.Schema[ProjectLFSObject]
-	ID         dbx.IDColumn[ProjectLFSObject, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID  dbx.Column[ProjectLFSObject, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	OID        dbx.Column[ProjectLFSObject, string]                   `dbx:"oid,index"`
-	ByteSize   dbx.Column[ProjectLFSObject, int64]                    `dbx:"byte_size"`
-	StorageKey dbx.Column[ProjectLFSObject, string]                   `dbx:"storage_key,unique"`
-	CreatedAt  dbx.Column[ProjectLFSObject, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt  dbx.Column[ProjectLFSObject, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectLFSObject]
+	ID         column.IDColumn[ProjectLFSObject, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID  column.Column[ProjectLFSObject, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	OID        column.Column[ProjectLFSObject, string]                     `dbx:"oid,index"`
+	ByteSize   column.Column[ProjectLFSObject, int64]                      `dbx:"byte_size"`
+	StorageKey column.Column[ProjectLFSObject, string]                     `dbx:"storage_key,unique"`
+	CreatedAt  column.Column[ProjectLFSObject, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt  column.Column[ProjectLFSObject, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectLFSObjectSchema = dbx.MustSchema("project_lfs_objects", ProjectLFSObjectSchemaDef{})
+var ProjectLFSObjectSchema = schema.MustSchema("project_lfs_objects", ProjectLFSObjectSchemaDef{})

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -27,7 +29,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectPackage], error) {
-	query := dbx.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(entity.ProjectPackageSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectPackageSchema.ID.Desc())
+	query := querydsl.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(entity.ProjectPackageSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectPackageSchema.ID.Desc())
 	return r.base.List(ctx, query)
 }
 
@@ -36,7 +38,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (entity.ProjectPacka
 }
 
 func (r *Repository) GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType string, name string) (entity.ProjectPackage, error) {
-	query := dbx.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(dbx.And(entity.ProjectPackageSchema.ProjectID.Eq(projectID), entity.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType)), entity.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name)))).Limit(1)
+	query := querydsl.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(querydsl.And(entity.ProjectPackageSchema.ProjectID.Eq(projectID), entity.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType)), entity.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -42,7 +44,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectPipeline], error) {
-	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineSchema).
 		Where(entity.ProjectPipelineSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectPipelineSchema.IID.Desc())
@@ -50,9 +52,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (entity.ProjectPipeline, error) {
-	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectPipelineSchema.ProjectID.Eq(projectID),
 			entity.ProjectPipelineSchema.ID.Eq(id),
 		)).
@@ -61,9 +63,9 @@ func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id 
 }
 
 func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source string, refName string, commitSHA string) (entity.ProjectPipeline, error) {
-	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectPipelineSchema.ProjectID.Eq(projectID),
 			entity.ProjectPipelineSchema.Source.Eq(strings.TrimSpace(source)),
 			entity.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
@@ -75,9 +77,9 @@ func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID 
 }
 
 func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName string, commitSHA string) (entity.ProjectPipeline, error) {
-	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
 		From(entity.ProjectPipelineSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectPipelineSchema.ProjectID.Eq(projectID),
 			entity.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
 			entity.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA)),
@@ -91,7 +93,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 	var created entity.ProjectPipeline
 	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[entity.ProjectPipeline, entity.ProjectPipelineSchemaDef]) error {
 		nextIID := int64(1)
-		query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+		query := querydsl.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
 			From(entity.ProjectPipelineSchema).
 			Where(entity.ProjectPipelineSchema.ProjectID.Eq(input.ProjectID)).
 			OrderBy(entity.ProjectPipelineSchema.IID.Desc()).
@@ -146,7 +148,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, item entity.ProjectPipeli
 		return nil
 	}
 	now := time.Now().UTC()
-	assignments := []dbx.Assignment{
+	assignments := []querydsl.Assignment{
 		entity.ProjectPipelineSchema.Status.Set(status),
 		entity.ProjectPipelineSchema.UpdatedAt.Set(now),
 	}

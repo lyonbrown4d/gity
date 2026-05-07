@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -36,7 +38,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectRunner], error) {
-	query := dbx.Select(entity.ProjectRunnerSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectRunnerSchema.AllColumns().Values()...).
 		From(entity.ProjectRunnerSchema).
 		Where(entity.ProjectRunnerSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectRunnerSchema.ID.Desc())
@@ -44,9 +46,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (entity.ProjectRunner, error) {
-	query := dbx.Select(entity.ProjectRunnerSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectRunnerSchema.AllColumns().Values()...).
 		From(entity.ProjectRunnerSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectRunnerSchema.ProjectID.Eq(projectID),
 			entity.ProjectRunnerSchema.ID.Eq(id),
 		)).

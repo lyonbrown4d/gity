@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -28,7 +30,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByNamespaceID(ctx context.Context, namespaceID int64) (*collectionx.List[entity.NamespaceMember], error) {
-	query := dbx.Select(entity.NamespaceMemberSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.NamespaceMemberSchema.AllColumns().Values()...).
 		From(entity.NamespaceMemberSchema).
 		Where(entity.NamespaceMemberSchema.NamespaceID.Eq(namespaceID)).
 		OrderBy(entity.NamespaceMemberSchema.ID.Desc())

@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectPackageVersion struct {
@@ -16,13 +18,13 @@ type ProjectPackageVersion struct {
 }
 
 type ProjectPackageVersionSchemaDef struct {
-	dbx.Schema[ProjectPackageVersion]
-	ID               dbx.IDColumn[ProjectPackageVersion, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectPackageID dbx.Column[ProjectPackageVersion, int64]                    `dbx:"project_package_id,index,ref=project_packages.id,ondelete=cascade"`
-	Version          dbx.Column[ProjectPackageVersion, string]                   `dbx:"version,index"`
-	Status           dbx.Column[ProjectPackageVersion, string]                   `dbx:"status,index"`
-	CreatedAt        dbx.Column[ProjectPackageVersion, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt        dbx.Column[ProjectPackageVersion, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectPackageVersion]
+	ID               column.IDColumn[ProjectPackageVersion, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectPackageID column.Column[ProjectPackageVersion, int64]                      `dbx:"project_package_id,index,ref=project_packages.id,ondelete=cascade"`
+	Version          column.Column[ProjectPackageVersion, string]                     `dbx:"version,index"`
+	Status           column.Column[ProjectPackageVersion, string]                     `dbx:"status,index"`
+	CreatedAt        column.Column[ProjectPackageVersion, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt        column.Column[ProjectPackageVersion, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectPackageVersionSchema = dbx.MustSchema("project_package_versions", ProjectPackageVersionSchemaDef{})
+var ProjectPackageVersionSchema = schema.MustSchema("project_package_versions", ProjectPackageVersionSchemaDef{})

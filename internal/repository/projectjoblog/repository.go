@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -42,9 +44,9 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[entity.ProjectJobLog], error) {
-	query := dbx.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
 		From(entity.ProjectJobLogSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobLogSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
 		)).
@@ -53,9 +55,9 @@ func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, pr
 }
 
 func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (entity.ProjectJobLog, error) {
-	query := dbx.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
 		From(entity.ProjectJobLogSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobLogSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
 		)).
@@ -65,9 +67,9 @@ func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID int64, 
 }
 
 func (r *Repository) GetByProjectJobAttempt(ctx context.Context, projectID int64, projectJobID int64, attempt int) (entity.ProjectJobLog, error) {
-	query := dbx.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectJobLogSchema.AllColumns().Values()...).
 		From(entity.ProjectJobLogSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectJobLogSchema.ProjectID.Eq(projectID),
 			entity.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
 			entity.ProjectJobLogSchema.Attempt.Eq(attempt),

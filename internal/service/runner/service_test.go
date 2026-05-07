@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
@@ -23,6 +22,8 @@ import (
 	projectrunnerrepo "github.com/DaiYuANg/gity/internal/repository/projectrunner"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
 	runnerservice "github.com/DaiYuANg/gity/internal/service/runner"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

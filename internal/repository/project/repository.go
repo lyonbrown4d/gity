@@ -7,9 +7,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -33,7 +35,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) List(ctx context.Context, namespaceID sql.NullInt64) (*collectionx.List[entity.Project], error) {
-	query := dbx.Select(entity.ProjectSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectSchema.AllColumns().Values()...).
 		From(entity.ProjectSchema).
 		OrderBy(entity.ProjectSchema.ID.Desc())
 	if namespaceID.Valid {

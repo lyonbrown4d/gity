@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -36,12 +38,12 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectMergeRequest], error) {
-	query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectMergeRequestSchema.IID.Desc())
+	query := querydsl.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectMergeRequestSchema.IID.Desc())
 	return r.base.List(ctx, query)
 }
 
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (entity.ProjectMergeRequest, error) {
-	query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(dbx.And(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID), entity.ProjectMergeRequestSchema.IID.Eq(iid))).Limit(1)
+	query := querydsl.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(querydsl.And(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID), entity.ProjectMergeRequestSchema.IID.Eq(iid))).Limit(1)
 	return r.base.First(ctx, query)
 }
 
@@ -49,7 +51,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 	var created entity.ProjectMergeRequest
 	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[entity.ProjectMergeRequest, entity.ProjectMergeRequestSchemaDef]) error {
 		nextIID := int64(1)
-		query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(input.ProjectID)).OrderBy(entity.ProjectMergeRequestSchema.IID.Desc()).Limit(1)
+		query := querydsl.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(input.ProjectID)).OrderBy(entity.ProjectMergeRequestSchema.IID.Desc()).Limit(1)
 		last, err := repo.First(ctx, query)
 		if err == nil {
 			nextIID = last.IID + 1
@@ -82,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 }
 
 func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
-	assignments := make([]dbx.Assignment, 0, 4)
+	assignments := make([]querydsl.Assignment, 0, 4)
 	if input.Title != nil {
 		assignments = append(assignments, entity.ProjectMergeRequestSchema.Title.Set(strings.TrimSpace(*input.Title)))
 	}

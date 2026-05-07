@@ -6,8 +6,10 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -20,7 +22,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (entity.ProjectLFSObject, error) {
-	query := dbx.Select(entity.ProjectLFSObjectSchema.AllColumns().Values()...).From(entity.ProjectLFSObjectSchema).Where(dbx.And(entity.ProjectLFSObjectSchema.ProjectID.Eq(projectID), entity.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid)))).Limit(1)
+	query := querydsl.Select(entity.ProjectLFSObjectSchema.AllColumns().Values()...).From(entity.ProjectLFSObjectSchema).Where(querydsl.And(entity.ProjectLFSObjectSchema.ProjectID.Eq(projectID), entity.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

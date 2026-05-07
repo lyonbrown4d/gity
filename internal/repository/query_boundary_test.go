@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
@@ -17,6 +16,8 @@ import (
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/repository/projectpackage"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/repository/projectpackageversion"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

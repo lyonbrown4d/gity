@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	setx "github.com/arcgolabs/collectionx/set"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/schemamigrate"
 )
 
 type Migration struct {
@@ -44,7 +46,7 @@ func migrations() []Migration {
 			Version: "0001_core",
 			Name:    "bootstrap core namespace project auth schema",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.UserSchema, entity.NamespaceSchema, entity.ProjectSchema, entity.NamespaceMemberSchema, entity.UserAccessTokenSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.UserSchema, entity.NamespaceSchema, entity.ProjectSchema, entity.NamespaceMemberSchema, entity.UserAccessTokenSchema)
 				return err
 			},
 		},
@@ -52,7 +54,7 @@ func migrations() []Migration {
 			Version: "0002_project_issues",
 			Name:    "add project issues comments and attachments",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectIssueSchema, entity.ProjectIssueCommentSchema, entity.ProjectIssueAttachmentSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectIssueSchema, entity.ProjectIssueCommentSchema, entity.ProjectIssueAttachmentSchema)
 				return err
 			},
 		},
@@ -60,7 +62,7 @@ func migrations() []Migration {
 			Version: "0003_project_merge_requests",
 			Name:    "add project merge requests",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectMergeRequestSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectMergeRequestSchema)
 				return err
 			},
 		},
@@ -68,7 +70,7 @@ func migrations() []Migration {
 			Version: "0004_project_packages",
 			Name:    "add project package registry",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectPackageSchema, entity.ProjectPackageVersionSchema, entity.ProjectPackageFileSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectPackageSchema, entity.ProjectPackageVersionSchema, entity.ProjectPackageFileSchema)
 				return err
 			},
 		},
@@ -76,7 +78,7 @@ func migrations() []Migration {
 			Version: "0005_project_lfs",
 			Name:    "add project git lfs objects",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectLFSObjectSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectLFSObjectSchema)
 				return err
 			},
 		},
@@ -84,7 +86,7 @@ func migrations() []Migration {
 			Version: "0006_project_lfs_locks",
 			Name:    "add project git lfs locks",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectLFSLockSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectLFSLockSchema)
 				return err
 			},
 		},
@@ -92,7 +94,7 @@ func migrations() []Migration {
 			Version: "0007_project_jobs",
 			Name:    "add project jobs",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectJobSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectJobSchema)
 				return err
 			},
 		},
@@ -100,7 +102,7 @@ func migrations() []Migration {
 			Version: "0008_project_wiki_pages",
 			Name:    "add project wiki pages",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectWikiPageSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectWikiPageSchema)
 				return err
 			},
 		},
@@ -108,7 +110,7 @@ func migrations() []Migration {
 			Version: "0009_project_runners",
 			Name:    "add project runners",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectRunnerSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectRunnerSchema)
 				return err
 			},
 		},
@@ -116,7 +118,7 @@ func migrations() []Migration {
 			Version: "0010_project_pipelines",
 			Name:    "add project pipelines",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectPipelineSchema, entity.ProjectPipelineJobSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectPipelineSchema, entity.ProjectPipelineJobSchema)
 				return err
 			},
 		},
@@ -124,7 +126,7 @@ func migrations() []Migration {
 			Version: "0011_project_job_logs_artifacts",
 			Name:    "add project job logs and artifacts",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectJobLogSchema, entity.ProjectJobArtifactSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectJobLogSchema, entity.ProjectJobArtifactSchema)
 				return err
 			},
 		},
@@ -132,7 +134,7 @@ func migrations() []Migration {
 			Version: "0012_project_branch_protections",
 			Name:    "add project branch protections",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := dbx.AutoMigrate(ctx, tx, entity.ProjectBranchProtectionSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, entity.ProjectBranchProtectionSchema)
 				return err
 			},
 		},

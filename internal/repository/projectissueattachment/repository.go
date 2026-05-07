@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -36,7 +38,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByIssueID(ctx context.Context, issueID int64) (*collectionx.List[entity.ProjectIssueAttachment], error) {
-	query := dbx.Select(entity.ProjectIssueAttachmentSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectIssueAttachmentSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueAttachmentSchema).
 		Where(entity.ProjectIssueAttachmentSchema.ProjectIssueID.Eq(issueID)).
 		OrderBy(entity.ProjectIssueAttachmentSchema.ID.Desc())
@@ -44,9 +46,9 @@ func (r *Repository) ListByIssueID(ctx context.Context, issueID int64) (*collect
 }
 
 func (r *Repository) GetByIssueAndID(ctx context.Context, issueID int64, attachmentID int64) (entity.ProjectIssueAttachment, error) {
-	query := dbx.Select(entity.ProjectIssueAttachmentSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectIssueAttachmentSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueAttachmentSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectIssueAttachmentSchema.ProjectIssueID.Eq(issueID),
 			entity.ProjectIssueAttachmentSchema.ID.Eq(attachmentID),
 		)).

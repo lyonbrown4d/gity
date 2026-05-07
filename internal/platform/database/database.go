@@ -5,11 +5,12 @@ import (
 	"log/slog"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/dialect"
 	mysqlDialect "github.com/arcgolabs/dbx/dialect/mysql"
 	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
-
 	_ "github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
 )
@@ -44,7 +45,7 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 	return db, nil
 }
 
-func resolveDialect(driver string) (dbx.SchemaDialect, error) {
+func resolveDialect(driver string) (dialect.Dialect, error) {
 	switch driver {
 	case "sqlite":
 		return sqliteDialect.New(), nil

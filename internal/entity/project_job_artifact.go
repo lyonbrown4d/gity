@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectJobArtifact struct {
@@ -21,18 +23,18 @@ type ProjectJobArtifact struct {
 }
 
 type ProjectJobArtifactSchemaDef struct {
-	dbx.Schema[ProjectJobArtifact]
-	ID           dbx.IDColumn[ProjectJobArtifact, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID    dbx.Column[ProjectJobArtifact, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	ProjectJobID dbx.Column[ProjectJobArtifact, int64]                    `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
-	Name         dbx.Column[ProjectJobArtifact, string]                   `dbx:"name"`
-	FileName     dbx.Column[ProjectJobArtifact, string]                   `dbx:"file_name"`
-	FilePath     dbx.Column[ProjectJobArtifact, string]                   `dbx:"file_path"`
-	ContentType  dbx.Column[ProjectJobArtifact, string]                   `dbx:"content_type"`
-	ByteSize     dbx.Column[ProjectJobArtifact, int64]                    `dbx:"byte_size"`
-	StorageKey   dbx.Column[ProjectJobArtifact, string]                   `dbx:"storage_key"`
-	CreatedAt    dbx.Column[ProjectJobArtifact, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt    dbx.Column[ProjectJobArtifact, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectJobArtifact]
+	ID           column.IDColumn[ProjectJobArtifact, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID    column.Column[ProjectJobArtifact, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	ProjectJobID column.Column[ProjectJobArtifact, int64]                      `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
+	Name         column.Column[ProjectJobArtifact, string]                     `dbx:"name"`
+	FileName     column.Column[ProjectJobArtifact, string]                     `dbx:"file_name"`
+	FilePath     column.Column[ProjectJobArtifact, string]                     `dbx:"file_path"`
+	ContentType  column.Column[ProjectJobArtifact, string]                     `dbx:"content_type"`
+	ByteSize     column.Column[ProjectJobArtifact, int64]                      `dbx:"byte_size"`
+	StorageKey   column.Column[ProjectJobArtifact, string]                     `dbx:"storage_key"`
+	CreatedAt    column.Column[ProjectJobArtifact, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt    column.Column[ProjectJobArtifact, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectJobArtifactSchema = dbx.MustSchema("project_job_artifacts", ProjectJobArtifactSchemaDef{})
+var ProjectJobArtifactSchema = schema.MustSchema("project_job_artifacts", ProjectJobArtifactSchemaDef{})

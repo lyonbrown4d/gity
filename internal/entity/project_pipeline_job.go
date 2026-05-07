@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectPipelineJob struct {
@@ -23,20 +25,20 @@ type ProjectPipelineJob struct {
 }
 
 type ProjectPipelineJobSchemaDef struct {
-	dbx.Schema[ProjectPipelineJob]
-	ID           dbx.IDColumn[ProjectPipelineJob, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID    dbx.Column[ProjectPipelineJob, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	PipelineID   dbx.Column[ProjectPipelineJob, int64]                    `dbx:"pipeline_id,index,ref=project_pipelines.id,ondelete=cascade"`
-	ProjectJobID dbx.Column[ProjectPipelineJob, int64]                    `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
-	Name         dbx.Column[ProjectPipelineJob, string]                   `dbx:"name"`
-	Stage        dbx.Column[ProjectPipelineJob, string]                   `dbx:"stage,index"`
-	Needs        dbx.Column[ProjectPipelineJob, string]                   `dbx:"needs,type=TEXT,null"`
-	Image        dbx.Column[ProjectPipelineJob, string]                   `dbx:"image,null"`
-	Script       dbx.Column[ProjectPipelineJob, string]                   `dbx:"script,type=TEXT"`
-	Artifacts    dbx.Column[ProjectPipelineJob, string]                   `dbx:"artifacts,type=TEXT,null"`
-	SortOrder    dbx.Column[ProjectPipelineJob, int]                      `dbx:"sort_order,index"`
-	CreatedAt    dbx.Column[ProjectPipelineJob, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt    dbx.Column[ProjectPipelineJob, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectPipelineJob]
+	ID           column.IDColumn[ProjectPipelineJob, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID    column.Column[ProjectPipelineJob, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	PipelineID   column.Column[ProjectPipelineJob, int64]                      `dbx:"pipeline_id,index,ref=project_pipelines.id,ondelete=cascade"`
+	ProjectJobID column.Column[ProjectPipelineJob, int64]                      `dbx:"project_job_id,index,ref=project_jobs.id,ondelete=cascade"`
+	Name         column.Column[ProjectPipelineJob, string]                     `dbx:"name"`
+	Stage        column.Column[ProjectPipelineJob, string]                     `dbx:"stage,index"`
+	Needs        column.Column[ProjectPipelineJob, string]                     `dbx:"needs,type=TEXT,null"`
+	Image        column.Column[ProjectPipelineJob, string]                     `dbx:"image,null"`
+	Script       column.Column[ProjectPipelineJob, string]                     `dbx:"script,type=TEXT"`
+	Artifacts    column.Column[ProjectPipelineJob, string]                     `dbx:"artifacts,type=TEXT,null"`
+	SortOrder    column.Column[ProjectPipelineJob, int]                        `dbx:"sort_order,index"`
+	CreatedAt    column.Column[ProjectPipelineJob, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt    column.Column[ProjectPipelineJob, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectPipelineJobSchema = dbx.MustSchema("project_pipeline_jobs", ProjectPipelineJobSchemaDef{})
+var ProjectPipelineJobSchema = schema.MustSchema("project_pipeline_jobs", ProjectPipelineJobSchemaDef{})

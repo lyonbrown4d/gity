@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	"github.com/DaiYuANg/gity/internal/repository/core"
@@ -21,6 +20,8 @@ import (
 	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/repository/projectpipelinejob"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
 	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

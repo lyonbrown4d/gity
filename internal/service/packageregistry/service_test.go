@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
@@ -29,6 +28,8 @@ import (
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

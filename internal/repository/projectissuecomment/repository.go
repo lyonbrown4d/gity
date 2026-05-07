@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -29,7 +31,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByIssueID(ctx context.Context, issueID int64) (*collectionx.List[entity.ProjectIssueComment], error) {
-	query := dbx.Select(entity.ProjectIssueCommentSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectIssueCommentSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueCommentSchema).
 		Where(entity.ProjectIssueCommentSchema.ProjectIssueID.Eq(issueID)).
 		OrderBy(entity.ProjectIssueCommentSchema.ID.Asc())

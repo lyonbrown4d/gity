@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+
 	collectionx "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/dbx"
+	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
@@ -37,7 +39,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectIssue], error) {
-	query := dbx.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueSchema).
 		Where(entity.ProjectIssueSchema.ProjectID.Eq(projectID)).
 		OrderBy(entity.ProjectIssueSchema.IID.Desc())
@@ -45,9 +47,9 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (entity.ProjectIssue, error) {
-	query := dbx.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
+	query := querydsl.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueSchema).
-		Where(dbx.And(
+		Where(querydsl.And(
 			entity.ProjectIssueSchema.ProjectID.Eq(projectID),
 			entity.ProjectIssueSchema.IID.Eq(iid),
 		)).
@@ -59,7 +61,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 	var created entity.ProjectIssue
 	err := r.base.InTx(ctx, nil, func(tx *dbx.Tx, repo *dbxrepo.Base[entity.ProjectIssue, entity.ProjectIssueSchemaDef]) error {
 		nextIID := int64(1)
-		query := dbx.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
+		query := querydsl.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
 			From(entity.ProjectIssueSchema).
 			Where(entity.ProjectIssueSchema.ProjectID.Eq(input.ProjectID)).
 			OrderBy(entity.ProjectIssueSchema.IID.Desc()).
@@ -99,7 +101,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Proj
 }
 
 func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
-	assignments := make([]dbx.Assignment, 0, 4)
+	assignments := make([]querydsl.Assignment, 0, 4)
 	if input.Title != nil {
 		assignments = append(assignments, entity.ProjectIssueSchema.Title.Set(strings.TrimSpace(*input.Title)))
 	}

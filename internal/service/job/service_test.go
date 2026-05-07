@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
@@ -19,6 +18,8 @@ import (
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/repository/projectjobartifact"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/repository/projectjoblog"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
+
+	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )

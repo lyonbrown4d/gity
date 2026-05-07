@@ -3,7 +3,9 @@ package entity
 import (
 	"time"
 
-	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dbx/column"
+	"github.com/arcgolabs/dbx/idgen"
+	"github.com/arcgolabs/dbx/schema"
 )
 
 type ProjectRunner struct {
@@ -21,18 +23,18 @@ type ProjectRunner struct {
 }
 
 type ProjectRunnerSchemaDef struct {
-	dbx.Schema[ProjectRunner]
-	ID            dbx.IDColumn[ProjectRunner, int64, dbx.IDSnowflake] `dbx:"id,pk"`
-	ProjectID     dbx.Column[ProjectRunner, int64]                    `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	Name          dbx.Column[ProjectRunner, string]                   `dbx:"name,index"`
-	Description   dbx.Column[ProjectRunner, string]                   `dbx:"description,type=TEXT,null"`
-	Tags          dbx.Column[ProjectRunner, string]                   `dbx:"tags,index,null"`
-	Token         dbx.Column[ProjectRunner, string]                   `dbx:"token,unique"`
-	Status        dbx.Column[ProjectRunner, string]                   `dbx:"status,index"`
-	Active        dbx.Column[ProjectRunner, int]                      `dbx:"active,index"`
-	LastContactAt dbx.Column[ProjectRunner, time.Time]                `dbx:"last_contact_at,type=TIMESTAMP,index"`
-	CreatedAt     dbx.Column[ProjectRunner, time.Time]                `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt     dbx.Column[ProjectRunner, time.Time]                `dbx:"updated_at,type=TIMESTAMP"`
+	schema.Schema[ProjectRunner]
+	ID            column.IDColumn[ProjectRunner, int64, idgen.IDSnowflake] `dbx:"id,pk"`
+	ProjectID     column.Column[ProjectRunner, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
+	Name          column.Column[ProjectRunner, string]                     `dbx:"name,index"`
+	Description   column.Column[ProjectRunner, string]                     `dbx:"description,type=TEXT,null"`
+	Tags          column.Column[ProjectRunner, string]                     `dbx:"tags,index,null"`
+	Token         column.Column[ProjectRunner, string]                     `dbx:"token,unique"`
+	Status        column.Column[ProjectRunner, string]                     `dbx:"status,index"`
+	Active        column.Column[ProjectRunner, int]                        `dbx:"active,index"`
+	LastContactAt column.Column[ProjectRunner, time.Time]                  `dbx:"last_contact_at,type=TIMESTAMP,index"`
+	CreatedAt     column.Column[ProjectRunner, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
+	UpdatedAt     column.Column[ProjectRunner, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }
 
-var ProjectRunnerSchema = dbx.MustSchema("project_runners", ProjectRunnerSchemaDef{})
+var ProjectRunnerSchema = schema.MustSchema("project_runners", ProjectRunnerSchemaDef{})
