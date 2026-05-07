@@ -96,6 +96,27 @@ export interface RepositoryIssueCommentView {
   updated_at: string;
 }
 
+export type RepositoryMergeRequestState = "opened" | "closed" | "merged";
+
+export interface RepositoryMergeRequestView {
+  id: string;
+  project_id: string;
+  iid: number;
+  author_user_id: string;
+  title: string;
+  description?: string | null;
+  state: RepositoryMergeRequestState;
+  source_branch: string;
+  target_branch: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryMergeRequestDiffView {
+  merge_request: RepositoryMergeRequestView;
+  diff: string;
+}
+
 export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
 
 export interface RepositoryJobView {

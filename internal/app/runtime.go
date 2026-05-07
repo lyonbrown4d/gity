@@ -1,17 +1,21 @@
 package app
 
 import (
-	"github.com/DaiYuANg/arcgo/dix"
 	"github.com/DaiYuANg/gity/internal/config"
+	authendpoint "github.com/DaiYuANg/gity/internal/endpoint/auth"
 	gittransportendpoint "github.com/DaiYuANg/gity/internal/endpoint/gittransport"
 	issueendpoint "github.com/DaiYuANg/gity/internal/endpoint/issue"
+	jobendpoint "github.com/DaiYuANg/gity/internal/endpoint/job"
 	lfsendpoint "github.com/DaiYuANg/gity/internal/endpoint/lfs"
 	mergerequestendpoint "github.com/DaiYuANg/gity/internal/endpoint/mergerequest"
 	namespaceendpoint "github.com/DaiYuANg/gity/internal/endpoint/namespace"
 	packageregistryendpoint "github.com/DaiYuANg/gity/internal/endpoint/packageregistry"
+	pipelineendpoint "github.com/DaiYuANg/gity/internal/endpoint/pipeline"
 	projectendpoint "github.com/DaiYuANg/gity/internal/endpoint/project"
+	runnerendpoint "github.com/DaiYuANg/gity/internal/endpoint/runner"
 	systemendpoint "github.com/DaiYuANg/gity/internal/endpoint/system"
 	userendpoint "github.com/DaiYuANg/gity/internal/endpoint/user"
+	wikiendpoint "github.com/DaiYuANg/gity/internal/endpoint/wiki"
 	httpapp "github.com/DaiYuANg/gity/internal/http"
 	"github.com/DaiYuANg/gity/internal/platform/auth"
 	"github.com/DaiYuANg/gity/internal/platform/database"
@@ -23,24 +27,38 @@ import (
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
+	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/repository/projectissue"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/repository/projectissueattachment"
 	projectissuecommentrepo "github.com/DaiYuANg/gity/internal/repository/projectissuecomment"
+	projectjobrepo "github.com/DaiYuANg/gity/internal/repository/projectjob"
+	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/repository/projectjobartifact"
+	projectjoblogrepo "github.com/DaiYuANg/gity/internal/repository/projectjoblog"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/repository/projectlfslock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/repository/projectlfsobject"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/repository/projectpackage"
 	projectpackagefilerepo "github.com/DaiYuANg/gity/internal/repository/projectpackagefile"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/repository/projectpackageversion"
+	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
+	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/repository/projectpipelinejob"
+	projectrunnerrepo "github.com/DaiYuANg/gity/internal/repository/projectrunner"
+	projectwikipagerepo "github.com/DaiYuANg/gity/internal/repository/projectwikipage"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 	issueservice "github.com/DaiYuANg/gity/internal/service/issue"
+	jobservice "github.com/DaiYuANg/gity/internal/service/job"
 	lfsservice "github.com/DaiYuANg/gity/internal/service/lfs"
 	mergerequestservice "github.com/DaiYuANg/gity/internal/service/mergerequest"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	packageregistryservice "github.com/DaiYuANg/gity/internal/service/packageregistry"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
+	runnerservice "github.com/DaiYuANg/gity/internal/service/runner"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
+	wikiservice "github.com/DaiYuANg/gity/internal/service/wiki"
+	jobrunner "github.com/DaiYuANg/gity/internal/worker/jobrunner"
+	"github.com/arcgolabs/dix"
 )
 
 func NewMigrationApp() *dix.App {
@@ -103,15 +121,23 @@ func sharedModules() []dix.Module {
 		namespacerepo.Module(),
 		namespacememberrepo.Module(),
 		projectrepo.Module(),
+		projectbranchprotectionrepo.Module(),
 		projectissuerepo.Module(),
 		projectissuecommentrepo.Module(),
 		projectissueattachmentrepo.Module(),
+		projectjobartifactrepo.Module(),
+		projectjoblogrepo.Module(),
+		projectjobrepo.Module(),
 		projectlfslockrepo.Module(),
 		projectlfsobjectrepo.Module(),
 		projectmergerequestrepo.Module(),
 		projectpackagerepo.Module(),
 		projectpackageversionrepo.Module(),
 		projectpackagefilerepo.Module(),
+		projectpipelinerepo.Module(),
+		projectpipelinejobrepo.Module(),
+		projectrunnerrepo.Module(),
+		projectwikipagerepo.Module(),
 		auth.Module(),
 		gitexec.Module(),
 		gitrepo.Module(),
@@ -121,9 +147,13 @@ func sharedModules() []dix.Module {
 		namespaceservice.Module(),
 		projectservice.Module(),
 		issueservice.Module(),
+		jobservice.Module(),
 		lfsservice.Module(),
 		mergerequestservice.Module(),
 		packageregistryservice.Module(),
+		pipelineservice.Module(),
+		runnerservice.Module(),
+		wikiservice.Module(),
 	}
 }
 
@@ -131,17 +161,24 @@ func serverAugmentModules() []dix.Module {
 	return []dix.Module{
 		httpapp.Module(),
 		systemendpoint.Module(),
+		authendpoint.Module(),
 		gittransportendpoint.Module(),
 		lfsendpoint.Module(),
 		userendpoint.Module(),
 		namespaceendpoint.Module(),
 		projectendpoint.Module(),
 		issueendpoint.Module(),
+		jobendpoint.Module(),
 		mergerequestendpoint.Module(),
 		packageregistryendpoint.Module(),
+		pipelineendpoint.Module(),
+		runnerendpoint.Module(),
+		wikiendpoint.Module(),
 	}
 }
 
 func workerAugmentModules() []dix.Module {
-	return []dix.Module{}
+	return []dix.Module{
+		jobrunner.Module(),
+	}
 }

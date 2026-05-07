@@ -3,7 +3,7 @@ package logger
 import (
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/logx"
+	"github.com/arcgolabs/logx"
 	"github.com/DaiYuANg/gity/internal/config"
 )
 

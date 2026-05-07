@@ -3,7 +3,7 @@ package http
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/dix"
+	"github.com/arcgolabs/dix"
 )
 
 func Module() dix.Module {
@@ -12,7 +12,7 @@ func Module() dix.Module {
 		dix.Description("Fiber HTTP server and lifecycle"),
 		dix.Providers(
 			dix.Provider0(NewFiberApp),
-			dix.ProviderErr3(NewServer),
+			dix.ProviderErr4(NewServer),
 			dix.Provider3(NewHost),
 		),
 		dix.Hooks(

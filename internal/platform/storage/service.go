@@ -77,6 +77,14 @@ func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath string, oid
 	return key, nil
 }
 
+func (s *Service) SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID int64, artifactID int64, fileName string, content []byte, contentType string) (string, error) {
+	key := BuildPipelineArtifactStorageKey(projectFullPath, projectJobID, artifactID, fileName)
+	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
+		return "", err
+	}
+	return key, nil
+}
+
 func (s *Service) Load(ctx context.Context, key string) ([]byte, error) {
 	if s == nil || s.backend == nil {
 		return nil, fmt.Errorf("storage backend is not configured")
@@ -214,12 +222,24 @@ func BuildIssueStorageKey(projectFullPath string, issueIID int64, attachmentID i
 	return path.Join("issues", sanitizeNestedPath(projectFullPath), fmt.Sprintf("%d", issueIID), fmt.Sprintf("%d", attachmentID), sanitizeFileName(fileName))
 }
 
+func BuildIssueDraftStorageKey(projectFullPath string, token string, fileName string) string {
+	return path.Join(BuildIssueDraftStoragePrefix(projectFullPath), sanitizePathSegment(token), sanitizeFileName(fileName))
+}
+
+func BuildIssueDraftStoragePrefix(projectFullPath string) string {
+	return path.Join("issues", "drafts", sanitizeNestedPath(projectFullPath))
+}
+
 func BuildPackageStorageKey(projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string) string {
 	return path.Join("packages", sanitizeNestedPath(projectFullPath), sanitizePathSegment(packageType), sanitizePathSegment(packageName), sanitizePathSegment(version), fmt.Sprintf("%d", fileID), sanitizeFileName(fileName))
 }
 
 func BuildLFSStorageKey(projectFullPath string, oid string) string {
 	return path.Join("lfs", sanitizeNestedPath(projectFullPath), sanitizePathSegment(oid))
+}
+
+func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID int64, artifactID int64, fileName string) string {
+	return path.Join("pipelines", sanitizeNestedPath(projectFullPath), "jobs", fmt.Sprintf("%d", projectJobID), "artifacts", fmt.Sprintf("%d", artifactID), sanitizeFileName(fileName))
 }
 
 func DetectContentType(fileName string) string {

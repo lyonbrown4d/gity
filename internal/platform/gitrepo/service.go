@@ -10,9 +10,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
-	"regexp"
 	"unicode/utf8"
 
 	"github.com/DaiYuANg/gity/internal/config"
@@ -24,14 +24,14 @@ import (
 )
 
 var (
-	ErrRepositoryNotFound = errors.New("git repository not found")
-	ErrReferenceNotFound  = errors.New("git reference not found")
-	ErrPathNotFound       = errors.New("git path not found")
-	ErrReadmeNotFound     = errors.New("git readme not found")
-	ErrEmptyRepository    = errors.New("git repository is empty")
+	ErrRepositoryNotFound  = errors.New("git repository not found")
+	ErrReferenceNotFound   = errors.New("git reference not found")
+	ErrPathNotFound        = errors.New("git path not found")
+	ErrReadmeNotFound      = errors.New("git readme not found")
+	ErrEmptyRepository     = errors.New("git repository is empty")
 	ErrInvalidSearchQuery  = errors.New("invalid search query")
 	ErrInvalidSearchRegexp = errors.New("invalid search regex")
-	errStopIteration      = errors.New("stop iteration")
+	errStopIteration       = errors.New("stop iteration")
 )
 
 type Service struct {
@@ -75,6 +75,18 @@ type SearchResult struct {
 	Column      int    `json:"column"`
 	MatchLength int    `json:"match_length"`
 	LineContent string `json:"line_content"`
+}
+
+type LanguageStat struct {
+	Language   string  `json:"language"`
+	Bytes      int64   `json:"bytes"`
+	Percentage float64 `json:"percentage"`
+}
+
+type LanguageAnalysis struct {
+	Revision   string         `json:"revision"`
+	TotalBytes int64          `json:"total_bytes"`
+	Languages  []LanguageStat `json:"languages"`
 }
 
 type SearchParams struct {
@@ -388,10 +400,67 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 	return results, nil
 }
 
+func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName string, defaultBranch string) (LanguageAnalysis, error) {
+	repository, err := s.openRepository(repoPath)
+	if err != nil {
+		return LanguageAnalysis{}, err
+	}
+	commit, err := s.resolveCommit(ctx, repository, refName, defaultBranch)
+	if err != nil {
+		if errors.Is(err, ErrEmptyRepository) {
+			return LanguageAnalysis{Languages: []LanguageStat{}}, nil
+		}
+		return LanguageAnalysis{}, err
+	}
+	tree, err := commit.Tree()
+	if err != nil {
+		return LanguageAnalysis{}, fmt.Errorf("load commit tree: %w", err)
+	}
+	bytesByLanguage := map[string]int64{}
+	total := int64(0)
+	err = tree.Files().ForEach(func(file *object.File) error {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		language := detectLanguage(file.Name)
+		if language == "" {
+			return nil
+		}
+		bytesByLanguage[language] += file.Blob.Size
+		total += file.Blob.Size
+		return nil
+	})
+	if err != nil {
+		return LanguageAnalysis{}, fmt.Errorf("analyze repository languages: %w", err)
+	}
+	languages := make([]LanguageStat, 0, len(bytesByLanguage))
+	for language, bytes := range bytesByLanguage {
+		percentage := float64(0)
+		if total > 0 {
+			percentage = float64(bytes) * 100 / float64(total)
+		}
+		languages = append(languages, LanguageStat{Language: language, Bytes: bytes, Percentage: percentage})
+	}
+	slices.SortFunc(languages, func(a LanguageStat, b LanguageStat) int {
+		if a.Bytes != b.Bytes {
+			if a.Bytes > b.Bytes {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.Language, b.Language)
+	})
+	return LanguageAnalysis{
+		Revision:   commit.Hash.String(),
+		TotalBytes: total,
+		Languages:  languages,
+	}, nil
+}
+
 type searchMatcher struct {
-	regex  *regexp.Regexp
-	query  string
-	raw    string
+	regex *regexp.Regexp
+	query string
+	raw   string
 }
 
 func buildSearchMatcher(query string, matchCase bool, useRegex bool) (searchMatcher, error) {
@@ -617,5 +686,74 @@ func isReadmeName(name string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func detectLanguage(filePath string) string {
+	name := strings.ToLower(path.Base(filePath))
+	ext := strings.ToLower(path.Ext(filePath))
+	switch name {
+	case "dockerfile":
+		return "Dockerfile"
+	case "makefile":
+		return "Makefile"
+	case "go.mod", "go.sum":
+		return "Go"
+	case "cargo.toml", "cargo.lock":
+		return "Rust"
+	case "package.json", "pnpm-lock.yaml", "package-lock.json", "yarn.lock":
+		return "JavaScript"
+	}
+	switch ext {
+	case ".go":
+		return "Go"
+	case ".rs":
+		return "Rust"
+	case ".java":
+		return "Java"
+	case ".kt", ".kts":
+		return "Kotlin"
+	case ".js", ".mjs", ".cjs":
+		return "JavaScript"
+	case ".ts":
+		return "TypeScript"
+	case ".jsx":
+		return "JavaScript JSX"
+	case ".tsx":
+		return "TypeScript JSX"
+	case ".css":
+		return "CSS"
+	case ".scss", ".sass":
+		return "SCSS"
+	case ".html", ".htm":
+		return "HTML"
+	case ".md", ".markdown":
+		return "Markdown"
+	case ".json":
+		return "JSON"
+	case ".yaml", ".yml":
+		return "YAML"
+	case ".toml":
+		return "TOML"
+	case ".xml", ".pom":
+		return "XML"
+	case ".sql":
+		return "SQL"
+	case ".sh", ".bash":
+		return "Shell"
+	case ".ps1":
+		return "PowerShell"
+	case ".py":
+		return "Python"
+	case ".rb":
+		return "Ruby"
+	case ".php":
+		return "PHP"
+	case ".c", ".h":
+		return "C"
+	case ".cc", ".cpp", ".cxx", ".hpp", ".hh":
+		return "C++"
+	default:
+		return ""
 	}
 }

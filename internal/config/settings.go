@@ -1,6 +1,6 @@
 package config
 
-import "github.com/DaiYuANg/arcgo/configx"
+import "github.com/arcgolabs/configx"
 
 type Settings struct {
 	App      AppSettings      `mapstructure:"app"`
@@ -8,6 +8,7 @@ type Settings struct {
 	Database DatabaseSettings `mapstructure:"database"`
 	Git      GitSettings      `mapstructure:"git"`
 	Storage  StorageSettings  `mapstructure:"storage"`
+	Worker   WorkerSettings   `mapstructure:"worker"`
 }
 
 type AppSettings struct {
@@ -43,6 +44,14 @@ type StorageSettings struct {
 	S3AutoCreateBucket bool   `mapstructure:"s3_auto_create_bucket"`
 }
 
+type WorkerSettings struct {
+	Enabled            bool   `mapstructure:"enabled"`
+	ID                 string `mapstructure:"id"`
+	PollIntervalMillis int    `mapstructure:"poll_interval_millis"`
+	LeaseSeconds       int    `mapstructure:"lease_seconds"`
+	MaxJobsPerTick     int    `mapstructure:"max_jobs_per_tick"`
+}
+
 func DefaultSettings() Settings {
 	return Settings{
 		App: AppSettings{
@@ -68,6 +77,12 @@ func DefaultSettings() Settings {
 			S3Region:           "us-east-1",
 			S3UsePathStyle:     true,
 			S3AutoCreateBucket: false,
+		},
+		Worker: WorkerSettings{
+			Enabled:            true,
+			PollIntervalMillis: 1000,
+			LeaseSeconds:       60,
+			MaxJobsPerTick:     1,
 		},
 	}
 }

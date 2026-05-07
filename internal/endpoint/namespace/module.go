@@ -1,13 +1,16 @@
 package namespace
 
-import "github.com/DaiYuANg/arcgo/dix"
+import (
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/httpx"
+)
 
 func Module() dix.Module {
 	return dix.NewModule(
 		"endpoint.namespace",
 		dix.Description("Namespace routes"),
-		dix.Invokes(
-			dix.Invoke2(RegisterRoutes),
+		dix.Providers(
+			dix.Provider1(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(40))),
 		),
 	)
 }

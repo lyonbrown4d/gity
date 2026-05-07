@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dbx"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 )
 
 type NamespaceMember struct {

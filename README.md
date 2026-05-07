@@ -6,12 +6,12 @@ This repository now uses a single Go module for the backend runtime and keeps th
 
 ## Current Backend Baseline
 
-- Go backend runtime with `arcgo/dix`
-- Typed HTTP surface with `arcgo/httpx` + Fiber + Swagger/OpenAPI
-- Authentication foundation through `arcgo/authx`
-- Configuration loading through `arcgo/configx`
-- Logging through `arcgo/logx`
-- Database foundation through `arcgo/dbx` repository mode
+- Go backend runtime with `arcgolabs/dix`
+- Typed HTTP surface with `arcgolabs/httpx` + Fiber + Swagger/OpenAPI
+- Authentication foundation through `arcgolabs/authx`
+- Configuration loading through `arcgolabs/configx`
+- Logging through `arcgolabs/logx`
+- Database foundation through `arcgolabs/dbx` repository mode
 - Snowflake `int64` IDs generated through `dbx`
 - Versioned schema bootstrap through a `schema_migrations` table plus `dbx` migration execution
 - Git process boundary through native `git` subprocesses

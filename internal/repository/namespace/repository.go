@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -23,13 +23,20 @@ type CreateInput struct {
 	Description string
 }
 
+type UpdateInput struct {
+	Kind        *string
+	Name        *string
+	PathKey     *string
+	Description *string
+}
+
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
 		base: dbxrepo.NewWithOptions[entity.Namespace](db, entity.NamespaceSchema, dbxrepo.WithByIDNotFoundAsError(true)),
 	}, nil
 }
 
-func (r *Repository) List(ctx context.Context) (collectionx.List[entity.Namespace], error) {
+func (r *Repository) List(ctx context.Context) (*collectionx.List[entity.Namespace], error) {
 	query := dbx.Select(entity.NamespaceSchema.AllColumns().Values()...).
 		From(entity.NamespaceSchema).
 		OrderBy(entity.NamespaceSchema.ID.Desc())
@@ -58,4 +65,33 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.Name
 		return entity.Namespace{}, fmt.Errorf("insert namespace: %w", err)
 	}
 	return item, nil
+}
+
+func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
+	assignments := []dbx.Assignment{}
+	if input.Kind != nil {
+		assignments = append(assignments, entity.NamespaceSchema.Kind.Set(strings.TrimSpace(*input.Kind)))
+	}
+	if input.Name != nil {
+		assignments = append(assignments, entity.NamespaceSchema.Name.Set(strings.TrimSpace(*input.Name)))
+	}
+	if input.PathKey != nil {
+		pathKey := strings.TrimSpace(*input.PathKey)
+		assignments = append(assignments, entity.NamespaceSchema.PathKey.Set(pathKey), entity.NamespaceSchema.FullPath.Set(pathKey))
+	}
+	if input.Description != nil {
+		assignments = append(assignments, entity.NamespaceSchema.Description.Set(strings.TrimSpace(*input.Description)))
+	}
+	assignments = append(assignments, entity.NamespaceSchema.UpdatedAt.Set(time.Now().UTC()))
+	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
+		return fmt.Errorf("update namespace: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
+	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+		return fmt.Errorf("delete namespace: %w", err)
+	}
+	return nil
 }

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -26,7 +26,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{base: dbxrepo.NewWithOptions[entity.ProjectPackageVersion](db, entity.ProjectPackageVersionSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
 }
 
-func (r *Repository) ListByPackageID(ctx context.Context, packageID int64) (collectionx.List[entity.ProjectPackageVersion], error) {
+func (r *Repository) ListByPackageID(ctx context.Context, packageID int64) (*collectionx.List[entity.ProjectPackageVersion], error) {
 	query := dbx.Select(entity.ProjectPackageVersionSchema.AllColumns().Values()...).From(entity.ProjectPackageVersionSchema).Where(entity.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID)).OrderBy(entity.ProjectPackageVersionSchema.ID.Desc())
 	return r.base.List(ctx, query)
 }
@@ -36,7 +36,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (entity.ProjectPacka
 }
 
 func (r *Repository) GetByPackageAndVersion(ctx context.Context, packageID int64, version string) (entity.ProjectPackageVersion, error) {
-	query := dbx.Select(entity.ProjectPackageVersionSchema.AllColumns().Values()...).From(entity.ProjectPackageVersionSchema).Where(entity.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID)).Where(entity.ProjectPackageVersionSchema.Version.Eq(strings.TrimSpace(version))).Limit(1)
+	query := dbx.Select(entity.ProjectPackageVersionSchema.AllColumns().Values()...).From(entity.ProjectPackageVersionSchema).Where(dbx.And(entity.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID), entity.ProjectPackageVersionSchema.Version.Eq(strings.TrimSpace(version)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

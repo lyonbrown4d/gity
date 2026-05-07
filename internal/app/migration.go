@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	"github.com/DaiYuANg/arcgo/dix"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dix"
 	coredb "github.com/DaiYuANg/gity/internal/repository/core"
 )
 

@@ -9,6 +9,7 @@ import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-cre
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
 import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-tab";
 import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
+import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
 import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
 import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
@@ -146,6 +147,19 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
+      {meta.repository && activeTab === "merge-requests" ? (
+        <RepositoryMergeRequestsTab
+          repoId={repoId}
+          branches={meta.branches}
+          defaultBranch={meta.repository.default_branch}
+          t={t}
+          onError={meta.setActionError}
+          onMerged={async () => {
+            await Promise.all([meta.loadBranches(), meta.loadCommits()]);
+          }}
+        />
+      ) : null}
+
       {meta.repository && activeTab === "jobs" ? (
         <RepositoryJobsTab
           repoId={repoId}
@@ -228,6 +242,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
 const isRepoTab = (value: string | null): value is RepoTab =>
   value === "code"
   || value === "issues"
+  || value === "merge-requests"
   || value === "wiki"
   || value === "jobs"
   || value === "runners"

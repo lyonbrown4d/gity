@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -36,7 +36,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (collectionx.List[entity.ProjectIssue], error) {
+func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectIssue], error) {
 	query := dbx.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueSchema).
 		Where(entity.ProjectIssueSchema.ProjectID.Eq(projectID)).
@@ -47,8 +47,10 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (coll
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (entity.ProjectIssue, error) {
 	query := dbx.Select(entity.ProjectIssueSchema.AllColumns().Values()...).
 		From(entity.ProjectIssueSchema).
-		Where(entity.ProjectIssueSchema.ProjectID.Eq(projectID)).
-		Where(entity.ProjectIssueSchema.IID.Eq(iid)).
+		Where(dbx.And(
+			entity.ProjectIssueSchema.ProjectID.Eq(projectID),
+			entity.ProjectIssueSchema.IID.Eq(iid),
+		)).
 		Limit(1)
 	return r.base.First(ctx, query)
 }

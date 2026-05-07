@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -20,7 +20,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 }
 
 func (r *Repository) GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (entity.ProjectLFSObject, error) {
-	query := dbx.Select(entity.ProjectLFSObjectSchema.AllColumns().Values()...).From(entity.ProjectLFSObjectSchema).Where(entity.ProjectLFSObjectSchema.ProjectID.Eq(projectID)).Where(entity.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid))).Limit(1)
+	query := dbx.Select(entity.ProjectLFSObjectSchema.AllColumns().Values()...).From(entity.ProjectLFSObjectSchema).Where(dbx.And(entity.ProjectLFSObjectSchema.ProjectID.Eq(projectID), entity.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

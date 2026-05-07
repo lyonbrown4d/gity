@@ -1,0 +1,37 @@
+package issue
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/arcgolabs/httpx"
+)
+
+func TestEndpointRegistersCanonicalIssueRoutes(t *testing.T) {
+	server := httpx.New(httpx.WithBasePath("/api"))
+
+	RegisterRoutes(server, nil, nil)
+
+	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/issues")
+	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/issues")
+	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/issues/{issue_iid}")
+	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/issues/{issue_iid}/comments")
+}
+
+func TestEndpointRegistersDeprecatedRepoIssueAliases(t *testing.T) {
+	server := httpx.New(httpx.WithBasePath("/api"))
+
+	RegisterRoutes(server, nil, nil)
+
+	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/issues")
+	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/issues")
+	assertRoute(t, server, http.MethodPatch, "/api/v1/repos/{id}/issues/{issue_iid}")
+	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/issues/{issue_iid}/comments")
+}
+
+func assertRoute(t *testing.T, server httpx.ServerRuntime, method string, path string) {
+	t.Helper()
+	if !server.HasRoute(method, path) {
+		t.Fatalf("expected route %s %s", method, path)
+	}
+}

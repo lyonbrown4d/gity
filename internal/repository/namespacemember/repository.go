@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -27,7 +27,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) ListByNamespaceID(ctx context.Context, namespaceID int64) (collectionx.List[entity.NamespaceMember], error) {
+func (r *Repository) ListByNamespaceID(ctx context.Context, namespaceID int64) (*collectionx.List[entity.NamespaceMember], error) {
 	query := dbx.Select(entity.NamespaceMemberSchema.AllColumns().Values()...).
 		From(entity.NamespaceMemberSchema).
 		Where(entity.NamespaceMemberSchema.NamespaceID.Eq(namespaceID)).

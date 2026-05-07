@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	sqliteDialect "github.com/DaiYuANg/arcgo/dbx/dialect/sqlite"
 	"github.com/DaiYuANg/gity/internal/config"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
@@ -17,6 +16,7 @@ import (
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
+	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/repository/projectlfslock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/repository/projectlfsobject"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
@@ -24,6 +24,7 @@ import (
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
+	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -50,6 +51,7 @@ func TestLFSFlow(t *testing.T) {
 	namespaceRepository, _ := namespacerepo.NewRepository(db)
 	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
 	projectRepository, _ := projectrepo.NewRepository(db)
+	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
 	projectLFSObjectRepository, _ := projectlfsobjectrepo.NewRepository(db)
 	projectLFSLockRepository, _ := projectlfslockrepo.NewRepository(db)
 	userRepository, _ := userrepo.NewRepository(db)
@@ -66,7 +68,7 @@ func TestLFSFlow(t *testing.T) {
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
 	lfsSvc := NewService(projectRepository, projectLFSObjectRepository, projectLFSLockRepository, userRepository, storage)
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})

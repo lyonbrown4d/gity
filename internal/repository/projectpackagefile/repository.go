@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -33,8 +33,16 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{base: dbxrepo.NewWithOptions[entity.ProjectPackageFile](db, entity.ProjectPackageFileSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
 }
 
-func (r *Repository) ListByVersionID(ctx context.Context, versionID int64) (collectionx.List[entity.ProjectPackageFile], error) {
+func (r *Repository) ListByVersionID(ctx context.Context, versionID int64) (*collectionx.List[entity.ProjectPackageFile], error) {
 	query := dbx.Select(entity.ProjectPackageFileSchema.AllColumns().Values()...).From(entity.ProjectPackageFileSchema).Where(entity.ProjectPackageFileSchema.ProjectPackageVersionID.Eq(versionID)).OrderBy(entity.ProjectPackageFileSchema.ID.Desc())
+	return r.base.List(ctx, query)
+}
+
+func (r *Repository) ListByVersionIDs(ctx context.Context, versionIDs ...int64) (*collectionx.List[entity.ProjectPackageFile], error) {
+	if len(versionIDs) == 0 {
+		return collectionx.NewList[entity.ProjectPackageFile](), nil
+	}
+	query := dbx.Select(entity.ProjectPackageFileSchema.AllColumns().Values()...).From(entity.ProjectPackageFileSchema).Where(entity.ProjectPackageFileSchema.ProjectPackageVersionID.In(versionIDs...)).OrderBy(entity.ProjectPackageFileSchema.ProjectPackageVersionID.Desc(), entity.ProjectPackageFileSchema.ID.Desc())
 	return r.base.List(ctx, query)
 }
 

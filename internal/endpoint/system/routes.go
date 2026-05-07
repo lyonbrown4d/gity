@@ -3,8 +3,9 @@ package system
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/httpx"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/DaiYuANg/gity/internal/httpapi"
+	"github.com/arcgolabs/httpx"
 )
 
 type healthOutput struct {
@@ -23,8 +24,26 @@ type rewriteInfoOutput struct {
 	} `json:"body"`
 }
 
+type Endpoint struct {
+	settings config.Settings
+}
+
+func NewEndpoint(settings config.Settings) *Endpoint {
+	return &Endpoint{settings: settings}
+}
+
+func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
+	return httpapi.EndpointSpec("", "System", "System", "System and runtime APIs.")
+}
+
 func RegisterRoutes(server httpx.ServerRuntime, settings config.Settings) {
-	httpx.MustGet(server, "/health", func(ctx context.Context, in *struct{}) (*healthOutput, error) {
+	server.RegisterOnly(NewEndpoint(settings))
+}
+
+func (e *Endpoint) Register(registrar httpx.Registrar) {
+	settings := e.settings
+
+	health := func(ctx context.Context, in *struct{}) (*healthOutput, error) {
 		_ = ctx
 		_ = in
 		out := &healthOutput{}
@@ -32,22 +51,26 @@ func RegisterRoutes(server httpx.ServerRuntime, settings config.Settings) {
 		out.Body.Application = settings.App.Name
 		out.Body.Stack = "go"
 		return out, nil
-	})
+	}
 
-	v1 := server.Group("/v1")
-	httpx.MustGroupGet(v1, "/rewrite/info", func(ctx context.Context, in *struct{}) (*rewriteInfoOutput, error) {
+	rewriteInfo := func(ctx context.Context, in *struct{}) (*rewriteInfoOutput, error) {
 		_ = ctx
 		_ = in
 		out := &rewriteInfoOutput{}
 		out.Body.Runtime = "go"
 		out.Body.Architecture = "single-module cmd+internal monorepo"
 		out.Body.Foundations = []string{
-			"arcgo/dix",
-			"arcgo/httpx",
-			"arcgo/authx",
-			"arcgo/dbx",
+			"arcgolabs/dix",
+			"arcgolabs/httpx",
+			"arcgolabs/authx",
+			"arcgolabs/dbx",
 			"go-git + native git",
 		}
 		return out, nil
-	})
+	}
+
+	httpapi.MustRegisterRoutes(registrar,
+		httpapi.Get("/health", health),
+		httpapi.Get("/v1/rewrite/info", rewriteInfo),
+	)
 }

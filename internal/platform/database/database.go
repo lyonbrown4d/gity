@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	mysqlDialect "github.com/DaiYuANg/arcgo/dbx/dialect/mysql"
-	postgresDialect "github.com/DaiYuANg/arcgo/dbx/dialect/postgres"
-	sqliteDialect "github.com/DaiYuANg/arcgo/dbx/dialect/sqlite"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	mysqlDialect "github.com/arcgolabs/dbx/dialect/mysql"
+	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
+	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	"github.com/DaiYuANg/gity/internal/config"
 
 	_ "github.com/go-sql-driver/mysql"

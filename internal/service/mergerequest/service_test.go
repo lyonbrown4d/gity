@@ -10,21 +10,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	sqliteDialect "github.com/DaiYuANg/arcgo/dbx/dialect/sqlite"
 	"github.com/DaiYuANg/gity/internal/config"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
+	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
+	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -51,6 +52,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	namespaceRepository, _ := namespacerepo.NewRepository(db)
 	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
 	projectRepository, _ := projectrepo.NewRepository(db)
+	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
 	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
 	userRepository, _ := userrepo.NewRepository(db)
 	userTokenRepository, _ := usertokenrepo.NewRepository(db)
@@ -61,8 +63,8 @@ func TestMergeRequestFlow(t *testing.T) {
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
+	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner)
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
 	if err != nil {
@@ -87,8 +89,26 @@ func TestMergeRequestFlow(t *testing.T) {
 	if mr.IID != 1 {
 		t.Fatalf("expected first merge request iid to be 1, got %d", mr.IID)
 	}
+	diff, err := mergeRequestSvc.GetDiff(ctx, project.ID, mr.IID)
+	if err != nil {
+		t.Fatalf("get merge request diff: %v", err)
+	}
+	if !strings.Contains(diff.Diff, "feature.txt") {
+		t.Fatalf("expected diff to include feature file, got %s", diff.Diff)
+	}
+	merged, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"})
+	if err != nil {
+		t.Fatalf("merge request: %v", err)
+	}
+	if merged.State != "merged" {
+		t.Fatalf("expected merged state, got %s", merged.State)
+	}
 
-	updated, err := mergeRequestSvc.Update(ctx, project.ID, mr.IID, UpdateInput{State: stringPtr("closed")})
+	closedMR, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "close feature", Description: "close feature", SourceBranch: "feature", TargetBranch: "main"})
+	if err != nil {
+		t.Fatalf("create second merge request: %v", err)
+	}
+	updated, err := mergeRequestSvc.Update(ctx, project.ID, closedMR.IID, UpdateInput{State: stringPtr("closed")})
 	if err != nil {
 		t.Fatalf("update merge request: %v", err)
 	}
@@ -100,7 +120,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list merge requests: %v", err)
 	}
-	if len(items) != 1 || items[0].SourceBranch != "feature" || items[0].TargetBranch != "main" {
+	if len(items) != 2 || items[0].SourceBranch != "feature" || items[0].TargetBranch != "main" {
 		t.Fatalf("unexpected merge requests: %+v", items)
 	}
 }
@@ -133,6 +153,21 @@ func pushFixtureBranches(ctx context.Context, repoRoot string, repoPath string) 
 		return err
 	}
 	if err := runGit(ctx, worktree, "branch", "feature"); err != nil {
+		return err
+	}
+	if err := runGit(ctx, worktree, "checkout", "feature"); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(worktree, "feature.txt"), []byte("feature branch\n"), 0o644); err != nil {
+		return err
+	}
+	if err := runGit(ctx, worktree, "add", "."); err != nil {
+		return err
+	}
+	if err := runGit(ctx, worktree, "commit", "-m", "Add feature content"); err != nil {
+		return err
+	}
+	if err := runGit(ctx, worktree, "checkout", "main"); err != nil {
 		return err
 	}
 

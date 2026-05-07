@@ -1,0 +1,180 @@
+package wiki
+
+import (
+	"context"
+
+	"github.com/DaiYuANg/gity/internal/httpapi"
+	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	projectservice "github.com/DaiYuANg/gity/internal/service/project"
+	wikiservice "github.com/DaiYuANg/gity/internal/service/wiki"
+	"github.com/arcgolabs/httpx"
+)
+
+type wikiPagesInput struct {
+	ProjectID int64 `path:"id"`
+}
+
+type wikiPageInput struct {
+	ProjectID     int64  `path:"id"`
+	Slug          string `path:"slug"`
+	Authorization string `header:"Authorization"`
+}
+
+type createWikiPageInput struct {
+	ProjectID     int64              `path:"id"`
+	Authorization string             `header:"Authorization"`
+	Body          createWikiPageBody `json:"body"`
+}
+
+type updateWikiPageInput struct {
+	ProjectID     int64              `path:"id"`
+	Slug          string             `path:"slug"`
+	Authorization string             `header:"Authorization"`
+	Body          updateWikiPageBody `json:"body"`
+}
+
+type createWikiPageBody struct {
+	Slug         string `json:"slug"`
+	Title        string `json:"title"`
+	Content      string `json:"content"`
+	Format       string `json:"format"`
+	AuthorUserID int64  `json:"author_user_id"`
+}
+
+type updateWikiPageBody struct {
+	Title        *string `json:"title"`
+	Content      *string `json:"content"`
+	EditorUserID int64   `json:"editor_user_id"`
+}
+
+type wikiOutput struct {
+	Body any `json:"body"`
+}
+
+type Endpoint struct {
+	service        *wikiservice.Service
+	projectService *projectservice.Service
+	authRuntime    *platformauth.Runtime
+}
+
+func NewEndpoint(service *wikiservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+}
+
+func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
+	return httpapi.EndpointSpec("/v1", "Wiki", "Wiki", "Project wiki APIs.")
+}
+
+func RegisterRoutes(server httpx.ServerRuntime, service *wikiservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) {
+	server.RegisterOnly(NewEndpoint(service, projectService, authRuntime))
+}
+
+func (e *Endpoint) Register(registrar httpx.Registrar) {
+	service := e.service
+	authRuntime := e.authRuntime
+	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+
+	listPages := func(ctx context.Context, in *wikiPagesInput) (*wikiOutput, error) {
+		items, err := service.ListPages(ctx, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		return &wikiOutput{Body: items}, nil
+	}
+
+	createPage := func(ctx context.Context, in *createWikiPageInput) (*wikiOutput, error) {
+		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.CreatePage(ctx, in.ProjectID, wikiservice.CreatePageInput{
+			Slug:         in.Body.Slug,
+			Title:        in.Body.Title,
+			Content:      in.Body.Content,
+			Format:       in.Body.Format,
+			AuthorUserID: authorUserID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &wikiOutput{Body: item}, nil
+	}
+
+	getPage := func(ctx context.Context, in *wikiPageInput) (*wikiOutput, error) {
+		item, err := service.GetPage(ctx, in.ProjectID, in.Slug)
+		if err != nil {
+			return nil, err
+		}
+		return &wikiOutput{Body: item}, nil
+	}
+
+	updatePage := func(ctx context.Context, in *updateWikiPageInput) (*wikiOutput, error) {
+		editorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.EditorUserID)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.UpdatePage(ctx, in.ProjectID, in.Slug, wikiservice.UpdatePageInput{
+			Title:        in.Body.Title,
+			Content:      in.Body.Content,
+			EditorUserID: editorUserID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &wikiOutput{Body: item}, nil
+	}
+
+	deletePage := func(ctx context.Context, in *wikiPageInput) (*wikiOutput, error) {
+		item, err := service.DeletePage(ctx, in.ProjectID, in.Slug)
+		if err != nil {
+			return nil, err
+		}
+		return &wikiOutput{Body: item}, nil
+	}
+
+	httpapi.MustRegisterRoutes(registrar,
+		httpapi.Get("/projects/{id}/wiki/pages", listPages),
+		httpapi.Get("/repos/{id}/wiki/pages", listPages, httpapi.DeprecatedRoute[wikiPagesInput, wikiOutput]("Use GET /projects/{id}/wiki/pages instead.")),
+		httpapi.Post("/projects/{id}/wiki/pages", createPage, httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/wiki/pages", createPage,
+			httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.DeprecatedRoute[createWikiPageInput, wikiOutput]("Use POST /projects/{id}/wiki/pages instead."),
+		),
+		httpapi.Get("/projects/{id}/wiki/pages/{slug}", getPage),
+		httpapi.Get("/repos/{id}/wiki/pages/{slug}", getPage, httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use GET /projects/{id}/wiki/pages/{slug} instead.")),
+		httpapi.Patch("/projects/{id}/wiki/pages/{slug}", updatePage, httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Patch("/repos/{id}/wiki/pages/{slug}", updatePage,
+			httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.DeprecatedRoute[updateWikiPageInput, wikiOutput]("Use PATCH /projects/{id}/wiki/pages/{slug} instead."),
+		),
+		httpapi.Delete("/projects/{id}/wiki/pages/{slug}", deletePage, httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Delete("/repos/{id}/wiki/pages/{slug}", deletePage,
+			httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use DELETE /projects/{id}/wiki/pages/{slug} instead."),
+		),
+	)
+}
+
+func (in wikiPageInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in wikiPageInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in createWikiPageInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in createWikiPageInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in updateWikiPageInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in updateWikiPageInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}

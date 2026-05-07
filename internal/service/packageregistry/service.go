@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"strings"
 
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
-	"github.com/DaiYuANg/arcgo/httpx"
 	"github.com/DaiYuANg/gity/internal/entity"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/repository/projectpackage"
 	projectpackagefilerepo "github.com/DaiYuANg/gity/internal/repository/projectpackagefile"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/repository/projectpackageversion"
+	mappingx "github.com/arcgolabs/collectionx/mapping"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/arcgolabs/httpx"
 )
 
 type Service struct {
@@ -74,14 +75,23 @@ func (s *Service) GetPackage(ctx context.Context, projectID int64, packageID int
 	if err != nil {
 		return PackageDetail{}, err
 	}
-	detail := PackageDetail{Package: pkg, Versions: make([]PackageVersionDetail, 0, versions.Len())}
-	for _, version := range versions.Values() {
-		files, fileErr := s.fileRepo.ListByVersionID(ctx, version.ID)
-		if fileErr != nil {
-			return PackageDetail{}, fileErr
-		}
-		detail.Versions = append(detail.Versions, PackageVersionDetail{Version: version, Files: files.Values()})
+	versionIDs := make([]int64, 0, versions.Len())
+	versions.Range(func(_ int, version entity.ProjectPackageVersion) bool {
+		versionIDs = append(versionIDs, version.ID)
+		return true
+	})
+	files, err := s.fileRepo.ListByVersionIDs(ctx, versionIDs...)
+	if err != nil {
+		return PackageDetail{}, err
 	}
+	filesByVersion := mappingx.GroupByList(files, func(_ int, file entity.ProjectPackageFile) int64 {
+		return file.ProjectPackageVersionID
+	})
+	detail := PackageDetail{Package: pkg, Versions: make([]PackageVersionDetail, 0, versions.Len())}
+	versions.Range(func(_ int, version entity.ProjectPackageVersion) bool {
+		detail.Versions = append(detail.Versions, PackageVersionDetail{Version: version, Files: filesByVersion.GetCopy(version.ID)})
+		return true
+	})
 	return detail, nil
 }
 

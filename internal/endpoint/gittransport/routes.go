@@ -3,6 +3,7 @@ package gittransport
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,10 @@ import (
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
 	platformgittransport "github.com/DaiYuANg/gity/internal/platform/gittransport"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
+	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
+	mappingx "github.com/arcgolabs/collectionx/mapping"
+	setx "github.com/arcgolabs/collectionx/set"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,7 +24,19 @@ const (
 	serviceReceivePack = "git-receive-pack"
 )
 
-func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, transport *platformgittransport.Service) {
+var (
+	supportedGitServices      = setx.NewSet(serviceUploadPack, serviceReceivePack)
+	advertisementContentTypes = mappingx.NewMapFrom(map[string]string{
+		serviceUploadPack:  "application/x-git-upload-pack-advertisement",
+		serviceReceivePack: "application/x-git-receive-pack-advertisement",
+	})
+	rpcContentTypes = mappingx.NewMapFrom(map[string]string{
+		serviceUploadPack:  "application/x-git-upload-pack-result",
+		serviceReceivePack: "application/x-git-receive-pack-result",
+	})
+)
+
+func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, branchProtectionRepo *projectbranchprotectionrepo.Repository, transport *platformgittransport.Service) {
 	app.Use(func(c *fiber.Ctx) error {
 		if !isGitProtocolPath(c.Path(), c.Method()) {
 			return c.Next()
@@ -28,7 +45,7 @@ func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformau
 		case fiber.MethodGet:
 			return handleInfoRefs(c, logger, authRuntime, repo, transport)
 		case fiber.MethodPost:
-			return handleRPC(c, logger, authRuntime, repo, transport)
+			return handleRPC(c, logger, authRuntime, repo, branchProtectionRepo, transport)
 		default:
 			return c.Next()
 		}
@@ -41,7 +58,7 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth
 		return c.Next()
 	}
 	service := strings.TrimSpace(c.Query("service"))
-	if service != serviceUploadPack && service != serviceReceivePack {
+	if !supportedGitServices.Contains(service) {
 		return fiber.NewError(http.StatusBadRequest, "unsupported git service")
 	}
 	repoPath := strings.TrimSuffix(path, "/info/refs")
@@ -66,17 +83,14 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth
 		return fiber.NewError(http.StatusInternalServerError, "git advertise failed")
 	}
 
-	contentType := map[string]string{
-		serviceUploadPack:  "application/x-git-upload-pack-advertisement",
-		serviceReceivePack: "application/x-git-receive-pack-advertisement",
-	}[service]
+	contentType, _ := advertisementContentTypes.Get(service)
 	body := append([]byte(pktLine("# service="+service+"\n")+"0000"), stdout.Bytes()...)
 	c.Set(fiber.HeaderContentType, contentType)
 	c.Set(fiber.HeaderCacheControl, "no-cache")
 	return c.Send(body)
 }
 
-func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, transport *platformgittransport.Service) error {
+func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, branchProtectionRepo *projectbranchprotectionrepo.Repository, transport *platformgittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	service := ""
 	repoPath := ""
@@ -104,6 +118,9 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runt
 	case serviceUploadPack:
 		err = transport.UploadPack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
 	case serviceReceivePack:
+		if err := rejectProtectedBranchUpdates(c.UserContext(), project, branchProtectionRepo, c.Body()); err != nil {
+			return err
+		}
 		err = transport.ReceivePack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
 	}
 	if err != nil {
@@ -111,13 +128,21 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runt
 		return fiber.NewError(http.StatusInternalServerError, "git rpc failed")
 	}
 
-	contentType := map[string]string{
-		serviceUploadPack:  "application/x-git-upload-pack-result",
-		serviceReceivePack: "application/x-git-receive-pack-result",
-	}[service]
+	contentType, _ := rpcContentTypes.Get(service)
 	c.Set(fiber.HeaderContentType, contentType)
 	c.Set(fiber.HeaderCacheControl, "no-cache")
 	return c.Send(stdout.Bytes())
+}
+
+func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, body []byte) error {
+	for _, branchName := range parseReceivePackBranchUpdates(body) {
+		if _, err := repo.GetByProjectAndBranch(ctx, project.ID, branchName); err == nil {
+			return fiber.NewError(http.StatusForbidden, "protected branch cannot be updated: "+branchName)
+		} else if err != dbxrepo.ErrNotFound {
+			return fiber.NewError(http.StatusInternalServerError, "check branch protection failed")
+		}
+	}
+	return nil
 }
 
 func authorizeProject(c *fiber.Ctx, authRuntime *platformauth.Runtime, project projectView, service string) error {
@@ -182,6 +207,44 @@ func normalizeRepoFullPath(value string) (string, error) {
 func pktLine(data string) string {
 	total := len(data) + 4
 	return fmt.Sprintf("%04x%s", total, data)
+}
+
+func parseReceivePackBranchUpdates(body []byte) []string {
+	branches := make([]string, 0)
+	offset := 0
+	for offset+4 <= len(body) {
+		rawLength := string(body[offset : offset+4])
+		offset += 4
+		if rawLength == "0000" {
+			break
+		}
+		lengthBytes, err := hex.DecodeString(rawLength)
+		if err != nil || len(lengthBytes) != 2 {
+			break
+		}
+		length := int(lengthBytes[0])<<8 + int(lengthBytes[1])
+		if length < 4 {
+			break
+		}
+		payloadLength := length - 4
+		if offset+payloadLength > len(body) {
+			break
+		}
+		payload := string(body[offset : offset+payloadLength])
+		offset += payloadLength
+		if index := strings.IndexByte(payload, 0); index >= 0 {
+			payload = payload[:index]
+		}
+		fields := strings.Fields(payload)
+		if len(fields) < 3 {
+			continue
+		}
+		refName := fields[2]
+		if strings.HasPrefix(refName, "refs/heads/") {
+			branches = append(branches, strings.TrimPrefix(refName, "refs/heads/"))
+		}
+	}
+	return branches
 }
 
 func isGitProtocolPath(path string, method string) bool {

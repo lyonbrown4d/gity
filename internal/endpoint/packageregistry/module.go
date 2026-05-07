@@ -1,13 +1,16 @@
 package packageregistry
 
-import "github.com/DaiYuANg/arcgo/dix"
+import (
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/httpx"
+)
 
 func Module() dix.Module {
 	return dix.NewModule(
 		"endpoint.packageregistry",
 		dix.Description("Package registry routes"),
-		dix.Invokes(
-			dix.Invoke2(RegisterRoutes),
+		dix.Providers(
+			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(80))),
 		),
 	)
 }

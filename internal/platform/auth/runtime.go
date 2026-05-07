@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/DaiYuANg/arcgo/authx"
+	"github.com/arcgolabs/authx"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"

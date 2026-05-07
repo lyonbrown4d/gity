@@ -3,8 +3,8 @@ package core
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	"github.com/DaiYuANg/arcgo/dix"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/arcgolabs/dix"
 )
 
 func Module() dix.Module {

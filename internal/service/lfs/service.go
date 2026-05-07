@@ -9,20 +9,23 @@ import (
 	"strings"
 	"unicode"
 
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
-	"github.com/DaiYuANg/arcgo/httpx"
 	"github.com/DaiYuANg/gity/internal/entity"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/repository/projectlfslock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/repository/projectlfsobject"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+	setx "github.com/arcgolabs/collectionx/set"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/arcgolabs/httpx"
 )
 
 const (
 	defaultLockPageSize     = 100
 	timeLayoutRFC3339Millis = "2006-01-02T15:04:05.000Z07:00"
 )
+
+var supportedBatchOperations = setx.NewSet("upload", "download")
 
 type Service struct {
 	projectRepo *projectrepo.Repository
@@ -121,7 +124,7 @@ func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request Bat
 		return BatchResponse{}, httpx.NewError(http.StatusNotFound, "project not found", err)
 	}
 	operation := strings.TrimSpace(strings.ToLower(request.Operation))
-	if operation != "upload" && operation != "download" {
+	if !supportedBatchOperations.Contains(operation) {
 		return BatchResponse{}, fmt.Errorf("unsupported lfs operation: %s", request.Operation)
 	}
 	response := BatchResponse{Transfer: "basic", Objects: make([]BatchObjectResult, 0, len(request.Objects))}

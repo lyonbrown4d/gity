@@ -1,0 +1,16 @@
+package pipeline
+
+import (
+	"github.com/arcgolabs/dix"
+	"github.com/arcgolabs/httpx"
+)
+
+func Module() dix.Module {
+	return dix.NewModule(
+		"endpoint.pipeline",
+		dix.Description("Project pipeline routes"),
+		dix.Providers(
+			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(100))),
+		),
+	)
+}

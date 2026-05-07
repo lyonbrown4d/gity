@@ -5,19 +5,19 @@ This repository is moving from the Rust workspace to a single Go module rooted a
 ## Goals
 
 - Keep one backend language across API server, worker, and future runner.
-- Use `arcgo` as the infrastructure foundation.
+- Use `arcgolabs` packages as the infrastructure foundation.
 - Keep the repository lightweight: single `go.mod`, `cmd + internal`, no multi-module workspace split.
 - Preserve GitLab-like domain modeling: `namespace -> project` is the core business chain.
 
 ## Foundation Packages
 
-- `arcgo/dix`: typed modular application runtime and lifecycle wiring.
-- `arcgo/httpx`: typed HTTP server and OpenAPI surface.
-- `arcgo/httpx/adapter/fiber`: runtime bridge for the HTTP API host.
-- `arcgo/authx`: authentication and authorization engine.
-- `arcgo/configx`: layered config loading from `.env`, environment variables, and defaults.
-- `arcgo/logx`: structured logging.
-- `arcgo/dbx`: schema-first ORM core and migration execution foundation.
+- `arcgolabs/dix`: typed modular application runtime and lifecycle wiring.
+- `arcgolabs/httpx`: typed HTTP server and OpenAPI surface.
+- `arcgolabs/httpx/adapter/fiber`: runtime bridge for the HTTP API host.
+- `arcgolabs/authx`: authentication and authorization engine.
+- `arcgolabs/configx`: layered config loading from `.env`, environment variables, and defaults.
+- `arcgolabs/logx`: structured logging.
+- `arcgolabs/dbx`: schema-first ORM core and migration execution foundation.
 
 ## Repository Layout
 
@@ -85,7 +85,7 @@ This is the current base for issues, package registry, LFS, and later worker job
 - `dbx` repository mode is the default persistence style for the backend.
 - Active record mode is intentionally not used in the main application chain.
 - Domain write paths stay in services; repositories stay focused on schema-backed persistence.
-- The current codebase uses a small versioned migration runner built on top of `dbx` because the currently pinned `arcgo/dbx` version does not expose a separate `dbx/migrate` package.
+- The current codebase uses a small versioned migration runner built on top of `dbx` because the currently pinned `arcgolabs/dbx` version does not expose a separate `dbx/migrate` package.
 
 ## Git Boundary
 

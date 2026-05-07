@@ -4,14 +4,16 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
 	"github.com/DaiYuANg/gity/internal/entity"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Service struct {
@@ -26,20 +28,37 @@ type CreateInput struct {
 	Email       string `json:"email"`
 }
 
+type UpdateInput struct {
+	Username    *string `json:"username"`
+	DisplayName *string `json:"display_name"`
+	Email       *string `json:"email"`
+	Status      *string `json:"status"`
+}
+
 type CreateTokenInput struct {
 	Name string `json:"name"`
+}
+
+type AuthSession struct {
+	User         entity.User
+	AccessToken  entity.UserAccessToken
+	RefreshToken entity.UserAccessToken
 }
 
 func NewService(logger *slog.Logger, repo *userrepo.Repository, tokenRepo *usertokenrepo.Repository) *Service {
 	return &Service{logger: logger, repo: repo, tokenRepo: tokenRepo}
 }
 
-func (s *Service) List(ctx context.Context) (collectionx.List[entity.User], error) {
+func (s *Service) List(ctx context.Context) (*collectionx.List[entity.User], error) {
 	return s.repo.List(ctx)
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (entity.User, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *Service) GetByUsername(ctx context.Context, username string) (entity.User, error) {
+	return s.repo.GetByUsername(ctx, username)
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (entity.User, error) {
@@ -54,6 +73,88 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (entity.User, e
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
 	})
+}
+
+func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (entity.User, error) {
+	if input.Username != nil && strings.TrimSpace(*input.Username) == "" {
+		return entity.User{}, fmt.Errorf("username is required")
+	}
+	if input.DisplayName != nil && strings.TrimSpace(*input.DisplayName) == "" {
+		displayName := ""
+		if input.Username != nil {
+			displayName = strings.TrimSpace(*input.Username)
+		}
+		input.DisplayName = &displayName
+	}
+	if err := s.repo.UpdateByID(ctx, id, userrepo.UpdateInput{
+		Username:    input.Username,
+		DisplayName: input.DisplayName,
+		Email:       input.Email,
+	}); err != nil {
+		return entity.User{}, err
+	}
+	return s.repo.GetByID(ctx, id)
+}
+
+func (s *Service) Delete(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("user id is required")
+	}
+	return s.repo.DeleteByID(ctx, id)
+}
+
+func (s *Service) Login(ctx context.Context, username string) (AuthSession, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return AuthSession{}, fmt.Errorf("username is required")
+	}
+	user, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		if !errors.Is(err, dbxrepo.ErrNotFound) {
+			return AuthSession{}, err
+		}
+		user, err = s.Create(ctx, CreateInput{
+			Username:    username,
+			DisplayName: username,
+			Email:       username + "@local.gity",
+		})
+		if err != nil {
+			return AuthSession{}, err
+		}
+	}
+	return s.createSession(ctx, user)
+}
+
+func (s *Service) Refresh(ctx context.Context, refreshToken string) (AuthSession, error) {
+	record, err := s.tokenRepo.GetByToken(ctx, strings.TrimSpace(refreshToken))
+	if err != nil {
+		return AuthSession{}, err
+	}
+	user, err := s.repo.GetByID(ctx, record.UserID)
+	if err != nil {
+		return AuthSession{}, err
+	}
+	_ = s.tokenRepo.DeleteByToken(ctx, record.Token)
+	return s.createSession(ctx, user)
+}
+
+func (s *Service) RevokeToken(ctx context.Context, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil
+	}
+	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, dbxrepo.ErrNotFound) {
+		return err
+	}
+	return nil
+}
+
+func (s *Service) GetByToken(ctx context.Context, token string) (entity.User, error) {
+	record, err := s.tokenRepo.GetByToken(ctx, strings.TrimSpace(token))
+	if err != nil {
+		return entity.User{}, err
+	}
+	return s.repo.GetByID(ctx, record.UserID)
 }
 
 func (s *Service) ListTokens(ctx context.Context, userID int64) ([]entity.UserAccessToken, error) {
@@ -84,6 +185,18 @@ func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTok
 		Name:   name,
 		Token:  token,
 	})
+}
+
+func (s *Service) createSession(ctx context.Context, user entity.User) (AuthSession, error) {
+	accessToken, err := s.CreateToken(ctx, user.ID, CreateTokenInput{Name: "access"})
+	if err != nil {
+		return AuthSession{}, err
+	}
+	refreshToken, err := s.CreateToken(ctx, user.ID, CreateTokenInput{Name: "refresh"})
+	if err != nil {
+		return AuthSession{}, err
+	}
+	return AuthSession{User: user, AccessToken: accessToken, RefreshToken: refreshToken}, nil
 }
 
 func generateToken() (string, error) {

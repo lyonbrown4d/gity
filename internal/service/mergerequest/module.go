@@ -1,13 +1,13 @@
 package mergerequest
 
-import "github.com/DaiYuANg/arcgo/dix"
+import "github.com/arcgolabs/dix"
 
 func Module() dix.Module {
 	return dix.NewModule(
 		"service.mergerequest",
 		dix.Description("Merge request application services"),
 		dix.Providers(
-			dix.Provider4(NewService),
+			dix.Provider5(NewService),
 		),
 	)
 }

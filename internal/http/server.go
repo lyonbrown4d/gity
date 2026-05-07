@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/httpx"
-	"github.com/DaiYuANg/arcgo/httpx/adapter"
-	httpxfiber "github.com/DaiYuANg/arcgo/httpx/adapter/fiber"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/DaiYuANg/gity/internal/httpapi"
+	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/httpx/adapter"
+	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -25,21 +27,24 @@ func NewFiberApp() *fiber.App {
 	return fiber.New()
 }
 
-func NewServer(app *fiber.App, settings config.Settings, logger *slog.Logger) (httpx.ServerRuntime, error) {
+func NewServer(app *fiber.App, settings config.Settings, logger *slog.Logger, endpoints *collectionlist.List[httpx.Endpoint]) (httpx.ServerRuntime, error) {
 	adapterRuntime := httpxfiber.New(app, adapter.HumaOptions{
 		Title:       settings.App.Name,
 		Version:     "0.1.0",
-		Description: "Gity Go rewrite API on arcgo/httpx fiber",
+		Description: "Gity Go rewrite API on arcgolabs/httpx fiber",
 		DocsPath:    "/docs",
 		OpenAPIPath: "/openapi.json",
 	})
 
-	return httpx.New(
+	server := httpx.New(
 		httpx.WithAdapter(adapterRuntime),
 		httpx.WithLogger(logger),
 		httpx.WithBasePath("/api"),
 		httpx.WithValidation(),
-	), nil
+	)
+	httpapi.Configure(server)
+	httpapi.RegisterEndpoints(server, endpoints)
+	return server, nil
 }
 
 func NewHost(server httpx.ServerRuntime, settings config.Settings, logger *slog.Logger) *Host {

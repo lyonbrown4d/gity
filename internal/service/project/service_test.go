@@ -10,20 +10,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DaiYuANg/arcgo/dbx"
-	sqliteDialect "github.com/DaiYuANg/arcgo/dbx/dialect/sqlite"
 	"github.com/DaiYuANg/gity/internal/config"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
+	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
+	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "modernc.org/sqlite"
 )
 
@@ -59,6 +60,10 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new project repo: %v", err)
 	}
+	projectBranchProtectionRepository, err := projectbranchprotectionrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new project branch protection repo: %v", err)
+	}
 	userRepository, err := userrepo.NewRepository(db)
 	if err != nil {
 		t.Fatalf("new user repo: %v", err)
@@ -82,7 +87,7 @@ func TestNamespaceProjectFlow(t *testing.T) {
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{
 		Username:    "alice",
@@ -168,6 +173,43 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if len(branches) != 1 || branches[0].Name != "main" {
 		t.Fatalf("unexpected branches: %+v", branches)
 	}
+	featureBranch, err := projectSvc.CreateBranch(ctx, project.ID, "feature/editor", "main")
+	if err != nil {
+		t.Fatalf("create branch: %v", err)
+	}
+	if featureBranch.Name != "feature/editor" || featureBranch.LastCommitSHA == "" {
+		t.Fatalf("unexpected created branch: %+v", featureBranch)
+	}
+	if err := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+		BranchName: "feature/editor",
+		Path:       "docs/new.md",
+		Content:    "New file from API\n",
+		Message:    "Add new file",
+	}); err != nil {
+		t.Fatalf("create file commit: %v", err)
+	}
+	createdBlob, err := projectSvc.GetBlob(ctx, project.ID, "feature/editor", "docs/new.md")
+	if err != nil {
+		t.Fatalf("get created blob: %v", err)
+	}
+	if createdBlob.Content != "New file from API\n" {
+		t.Fatalf("unexpected created blob: %+v", createdBlob)
+	}
+	protectedBranch, err := projectSvc.SetBranchProtection(ctx, project.ID, "feature/editor", true)
+	if err != nil {
+		t.Fatalf("protect branch: %v", err)
+	}
+	if !protectedBranch.IsProtected {
+		t.Fatalf("expected branch to be protected: %+v", protectedBranch)
+	}
+	if err := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+		BranchName: "feature/editor",
+		Path:       "docs/protected.md",
+		Content:    "blocked\n",
+		Message:    "Try protected branch",
+	}); err == nil {
+		t.Fatalf("expected protected branch file commit to fail")
+	}
 
 	commits, err := projectSvc.ListCommits(ctx, project.ID, "", 10)
 	if err != nil {
@@ -183,6 +225,13 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	}
 	if readme.Path != "README.md" || !strings.Contains(readme.Content, "Hello Gity") {
 		t.Fatalf("unexpected readme blob: %+v", readme)
+	}
+	languages, err := projectSvc.AnalyzeLanguages(ctx, project.ID, "main")
+	if err != nil {
+		t.Fatalf("analyze languages: %v", err)
+	}
+	if languages.TotalBytes == 0 || len(languages.Languages) == 0 || languages.Languages[0].Language != "Markdown" {
+		t.Fatalf("unexpected language analysis: %+v", languages)
 	}
 
 	rootTree, err := projectSvc.ListTree(ctx, project.ID, "", "")

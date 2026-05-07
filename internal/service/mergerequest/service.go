@@ -2,17 +2,19 @@ package mergerequest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
-	"github.com/DaiYuANg/arcgo/httpx"
 	"github.com/DaiYuANg/gity/internal/entity"
+	"github.com/DaiYuANg/gity/internal/platform/gitexec"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/arcgolabs/httpx"
 )
 
 type Service struct {
@@ -20,6 +22,7 @@ type Service struct {
 	mergeRepo   *projectmergerequestrepo.Repository
 	userRepo    *userrepo.Repository
 	gitRepo     *gitrepo.Service
+	gitRunner   *gitexec.Runner
 }
 
 type CreateInput struct {
@@ -36,8 +39,19 @@ type UpdateInput struct {
 	State       *string `json:"state"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service) *Service {
-	return &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo}
+type DiffView struct {
+	MergeRequest entity.ProjectMergeRequest `json:"merge_request"`
+	Diff         string                     `json:"diff"`
+}
+
+type MergeInput struct {
+	AuthorName  string `json:"author_name"`
+	AuthorEmail string `json:"author_email"`
+	Message     string `json:"message"`
+}
+
+func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service, gitRunner *gitexec.Runner) *Service {
+	return &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner}
 }
 
 func (s *Service) List(ctx context.Context, projectID int64) ([]entity.ProjectMergeRequest, error) {
@@ -110,6 +124,47 @@ func (s *Service) Update(ctx context.Context, projectID int64, mergeIID int64, i
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
 }
 
+func (s *Service) GetDiff(ctx context.Context, projectID int64, mergeIID int64) (DiffView, error) {
+	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
+	if err != nil {
+		return DiffView{}, err
+	}
+	diff, err := s.gitRunner.DiffBranches(ctx, project.FullPath+".git", mr.TargetBranch, mr.SourceBranch)
+	if err != nil {
+		return DiffView{}, mapGitExecError(err)
+	}
+	return DiffView{MergeRequest: mr, Diff: diff}, nil
+}
+
+func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, input MergeInput) (entity.ProjectMergeRequest, error) {
+	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
+	if err != nil {
+		return entity.ProjectMergeRequest{}, err
+	}
+	if mr.State != "opened" {
+		return entity.ProjectMergeRequest{}, httpx.NewError(http.StatusConflict, "merge request is not opened", fmt.Errorf("merge request state: %s", mr.State))
+	}
+	message := strings.TrimSpace(input.Message)
+	if message == "" {
+		message = fmt.Sprintf("Merge branch '%s' into '%s'", mr.SourceBranch, mr.TargetBranch)
+	}
+	err = s.gitRunner.MergeBranches(ctx, project.FullPath+".git", gitexec.MergeBranchesInput{
+		TargetBranch: mr.TargetBranch,
+		SourceBranch: mr.SourceBranch,
+		Message:      message,
+		AuthorName:   input.AuthorName,
+		AuthorEmail:  input.AuthorEmail,
+	})
+	if err != nil {
+		return entity.ProjectMergeRequest{}, mapGitExecError(err)
+	}
+	merged := "merged"
+	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, projectmergerequestrepo.UpdateInput{State: &merged}); err != nil {
+		return entity.ProjectMergeRequest{}, err
+	}
+	return s.loadMergeRequest(ctx, projectID, mergeIID)
+}
+
 func (s *Service) ensureBranchExists(ctx context.Context, project entity.Project, branch string) error {
 	branches, err := s.gitRepo.ListBranches(ctx, project.FullPath+".git", project.DefaultBranch)
 	if err != nil {
@@ -124,6 +179,23 @@ func (s *Service) ensureBranchExists(ctx context.Context, project entity.Project
 }
 
 func (s *Service) loadMergeRequest(ctx context.Context, projectID int64, mergeIID int64) (entity.ProjectMergeRequest, error) {
+	_, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
+	return mr, err
+}
+
+func (s *Service) loadProjectMergeRequest(ctx context.Context, projectID int64, mergeIID int64) (entity.Project, entity.ProjectMergeRequest, error) {
+	project, err := s.projectRepo.GetByID(ctx, projectID)
+	if err != nil {
+		return entity.Project{}, entity.ProjectMergeRequest{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+	}
+	mr, err := s.loadMergeRequestRecord(ctx, projectID, mergeIID)
+	if err != nil {
+		return entity.Project{}, entity.ProjectMergeRequest{}, err
+	}
+	return project, mr, nil
+}
+
+func (s *Service) loadMergeRequestRecord(ctx context.Context, projectID int64, mergeIID int64) (entity.ProjectMergeRequest, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return entity.ProjectMergeRequest{}, httpx.NewError(http.StatusNotFound, "project not found", err)
 	}
@@ -135,4 +207,17 @@ func (s *Service) loadMergeRequest(ctx context.Context, projectID int64, mergeII
 		return entity.ProjectMergeRequest{}, err
 	}
 	return mr, nil
+}
+
+func mapGitExecError(err error) error {
+	switch {
+	case errors.Is(err, gitexec.ErrMergeConflict):
+		return httpx.NewError(http.StatusConflict, "merge conflict", err)
+	case errors.Is(err, gitexec.ErrSourceReferenceNotFound):
+		return httpx.NewError(http.StatusNotFound, "git reference not found", err)
+	case errors.Is(err, gitexec.ErrInvalidBranchName):
+		return httpx.NewError(http.StatusBadRequest, "invalid branch name", err)
+	default:
+		return err
+	}
 }

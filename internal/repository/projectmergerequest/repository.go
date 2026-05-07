@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -35,13 +35,13 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{base: dbxrepo.NewWithOptions[entity.ProjectMergeRequest](db, entity.ProjectMergeRequestSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
 }
 
-func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (collectionx.List[entity.ProjectMergeRequest], error) {
+func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectMergeRequest], error) {
 	query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectMergeRequestSchema.IID.Desc())
 	return r.base.List(ctx, query)
 }
 
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (entity.ProjectMergeRequest, error) {
-	query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).Where(entity.ProjectMergeRequestSchema.IID.Eq(iid)).Limit(1)
+	query := dbx.Select(entity.ProjectMergeRequestSchema.AllColumns().Values()...).From(entity.ProjectMergeRequestSchema).Where(dbx.And(entity.ProjectMergeRequestSchema.ProjectID.Eq(projectID), entity.ProjectMergeRequestSchema.IID.Eq(iid))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

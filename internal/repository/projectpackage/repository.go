@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -26,7 +26,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{base: dbxrepo.NewWithOptions[entity.ProjectPackage](db, entity.ProjectPackageSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
 }
 
-func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (collectionx.List[entity.ProjectPackage], error) {
+func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[entity.ProjectPackage], error) {
 	query := dbx.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(entity.ProjectPackageSchema.ProjectID.Eq(projectID)).OrderBy(entity.ProjectPackageSchema.ID.Desc())
 	return r.base.List(ctx, query)
 }
@@ -36,7 +36,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (entity.ProjectPacka
 }
 
 func (r *Repository) GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType string, name string) (entity.ProjectPackage, error) {
-	query := dbx.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(entity.ProjectPackageSchema.ProjectID.Eq(projectID)).Where(entity.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType))).Where(entity.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name))).Limit(1)
+	query := dbx.Select(entity.ProjectPackageSchema.AllColumns().Values()...).From(entity.ProjectPackageSchema).Where(dbx.And(entity.ProjectPackageSchema.ProjectID.Eq(projectID), entity.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType)), entity.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name)))).Limit(1)
 	return r.base.First(ctx, query)
 }
 

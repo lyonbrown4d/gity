@@ -3,9 +3,16 @@ package packageregistry
 import (
 	"context"
 
-	"github.com/DaiYuANg/arcgo/httpx"
+	"github.com/DaiYuANg/gity/internal/httpapi"
+	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
 	packageregistryservice "github.com/DaiYuANg/gity/internal/service/packageregistry"
+	projectservice "github.com/DaiYuANg/gity/internal/service/project"
+	"github.com/arcgolabs/httpx"
 )
+
+type projectPackagesInput struct {
+	ProjectID int64 `path:"id"`
+}
 
 type packageInput struct {
 	ProjectID int64 `path:"id"`
@@ -18,8 +25,9 @@ type packageFileInput struct {
 }
 
 type uploadPackageFileInput struct {
-	ProjectID int64                 `path:"id"`
-	Body      uploadPackageFileBody `json:"body"`
+	ProjectID     int64                 `path:"id"`
+	Authorization string                `header:"Authorization"`
+	Body          uploadPackageFileBody `json:"body"`
 }
 
 type packageOutput struct {
@@ -36,28 +44,46 @@ type uploadPackageFileBody struct {
 	ContentBase64 string `json:"content_base64"`
 }
 
-func RegisterRoutes(server httpx.ServerRuntime, service *packageregistryservice.Service) {
-	v1 := server.Group("/v1")
+type Endpoint struct {
+	service        *packageregistryservice.Service
+	projectService *projectservice.Service
+	authRuntime    *platformauth.Runtime
+}
 
-	httpx.MustGroupGet(v1, "/projects/{id}/packages", func(ctx context.Context, in *struct {
-		ProjectID int64 `path:"id"`
-	}) (*packageOutput, error) {
+func NewEndpoint(service *packageregistryservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+}
+
+func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
+	return httpapi.EndpointSpec("/v1", "Package Registry", "Package Registry", "Project package registry APIs.")
+}
+
+func RegisterRoutes(server httpx.ServerRuntime, service *packageregistryservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) {
+	server.RegisterOnly(NewEndpoint(service, projectService, authRuntime))
+}
+
+func (e *Endpoint) Register(registrar httpx.Registrar) {
+	service := e.service
+	authRuntime := e.authRuntime
+	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+
+	listPackages := func(ctx context.Context, in *projectPackagesInput) (*packageOutput, error) {
 		items, err := service.ListPackages(ctx, in.ProjectID)
 		if err != nil {
 			return nil, err
 		}
 		return &packageOutput{Body: items}, nil
-	})
+	}
 
-	httpx.MustGroupGet(v1, "/projects/{id}/packages/{package_id}", func(ctx context.Context, in *packageInput) (*packageOutput, error) {
+	getPackage := func(ctx context.Context, in *packageInput) (*packageOutput, error) {
 		item, err := service.GetPackage(ctx, in.ProjectID, in.PackageID)
 		if err != nil {
 			return nil, err
 		}
 		return &packageOutput{Body: item}, nil
-	})
+	}
 
-	httpx.MustGroupPost(v1, "/projects/{id}/packages/files", func(ctx context.Context, in *uploadPackageFileInput) (*packageOutput, error) {
+	uploadPackageFile := func(ctx context.Context, in *uploadPackageFileInput) (*packageOutput, error) {
 		item, err := service.UploadFile(ctx, in.ProjectID, packageregistryservice.UploadFileInput{
 			Type:          in.Body.Type,
 			Name:          in.Body.Name,
@@ -71,13 +97,35 @@ func RegisterRoutes(server httpx.ServerRuntime, service *packageregistryservice.
 			return nil, err
 		}
 		return &packageOutput{Body: item}, nil
-	})
+	}
 
-	httpx.MustGroupGet(v1, "/projects/{id}/packages/files/{file_id}", func(ctx context.Context, in *packageFileInput) (*packageOutput, error) {
+	getPackageFile := func(ctx context.Context, in *packageFileInput) (*packageOutput, error) {
 		item, err := service.GetFileContent(ctx, in.ProjectID, in.FileID)
 		if err != nil {
 			return nil, err
 		}
 		return &packageOutput{Body: item}, nil
-	})
+	}
+
+	httpapi.MustRegisterRoutes(registrar,
+		httpapi.Get("/projects/{id}/packages", listPackages),
+		httpapi.Get("/repos/{id}/packages", listPackages, httpapi.DeprecatedRoute[projectPackagesInput, packageOutput]("Use GET /projects/{id}/packages instead.")),
+		httpapi.Get("/projects/{id}/packages/{package_id}", getPackage),
+		httpapi.Get("/repos/{id}/packages/{package_id}", getPackage, httpapi.DeprecatedRoute[packageInput, packageOutput]("Use GET /projects/{id}/packages/{package_id} instead.")),
+		httpapi.Post("/projects/{id}/packages/files", uploadPackageFile, httpapi.RequireProjectWriteRoute[uploadPackageFileInput, packageOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/packages/files", uploadPackageFile,
+			httpapi.RequireProjectWriteRoute[uploadPackageFileInput, packageOutput](authRuntime, projectWrite),
+			httpapi.DeprecatedRoute[uploadPackageFileInput, packageOutput]("Use POST /projects/{id}/packages/files instead."),
+		),
+		httpapi.Get("/projects/{id}/packages/files/{file_id}", getPackageFile),
+		httpapi.Get("/repos/{id}/packages/files/{file_id}", getPackageFile, httpapi.DeprecatedRoute[packageFileInput, packageOutput]("Use GET /projects/{id}/packages/files/{file_id} instead.")),
+	)
+}
+
+func (in uploadPackageFileInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in uploadPackageFileInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }

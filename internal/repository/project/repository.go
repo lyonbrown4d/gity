@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -32,7 +32,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) List(ctx context.Context, namespaceID sql.NullInt64) (collectionx.List[entity.Project], error) {
+func (r *Repository) List(ctx context.Context, namespaceID sql.NullInt64) (*collectionx.List[entity.Project], error) {
 	query := dbx.Select(entity.ProjectSchema.AllColumns().Values()...).
 		From(entity.ProjectSchema).
 		OrderBy(entity.ProjectSchema.ID.Desc())

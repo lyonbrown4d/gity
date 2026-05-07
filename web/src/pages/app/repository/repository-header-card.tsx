@@ -14,7 +14,7 @@ interface RepositoryHeaderCardProps {
   onCopyCloneUrl: () => void;
 }
 
-const TABS: RepoTab[] = ["code", "issues", "commits", "branches", "settings"];
+const TABS: RepoTab[] = ["code", "issues", "merge-requests", "wiki", "jobs", "runners", "commits", "branches", "settings"];
 
 export const RepositoryHeaderCard = ({
   activeTab,
@@ -64,11 +64,18 @@ export const RepositoryHeaderCard = ({
               onClick={() => onChangeTab(tab)}
               className="action-pop"
             >
-              {t(tab[0].toUpperCase() + tab.slice(1))}
+              {t(tabLabel(tab))}
             </Button>
           ))}
         </div>
       </CardContent>
     </Card>
   );
+};
+
+const tabLabel = (tab: RepoTab): string => {
+  if (tab === "merge-requests") {
+    return "Merge Requests";
+  }
+  return tab[0].toUpperCase() + tab.slice(1);
 };

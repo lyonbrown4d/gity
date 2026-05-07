@@ -1,6 +1,6 @@
 package projectissueattachment
 
-import "github.com/DaiYuANg/arcgo/dix"
+import "github.com/arcgolabs/dix"
 
 func Module() dix.Module {
 	return dix.NewModule(

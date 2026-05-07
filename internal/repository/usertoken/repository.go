@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DaiYuANg/arcgo/collectionx"
-	"github.com/DaiYuANg/arcgo/dbx"
-	dbxrepo "github.com/DaiYuANg/arcgo/dbx/repository"
+	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	"github.com/DaiYuANg/gity/internal/entity"
+	collectionx "github.com/arcgolabs/collectionx/list"
+	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Repository struct {
@@ -28,7 +28,7 @@ func NewRepository(db *dbx.DB) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) ListByUserID(ctx context.Context, userID int64) (collectionx.List[entity.UserAccessToken], error) {
+func (r *Repository) ListByUserID(ctx context.Context, userID int64) (*collectionx.List[entity.UserAccessToken], error) {
 	query := dbx.Select(entity.UserAccessTokenSchema.AllColumns().Values()...).
 		From(entity.UserAccessTokenSchema).
 		Where(entity.UserAccessTokenSchema.UserID.Eq(userID)).
@@ -55,4 +55,15 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.User
 		return entity.UserAccessToken{}, fmt.Errorf("insert user token: %w", err)
 	}
 	return item, nil
+}
+
+func (r *Repository) DeleteByToken(ctx context.Context, token string) error {
+	record, err := r.GetByToken(ctx, token)
+	if err != nil {
+		return err
+	}
+	if _, err := r.base.DeleteByID(ctx, record.ID); err != nil {
+		return fmt.Errorf("delete user token: %w", err)
+	}
+	return nil
 }

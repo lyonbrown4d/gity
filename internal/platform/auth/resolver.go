@@ -6,11 +6,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DaiYuANg/arcgo/authx"
-	"github.com/DaiYuANg/arcgo/collectionx"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
+	"github.com/arcgolabs/authx"
+	mappingx "github.com/arcgolabs/collectionx/mapping"
+	setx "github.com/arcgolabs/collectionx/set"
+)
+
+var (
+	projectReadVisibilityPolicies = mappingx.NewMapFrom(map[string]string{
+		"public":   "project_public_read",
+		"internal": "project_internal_read",
+	})
+	projectWriteRoles = setx.NewSet("developer", "maintainer", "owner")
 )
 
 type ProjectScope struct {
@@ -44,11 +53,8 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 
 		switch input.Action {
 		case "project.read":
-			if visibilityValue == "public" {
-				return authx.Decision{Allowed: true, PolicyID: "project_public_read"}, nil
-			}
-			if visibilityValue == "internal" {
-				return authx.Decision{Allowed: true, PolicyID: "project_internal_read"}, nil
+			if policyID, ok := projectReadVisibilityPolicies.Get(visibilityValue); ok {
+				return authx.Decision{Allowed: true, PolicyID: policyID}, nil
 			}
 			if _, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceIDValue, principal.UserID); err == nil {
 				return authx.Decision{Allowed: true, PolicyID: "project_private_read"}, nil
@@ -56,8 +62,7 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 		case "project.write":
 			member, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceIDValue, principal.UserID)
 			if err == nil {
-				switch strings.TrimSpace(member.Role) {
-				case "developer", "maintainer", "owner":
+				if projectWriteRoles.Contains(strings.TrimSpace(member.Role)) {
 					return authx.Decision{Allowed: true, PolicyID: "project_write"}, nil
 				}
 			}
@@ -96,6 +101,10 @@ func tokenFromAuthorizationHeader(value string) (string, bool) {
 	return "", false
 }
 
+func TokenFromAuthorizationHeader(value string) (string, bool) {
+	return tokenFromAuthorizationHeader(value)
+}
+
 func (r *Runtime) AuthenticateHeader(ctx context.Context, authorization string) (Principal, bool, error) {
 	token, ok := tokenFromAuthorizationHeader(authorization)
 	if !ok {
@@ -117,7 +126,7 @@ func (r *Runtime) CanReadProject(ctx context.Context, principal Principal, proje
 		Principal: principal,
 		Action:    "project.read",
 		Resource:  fmt.Sprintf("project:%d", project.ID),
-		Context: collectionx.NewMapFrom(map[string]any{
+		Context: mappingx.NewMapFrom(map[string]any{
 			"namespace_id": project.NamespaceID,
 			"visibility":   strings.TrimSpace(project.Visibility),
 		}),
@@ -133,7 +142,7 @@ func (r *Runtime) CanWriteProject(ctx context.Context, principal Principal, proj
 		Principal: principal,
 		Action:    "project.write",
 		Resource:  fmt.Sprintf("project:%d", project.ID),
-		Context: collectionx.NewMapFrom(map[string]any{
+		Context: mappingx.NewMapFrom(map[string]any{
 			"namespace_id": project.NamespaceID,
 			"visibility":   strings.TrimSpace(project.Visibility),
 		}),
