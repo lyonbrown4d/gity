@@ -118,6 +118,25 @@ export interface RepositoryMergeRequestDiffView {
 }
 
 export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+export type RepositoryPipelineStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+export type RepositoryPipelineJobStatus = RepositoryJobStatus | "blocked";
+
+export interface RepositoryPipelineView {
+  id: string;
+  project_id: string;
+  iid: number;
+  name: string;
+  source: string;
+  ref_name: string;
+  commit_sha: string;
+  status: RepositoryPipelineStatus;
+  config_source: string;
+  config_content?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
 
 export interface RepositoryJobView {
   id: string;
@@ -136,6 +155,36 @@ export interface RepositoryJobView {
   updated_at?: string | null;
   started_at?: string | null;
   finished_at?: string | null;
+}
+
+export interface RepositoryPipelineJobLinkView {
+  id: string;
+  project_id: string;
+  pipeline_id: string;
+  project_job_id: string;
+  name: string;
+  stage: string;
+  needs?: string | null;
+  image?: string | null;
+  script?: string | null;
+  artifacts?: string | null;
+  sort_order: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryPipelineJobView {
+  pipeline_job: RepositoryPipelineJobLinkView;
+  project_job: RepositoryJobView;
+  status: RepositoryPipelineJobStatus;
+  needs: string[];
+  script: string[];
+  artifacts: string[];
+}
+
+export interface RepositoryPipelineDetailView {
+  pipeline: RepositoryPipelineView;
+  jobs: RepositoryPipelineJobView[];
 }
 
 export interface RepositoryWikiPageView {

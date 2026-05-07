@@ -14,6 +14,7 @@ import (
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
 )
@@ -25,6 +26,12 @@ type Service struct {
 	gitRepo      *gitrepo.Service
 	gitRunner    *gitexec.Runner
 	pipelineRepo *projectpipelinerepo.Repository
+	pipelineSvc  *pipelineservice.Service
+}
+
+type PipelineDeps struct {
+	pipelineRepo *projectpipelinerepo.Repository
+	pipelineSvc  *pipelineservice.Service
 }
 
 type CreateInput struct {
@@ -65,8 +72,17 @@ type MergeInput struct {
 
 const defaultCIConfigPath = ".gity-ci.plano"
 
-func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service, gitRunner *gitexec.Runner, pipelineRepo *projectpipelinerepo.Repository) *Service {
-	return &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner, pipelineRepo: pipelineRepo}
+func NewPipelineDeps(pipelineRepo *projectpipelinerepo.Repository, pipelineSvc *pipelineservice.Service) *PipelineDeps {
+	return &PipelineDeps{pipelineRepo: pipelineRepo, pipelineSvc: pipelineSvc}
+}
+
+func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service, gitRunner *gitexec.Runner, pipelineDeps *PipelineDeps) *Service {
+	service := &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner}
+	if pipelineDeps != nil {
+		service.pipelineRepo = pipelineDeps.pipelineRepo
+		service.pipelineSvc = pipelineDeps.pipelineSvc
+	}
+	return service
 }
 
 func (s *Service) List(ctx context.Context, projectID int64) ([]entity.ProjectMergeRequest, error) {
@@ -192,7 +208,19 @@ func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, in
 	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, projectmergerequestrepo.UpdateInput{State: &merged}); err != nil {
 		return entity.ProjectMergeRequest{}, err
 	}
+	s.triggerTargetBranchPipeline(ctx, project, mr)
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
+}
+
+func (s *Service) triggerTargetBranchPipeline(ctx context.Context, project entity.Project, mr entity.ProjectMergeRequest) {
+	if s.pipelineSvc == nil {
+		return
+	}
+	branch, err := s.resolveBranch(ctx, project, mr.TargetBranch)
+	if err != nil || branch.Hash == "" {
+		return
+	}
+	_, _, _ = s.pipelineSvc.CreatePushPipeline(ctx, project.ID, branch.Name, branch.Hash)
 }
 
 func (s *Service) evaluateChecks(ctx context.Context, project entity.Project, mr entity.ProjectMergeRequest) (CheckStatusView, error) {

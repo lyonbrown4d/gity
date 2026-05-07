@@ -19,11 +19,15 @@ import (
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
+	projectjobrepo "github.com/DaiYuANg/gity/internal/repository/projectjob"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
+	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/repository/projectpipelinejob"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
+	jobservice "github.com/DaiYuANg/gity/internal/service/job"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	userservice "github.com/DaiYuANg/gity/internal/service/user"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -66,7 +70,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, pipelineRepository)
+	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, NewPipelineDeps(pipelineRepository, nil))
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
 	if err != nil {
@@ -153,6 +157,8 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
 	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
 	pipelineRepository, _ := projectpipelinerepo.NewRepository(db)
+	pipelineJobRepository, _ := projectpipelinejobrepo.NewRepository(db)
+	jobRepository, _ := projectjobrepo.NewRepository(db)
 	userRepository, _ := userrepo.NewRepository(db)
 	userTokenRepository, _ := usertokenrepo.NewRepository(db)
 
@@ -163,7 +169,9 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, pipelineRepository)
+	jobSvc := jobservice.NewService(logger, projectRepository, jobRepository, nil, nil, nil)
+	pipelineSvc := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, NewPipelineDeps(pipelineRepository, pipelineSvc))
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
 	if err != nil {
@@ -236,6 +244,14 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	}
 	if merged.State != "merged" {
 		t.Fatalf("expected merged state, got %s", merged.State)
+	}
+	targetBranch := findBranch(t, ctx, gitRepository, project.FullPath+".git", project.DefaultBranch, "main")
+	targetPipeline, err := pipelineRepository.GetLatestByProjectRefCommit(ctx, project.ID, "main", targetBranch.Hash)
+	if err != nil {
+		t.Fatalf("get target branch pipeline: %v", err)
+	}
+	if targetPipeline.Source != "push" || targetPipeline.CommitSHA != targetBranch.Hash {
+		t.Fatalf("unexpected target branch pipeline: %+v", targetPipeline)
 	}
 }
 

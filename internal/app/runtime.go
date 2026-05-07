@@ -23,7 +23,9 @@ import (
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	"github.com/DaiYuANg/gity/internal/platform/gittransport"
 	platformlogger "github.com/DaiYuANg/gity/internal/platform/logger"
+	platformmapper "github.com/DaiYuANg/gity/internal/platform/mapperx"
 	platformstorage "github.com/DaiYuANg/gity/internal/platform/storage"
+	coredb "github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	namespacememberrepo "github.com/DaiYuANg/gity/internal/repository/namespacemember"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
@@ -109,6 +111,7 @@ func migrationModules() []dix.Module {
 	return []dix.Module{
 		config.Module(),
 		database.Module(),
+		coredb.Module(),
 	}
 }
 
@@ -116,6 +119,7 @@ func sharedModules() []dix.Module {
 	return []dix.Module{
 		config.Module(),
 		database.Module(),
+		coredb.Module(),
 		userrepo.Module(),
 		usertokenrepo.Module(),
 		namespacerepo.Module(),
@@ -142,6 +146,7 @@ func sharedModules() []dix.Module {
 		gitexec.Module(),
 		gitrepo.Module(),
 		gittransport.Module(),
+		platformmapper.Module(),
 		platformstorage.Module(),
 		userservice.Module(),
 		namespaceservice.Module(),

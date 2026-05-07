@@ -10,6 +10,7 @@ import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-c
 import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-tab";
 import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
 import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
+import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
 import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
 import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
@@ -160,6 +161,14 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
+      {meta.repository && activeTab === "pipelines" ? (
+        <RepositoryPipelinesTab
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
       {meta.repository && activeTab === "jobs" ? (
         <RepositoryJobsTab
           repoId={repoId}
@@ -244,6 +253,7 @@ const isRepoTab = (value: string | null): value is RepoTab =>
   || value === "issues"
   || value === "merge-requests"
   || value === "wiki"
+  || value === "pipelines"
   || value === "jobs"
   || value === "runners"
   || value === "commits"

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/DaiYuANg/gity/internal/config"
 	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
 	mysqlDialect "github.com/arcgolabs/dbx/dialect/mysql"
 	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
-	"github.com/DaiYuANg/gity/internal/config"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "modernc.org/sqlite"
@@ -24,6 +24,9 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 	if err != nil {
 		return nil, err
 	}
+	if settings.Database.NodeID < 1 || settings.Database.NodeID > 1023 {
+		return nil, fmt.Errorf("database node id %d out of range [1,1023]", settings.Database.NodeID)
+	}
 
 	db, err := dbx.Open(
 		dbx.WithDriver(settings.Database.Driver),
@@ -32,7 +35,7 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		dbx.ApplyOptions(
 			dbx.WithLogger(logger),
 			dbx.WithDebug(settings.App.Environment == "development"),
-			dbx.WithNodeID(settings.Database.NodeID),
+			dbx.WithNodeID(uint16(settings.Database.NodeID)),
 		),
 	)
 	if err != nil {

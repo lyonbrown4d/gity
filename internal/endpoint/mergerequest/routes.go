@@ -5,8 +5,10 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	mergerequestservice "github.com/DaiYuANg/gity/internal/service/mergerequest"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type mergeRequestInput struct {
@@ -65,10 +67,11 @@ type mergeMergeRequestBody struct {
 type Endpoint struct {
 	service     *mergerequestservice.Service
 	authRuntime *platformauth.Runtime
+	mapper      *mapper.Mapper
 }
 
-func NewEndpoint(service *mergerequestservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, authRuntime: authRuntime}
+func NewEndpoint(service *mergerequestservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -112,17 +115,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createMergeRequest := func(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
+		input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
 		if err != nil {
 			return nil, err
 		}
-		item, err := service.Create(ctx, in.ProjectID, mergerequestservice.CreateInput{
-			AuthorUserID: authorUserID,
-			Title:        in.Body.Title,
-			Description:  in.Body.Description,
-			SourceBranch: in.Body.SourceBranch,
-			TargetBranch: in.Body.TargetBranch,
-		})
+		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
+		if err != nil {
+			return nil, err
+		}
+		input.AuthorUserID = authorUserID
+		item, err := service.Create(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -130,11 +132,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	mergeMergeRequest := func(ctx context.Context, in *mergeMergeRequestInput) (*mergeRequestOutput, error) {
-		item, err := service.Merge(ctx, in.ProjectID, in.MergeIID, mergerequestservice.MergeInput{
-			AuthorName:  in.Body.AuthorName,
-			AuthorEmail: in.Body.AuthorEmail,
-			Message:     in.Body.Message,
-		})
+		input, err := mapperx.MapStrict[mergerequestservice.MergeInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.Merge(ctx, in.ProjectID, in.MergeIID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -142,11 +144,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	updateMergeRequest := func(ctx context.Context, in *updateMergeRequestInput) (*mergeRequestOutput, error) {
-		item, err := service.Update(ctx, in.ProjectID, in.MergeIID, mergerequestservice.UpdateInput{
-			Title:       in.Body.Title,
-			Description: in.Body.Description,
-			State:       in.Body.State,
-		})
+		input, err := mapperx.MapStrict[mergerequestservice.UpdateInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.Update(ctx, in.ProjectID, in.MergeIID, input)
 		if err != nil {
 			return nil, err
 		}

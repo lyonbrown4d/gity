@@ -14,7 +14,7 @@ interface RepositoryHeaderCardProps {
   onCopyCloneUrl: () => void;
 }
 
-const TABS: RepoTab[] = ["code", "issues", "merge-requests", "wiki", "jobs", "runners", "commits", "branches", "settings"];
+const TABS: RepoTab[] = ["code", "issues", "merge-requests", "wiki", "pipelines", "jobs", "runners", "commits", "branches", "settings"];
 
 export const RepositoryHeaderCard = ({
   activeTab,

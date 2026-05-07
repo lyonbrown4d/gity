@@ -83,6 +83,7 @@ data
 .tmp-e2e
 bin/
 coverage.out
+/gity.db
 
 node_modules/
 packages/

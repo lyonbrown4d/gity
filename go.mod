@@ -13,12 +13,14 @@ require (
 	github.com/arcgolabs/httpx v0.1.4
 	github.com/arcgolabs/httpx/adapter/fiber v0.1.4
 	github.com/arcgolabs/logx v0.1.2
+	github.com/arcgolabs/mapper v0.1.2
 	github.com/arcgolabs/plano v0.7.1
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.99.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/danielgtaylor/huma/v2 v2.37.3
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gofiber/fiber/v2 v2.52.13
@@ -62,7 +64,6 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
-	github.com/danielgtaylor/huma/v2 v2.37.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/expr-lang/expr v1.17.8 // indirect

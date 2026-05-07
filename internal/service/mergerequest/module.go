@@ -7,6 +7,7 @@ func Module() dix.Module {
 		"service.mergerequest",
 		dix.Description("Merge request application services"),
 		dix.Providers(
+			dix.Provider2(NewPipelineDeps),
 			dix.Provider6(NewService),
 		),
 	)

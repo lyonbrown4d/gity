@@ -54,8 +54,8 @@ cp .env.example .env
 ```
 
 The current backend defaults to sqlite for the rewrite bootstrap, so Docker is optional for now.
-`GITY_DATABASE_NODE_ID` controls the Snowflake node id used by `dbx`.
-`GITY_STORAGE_ROOT` controls where issue attachments are stored on local disk.
+`GITY_DATABASE__NODE_ID` controls the Snowflake node id used by `dbx`.
+`GITY_STORAGE__ROOT` controls where issue attachments are stored on local disk.
 
 ### 3. Run the backend
 
@@ -69,7 +69,7 @@ Current backend defaults:
 - Health: `http://localhost:8080/api/health`
 - Swagger UI: `http://localhost:8080/docs`
 - OpenAPI: `http://localhost:8080/openapi.json`
-- Database: local sqlite file from `GITY_DATABASE_DSN`
+- Database: local sqlite file from `GITY_DATABASE__DSN`
 
 ### 4. Run the frontend
 

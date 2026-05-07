@@ -25,7 +25,7 @@ func ConfigFromEnv(args []string) (Config, error) {
 		ServerURL:      envString("GITY_RUNNER_URL", "http://localhost:8080/v1"),
 		Token:          envString("GITY_RUNNER_TOKEN", ""),
 		WorkDir:        envString("GITY_RUNNER_WORKDIR", "./data/runner"),
-		RepoRoot:       envString("GITY_RUNNER_REPO_ROOT", envString("GITY_GIT_REPO_ROOT", "")),
+		RepoRoot:       envString("GITY_RUNNER_REPO_ROOT", envString("GITY_GIT__REPO_ROOT", envString("GITY_GIT_REPO_ROOT", ""))),
 		PollInterval:   envDuration("GITY_RUNNER_POLL_INTERVAL", time.Second),
 		LeaseSeconds:   envInt("GITY_RUNNER_LEASE_SECONDS", 600),
 		MaxOutputBytes: envInt("GITY_RUNNER_MAX_OUTPUT_BYTES", 65536),

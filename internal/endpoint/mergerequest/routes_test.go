@@ -10,7 +10,7 @@ import (
 func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests")
@@ -22,7 +22,7 @@ func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoMergeRequestAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil))
+	server.RegisterOnly(NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests")

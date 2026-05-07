@@ -5,9 +5,11 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
+	"github.com/DaiYuANg/gity/internal/platform/mapperx"
 	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	"github.com/arcgolabs/httpx"
+	"github.com/arcgolabs/mapper"
 )
 
 type projectPipelinesInput struct {
@@ -52,10 +54,11 @@ type Endpoint struct {
 	service        *pipelineservice.Service
 	projectService *projectservice.Service
 	authRuntime    *platformauth.Runtime
+	mapper         *mapper.Mapper
 }
 
-func NewEndpoint(service *pipelineservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime}
+func NewEndpoint(service *pipelineservice.Service, projectService *projectservice.Service, authRuntime *platformauth.Runtime, requestMapper *mapper.Mapper) *Endpoint {
+	return &Endpoint{service: service, projectService: projectService, authRuntime: authRuntime, mapper: mapperx.Ensure(requestMapper)}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -76,13 +79,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createPipeline := func(ctx context.Context, in *createPipelineInput) (*pipelineOutput, error) {
-		item, err := service.CreatePipeline(ctx, in.ProjectID, pipelineservice.CreatePipelineInput{
-			Source:        in.Body.Source,
-			RefName:       in.Body.RefName,
-			CommitSHA:     in.Body.CommitSHA,
-			ConfigSource:  in.Body.ConfigSource,
-			ConfigContent: in.Body.ConfigContent,
-		})
+		input, err := mapperx.MapStrict[pipelineservice.CreatePipelineInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.CreatePipeline(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
@@ -90,9 +91,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	lintPipeline := func(ctx context.Context, in *lintPipelineInput) (*pipelineOutput, error) {
-		item, err := service.LintPipeline(ctx, in.ProjectID, pipelineservice.LintInput{
-			ConfigContent: in.Body.ConfigContent,
-		})
+		input, err := mapperx.MapStrict[pipelineservice.LintInput](e.mapper, in.Body)
+		if err != nil {
+			return nil, err
+		}
+		item, err := service.LintPipeline(ctx, in.ProjectID, input)
 		if err != nil {
 			return nil, err
 		}
