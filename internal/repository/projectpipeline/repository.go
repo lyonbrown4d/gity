@@ -60,6 +60,33 @@ func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id 
 	return r.base.First(ctx, query)
 }
 
+func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source string, refName string, commitSHA string) (entity.ProjectPipeline, error) {
+	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+		From(entity.ProjectPipelineSchema).
+		Where(dbx.And(
+			entity.ProjectPipelineSchema.ProjectID.Eq(projectID),
+			entity.ProjectPipelineSchema.Source.Eq(strings.TrimSpace(source)),
+			entity.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
+			entity.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA)),
+		)).
+		OrderBy(entity.ProjectPipelineSchema.IID.Desc()).
+		Limit(1)
+	return r.base.First(ctx, query)
+}
+
+func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName string, commitSHA string) (entity.ProjectPipeline, error) {
+	query := dbx.Select(entity.ProjectPipelineSchema.AllColumns().Values()...).
+		From(entity.ProjectPipelineSchema).
+		Where(dbx.And(
+			entity.ProjectPipelineSchema.ProjectID.Eq(projectID),
+			entity.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
+			entity.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA)),
+		)).
+		OrderBy(entity.ProjectPipelineSchema.IID.Desc()).
+		Limit(1)
+	return r.base.First(ctx, query)
+}
+
 func (r *Repository) Create(ctx context.Context, input CreateInput) (entity.ProjectPipeline, error) {
 	var created entity.ProjectPipeline
 	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[entity.ProjectPipeline, entity.ProjectPipelineSchemaDef]) error {

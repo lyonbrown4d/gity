@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/entity"
@@ -69,7 +70,8 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 	expectedLocker := job.LockedBy
 	switch job.Kind {
 	case "script":
-		result, err := ExecuteScriptJobWithChecker(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
+		var traceWarned atomic.Bool
+		result, err := ExecuteScriptJobWithTrace(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
 			current, err := a.client.GetProjectJob(checkCtx, job.ProjectID, job.ID)
 			if err != nil {
 				return false, nil
@@ -81,6 +83,14 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job entity.ProjectJob) er
 				return true, nil
 			}
 			return false, nil
+		}, func(traceCtx context.Context, output string, outputTruncated bool, durationMillis int64) error {
+			if err := a.client.AppendTrace(traceCtx, job.ID, output, outputTruncated, durationMillis); err != nil {
+				if traceWarned.CompareAndSwap(false, true) {
+					a.logger.Warn("runner trace upload failed", slog.Int64("job_id", job.ID), slog.String("error", err.Error()))
+				}
+				return nil
+			}
+			return nil
 		})
 		artifactErr := a.uploadArtifacts(ctx, job, result)
 		if err != nil {

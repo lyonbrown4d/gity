@@ -154,6 +154,13 @@ func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 	if !ok || claimed.ID != created.ID {
 		t.Fatalf("unexpected claimed job: ok=%v job=%+v", ok, claimed)
 	}
+	streamed, err := service.AppendProjectJobTrace(ctx, project.ID, claimed.ID, jobservice.AppendTraceInput{Output: "streaming\n", DurationMillis: 12})
+	if err != nil {
+		t.Fatalf("append trace: %v", err)
+	}
+	if streamed.Trace != "streaming" || streamed.DurationMillis != 12 {
+		t.Fatalf("unexpected streamed trace: %+v", streamed)
+	}
 	if _, err := service.CompleteProjectJob(ctx, project.ID, claimed.ID, `{"exit_code":0,"output":"ok\n","output_truncated":false,"duration_millis":42,"work_dir":"."}`); err != nil {
 		t.Fatalf("complete script job: %v", err)
 	}
@@ -226,8 +233,8 @@ func TestProjectJobRetry(t *testing.T) {
 	}
 
 	created, err := service.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{
-		Kind:    jobservice.KindScript,
-		Payload: `{"script":["echo"]}`,
+		Kind:        jobservice.KindScript,
+		Payload:     `{"script":["echo"]}`,
 		MaxAttempts: 2,
 	})
 	if err != nil {

@@ -15,6 +15,7 @@ func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests/{merge_iid}/diff")
+	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests/{merge_iid}/checks")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests/{merge_iid}/merge")
 }
 
@@ -26,6 +27,7 @@ func TestEndpointRegistersDeprecatedRepoMergeRequestAliases(t *testing.T) {
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests/{merge_iid}/diff")
+	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests/{merge_iid}/checks")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests/{merge_iid}/merge")
 }
 

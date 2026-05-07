@@ -11,6 +11,7 @@ import (
 	"github.com/DaiYuANg/gity/internal/httpapi"
 	platformauth "github.com/DaiYuANg/gity/internal/platform/auth"
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/service/project"
 	"github.com/arcgolabs/httpx"
 )
@@ -154,13 +155,14 @@ type repositoryLanguagesView struct {
 }
 
 type Endpoint struct {
-	service     *projectservice.Service
-	settings    config.Settings
-	authRuntime *platformauth.Runtime
+	service         *projectservice.Service
+	settings        config.Settings
+	authRuntime     *platformauth.Runtime
+	pipelineService *pipelineservice.Service
 }
 
-func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *platformauth.Runtime) *Endpoint {
-	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime}
+func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *platformauth.Runtime, pipelineService *pipelineservice.Service) *Endpoint {
+	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -339,8 +341,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	createFileCommit := func(ctx context.Context, in *createFileCommitInput) (*projectOutput, error) {
+		branchName := strings.TrimSpace(in.Body.BranchName)
 		if err := service.CreateFileCommit(ctx, in.ID, projectservice.CreateFileCommitInput{
-			BranchName:  in.Body.BranchName,
+			BranchName:  branchName,
 			Path:        in.Body.Path,
 			Content:     in.Body.Content,
 			Message:     in.Body.Message,
@@ -349,7 +352,35 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		}); err != nil {
 			return nil, err
 		}
-		return &projectOutput{Body: map[string]string{"status": "created"}}, nil
+		body := map[string]any{"status": "created"}
+		if e.pipelineService != nil {
+			var branch projectservice.Branch
+			var err error
+			if branchName != "" {
+				branch, err = service.GetBranch(ctx, in.ID, branchName)
+			} else {
+				branches, listErr := service.ListBranches(ctx, in.ID)
+				err = listErr
+				if err == nil {
+					for _, item := range branches {
+						if item.IsDefault {
+							branch = item
+							break
+						}
+					}
+				}
+			}
+			if err == nil && branch.LastCommitSHA != "" {
+				view, created, triggerErr := e.pipelineService.CreatePushPipeline(ctx, in.ID, branch.Name, branch.LastCommitSHA)
+				if triggerErr != nil {
+					body["pipeline_error"] = triggerErr.Error()
+				} else if view.Pipeline.ID != 0 {
+					body["pipeline_id"] = view.Pipeline.ID
+					body["pipeline_created"] = created
+				}
+			}
+		}
+		return &projectOutput{Body: body}, nil
 	}
 
 	languages := func(ctx context.Context, in *projectRepositoryInput) (*projectOutput, error) {

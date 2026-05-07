@@ -12,17 +12,19 @@ import (
 	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
+	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/arcgolabs/httpx"
 )
 
 type Service struct {
-	projectRepo *projectrepo.Repository
-	mergeRepo   *projectmergerequestrepo.Repository
-	userRepo    *userrepo.Repository
-	gitRepo     *gitrepo.Service
-	gitRunner   *gitexec.Runner
+	projectRepo  *projectrepo.Repository
+	mergeRepo    *projectmergerequestrepo.Repository
+	userRepo     *userrepo.Repository
+	gitRepo      *gitrepo.Service
+	gitRunner    *gitexec.Runner
+	pipelineRepo *projectpipelinerepo.Repository
 }
 
 type CreateInput struct {
@@ -44,14 +46,27 @@ type DiffView struct {
 	Diff         string                     `json:"diff"`
 }
 
+type CheckStatusView struct {
+	MergeRequest    entity.ProjectMergeRequest `json:"merge_request"`
+	SourceBranch    string                     `json:"source_branch"`
+	SourceCommitSHA string                     `json:"source_commit_sha"`
+	Required        bool                       `json:"required"`
+	Mergeable       bool                       `json:"mergeable"`
+	Status          string                     `json:"status"`
+	BlockingReason  string                     `json:"blocking_reason,omitempty"`
+	Pipeline        *entity.ProjectPipeline    `json:"pipeline,omitempty"`
+}
+
 type MergeInput struct {
 	AuthorName  string `json:"author_name"`
 	AuthorEmail string `json:"author_email"`
 	Message     string `json:"message"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service, gitRunner *gitexec.Runner) *Service {
-	return &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner}
+const defaultCIConfigPath = ".gity-ci.plano"
+
+func NewService(projectRepo *projectrepo.Repository, mergeRepo *projectmergerequestrepo.Repository, userRepo *userrepo.Repository, gitRepo *gitrepo.Service, gitRunner *gitexec.Runner, pipelineRepo *projectpipelinerepo.Repository) *Service {
+	return &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner, pipelineRepo: pipelineRepo}
 }
 
 func (s *Service) List(ctx context.Context, projectID int64) ([]entity.ProjectMergeRequest, error) {
@@ -136,6 +151,14 @@ func (s *Service) GetDiff(ctx context.Context, projectID int64, mergeIID int64) 
 	return DiffView{MergeRequest: mr, Diff: diff}, nil
 }
 
+func (s *Service) GetChecks(ctx context.Context, projectID int64, mergeIID int64) (CheckStatusView, error) {
+	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
+	if err != nil {
+		return CheckStatusView{}, err
+	}
+	return s.evaluateChecks(ctx, project, mr)
+}
+
 func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, input MergeInput) (entity.ProjectMergeRequest, error) {
 	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	if err != nil {
@@ -143,6 +166,13 @@ func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, in
 	}
 	if mr.State != "opened" {
 		return entity.ProjectMergeRequest{}, httpx.NewError(http.StatusConflict, "merge request is not opened", fmt.Errorf("merge request state: %s", mr.State))
+	}
+	checks, err := s.evaluateChecks(ctx, project, mr)
+	if err != nil {
+		return entity.ProjectMergeRequest{}, err
+	}
+	if checks.Required && !checks.Mergeable {
+		return entity.ProjectMergeRequest{}, httpx.NewError(http.StatusConflict, "merge request pipeline is not successful", errors.New(checks.BlockingReason))
 	}
 	message := strings.TrimSpace(input.Message)
 	if message == "" {
@@ -165,17 +195,77 @@ func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, in
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
 }
 
-func (s *Service) ensureBranchExists(ctx context.Context, project entity.Project, branch string) error {
+func (s *Service) evaluateChecks(ctx context.Context, project entity.Project, mr entity.ProjectMergeRequest) (CheckStatusView, error) {
+	branch, err := s.resolveBranch(ctx, project, mr.SourceBranch)
+	if err != nil {
+		return CheckStatusView{}, err
+	}
+	view := CheckStatusView{
+		MergeRequest:    mr,
+		SourceBranch:    branch.Name,
+		SourceCommitSHA: branch.Hash,
+		Mergeable:       true,
+		Status:          "not_required",
+	}
+	required, err := s.hasCIConfig(ctx, project, branch.Hash)
+	if err != nil {
+		return CheckStatusView{}, err
+	}
+	if !required {
+		return view, nil
+	}
+	view.Required = true
+	view.Mergeable = false
+	if s.pipelineRepo == nil {
+		view.Status = "missing"
+		view.BlockingReason = "pipeline repository is not configured"
+		return view, nil
+	}
+	pipeline, err := s.pipelineRepo.GetLatestByProjectRefCommit(ctx, project.ID, branch.Name, branch.Hash)
+	if err != nil {
+		if err == dbxrepo.ErrNotFound {
+			view.Status = "missing"
+			view.BlockingReason = "required pipeline is missing"
+			return view, nil
+		}
+		return CheckStatusView{}, err
+	}
+	view.Pipeline = &pipeline
+	view.Status = pipeline.Status
+	view.Mergeable = pipeline.Status == projectpipelinerepo.StatusSucceeded
+	if !view.Mergeable {
+		view.BlockingReason = fmt.Sprintf("pipeline status is %s", pipeline.Status)
+	}
+	return view, nil
+}
+
+func (s *Service) hasCIConfig(ctx context.Context, project entity.Project, commitSHA string) (bool, error) {
+	_, err := s.gitRepo.GetBlob(ctx, project.FullPath+".git", commitSHA, project.DefaultBranch, defaultCIConfigPath)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gitrepo.ErrPathNotFound) || errors.Is(err, gitrepo.ErrReferenceNotFound) || errors.Is(err, gitrepo.ErrEmptyRepository) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s *Service) resolveBranch(ctx context.Context, project entity.Project, branch string) (gitrepo.Branch, error) {
 	branches, err := s.gitRepo.ListBranches(ctx, project.FullPath+".git", project.DefaultBranch)
 	if err != nil {
-		return err
+		return gitrepo.Branch{}, err
 	}
 	for _, item := range branches {
 		if item.Name == branch {
-			return nil
+			return item, nil
 		}
 	}
-	return httpx.NewError(http.StatusNotFound, "merge request branch not found", fmt.Errorf("branch %s not found", branch))
+	return gitrepo.Branch{}, httpx.NewError(http.StatusNotFound, "merge request branch not found", fmt.Errorf("branch %s not found", branch))
+}
+
+func (s *Service) ensureBranchExists(ctx context.Context, project entity.Project, branch string) error {
+	_, err := s.resolveBranch(ctx, project, branch)
+	return err
 }
 
 func (s *Service) loadMergeRequest(ctx context.Context, projectID int64, mergeIID int64) (entity.ProjectMergeRequest, error) {

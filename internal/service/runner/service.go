@@ -39,6 +39,12 @@ type UploadArtifactInput struct {
 	ContentBase64 string `json:"content_base64"`
 }
 
+type AppendTraceInput struct {
+	Output          string `json:"output"`
+	OutputTruncated bool   `json:"output_truncated"`
+	DurationMillis  int64  `json:"duration_millis"`
+}
+
 type RunnerView struct {
 	ID            int64      `json:"id"`
 	ProjectID     int64      `json:"project_id"`
@@ -231,6 +237,28 @@ func (s *Service) UploadArtifact(ctx context.Context, token string, jobID int64,
 		FilePath:      input.FilePath,
 		ContentType:   input.ContentType,
 		ContentBase64: input.ContentBase64,
+	})
+}
+
+func (s *Service) AppendTrace(ctx context.Context, token string, jobID int64, input AppendTraceInput) (jobservice.ProjectJobTrace, error) {
+	runner, err := s.authenticateRunner(ctx, token)
+	if err != nil {
+		return jobservice.ProjectJobTrace{}, err
+	}
+	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
+	if err != nil {
+		return jobservice.ProjectJobTrace{}, err
+	}
+	if err := ensureRunnerOwnsJob(runner, job); err != nil {
+		return jobservice.ProjectJobTrace{}, err
+	}
+	if err := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); err != nil {
+		return jobservice.ProjectJobTrace{}, err
+	}
+	return s.jobService.AppendProjectJobTrace(ctx, runner.ProjectID, jobID, jobservice.AppendTraceInput{
+		Output:          input.Output,
+		OutputTruncated: input.OutputTruncated,
+		DurationMillis:  input.DurationMillis,
 	})
 }
 

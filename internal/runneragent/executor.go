@@ -11,17 +11,21 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DaiYuANg/gity/internal/entity"
 )
 
 type ScriptPayload struct {
-	Script         []string          `json:"script"`
-	Env            map[string]string `json:"env"`
-	Shell          string            `json:"shell"`
-	Artifacts      []string          `json:"artifacts"`
-	TimeoutSeconds int               `json:"timeout_seconds"`
+	ProjectFullPath string            `json:"project_full_path"`
+	RefName         string            `json:"ref_name"`
+	CommitSHA       string            `json:"commit_sha"`
+	Script          []string          `json:"script"`
+	Env             map[string]string `json:"env"`
+	Shell           string            `json:"shell"`
+	Artifacts       []string          `json:"artifacts"`
+	TimeoutSeconds  int               `json:"timeout_seconds"`
 }
 
 type ScriptResult struct {
@@ -34,11 +38,17 @@ type ScriptResult struct {
 
 type ScriptCancellationChecker func(ctx context.Context) (bool, error)
 
+type ScriptTraceStreamer func(ctx context.Context, output string, outputTruncated bool, durationMillis int64) error
+
 func ExecuteScriptJob(ctx context.Context, cfg Config, job entity.ProjectJob) (string, error) {
 	return ExecuteScriptJobWithChecker(ctx, cfg, job, nil)
 }
 
 func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker) (string, error) {
+	return ExecuteScriptJobWithTrace(ctx, cfg, job, checker, nil)
+}
+
+func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job entity.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer) (string, error) {
 	var payload ScriptPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
 		return "", fmt.Errorf("decode script job payload: %w", err)
@@ -91,6 +101,9 @@ func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.Pro
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		return "", fmt.Errorf("create job workspace: %w", err)
 	}
+	if err := checkoutProjectSource(ctx, cfg, payload, workDir); err != nil {
+		return "", err
+	}
 
 	started := time.Now()
 	command := scriptCommand(ctx, payload.Shell, strings.Join(payload.Script, "\n"))
@@ -99,6 +112,9 @@ func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.Pro
 		fmt.Sprintf("GITY_JOB_ID=%d", job.ID),
 		fmt.Sprintf("GITY_PROJECT_ID=%d", job.ProjectID),
 		fmt.Sprintf("GITY_JOB_ATTEMPT=%d", job.Attempts),
+		fmt.Sprintf("GITY_PROJECT_FULL_PATH=%s", payload.ProjectFullPath),
+		fmt.Sprintf("GITY_REF_NAME=%s", payload.RefName),
+		fmt.Sprintf("GITY_COMMIT_SHA=%s", payload.CommitSHA),
 	)
 	for key, value := range payload.Env {
 		key = strings.TrimSpace(key)
@@ -108,7 +124,12 @@ func ExecuteScriptJobWithChecker(ctx context.Context, cfg Config, job entity.Pro
 		command.Env = append(command.Env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	output := &cappedBuffer{limit: cfg.MaxOutputBytes}
+	output := &cappedBuffer{
+		limit:         cfg.MaxOutputBytes,
+		ctx:           ctx,
+		started:       started,
+		traceStreamer: traceStreamer,
+	}
 	command.Stdout = output
 	command.Stderr = output
 	err := command.Run()
@@ -172,6 +193,67 @@ func scriptCommand(ctx context.Context, shell string, script string) *exec.Cmd {
 	}
 }
 
+func checkoutProjectSource(ctx context.Context, cfg Config, payload ScriptPayload, workDir string) error {
+	repoRoot := strings.TrimSpace(cfg.RepoRoot)
+	projectFullPath := strings.TrimSpace(payload.ProjectFullPath)
+	if repoRoot == "" || projectFullPath == "" {
+		return nil
+	}
+	repoPath, err := resolveLocalBareRepo(repoRoot, projectFullPath)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(repoPath); err != nil {
+		return fmt.Errorf("local repository is not available for checkout: %w", err)
+	}
+	if _, err := os.Stat(filepath.Join(workDir, ".git")); err == nil {
+		if err := runGit(ctx, workDir, "fetch", "--all", "--prune"); err != nil {
+			return err
+		}
+	} else if err := runGit(ctx, workDir, "clone", "--no-checkout", repoPath, "."); err != nil {
+		return err
+	}
+
+	revision := strings.TrimSpace(payload.CommitSHA)
+	if revision != "" {
+		return runGit(ctx, workDir, "checkout", "--detach", revision)
+	}
+	refName := strings.TrimSpace(payload.RefName)
+	if refName == "" {
+		return nil
+	}
+	return runGit(ctx, workDir, "checkout", "-B", refName, "origin/"+refName)
+}
+
+func resolveLocalBareRepo(repoRoot string, projectFullPath string) (string, error) {
+	root, err := filepath.Abs(repoRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve runner repo root: %w", err)
+	}
+	normalized := strings.Trim(strings.ReplaceAll(projectFullPath, "\\", "/"), "/")
+	if normalized == "" || strings.Contains(normalized, "..") || filepath.IsAbs(normalized) {
+		return "", fmt.Errorf("invalid project full path for checkout: %s", projectFullPath)
+	}
+	repoPath, err := filepath.Abs(filepath.Join(root, filepath.FromSlash(normalized)+".git"))
+	if err != nil {
+		return "", fmt.Errorf("resolve runner repository path: %w", err)
+	}
+	if repoPath != root && !strings.HasPrefix(repoPath, root+string(filepath.Separator)) {
+		return "", fmt.Errorf("runner repository path escapes repo root")
+	}
+	return repoPath, nil
+}
+
+func runGit(ctx context.Context, dir string, args ...string) error {
+	command := exec.CommandContext(ctx, "git", args...)
+	command.Dir = dir
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+}
+
 func exitCodeFromError(err error) int {
 	if err == nil {
 		return 0
@@ -184,24 +266,61 @@ func exitCodeFromError(err error) int {
 }
 
 type cappedBuffer struct {
-	bytes.Buffer
-	limit     int
-	truncated bool
+	mu            sync.Mutex
+	buffer        bytes.Buffer
+	limit         int
+	truncated     bool
+	truncatedSent bool
+	ctx           context.Context
+	started       time.Time
+	traceStreamer ScriptTraceStreamer
 }
 
 func (b *cappedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.limit <= 0 {
 		return len(p), nil
 	}
-	remaining := b.limit - b.Buffer.Len()
+	remaining := b.limit - b.buffer.Len()
 	if remaining <= 0 {
 		b.truncated = true
+		if !b.truncatedSent {
+			b.truncatedSent = true
+			b.stream(nil)
+		}
 		return len(p), nil
 	}
+	captured := p
 	if len(p) > remaining {
 		b.truncated = true
-		_, _ = b.Buffer.Write(p[:remaining])
+		b.truncatedSent = true
+		captured = p[:remaining]
+		_, _ = b.buffer.Write(captured)
+		b.stream(captured)
 		return len(p), nil
 	}
-	return b.Buffer.Write(p)
+	n, err := b.buffer.Write(p)
+	b.stream(p)
+	return n, err
+}
+
+func (b *cappedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.String()
+}
+
+func (b *cappedBuffer) stream(chunk []byte) {
+	if b.traceStreamer == nil {
+		return
+	}
+	if len(chunk) == 0 && !b.truncated {
+		return
+	}
+	duration := int64(0)
+	if !b.started.IsZero() {
+		duration = time.Since(b.started).Milliseconds()
+	}
+	_ = b.traceStreamer(b.ctx, string(chunk), b.truncated, duration)
 }

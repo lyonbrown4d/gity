@@ -11,7 +11,7 @@ import (
 func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil))
+	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branches")
@@ -22,7 +22,7 @@ func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil))
+	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/branches")

@@ -70,6 +70,16 @@ func (c *Client) FailJob(ctx context.Context, jobID int64, message string, resul
 	}, &out)
 }
 
+func (c *Client) AppendTrace(ctx context.Context, jobID int64, output string, outputTruncated bool, durationMillis int64) error {
+	var out map[string]any
+	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/trace", jobID), map[string]any{
+		"token":            c.token,
+		"output":           output,
+		"output_truncated": outputTruncated,
+		"duration_millis":  durationMillis,
+	}, &out)
+}
+
 func (c *Client) UploadArtifact(ctx context.Context, jobID int64, artifact ArtifactFile) error {
 	var out entity.ProjectJobArtifact
 	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/artifacts", jobID), map[string]any{

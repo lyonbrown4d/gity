@@ -13,6 +13,7 @@ import (
 	platformgittransport "github.com/DaiYuANg/gity/internal/platform/gittransport"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
+	pipelineservice "github.com/DaiYuANg/gity/internal/service/pipeline"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
@@ -36,7 +37,16 @@ var (
 	})
 )
 
-func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, branchProtectionRepo *projectbranchprotectionrepo.Repository, transport *platformgittransport.Service) {
+type RouteServices struct {
+	branchProtectionRepo *projectbranchprotectionrepo.Repository
+	pipelineService      *pipelineservice.Service
+}
+
+func NewRouteServices(branchProtectionRepo *projectbranchprotectionrepo.Repository, pipelineService *pipelineservice.Service) *RouteServices {
+	return &RouteServices{branchProtectionRepo: branchProtectionRepo, pipelineService: pipelineService}
+}
+
+func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, transport *platformgittransport.Service, services *RouteServices) {
 	app.Use(func(c *fiber.Ctx) error {
 		if !isGitProtocolPath(c.Path(), c.Method()) {
 			return c.Next()
@@ -45,7 +55,7 @@ func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *platformau
 		case fiber.MethodGet:
 			return handleInfoRefs(c, logger, authRuntime, repo, transport)
 		case fiber.MethodPost:
-			return handleRPC(c, logger, authRuntime, repo, branchProtectionRepo, transport)
+			return handleRPC(c, logger, authRuntime, repo, services, transport)
 		default:
 			return c.Next()
 		}
@@ -90,7 +100,7 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth
 	return c.Send(body)
 }
 
-func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, branchProtectionRepo *projectbranchprotectionrepo.Repository, transport *platformgittransport.Service) error {
+func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *platformgittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	service := ""
 	repoPath := ""
@@ -112,13 +122,14 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runt
 		return err
 	}
 
+	updates := parseReceivePackUpdates(c.Body())
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	switch service {
 	case serviceUploadPack:
 		err = transport.UploadPack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
 	case serviceReceivePack:
-		if err := rejectProtectedBranchUpdates(c.UserContext(), project, branchProtectionRepo, c.Body()); err != nil {
+		if err := rejectProtectedBranchUpdates(c.UserContext(), project, services.branchProtectionRepo, updates); err != nil {
 			return err
 		}
 		err = transport.ReceivePack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
@@ -131,13 +142,19 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *platformauth.Runt
 	contentType, _ := rpcContentTypes.Get(service)
 	c.Set(fiber.HeaderContentType, contentType)
 	c.Set(fiber.HeaderCacheControl, "no-cache")
+	if service == serviceReceivePack {
+		triggerPushPipelines(c.UserContext(), logger, services.pipelineService, project, updates)
+	}
 	return c.Send(stdout.Bytes())
 }
 
-func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, body []byte) error {
-	for _, branchName := range parseReceivePackBranchUpdates(body) {
-		if _, err := repo.GetByProjectAndBranch(ctx, project.ID, branchName); err == nil {
-			return fiber.NewError(http.StatusForbidden, "protected branch cannot be updated: "+branchName)
+func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, updates []receivePackUpdate) error {
+	for _, update := range updates {
+		if update.BranchName == "" {
+			continue
+		}
+		if _, err := repo.GetByProjectAndBranch(ctx, project.ID, update.BranchName); err == nil {
+			return fiber.NewError(http.StatusForbidden, "protected branch cannot be updated: "+update.BranchName)
 		} else if err != dbxrepo.ErrNotFound {
 			return fiber.NewError(http.StatusInternalServerError, "check branch protection failed")
 		}
@@ -209,8 +226,27 @@ func pktLine(data string) string {
 	return fmt.Sprintf("%04x%s", total, data)
 }
 
+type receivePackUpdate struct {
+	OldSHA     string
+	NewSHA     string
+	RefName    string
+	BranchName string
+	Delete     bool
+}
+
 func parseReceivePackBranchUpdates(body []byte) []string {
+	updates := parseReceivePackUpdates(body)
 	branches := make([]string, 0)
+	for _, update := range updates {
+		if update.BranchName != "" {
+			branches = append(branches, update.BranchName)
+		}
+	}
+	return branches
+}
+
+func parseReceivePackUpdates(body []byte) []receivePackUpdate {
+	updates := make([]receivePackUpdate, 0)
 	offset := 0
 	for offset+4 <= len(body) {
 		rawLength := string(body[offset : offset+4])
@@ -241,10 +277,46 @@ func parseReceivePackBranchUpdates(body []byte) []string {
 		}
 		refName := fields[2]
 		if strings.HasPrefix(refName, "refs/heads/") {
-			branches = append(branches, strings.TrimPrefix(refName, "refs/heads/"))
+			newSHA := fields[1]
+			updates = append(updates, receivePackUpdate{
+				OldSHA:     fields[0],
+				NewSHA:     newSHA,
+				RefName:    refName,
+				BranchName: strings.TrimPrefix(refName, "refs/heads/"),
+				Delete:     isZeroOID(newSHA),
+			})
 		}
 	}
-	return branches
+	return updates
+}
+
+func triggerPushPipelines(ctx context.Context, logger *slog.Logger, service *pipelineservice.Service, project projectView, updates []receivePackUpdate) {
+	if service == nil {
+		return
+	}
+	for _, update := range updates {
+		if update.BranchName == "" || update.Delete || isZeroOID(update.NewSHA) {
+			continue
+		}
+		view, created, err := service.CreatePushPipeline(ctx, project.ID, update.BranchName, update.NewSHA)
+		if err != nil {
+			logger.Warn("create push pipeline failed", slog.String("project", project.FullPath), slog.String("branch", update.BranchName), slog.String("commit", update.NewSHA), slog.String("error", err.Error()))
+			continue
+		}
+		if view.Pipeline.ID == 0 {
+			continue
+		}
+		if created {
+			logger.Info("push pipeline created", slog.String("project", project.FullPath), slog.String("branch", update.BranchName), slog.String("commit", update.NewSHA), slog.Int64("pipeline_id", view.Pipeline.ID))
+		} else {
+			logger.Debug("push pipeline already exists", slog.String("project", project.FullPath), slog.String("branch", update.BranchName), slog.String("commit", update.NewSHA), slog.Int64("pipeline_id", view.Pipeline.ID))
+		}
+	}
+}
+
+func isZeroOID(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "" || value == "0000000000000000000000000000000000000000"
 }
 
 func isGitProtocolPath(path string, method string) bool {

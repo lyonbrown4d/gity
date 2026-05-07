@@ -14,6 +14,7 @@ import (
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/repository/projectjob"
+	projectjoblogrepo "github.com/DaiYuANg/gity/internal/repository/projectjoblog"
 	projectrunnerrepo "github.com/DaiYuANg/gity/internal/repository/projectrunner"
 	jobservice "github.com/DaiYuANg/gity/internal/service/job"
 	runnerservice "github.com/DaiYuANg/gity/internal/service/runner"
@@ -43,11 +44,15 @@ func TestProjectRunnerFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new job repo: %v", err)
 	}
+	logRepository, err := projectjoblogrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new job log repo: %v", err)
+	}
 	runnerRepository, err := projectrunnerrepo.NewRepository(db)
 	if err != nil {
 		t.Fatalf("new runner repo: %v", err)
 	}
-	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
+	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, nil, nil)
 	runnerSvc := runnerservice.NewService(projectRepository, runnerRepository, jobSvc, nil)
 
 	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
@@ -118,6 +123,13 @@ func TestProjectRunnerFlow(t *testing.T) {
 	}
 	if !claim.Claimed || claim.Job.ID != created.ID || claim.Job.Status != projectjobrepo.StatusRunning {
 		t.Fatalf("unexpected claim: %+v", claim)
+	}
+	trace, err := runnerSvc.AppendTrace(ctx, registration.Token, created.ID, runnerservice.AppendTraceInput{Output: "hello\n", DurationMillis: 10})
+	if err != nil {
+		t.Fatalf("append trace: %v", err)
+	}
+	if trace.Trace != "hello" || trace.DurationMillis != 10 {
+		t.Fatalf("unexpected runner trace: %+v", trace)
 	}
 
 	completed, err := runnerSvc.CompleteJob(ctx, registration.Token, created.ID, `{"ok":true}`)

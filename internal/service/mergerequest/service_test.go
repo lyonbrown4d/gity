@@ -20,6 +20,7 @@ import (
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/repository/projectbranchprotection"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/repository/projectmergerequest"
+	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
 	userrepo "github.com/DaiYuANg/gity/internal/repository/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/repository/usertoken"
 	namespaceservice "github.com/DaiYuANg/gity/internal/service/namespace"
@@ -54,6 +55,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	projectRepository, _ := projectrepo.NewRepository(db)
 	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
 	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
+	pipelineRepository, _ := projectpipelinerepo.NewRepository(db)
 	userRepository, _ := userrepo.NewRepository(db)
 	userTokenRepository, _ := usertokenrepo.NewRepository(db)
 
@@ -64,7 +66,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner)
+	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, pipelineRepository)
 
 	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
 	if err != nil {
@@ -125,8 +127,149 @@ func TestMergeRequestFlow(t *testing.T) {
 	}
 }
 
+func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testing.T) {
+	t.Parallel()
+
+	dbPath := filepath.Join(t.TempDir(), "gity-mr-checks-test.db")
+	db, err := dbx.Open(
+		dbx.WithDriver("sqlite"),
+		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
+		dbx.WithDialect(sqliteDialect.New()),
+	)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	if err := core.EnsureSchema(ctx, db); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+
+	logger := slog.Default()
+	namespaceRepository, _ := namespacerepo.NewRepository(db)
+	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
+	projectRepository, _ := projectrepo.NewRepository(db)
+	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
+	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
+	pipelineRepository, _ := projectpipelinerepo.NewRepository(db)
+	userRepository, _ := userrepo.NewRepository(db)
+	userTokenRepository, _ := usertokenrepo.NewRepository(db)
+
+	repoRoot := filepath.Join(t.TempDir(), "repos")
+	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
+	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
+
+	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
+	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
+	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, pipelineRepository)
+
+	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
+	if err != nil {
+		t.Fatalf("create namespace: %v", err)
+	}
+	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if err := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); err != nil {
+		t.Fatalf("push fixture branches: %v", err)
+	}
+	if err := runner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+		BranchName:  "feature",
+		FilePath:    ".gity-ci.plano",
+		Content:     mergeRequestCIConfig(),
+		Message:     "Add CI config",
+		AuthorName:  "Gity Test",
+		AuthorEmail: "test@gity.dev",
+	}); err != nil {
+		t.Fatalf("add ci config: %v", err)
+	}
+	sourceBranch := findBranch(t, ctx, gitRepository, project.FullPath+".git", project.DefaultBranch, "feature")
+
+	mr, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "merge feature with checks", SourceBranch: "feature", TargetBranch: "main"})
+	if err != nil {
+		t.Fatalf("create merge request: %v", err)
+	}
+	checks, err := mergeRequestSvc.GetChecks(ctx, project.ID, mr.IID)
+	if err != nil {
+		t.Fatalf("get missing checks: %v", err)
+	}
+	if !checks.Required || checks.Mergeable || checks.Status != "missing" {
+		t.Fatalf("expected missing required checks: %+v", checks)
+	}
+	if _, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); err == nil {
+		t.Fatalf("expected merge to be blocked before pipeline exists")
+	}
+
+	pipeline, err := pipelineRepository.Create(ctx, projectpipelinerepo.CreateInput{
+		ProjectID:     project.ID,
+		Name:          "merge-request",
+		Source:        "push",
+		RefName:       "feature",
+		CommitSHA:     sourceBranch.Hash,
+		Status:        projectpipelinerepo.StatusFailed,
+		ConfigSource:  ".gity-ci.plano",
+		ConfigContent: mergeRequestCIConfig(),
+	})
+	if err != nil {
+		t.Fatalf("create failed pipeline: %v", err)
+	}
+	checks, err = mergeRequestSvc.GetChecks(ctx, project.ID, mr.IID)
+	if err != nil {
+		t.Fatalf("get failed checks: %v", err)
+	}
+	if checks.Mergeable || checks.Status != projectpipelinerepo.StatusFailed || checks.Pipeline == nil {
+		t.Fatalf("expected failed checks: %+v", checks)
+	}
+	if err := pipelineRepository.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusSucceeded); err != nil {
+		t.Fatalf("mark pipeline succeeded: %v", err)
+	}
+	merged, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"})
+	if err != nil {
+		t.Fatalf("merge after successful pipeline: %v", err)
+	}
+	if merged.State != "merged" {
+		t.Fatalf("expected merged state, got %s", merged.State)
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
+}
+
+func mergeRequestCIConfig() string {
+	return `
+pipeline {
+  name = "merge-request"
+}
+
+stage test {
+  run {
+    shell("echo ok")
+  }
+}
+`
+}
+
+func findBranch(t *testing.T, ctx context.Context, gitRepository *gitrepo.Service, repoPath string, defaultBranch string, branchName string) gitrepo.Branch {
+	t.Helper()
+	branches, err := gitRepository.ListBranches(ctx, repoPath, defaultBranch)
+	if err != nil {
+		t.Fatalf("list branches: %v", err)
+	}
+	for _, branch := range branches {
+		if branch.Name == branchName {
+			return branch
+		}
+	}
+	t.Fatalf("branch %s not found: %+v", branchName, branches)
+	return gitrepo.Branch{}
 }
 
 func pushFixtureBranches(ctx context.Context, repoRoot string, repoPath string) error {

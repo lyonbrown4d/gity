@@ -13,6 +13,7 @@ type Config struct {
 	ServerURL      string
 	Token          string
 	WorkDir        string
+	RepoRoot       string
 	PollInterval   time.Duration
 	LeaseSeconds   int
 	MaxOutputBytes int
@@ -24,6 +25,7 @@ func ConfigFromEnv(args []string) (Config, error) {
 		ServerURL:      envString("GITY_RUNNER_URL", "http://localhost:8080/v1"),
 		Token:          envString("GITY_RUNNER_TOKEN", ""),
 		WorkDir:        envString("GITY_RUNNER_WORKDIR", "./data/runner"),
+		RepoRoot:       envString("GITY_RUNNER_REPO_ROOT", envString("GITY_GIT_REPO_ROOT", "")),
 		PollInterval:   envDuration("GITY_RUNNER_POLL_INTERVAL", time.Second),
 		LeaseSeconds:   envInt("GITY_RUNNER_LEASE_SECONDS", 600),
 		MaxOutputBytes: envInt("GITY_RUNNER_MAX_OUTPUT_BYTES", 65536),
@@ -34,6 +36,7 @@ func ConfigFromEnv(args []string) (Config, error) {
 	flags.StringVar(&cfg.ServerURL, "server", cfg.ServerURL, "Gity API base URL, for example http://localhost:8080/v1")
 	flags.StringVar(&cfg.Token, "token", cfg.Token, "runner registration token")
 	flags.StringVar(&cfg.WorkDir, "workdir", cfg.WorkDir, "runner workspace directory")
+	flags.StringVar(&cfg.RepoRoot, "repo-root", cfg.RepoRoot, "local bare repository root used for CI checkout")
 	flags.DurationVar(&cfg.PollInterval, "poll-interval", cfg.PollInterval, "job polling interval")
 	flags.IntVar(&cfg.LeaseSeconds, "lease-seconds", cfg.LeaseSeconds, "claim lease in seconds")
 	flags.IntVar(&cfg.MaxOutputBytes, "max-output-bytes", cfg.MaxOutputBytes, "maximum captured job output bytes")

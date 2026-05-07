@@ -103,6 +103,14 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		return &mergeRequestOutput{Body: item}, nil
 	}
 
+	getChecks := func(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
+		item, err := service.GetChecks(ctx, in.ProjectID, in.MergeIID)
+		if err != nil {
+			return nil, err
+		}
+		return &mergeRequestOutput{Body: item}, nil
+	}
+
 	createMergeRequest := func(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
 		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, in.Body.AuthorUserID)
 		if err != nil {
@@ -151,6 +159,8 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}", getMergeRequest, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid} instead.")),
 		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/diff", getDiff),
 		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/diff", getDiff, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/diff instead.")),
+		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/checks", getChecks),
+		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/checks", getChecks, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/checks instead.")),
 		httpapi.Post("/projects/{id}/merge-requests", createMergeRequest, httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime)),
 		httpapi.Post("/repos/{id}/merge-requests", createMergeRequest,
 			httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime),

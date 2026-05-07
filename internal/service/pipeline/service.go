@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/ci/plandsl"
 	"github.com/DaiYuANg/gity/internal/entity"
+	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/repository/projectjob"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/repository/projectpipeline"
@@ -25,6 +27,7 @@ type Service struct {
 	pipelineJobRepo *projectpipelinejobrepo.Repository
 	jobService      *jobservice.Service
 	jobRepo         *projectjobrepo.Repository
+	gitRepo         *gitrepo.Service
 }
 
 type CreatePipelineInput struct {
@@ -58,6 +61,9 @@ type scriptJobPayload struct {
 	PipelineID      int64    `json:"pipeline_id"`
 	PipelineIID     int64    `json:"pipeline_iid"`
 	PipelineName    string   `json:"pipeline_name"`
+	ProjectFullPath string   `json:"project_full_path"`
+	RefName         string   `json:"ref_name"`
+	CommitSHA       string   `json:"commit_sha"`
 	Stage           string   `json:"stage"`
 	Image           string   `json:"image,omitempty"`
 	Needs           []string `json:"needs,omitempty"`
@@ -68,6 +74,11 @@ type scriptJobPayload struct {
 	PipelineJobName string   `json:"pipeline_job_name"`
 }
 
+const (
+	defaultCIConfigPath = ".gity-ci.plano"
+	pipelineSourcePush  = "push"
+)
+
 var blockedRunAfter = time.Date(9999, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func NewService(
@@ -76,6 +87,7 @@ func NewService(
 	pipelineJobRepo *projectpipelinejobrepo.Repository,
 	jobService *jobservice.Service,
 	jobRepo *projectjobrepo.Repository,
+	gitRepo *gitrepo.Service,
 ) *Service {
 	return &Service{
 		projectRepo:     projectRepo,
@@ -83,6 +95,7 @@ func NewService(
 		pipelineJobRepo: pipelineJobRepo,
 		jobService:      jobService,
 		jobRepo:         jobRepo,
+		gitRepo:         gitRepo,
 	}
 }
 
@@ -117,7 +130,8 @@ func (s *Service) LintPipeline(ctx context.Context, projectID int64, input LintI
 }
 
 func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input CreatePipelineInput) (PipelineView, error) {
-	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
+	project, err := s.projectRepo.GetByID(ctx, projectID)
+	if err != nil {
 		return PipelineView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
 	}
 	spec, err := s.compileConfig(ctx, input.ConfigContent)
@@ -139,13 +153,43 @@ func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input Cre
 	}
 	jobs := make([]PipelineJobView, 0, len(spec.Stages))
 	for index, stage := range spec.Stages {
-		view, err := s.enqueueStage(ctx, pipeline, stage, index, initialRunAfter(stage))
+		view, err := s.enqueueStage(ctx, project, pipeline, stage, index, initialRunAfter(stage))
 		if err != nil {
 			return PipelineView{}, err
 		}
 		jobs = append(jobs, view)
 	}
 	return PipelineView{Pipeline: pipeline, Spec: spec, Jobs: jobs}, nil
+}
+
+func (s *Service) CreatePushPipeline(ctx context.Context, projectID int64, refName string, commitSHA string) (PipelineView, bool, error) {
+	project, err := s.projectRepo.GetByID(ctx, projectID)
+	if err != nil {
+		return PipelineView{}, false, httpx.NewError(http.StatusNotFound, "project not found", err)
+	}
+	configContent, ok, err := s.loadRepositoryConfig(ctx, project, refName, commitSHA)
+	if err != nil || !ok {
+		return PipelineView{}, false, err
+	}
+	existing, err := s.pipelineRepo.GetByProjectSourceRefCommit(ctx, projectID, pipelineSourcePush, refName, commitSHA)
+	if err == nil {
+		view, viewErr := s.GetPipeline(ctx, projectID, existing.ID)
+		return view, false, viewErr
+	}
+	if err != dbxrepo.ErrNotFound {
+		return PipelineView{}, false, err
+	}
+	view, err := s.CreatePipeline(ctx, projectID, CreatePipelineInput{
+		Source:        pipelineSourcePush,
+		RefName:       refName,
+		CommitSHA:     commitSHA,
+		ConfigSource:  defaultCIConfigPath,
+		ConfigContent: configContent,
+	})
+	if err != nil {
+		return PipelineView{}, false, err
+	}
+	return view, true, nil
 }
 
 func (s *Service) ListPipelineJobs(ctx context.Context, projectID int64, pipelineID int64) ([]PipelineJobView, error) {
@@ -285,11 +329,14 @@ func (s *Service) compileConfig(ctx context.Context, content string) (plandsl.Pi
 	return spec, nil
 }
 
-func (s *Service) enqueueStage(ctx context.Context, pipeline entity.ProjectPipeline, stage plandsl.StageSpec, index int, runAfter time.Time) (PipelineJobView, error) {
+func (s *Service) enqueueStage(ctx context.Context, project entity.Project, pipeline entity.ProjectPipeline, stage plandsl.StageSpec, index int, runAfter time.Time) (PipelineJobView, error) {
 	payload, err := encodeScriptPayload(scriptJobPayload{
 		PipelineID:      pipeline.ID,
 		PipelineIID:     pipeline.IID,
 		PipelineName:    pipeline.Name,
+		ProjectFullPath: project.FullPath,
+		RefName:         pipeline.RefName,
+		CommitSHA:       pipeline.CommitSHA,
 		Stage:           stage.Name,
 		Image:           stage.Image,
 		Needs:           stage.Needs,
@@ -346,6 +393,27 @@ func (s *Service) enqueueStage(ctx context.Context, pipeline entity.ProjectPipel
 		Script:      stage.Script,
 		Artifacts:   stage.Artifacts,
 	}, nil
+}
+
+func (s *Service) loadRepositoryConfig(ctx context.Context, project entity.Project, refName string, commitSHA string) (string, bool, error) {
+	if s.gitRepo == nil {
+		return "", false, httpx.NewError(http.StatusInternalServerError, "git repository service is not configured")
+	}
+	revision := strings.TrimSpace(commitSHA)
+	if revision == "" {
+		revision = strings.TrimSpace(refName)
+	}
+	blob, err := s.gitRepo.GetBlob(ctx, project.FullPath+".git", revision, project.DefaultBranch, defaultCIConfigPath)
+	if err != nil {
+		if errors.Is(err, gitrepo.ErrPathNotFound) || errors.Is(err, gitrepo.ErrReferenceNotFound) || errors.Is(err, gitrepo.ErrEmptyRepository) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if blob.Encoding != "utf-8" {
+		return "", false, httpx.NewError(http.StatusBadRequest, "ci config must be utf-8 text", fmt.Errorf("ci config encoding: %s", blob.Encoding))
+	}
+	return blob.Content, true, nil
 }
 
 func (s *Service) toPipelineJobView(ctx context.Context, item entity.ProjectPipelineJob) (PipelineJobView, error) {

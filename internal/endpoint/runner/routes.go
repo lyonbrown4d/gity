@@ -62,6 +62,13 @@ type runnerJobBody struct {
 	RetryAfterSeconds int    `json:"retry_after_seconds"`
 }
 
+type runnerTraceBody struct {
+	Token           string `json:"token"`
+	Output          string `json:"output"`
+	OutputTruncated bool   `json:"output_truncated"`
+	DurationMillis  int64  `json:"duration_millis"`
+}
+
 type runnerArtifactBody struct {
 	Token         string `json:"token"`
 	Name          string `json:"name"`
@@ -74,6 +81,11 @@ type runnerArtifactBody struct {
 type runnerArtifactInput struct {
 	JobID int64              `path:"job_id"`
 	Body  runnerArtifactBody `json:"body"`
+}
+
+type runnerTraceInput struct {
+	JobID int64           `path:"job_id"`
+	Body  runnerTraceBody `json:"body"`
 }
 
 type runnerOutput struct {
@@ -159,6 +171,18 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		return &runnerOutput{Body: item}, nil
 	}
 
+	appendTrace := func(ctx context.Context, in *runnerTraceInput) (*runnerOutput, error) {
+		item, err := service.AppendTrace(ctx, in.Body.Token, in.JobID, runnerservice.AppendTraceInput{
+			Output:          in.Body.Output,
+			OutputTruncated: in.Body.OutputTruncated,
+			DurationMillis:  in.Body.DurationMillis,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &runnerOutput{Body: item}, nil
+	}
+
 	uploadArtifact := func(ctx context.Context, in *runnerArtifactInput) (*runnerOutput, error) {
 		item, err := service.UploadArtifact(ctx, in.Body.Token, in.JobID, runnerservice.UploadArtifactInput{
 			Name:          in.Body.Name,
@@ -190,6 +214,7 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Post("/runners/jobs/claim", claimJob),
 		httpapi.Post("/runners/jobs/{job_id}/complete", completeJob),
 		httpapi.Post("/runners/jobs/{job_id}/fail", failJob),
+		httpapi.Post("/runners/jobs/{job_id}/trace", appendTrace),
 		httpapi.Post("/runners/jobs/{job_id}/artifacts", uploadArtifact),
 	)
 }

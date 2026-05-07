@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DaiYuANg/gity/internal/config"
 	dbx "github.com/DaiYuANg/gity/internal/dbxcompat"
+	"github.com/DaiYuANg/gity/internal/platform/gitexec"
+	"github.com/DaiYuANg/gity/internal/platform/gitrepo"
 	"github.com/DaiYuANg/gity/internal/repository/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/repository/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/repository/project"
@@ -53,7 +56,7 @@ func TestProjectPipelineFlow(t *testing.T) {
 		t.Fatalf("new pipeline job repo: %v", err)
 	}
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
-	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository)
+	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, nil)
 
 	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
 	if err != nil {
@@ -124,6 +127,92 @@ func TestProjectPipelineFlow(t *testing.T) {
 	}
 	if !ok || claimed.ID != second.ProjectJob.ID {
 		t.Fatalf("dependency job was not released: ok=%v job=%+v", ok, claimed)
+	}
+}
+
+func TestCreatePushPipelineFromRepositoryConfig(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	db := openTestDB(t)
+	defer db.Close()
+	if err := core.EnsureSchema(ctx, db); err != nil {
+		t.Fatalf("ensure schema: %v", err)
+	}
+
+	namespaceRepository, err := namespacerepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new namespace repo: %v", err)
+	}
+	projectRepository, err := projectrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new project repo: %v", err)
+	}
+	jobRepository, err := projectjobrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new job repo: %v", err)
+	}
+	pipelineRepository, err := projectpipelinerepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new pipeline repo: %v", err)
+	}
+	pipelineJobRepository, err := projectpipelinejobrepo.NewRepository(db)
+	if err != nil {
+		t.Fatalf("new pipeline job repo: %v", err)
+	}
+
+	repoRoot := t.TempDir()
+	gitRunner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
+	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
+	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
+	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+
+	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
+	if err != nil {
+		t.Fatalf("create namespace: %v", err)
+	}
+	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private", DefaultBranch: "main"}, namespace)
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if err := gitRunner.InitBare(ctx, project.FullPath+".git", project.DefaultBranch); err != nil {
+		t.Fatalf("init bare repo: %v", err)
+	}
+	if err := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+		BranchName:  "main",
+		FilePath:    ".gity-ci.plano",
+		Content:     pipelineConfig(),
+		Message:     "Add CI config",
+		AuthorName:  "Gity Test",
+		AuthorEmail: "test@gity.dev",
+	}); err != nil {
+		t.Fatalf("create ci config commit: %v", err)
+	}
+	branch, err := gitRepository.ListBranches(ctx, project.FullPath+".git", project.DefaultBranch)
+	if err != nil {
+		t.Fatalf("list branches: %v", err)
+	}
+	if len(branch) != 1 {
+		t.Fatalf("unexpected branches: %+v", branch)
+	}
+
+	view, created, err := service.CreatePushPipeline(ctx, project.ID, "main", branch[0].Hash)
+	if err != nil {
+		t.Fatalf("create push pipeline: %v", err)
+	}
+	if !created || view.Pipeline.Source != "push" || view.Pipeline.RefName != "main" || view.Pipeline.CommitSHA != branch[0].Hash {
+		t.Fatalf("unexpected push pipeline: created=%v view=%+v", created, view.Pipeline)
+	}
+	if len(view.Jobs) != 2 || !strings.Contains(view.Jobs[0].ProjectJob.Payload, `"project_full_path":"core-team/gity"`) {
+		t.Fatalf("unexpected push pipeline jobs: %+v", view.Jobs)
+	}
+
+	duplicate, created, err := service.CreatePushPipeline(ctx, project.ID, "main", branch[0].Hash)
+	if err != nil {
+		t.Fatalf("deduplicate push pipeline: %v", err)
+	}
+	if created || duplicate.Pipeline.ID != view.Pipeline.ID {
+		t.Fatalf("expected duplicate trigger to reuse pipeline: created=%v duplicate=%+v", created, duplicate.Pipeline)
 	}
 }
 
@@ -338,7 +427,7 @@ func setupPipelineTest(t *testing.T, ctx context.Context) pipelineTestEnv {
 		t.Fatalf("new pipeline job repo: %v", err)
 	}
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
-	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository)
+	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, nil)
 	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
 	if err != nil {
 		t.Fatalf("create namespace: %v", err)

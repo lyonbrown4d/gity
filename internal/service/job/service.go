@@ -52,6 +52,12 @@ type UploadArtifactInput struct {
 	ContentBase64 string `json:"content_base64"`
 }
 
+type AppendTraceInput struct {
+	Output          string `json:"output"`
+	OutputTruncated bool   `json:"output_truncated"`
+	DurationMillis  int64  `json:"duration_millis"`
+}
+
 type ProjectJobTrace struct {
 	Job             entity.ProjectJob      `json:"job"`
 	Logs            []entity.ProjectJobLog `json:"logs"`
@@ -265,6 +271,36 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 	return s.artifactRepo.GetByID(ctx, artifact.ID)
 }
 
+func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID int64, jobID int64, input AppendTraceInput) (ProjectJobTrace, error) {
+	item, err := s.GetProjectJob(ctx, projectID, jobID)
+	if err != nil {
+		return ProjectJobTrace{}, err
+	}
+	if item.Kind != KindScript {
+		return ProjectJobTrace{}, httpx.NewError(http.StatusBadRequest, "project job does not support trace streaming", fmt.Errorf("project job kind: %s", item.Kind))
+	}
+	if item.Status != projectjobrepo.StatusRunning {
+		return ProjectJobTrace{}, httpx.NewError(http.StatusConflict, "project job is not running", fmt.Errorf("project job status: %s", item.Status))
+	}
+	if s.logRepo == nil {
+		return ProjectJobTrace{}, httpx.NewError(http.StatusInternalServerError, "project job log repository is not configured")
+	}
+	if input.Output == "" && !input.OutputTruncated {
+		return s.GetProjectJobTrace(ctx, projectID, jobID)
+	}
+	if _, err := s.logRepo.Append(ctx, projectjoblogrepo.AppendInput{
+		ProjectID:       projectID,
+		ProjectJobID:    jobID,
+		Attempt:         item.Attempts,
+		Output:          input.Output,
+		OutputTruncated: input.OutputTruncated,
+		DurationMillis:  input.DurationMillis,
+	}); err != nil {
+		return ProjectJobTrace{}, err
+	}
+	return s.GetProjectJobTrace(ctx, projectID, jobID)
+}
+
 func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Duration) (bool, error) {
 	job, claimed, err := s.jobRepo.ClaimNextByKinds(ctx, []string{KindNoop}, normalizeWorkerID(workerID), lease)
 	if err != nil || !claimed {
@@ -348,7 +384,7 @@ func (s *Service) recordScriptLog(ctx context.Context, item entity.ProjectJob, r
 		return nil
 	}
 	parsed := parseScriptResult(result, fallback)
-	_, err := s.logRepo.Create(ctx, projectjoblogrepo.CreateInput{
+	_, err := s.logRepo.UpsertAttempt(ctx, projectjoblogrepo.CreateInput{
 		ProjectID:       item.ProjectID,
 		ProjectJobID:    item.ID,
 		Attempt:         item.Attempts,
