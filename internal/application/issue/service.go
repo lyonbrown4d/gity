@@ -6,27 +6,20 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissue"
-	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissueattachment"
-	projectissuecommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissuecomment"
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
 	"log/slog"
-	"net/http"
 	"strings"
 )
 
 type Service struct {
 	logger         *slog.Logger
-	projectRepo    *projectrepo.Repository
-	issueRepo      *projectissuerepo.Repository
-	commentRepo    *projectissuecommentrepo.Repository
-	attachmentRepo *projectissueattachmentrepo.Repository
-	userRepo       *userrepo.Repository
+	projectRepo    storageports.ProjectRepository
+	issueRepo      storageports.ProjectIssueRepository
+	commentRepo    storageports.ProjectIssueCommentRepository
+	attachmentRepo storageports.ProjectIssueAttachmentRepository
+	userRepo       storageports.UserRepository
 	storage        storageports.ObjectStorage
 }
 
@@ -81,7 +74,7 @@ type AttachmentRawContent struct {
 	Content     []byte
 }
 
-func NewService(projectRepo *projectrepo.Repository, issueRepo *projectissuerepo.Repository, commentRepo *projectissuecommentrepo.Repository, attachmentRepo *projectissueattachmentrepo.Repository, userRepo *userrepo.Repository, storage storageports.ObjectStorage) *Service {
+func NewService(projectRepo storageports.ProjectRepository, issueRepo storageports.ProjectIssueRepository, commentRepo storageports.ProjectIssueCommentRepository, attachmentRepo storageports.ProjectIssueAttachmentRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
 	return &Service{
 		logger:         slog.Default(),
 		projectRepo:    projectRepo,
@@ -95,7 +88,7 @@ func NewService(projectRepo *projectrepo.Repository, issueRepo *projectissuerepo
 
 func (s *Service) ListIssues(ctx context.Context, projectID int64) ([]issuedomain.ProjectIssue, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	items, err := s.issueRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
@@ -113,12 +106,12 @@ func (s *Service) CreateIssue(ctx context.Context, projectID int64, input Create
 		return issuedomain.ProjectIssue{}, fmt.Errorf("issue title is required")
 	}
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return issuedomain.ProjectIssue{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return issuedomain.ProjectIssue{}, apperror.NotFound("project not found", err)
 	}
 	if _, err := s.userRepo.GetByID(ctx, input.AuthorUserID); err != nil {
-		return issuedomain.ProjectIssue{}, httpx.NewError(http.StatusNotFound, "issue author not found", err)
+		return issuedomain.ProjectIssue{}, apperror.NotFound("issue author not found", err)
 	}
-	return s.issueRepo.Create(ctx, projectissuerepo.CreateInput{
+	return s.issueRepo.Create(ctx, storageports.CreateProjectIssueInput{
 		ProjectID:    projectID,
 		AuthorUserID: input.AuthorUserID,
 		Title:        input.Title,
@@ -140,7 +133,7 @@ func (s *Service) UpdateIssue(ctx context.Context, projectID int64, issueIID int
 			return issuedomain.ProjectIssue{}, fmt.Errorf("issue state must be opened or closed")
 		}
 	}
-	if err := s.issueRepo.UpdateByID(ctx, issue.ID, projectissuerepo.UpdateInput{Title: input.Title, Description: input.Description, State: input.State}); err != nil {
+	if err := s.issueRepo.UpdateByID(ctx, issue.ID, storageports.UpdateProjectIssueInput{Title: input.Title, Description: input.Description, State: input.State}); err != nil {
 		return issuedomain.ProjectIssue{}, err
 	}
 	return s.loadIssue(ctx, projectID, issueIID)
@@ -167,9 +160,9 @@ func (s *Service) CreateComment(ctx context.Context, projectID int64, issueIID i
 		return issuedomain.ProjectIssueComment{}, fmt.Errorf("issue comment body is required")
 	}
 	if _, err := s.userRepo.GetByID(ctx, input.AuthorUserID); err != nil {
-		return issuedomain.ProjectIssueComment{}, httpx.NewError(http.StatusNotFound, "comment author not found", err)
+		return issuedomain.ProjectIssueComment{}, apperror.NotFound("comment author not found", err)
 	}
-	return s.commentRepo.Create(ctx, projectissuecommentrepo.CreateInput{ProjectIssueID: issue.ID, AuthorUserID: input.AuthorUserID, Body: input.Body})
+	return s.commentRepo.Create(ctx, storageports.CreateProjectIssueCommentInput{ProjectIssueID: issue.ID, AuthorUserID: input.AuthorUserID, Body: input.Body})
 }
 
 func (s *Service) ListAttachments(ctx context.Context, projectID int64, issueIID int64) ([]issuedomain.ProjectIssueAttachment, error) {
@@ -211,10 +204,10 @@ func (s *Service) CreateAttachment(ctx context.Context, projectID int64, issueII
 func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input AttachmentUploadInput) (AttachmentUploadView, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return AttachmentUploadView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return AttachmentUploadView{}, apperror.NotFound("project not found", err)
 	}
 	if _, err := s.userRepo.GetByID(ctx, input.UploadedByUserID); err != nil {
-		return AttachmentUploadView{}, httpx.NewError(http.StatusNotFound, "attachment uploader not found", err)
+		return AttachmentUploadView{}, apperror.NotFound("attachment uploader not found", err)
 	}
 	if strings.TrimSpace(input.FileName) == "" {
 		return AttachmentUploadView{}, fmt.Errorf("attachment file_name is required")
@@ -248,7 +241,7 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 	if err != nil {
 		return AttachmentUploadView{}, err
 	}
-	attachment, err := s.attachmentRepo.Create(ctx, projectissueattachmentrepo.CreateInput{ProjectIssueID: issue.ID, UploadedByUserID: input.UploadedByUserID, FileName: input.FileName, ContentType: contentType})
+	attachment, err := s.attachmentRepo.Create(ctx, storageports.CreateProjectIssueAttachmentInput{ProjectIssueID: issue.ID, UploadedByUserID: input.UploadedByUserID, FileName: input.FileName, ContentType: contentType})
 	if err != nil {
 		return AttachmentUploadView{}, err
 	}
@@ -257,7 +250,7 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 		_ = s.attachmentRepo.DeleteByID(ctx, attachment.ID)
 		return AttachmentUploadView{}, err
 	}
-	if err := s.attachmentRepo.MarkStored(ctx, attachment.ID, projectissueattachmentrepo.StoreInput{ContentType: contentType, ByteSize: int64(len(input.Content)), StorageKey: storageKey}); err != nil {
+	if err := s.attachmentRepo.MarkStored(ctx, attachment.ID, storageports.StoreProjectIssueAttachmentInput{ContentType: contentType, ByteSize: int64(len(input.Content)), StorageKey: storageKey}); err != nil {
 		return AttachmentUploadView{}, err
 	}
 	stored, err := s.attachmentRepo.GetByIssueAndID(ctx, issue.ID, attachment.ID)
@@ -289,17 +282,17 @@ func (s *Service) GetAttachmentRaw(ctx context.Context, projectID int64, issueII
 func (s *Service) GetDraftAttachmentRaw(ctx context.Context, projectID int64, objectKey string) (AttachmentRawContent, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return AttachmentRawContent{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return AttachmentRawContent{}, apperror.NotFound("project not found", err)
 	}
 	normalizedKey := strings.Trim(strings.ReplaceAll(objectKey, "\\", "/"), "/")
 	prefix := storageports.BuildIssueDraftStoragePrefix(project.FullPath) + "/"
 	if !strings.HasPrefix(normalizedKey, prefix) {
-		return AttachmentRawContent{}, httpx.NewError(http.StatusBadRequest, "invalid attachment object key", nil)
+		return AttachmentRawContent{}, apperror.BadRequest("invalid attachment object key", nil)
 	}
 	content, err := s.storage.Load(ctx, normalizedKey)
 	if err != nil {
 		s.logger.Error("load issue draft attachment failed", slog.String("storage_key", normalizedKey), slog.String("error", err.Error()))
-		return AttachmentRawContent{}, httpx.NewError(http.StatusNotFound, "issue attachment content not found", err)
+		return AttachmentRawContent{}, apperror.NotFound("issue attachment content not found", err)
 	}
 	return AttachmentRawContent{
 		FileName:    storageKeyFileName(normalizedKey),
@@ -315,27 +308,27 @@ func (s *Service) loadAttachmentRaw(ctx context.Context, projectID int64, issueI
 	}
 	attachment, err := s.attachmentRepo.GetByIssueAndID(ctx, issue.ID, attachmentID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, httpx.NewError(http.StatusNotFound, "issue attachment not found", err)
+		if err == storageports.ErrNotFound {
+			return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, apperror.NotFound("issue attachment not found", err)
 		}
 		return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, err
 	}
 	content, err := s.storage.Load(ctx, attachment.StorageKey)
 	if err != nil {
 		s.logger.Error("load issue attachment failed", slog.String("storage_key", attachment.StorageKey), slog.String("error", err.Error()))
-		return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, httpx.NewError(http.StatusNotFound, "issue attachment content not found", err)
+		return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, apperror.NotFound("issue attachment content not found", err)
 	}
 	return AttachmentRawContent{FileName: attachment.FileName, ContentType: attachment.ContentType, Content: content}, attachment, nil
 }
 
 func (s *Service) loadIssue(ctx context.Context, projectID int64, issueIID int64) (issuedomain.ProjectIssue, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return issuedomain.ProjectIssue{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return issuedomain.ProjectIssue{}, apperror.NotFound("project not found", err)
 	}
 	issue, err := s.issueRepo.GetByProjectAndIID(ctx, projectID, issueIID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return issuedomain.ProjectIssue{}, httpx.NewError(http.StatusNotFound, "issue not found", err)
+		if err == storageports.ErrNotFound {
+			return issuedomain.ProjectIssue{}, apperror.NotFound("issue not found", err)
 		}
 		return issuedomain.ProjectIssue{}, err
 	}

@@ -3,7 +3,10 @@ package user
 import (
 	"context"
 	"fmt"
+	identityports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
+	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
+	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	"strings"
 	"time"
 
@@ -14,42 +17,37 @@ import (
 )
 
 type Repository struct {
-	base *dbxrepo.Base[identity.User, identity.UserSchemaDef]
+	base *dbxrepo.Base[identity.User, dbschema.UserSchemaDef]
 }
 
-type CreateInput struct {
-	Username    string
-	DisplayName string
-	Email       string
-}
-
-type UpdateInput struct {
-	Username    *string
-	DisplayName *string
-	Email       *string
-}
+type CreateInput = identityports.CreateUserInput
+type UpdateInput = identityports.UpdateUserInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[identity.User](db, identity.UserSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[identity.User](db, dbschema.UserSchema, dbxrepo.WithByIDNotFoundAsError(true)),
 	}, nil
 }
 
+func NewUserRepository(repo *Repository) identityports.UserRepository {
+	return repo
+}
+
 func (r *Repository) List(ctx context.Context) (*collectionx.List[identity.User], error) {
-	query := querydsl.Select(identity.UserSchema.AllColumns().Values()...).
-		From(identity.UserSchema).
-		OrderBy(identity.UserSchema.ID.Desc())
-	return r.base.List(ctx, query)
+	query := querydsl.Select(dbschema.UserSchema.AllColumns().Values()...).
+		From(dbschema.UserSchema).
+		OrderBy(dbschema.UserSchema.ID.Desc())
+	return persistence.Many(r.base.List(ctx, query))
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (identity.User, error) {
-	return r.base.GetByID(ctx, id)
+	return persistence.One(r.base.GetByID(ctx, id))
 }
 
 func (r *Repository) GetByUsername(ctx context.Context, username string) (identity.User, error) {
-	return r.base.GetByKey(ctx, dbxrepo.Key{
+	return persistence.One(r.base.GetByKey(ctx, dbxrepo.Key{
 		"username": strings.TrimSpace(username),
-	})
+	}))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (identity.User, error) {
@@ -70,15 +68,15 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (identity.Us
 func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput) error {
 	assignments := []querydsl.Assignment{}
 	if input.Username != nil {
-		assignments = append(assignments, identity.UserSchema.Username.Set(strings.TrimSpace(*input.Username)))
+		assignments = append(assignments, dbschema.UserSchema.Username.Set(strings.TrimSpace(*input.Username)))
 	}
 	if input.DisplayName != nil {
-		assignments = append(assignments, identity.UserSchema.DisplayName.Set(strings.TrimSpace(*input.DisplayName)))
+		assignments = append(assignments, dbschema.UserSchema.DisplayName.Set(strings.TrimSpace(*input.DisplayName)))
 	}
 	if input.Email != nil {
-		assignments = append(assignments, identity.UserSchema.Email.Set(strings.TrimSpace(*input.Email)))
+		assignments = append(assignments, dbschema.UserSchema.Email.Set(strings.TrimSpace(*input.Email)))
 	}
-	assignments = append(assignments, identity.UserSchema.UpdatedAt.Set(time.Now().UTC()))
+	assignments = append(assignments, dbschema.UserSchema.UpdatedAt.Set(time.Now().UTC()))
 	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}

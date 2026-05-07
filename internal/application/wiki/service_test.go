@@ -11,7 +11,7 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectwikipage"
+	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 
 	"github.com/arcgolabs/dbx"

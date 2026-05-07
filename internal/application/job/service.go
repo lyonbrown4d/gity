@@ -5,17 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
-	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjobartifact"
-	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjoblog"
 	setx "github.com/arcgolabs/collectionx/set"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -29,10 +23,10 @@ var supportedKinds = setx.NewSet(KindNoop, KindScript)
 
 type Service struct {
 	logger       *slog.Logger
-	projectRepo  *projectrepo.Repository
-	jobRepo      *projectjobrepo.Repository
-	logRepo      *projectjoblogrepo.Repository
-	artifactRepo *projectjobartifactrepo.Repository
+	projectRepo  storageports.ProjectRepository
+	jobRepo      storageports.ProjectJobRepository
+	logRepo      storageports.ProjectJobLogRepository
+	artifactRepo storageports.ProjectJobArtifactRepository
 	storage      storageports.ObjectStorage
 }
 
@@ -81,10 +75,10 @@ type scriptResult struct {
 
 func NewService(
 	logger *slog.Logger,
-	projectRepo *projectrepo.Repository,
-	jobRepo *projectjobrepo.Repository,
-	logRepo *projectjoblogrepo.Repository,
-	artifactRepo *projectjobartifactrepo.Repository,
+	projectRepo storageports.ProjectRepository,
+	jobRepo storageports.ProjectJobRepository,
+	logRepo storageports.ProjectJobLogRepository,
+	artifactRepo storageports.ProjectJobArtifactRepository,
 	storage storageports.ObjectStorage,
 ) *Service {
 	if logger == nil {
@@ -95,7 +89,7 @@ func NewService(
 
 func (s *Service) ListProjectJobs(ctx context.Context, projectID int64) ([]cidomain.ProjectJob, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	items, err := s.jobRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
@@ -106,12 +100,12 @@ func (s *Service) ListProjectJobs(ctx context.Context, projectID int64) ([]cidom
 
 func (s *Service) GetProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return cidomain.ProjectJob{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return cidomain.ProjectJob{}, apperror.NotFound("project not found", err)
 	}
 	item, err := s.jobRepo.GetByProjectAndID(ctx, projectID, jobID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return cidomain.ProjectJob{}, httpx.NewError(http.StatusNotFound, "project job not found", err)
+		if err == storageports.ErrNotFound {
+			return cidomain.ProjectJob{}, apperror.NotFound("project job not found", err)
 		}
 		return cidomain.ProjectJob{}, err
 	}
@@ -120,7 +114,7 @@ func (s *Service) GetProjectJob(ctx context.Context, projectID int64, jobID int6
 
 func (s *Service) EnqueueProjectJob(ctx context.Context, projectID int64, input CreateInput) (cidomain.ProjectJob, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return cidomain.ProjectJob{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return cidomain.ProjectJob{}, apperror.NotFound("project not found", err)
 	}
 	kind := strings.TrimSpace(strings.ToLower(input.Kind))
 	if kind == "" {
@@ -133,7 +127,7 @@ func (s *Service) EnqueueProjectJob(ctx context.Context, projectID int64, input 
 	if maxAttempts <= 0 {
 		maxAttempts = 3
 	}
-	return s.jobRepo.Create(ctx, projectjobrepo.CreateInput{
+	return s.jobRepo.Create(ctx, storageports.CreateProjectJobInput{
 		ProjectID:   projectID,
 		Kind:        kind,
 		Payload:     input.Payload,
@@ -148,7 +142,7 @@ func (s *Service) CancelProjectJob(ctx context.Context, projectID int64, jobID i
 		return cidomain.ProjectJob{}, err
 	}
 	switch item.Status {
-	case projectjobrepo.StatusSucceeded, projectjobrepo.StatusFailed, projectjobrepo.StatusCancelled:
+	case storageports.ProjectJobStatusSucceeded, storageports.ProjectJobStatusFailed, storageports.ProjectJobStatusCancelled:
 		return item, nil
 	}
 	if err := s.jobRepo.CancelByID(ctx, item.ID); err != nil {
@@ -162,10 +156,10 @@ func (s *Service) RetryProjectJob(ctx context.Context, projectID int64, jobID in
 	if err != nil {
 		return cidomain.ProjectJob{}, err
 	}
-	if item.Status == projectjobrepo.StatusRunning {
-		return cidomain.ProjectJob{}, httpx.NewError(http.StatusConflict, "project job is running", fmt.Errorf("project job is running: %s", item.Status))
+	if item.Status == storageports.ProjectJobStatusRunning {
+		return cidomain.ProjectJob{}, apperror.Conflict("project job is running", fmt.Errorf("project job is running: %s", item.Status))
 	}
-	if item.Status == projectjobrepo.StatusSucceeded {
+	if item.Status == storageports.ProjectJobStatusSucceeded {
 		return item, nil
 	}
 	if err := s.jobRepo.RetryByID(ctx, item.ID, time.Now().UTC()); err != nil {
@@ -213,14 +207,14 @@ func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID in
 	}
 	artifact, err := s.artifactRepo.GetByProjectJobAndID(ctx, projectID, jobID, artifactID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return ProjectJobArtifactContent{}, httpx.NewError(http.StatusNotFound, "project job artifact not found", err)
+		if err == storageports.ErrNotFound {
+			return ProjectJobArtifactContent{}, apperror.NotFound("project job artifact not found", err)
 		}
 		return ProjectJobArtifactContent{}, err
 	}
 	content, err := s.storage.Load(ctx, artifact.StorageKey)
 	if err != nil {
-		return ProjectJobArtifactContent{}, httpx.NewError(http.StatusNotFound, "project job artifact content not found", err)
+		return ProjectJobArtifactContent{}, apperror.NotFound("project job artifact content not found", err)
 	}
 	return ProjectJobArtifactContent{Artifact: artifact, ContentBase64: base64.StdEncoding.EncodeToString(content)}, nil
 }
@@ -228,17 +222,17 @@ func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID in
 func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64, jobID int64, input UploadArtifactInput) (cidomain.ProjectJobArtifact, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return cidomain.ProjectJobArtifact{}, apperror.NotFound("project not found", err)
 	}
 	if _, err := s.GetProjectJob(ctx, projectID, jobID); err != nil {
 		return cidomain.ProjectJobArtifact{}, err
 	}
 	fileName := strings.TrimSpace(input.FileName)
 	if fileName == "" {
-		return cidomain.ProjectJobArtifact{}, httpx.NewError(http.StatusBadRequest, "artifact file_name is required", fmt.Errorf("artifact file_name is required"))
+		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact file_name is required", fmt.Errorf("artifact file_name is required"))
 	}
 	if strings.TrimSpace(input.ContentBase64) == "" {
-		return cidomain.ProjectJobArtifact{}, httpx.NewError(http.StatusBadRequest, "artifact content_base64 is required", fmt.Errorf("artifact content_base64 is required"))
+		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact content_base64 is required", fmt.Errorf("artifact content_base64 is required"))
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.ContentBase64))
 	if err != nil {
@@ -248,7 +242,7 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 	if contentType == "" {
 		contentType = storageports.DetectContentType(fileName)
 	}
-	artifact, err := s.artifactRepo.Create(ctx, projectjobartifactrepo.CreateInput{
+	artifact, err := s.artifactRepo.Create(ctx, storageports.CreateProjectJobArtifactInput{
 		ProjectID:    projectID,
 		ProjectJobID: jobID,
 		Name:         input.Name,
@@ -264,7 +258,7 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 		_ = s.artifactRepo.DeleteByID(ctx, artifact.ID)
 		return cidomain.ProjectJobArtifact{}, err
 	}
-	if err := s.artifactRepo.MarkStored(ctx, artifact.ID, projectjobartifactrepo.StoreInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
+	if err := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
 		return cidomain.ProjectJobArtifact{}, err
 	}
 	return s.artifactRepo.GetByID(ctx, artifact.ID)
@@ -276,18 +270,18 @@ func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID int64, jo
 		return ProjectJobTrace{}, err
 	}
 	if item.Kind != KindScript {
-		return ProjectJobTrace{}, httpx.NewError(http.StatusBadRequest, "project job does not support trace streaming", fmt.Errorf("project job kind: %s", item.Kind))
+		return ProjectJobTrace{}, apperror.BadRequest("project job does not support trace streaming", fmt.Errorf("project job kind: %s", item.Kind))
 	}
-	if item.Status != projectjobrepo.StatusRunning {
-		return ProjectJobTrace{}, httpx.NewError(http.StatusConflict, "project job is not running", fmt.Errorf("project job status: %s", item.Status))
+	if item.Status != storageports.ProjectJobStatusRunning {
+		return ProjectJobTrace{}, apperror.Conflict("project job is not running", fmt.Errorf("project job status: %s", item.Status))
 	}
 	if s.logRepo == nil {
-		return ProjectJobTrace{}, httpx.NewError(http.StatusInternalServerError, "project job log repository is not configured")
+		return ProjectJobTrace{}, apperror.Internal("project job log repository is not configured")
 	}
 	if input.Output == "" && !input.OutputTruncated {
 		return s.GetProjectJobTrace(ctx, projectID, jobID)
 	}
-	if _, err := s.logRepo.Append(ctx, projectjoblogrepo.AppendInput{
+	if _, err := s.logRepo.Append(ctx, storageports.AppendProjectJobLogInput{
 		ProjectID:       projectID,
 		ProjectJobID:    jobID,
 		Attempt:         item.Attempts,
@@ -322,7 +316,7 @@ func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Durat
 
 func (s *Service) ClaimProjectJob(ctx context.Context, projectID int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return cidomain.ProjectJob{}, false, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return cidomain.ProjectJob{}, false, apperror.NotFound("project not found", err)
 	}
 	return s.jobRepo.ClaimNextByProjectIDAndKinds(ctx, projectID, []string{KindScript}, normalizeWorkerID(workerID), lease)
 }
@@ -332,8 +326,8 @@ func (s *Service) CompleteProjectJob(ctx context.Context, projectID int64, jobID
 	if err != nil {
 		return cidomain.ProjectJob{}, err
 	}
-	if item.Status != projectjobrepo.StatusRunning {
-		return cidomain.ProjectJob{}, httpx.NewError(http.StatusConflict, "project job is not running", fmt.Errorf("project job is not running: %s", item.Status))
+	if item.Status != storageports.ProjectJobStatusRunning {
+		return cidomain.ProjectJob{}, apperror.Conflict("project job is not running", fmt.Errorf("project job is not running: %s", item.Status))
 	}
 	if err := s.jobRepo.MarkSucceeded(ctx, item.ID, result); err != nil {
 		return cidomain.ProjectJob{}, err
@@ -353,8 +347,8 @@ func (s *Service) FailProjectJobWithResult(ctx context.Context, projectID int64,
 	if err != nil {
 		return cidomain.ProjectJob{}, err
 	}
-	if item.Status != projectjobrepo.StatusRunning {
-		return cidomain.ProjectJob{}, httpx.NewError(http.StatusConflict, "project job is not running", fmt.Errorf("project job is not running: %s", item.Status))
+	if item.Status != storageports.ProjectJobStatusRunning {
+		return cidomain.ProjectJob{}, apperror.Conflict("project job is not running", fmt.Errorf("project job is not running: %s", item.Status))
 	}
 	if retryAfter <= 0 {
 		retryAfter = retryDelay(item.Attempts)
@@ -383,7 +377,7 @@ func (s *Service) recordScriptLog(ctx context.Context, item cidomain.ProjectJob,
 		return nil
 	}
 	parsed := parseScriptResult(result, fallback)
-	_, err := s.logRepo.UpsertAttempt(ctx, projectjoblogrepo.CreateInput{
+	_, err := s.logRepo.UpsertAttempt(ctx, storageports.CreateProjectJobLogInput{
 		ProjectID:       item.ProjectID,
 		ProjectJobID:    item.ID,
 		Attempt:         item.Attempts,

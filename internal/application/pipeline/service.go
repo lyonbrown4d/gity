@@ -7,28 +7,22 @@ import (
 	"fmt"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	"net/http"
 	"strings"
 	"time"
 
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	"github.com/DaiYuANg/gity/internal/ci/plandsl"
-	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
-	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpipeline"
-	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpipelinejob"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
+	gitports "github.com/DaiYuANg/gity/internal/application/ports"
+	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
 )
 
 type Service struct {
-	projectRepo     *projectrepo.Repository
-	pipelineRepo    *projectpipelinerepo.Repository
-	pipelineJobRepo *projectpipelinejobrepo.Repository
+	projectRepo     gitports.ProjectRepository
+	pipelineRepo    gitports.ProjectPipelineRepository
+	pipelineJobRepo gitports.ProjectPipelineJobRepository
 	jobService      *jobservice.Service
-	jobRepo         *projectjobrepo.Repository
-	gitRepo         *gitrepo.Service
+	jobRepo         gitports.ProjectJobRepository
+	gitRepo         gitports.GitRepository
 }
 
 type CreatePipelineInput struct {
@@ -83,12 +77,12 @@ const (
 var blockedRunAfter = time.Date(9999, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func NewService(
-	projectRepo *projectrepo.Repository,
-	pipelineRepo *projectpipelinerepo.Repository,
-	pipelineJobRepo *projectpipelinejobrepo.Repository,
+	projectRepo gitports.ProjectRepository,
+	pipelineRepo gitports.ProjectPipelineRepository,
+	pipelineJobRepo gitports.ProjectPipelineJobRepository,
 	jobService *jobservice.Service,
-	jobRepo *projectjobrepo.Repository,
-	gitRepo *gitrepo.Service,
+	jobRepo gitports.ProjectJobRepository,
+	gitRepo gitports.GitRepository,
 ) *Service {
 	return &Service{
 		projectRepo:     projectRepo,
@@ -102,7 +96,7 @@ func NewService(
 
 func (s *Service) ListPipelines(ctx context.Context, projectID int64) ([]cidomain.ProjectPipeline, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	items, err := s.pipelineRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
@@ -125,7 +119,7 @@ func (s *Service) GetPipeline(ctx context.Context, projectID int64, pipelineID i
 
 func (s *Service) LintPipeline(ctx context.Context, projectID int64, input LintInput) (plandsl.PipelineSpec, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return plandsl.PipelineSpec{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return plandsl.PipelineSpec{}, apperror.NotFound("project not found", err)
 	}
 	return s.compileConfig(ctx, input.ConfigContent)
 }
@@ -133,19 +127,19 @@ func (s *Service) LintPipeline(ctx context.Context, projectID int64, input LintI
 func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input CreatePipelineInput) (PipelineView, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return PipelineView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return PipelineView{}, apperror.NotFound("project not found", err)
 	}
 	spec, err := s.compileConfig(ctx, input.ConfigContent)
 	if err != nil {
 		return PipelineView{}, err
 	}
-	pipeline, err := s.pipelineRepo.Create(ctx, projectpipelinerepo.CreateInput{
+	pipeline, err := s.pipelineRepo.Create(ctx, gitports.CreateProjectPipelineInput{
 		ProjectID:     projectID,
 		Name:          spec.Name,
 		Source:        input.Source,
 		RefName:       input.RefName,
 		CommitSHA:     input.CommitSHA,
-		Status:        projectpipelinerepo.StatusPending,
+		Status:        gitports.ProjectPipelineStatusPending,
 		ConfigSource:  input.ConfigSource,
 		ConfigContent: input.ConfigContent,
 	})
@@ -166,7 +160,7 @@ func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input Cre
 func (s *Service) CreatePushPipeline(ctx context.Context, projectID int64, refName string, commitSHA string) (PipelineView, bool, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return PipelineView{}, false, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return PipelineView{}, false, apperror.NotFound("project not found", err)
 	}
 	configContent, ok, err := s.loadRepositoryConfig(ctx, project, refName, commitSHA)
 	if err != nil || !ok {
@@ -177,7 +171,7 @@ func (s *Service) CreatePushPipeline(ctx context.Context, projectID int64, refNa
 		view, viewErr := s.GetPipeline(ctx, projectID, existing.ID)
 		return view, false, viewErr
 	}
-	if err != dbxrepo.ErrNotFound {
+	if err != gitports.ErrNotFound {
 		return PipelineView{}, false, err
 	}
 	view, err := s.CreatePipeline(ctx, projectID, CreatePipelineInput{
@@ -217,8 +211,8 @@ func (s *Service) RetryPipeline(ctx context.Context, projectID int64, pipelineID
 	if err != nil {
 		return PipelineView{}, err
 	}
-	if !isTerminalPipelineStatus(pipeline.Status) && pipeline.Status != projectpipelinerepo.StatusPending {
-		return PipelineView{}, httpx.NewError(http.StatusConflict, "pipeline is not retryable", fmt.Errorf("pipeline status: %s", pipeline.Status))
+	if !isTerminalPipelineStatus(pipeline.Status) && pipeline.Status != gitports.ProjectPipelineStatusPending {
+		return PipelineView{}, apperror.Conflict("pipeline is not retryable", fmt.Errorf("pipeline status: %s", pipeline.Status))
 	}
 	items, err := s.pipelineJobRepo.ListByPipelineID(ctx, projectID, pipelineID)
 	if err != nil {
@@ -229,8 +223,8 @@ func (s *Service) RetryPipeline(ctx context.Context, projectID int64, pipelineID
 		if err != nil {
 			return PipelineView{}, err
 		}
-		if job.Status == projectjobrepo.StatusRunning {
-			return PipelineView{}, httpx.NewError(http.StatusConflict, "pipeline has running job", fmt.Errorf("project job is running: %s", job.Status))
+		if job.Status == gitports.ProjectJobStatusRunning {
+			return PipelineView{}, apperror.Conflict("pipeline has running job", fmt.Errorf("project job is running: %s", job.Status))
 		}
 		needs, err := decodeStringSlice(item.Needs)
 		if err != nil {
@@ -244,7 +238,7 @@ func (s *Service) RetryPipeline(ctx context.Context, projectID int64, pipelineID
 			return PipelineView{}, err
 		}
 	}
-	if err := s.pipelineRepo.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusPending); err != nil {
+	if err := s.pipelineRepo.UpdateStatus(ctx, pipeline, gitports.ProjectPipelineStatusPending); err != nil {
 		return PipelineView{}, err
 	}
 	return s.RefreshPipeline(ctx, projectID, pipelineID)
@@ -271,7 +265,7 @@ func (s *Service) CancelPipeline(ctx context.Context, projectID int64, pipelineI
 			return PipelineView{}, err
 		}
 	}
-	if err := s.pipelineRepo.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusCancelled); err != nil {
+	if err := s.pipelineRepo.UpdateStatus(ctx, pipeline, gitports.ProjectPipelineStatusCancelled); err != nil {
 		return PipelineView{}, err
 	}
 	return s.GetPipeline(ctx, projectID, pipelineID)
@@ -280,7 +274,7 @@ func (s *Service) CancelPipeline(ctx context.Context, projectID int64, pipelineI
 func (s *Service) RefreshProjectJob(ctx context.Context, projectID int64, projectJobID int64) error {
 	item, err := s.pipelineJobRepo.GetByProjectJobID(ctx, projectID, projectJobID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
+		if err == gitports.ErrNotFound {
 			return nil
 		}
 		return err
@@ -307,12 +301,12 @@ func (s *Service) listPipelineJobs(ctx context.Context, projectID int64, pipelin
 
 func (s *Service) loadPipeline(ctx context.Context, projectID int64, pipelineID int64) (cidomain.ProjectPipeline, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return cidomain.ProjectPipeline{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return cidomain.ProjectPipeline{}, apperror.NotFound("project not found", err)
 	}
 	item, err := s.pipelineRepo.GetByProjectAndID(ctx, projectID, pipelineID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return cidomain.ProjectPipeline{}, httpx.NewError(http.StatusNotFound, "project pipeline not found", err)
+		if err == gitports.ErrNotFound {
+			return cidomain.ProjectPipeline{}, apperror.NotFound("project pipeline not found", err)
 		}
 		return cidomain.ProjectPipeline{}, err
 	}
@@ -321,11 +315,11 @@ func (s *Service) loadPipeline(ctx context.Context, projectID int64, pipelineID 
 
 func (s *Service) compileConfig(ctx context.Context, content string) (plandsl.PipelineSpec, error) {
 	if strings.TrimSpace(content) == "" {
-		return plandsl.PipelineSpec{}, httpx.NewError(http.StatusBadRequest, "ci config content is required", fmt.Errorf("ci config content is required"))
+		return plandsl.PipelineSpec{}, apperror.BadRequest("ci config content is required", fmt.Errorf("ci config content is required"))
 	}
 	spec, err := plandsl.Compile(ctx, ".gity-ci.plano", content)
 	if err != nil {
-		return plandsl.PipelineSpec{}, httpx.NewError(http.StatusBadRequest, "invalid ci plano config", err)
+		return plandsl.PipelineSpec{}, apperror.BadRequest("invalid ci plano config", err)
 	}
 	return spec, nil
 }
@@ -371,7 +365,7 @@ func (s *Service) enqueueStage(ctx context.Context, project projectdomain.Projec
 	if err != nil {
 		return PipelineJobView{}, err
 	}
-	pipelineJob, err := s.pipelineJobRepo.Create(ctx, projectpipelinejobrepo.CreateInput{
+	pipelineJob, err := s.pipelineJobRepo.Create(ctx, gitports.CreateProjectPipelineJobInput{
 		ProjectID:    pipeline.ProjectID,
 		PipelineID:   pipeline.ID,
 		ProjectJobID: projectJob.ID,
@@ -398,7 +392,7 @@ func (s *Service) enqueueStage(ctx context.Context, project projectdomain.Projec
 
 func (s *Service) loadRepositoryConfig(ctx context.Context, project projectdomain.Project, refName string, commitSHA string) (string, bool, error) {
 	if s.gitRepo == nil {
-		return "", false, httpx.NewError(http.StatusInternalServerError, "git repository service is not configured")
+		return "", false, apperror.Internal("git repository service is not configured")
 	}
 	revision := strings.TrimSpace(commitSHA)
 	if revision == "" {
@@ -406,13 +400,13 @@ func (s *Service) loadRepositoryConfig(ctx context.Context, project projectdomai
 	}
 	blob, err := s.gitRepo.GetBlob(ctx, project.FullPath+".git", revision, project.DefaultBranch, defaultCIConfigPath)
 	if err != nil {
-		if errors.Is(err, gitrepo.ErrPathNotFound) || errors.Is(err, gitrepo.ErrReferenceNotFound) || errors.Is(err, gitrepo.ErrEmptyRepository) {
+		if errors.Is(err, gitports.ErrPathNotFound) || errors.Is(err, gitports.ErrReferenceNotFound) || errors.Is(err, gitports.ErrEmptyRepository) {
 			return "", false, nil
 		}
 		return "", false, err
 	}
 	if blob.Encoding != "utf-8" {
-		return "", false, httpx.NewError(http.StatusBadRequest, "ci config must be utf-8 text", fmt.Errorf("ci config encoding: %s", blob.Encoding))
+		return "", false, apperror.BadRequest("ci config must be utf-8 text", fmt.Errorf("ci config encoding: %s", blob.Encoding))
 	}
 	return blob.Content, true, nil
 }
@@ -462,13 +456,13 @@ func (s *Service) refreshPipelineState(ctx context.Context, projectID int64, pip
 		jobs[item.Stage] = job
 	}
 	nextStatus := pipelineStatus(jobs)
-	if nextStatus != projectpipelinerepo.StatusFailed && nextStatus != projectpipelinerepo.StatusCancelled {
+	if nextStatus != gitports.ProjectPipelineStatusFailed && nextStatus != gitports.ProjectPipelineStatusCancelled {
 		if err := s.releaseReadyJobs(ctx, items.Values(), jobs); err != nil {
 			return cidomain.ProjectPipeline{}, err
 		}
 		nextStatus = pipelineStatus(jobs)
 	}
-	if nextStatus == projectpipelinerepo.StatusFailed || nextStatus == projectpipelinerepo.StatusCancelled {
+	if nextStatus == gitports.ProjectPipelineStatusFailed || nextStatus == gitports.ProjectPipelineStatusCancelled {
 		if err := s.cancelPendingJobs(ctx, jobs); err != nil {
 			return cidomain.ProjectPipeline{}, err
 		}
@@ -483,7 +477,7 @@ func (s *Service) releaseReadyJobs(ctx context.Context, items []cidomain.Project
 	now := time.Now().UTC()
 	for _, item := range items {
 		job := jobs[item.Stage]
-		if job.Status != projectjobrepo.StatusPending || !isBlockedRunAfter(job.RunAfter) {
+		if job.Status != gitports.ProjectJobStatusPending || !isBlockedRunAfter(job.RunAfter) {
 			continue
 		}
 		needs, err := decodeStringSlice(item.Needs)
@@ -505,7 +499,7 @@ func (s *Service) releaseReadyJobs(ctx context.Context, items []cidomain.Project
 
 func (s *Service) cancelPendingJobs(ctx context.Context, jobs map[string]cidomain.ProjectJob) error {
 	for _, job := range jobs {
-		if job.Status == projectjobrepo.StatusPending {
+		if job.Status == gitports.ProjectJobStatusPending {
 			if err := s.jobRepo.CancelByID(ctx, job.ID); err != nil {
 				return err
 			}
@@ -556,7 +550,7 @@ func isBlockedRunAfter(value time.Time) bool {
 }
 
 func pipelineJobStatus(job cidomain.ProjectJob, needs []string) string {
-	if job.Status == projectjobrepo.StatusPending && len(needs) > 0 && isBlockedRunAfter(job.RunAfter) {
+	if job.Status == gitports.ProjectJobStatusPending && len(needs) > 0 && isBlockedRunAfter(job.RunAfter) {
 		return "blocked"
 	}
 	return job.Status
@@ -564,7 +558,7 @@ func pipelineJobStatus(job cidomain.ProjectJob, needs []string) string {
 
 func isTerminalPipelineStatus(status string) bool {
 	switch status {
-	case projectpipelinerepo.StatusSucceeded, projectpipelinerepo.StatusFailed, projectpipelinerepo.StatusCancelled:
+	case gitports.ProjectPipelineStatusSucceeded, gitports.ProjectPipelineStatusFailed, gitports.ProjectPipelineStatusCancelled:
 		return true
 	default:
 		return false
@@ -573,7 +567,7 @@ func isTerminalPipelineStatus(status string) bool {
 
 func isTerminalJobStatus(status string) bool {
 	switch status {
-	case projectjobrepo.StatusSucceeded, projectjobrepo.StatusFailed, projectjobrepo.StatusCancelled:
+	case gitports.ProjectJobStatusSucceeded, gitports.ProjectJobStatusFailed, gitports.ProjectJobStatusCancelled:
 		return true
 	default:
 		return false
@@ -582,7 +576,7 @@ func isTerminalJobStatus(status string) bool {
 
 func pipelineStatus(jobs map[string]cidomain.ProjectJob) string {
 	if len(jobs) == 0 {
-		return projectpipelinerepo.StatusPending
+		return gitports.ProjectPipelineStatusPending
 	}
 	allSucceeded := true
 	anyRunning := false
@@ -590,14 +584,14 @@ func pipelineStatus(jobs map[string]cidomain.ProjectJob) string {
 	anyCancelled := false
 	for _, job := range jobs {
 		switch job.Status {
-		case projectjobrepo.StatusFailed:
-			return projectpipelinerepo.StatusFailed
-		case projectjobrepo.StatusCancelled:
+		case gitports.ProjectJobStatusFailed:
+			return gitports.ProjectPipelineStatusFailed
+		case gitports.ProjectJobStatusCancelled:
 			anyCancelled = true
 			allSucceeded = false
-		case projectjobrepo.StatusSucceeded:
+		case gitports.ProjectJobStatusSucceeded:
 			anyStarted = true
-		case projectjobrepo.StatusRunning:
+		case gitports.ProjectJobStatusRunning:
 			anyRunning = true
 			anyStarted = true
 			allSucceeded = false
@@ -606,21 +600,21 @@ func pipelineStatus(jobs map[string]cidomain.ProjectJob) string {
 		}
 	}
 	if allSucceeded {
-		return projectpipelinerepo.StatusSucceeded
+		return gitports.ProjectPipelineStatusSucceeded
 	}
 	if anyCancelled {
-		return projectpipelinerepo.StatusCancelled
+		return gitports.ProjectPipelineStatusCancelled
 	}
 	if anyRunning || anyStarted {
-		return projectpipelinerepo.StatusRunning
+		return gitports.ProjectPipelineStatusRunning
 	}
-	return projectpipelinerepo.StatusPending
+	return gitports.ProjectPipelineStatusPending
 }
 
 func needsSucceeded(needs []string, jobs map[string]cidomain.ProjectJob) bool {
 	for _, need := range needs {
 		job, ok := jobs[need]
-		if !ok || job.Status != projectjobrepo.StatusSucceeded {
+		if !ok || job.Status != gitports.ProjectJobStatusSucceeded {
 			return false
 		}
 	}

@@ -2,21 +2,14 @@ package project
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
+	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	"github.com/DaiYuANg/gity/internal/infrastructure/gitexec"
-	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectbranchprotection"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
 	"log/slog"
-	"net/http"
 	"strings"
 )
 
@@ -24,11 +17,26 @@ var projectVisibilities = setx.NewSet("private", "internal", "public")
 
 type Service struct {
 	logger        *slog.Logger
-	repo          *projectrepo.Repository
-	gitRunner     *gitexec.Runner
-	gitRepository *gitrepo.Service
-	namespaceRepo *namespacerepo.Repository
-	branchRepo    *projectbranchprotectionrepo.Repository
+	repo          gitports.ProjectRepository
+	gitRunner     gitports.GitRunner
+	gitRepository gitports.GitRepository
+	namespaceRepo gitports.NamespaceRepository
+	branchRepo    gitports.ProjectBranchProtectionRepository
+	events        gitports.DomainEventPublisher
+}
+
+type GitDependencies struct {
+	Runner     gitports.GitRunner
+	Repository gitports.GitRepository
+}
+
+type Dependencies struct {
+	Logger        *slog.Logger
+	Repo          gitports.ProjectRepository
+	Git           GitDependencies
+	NamespaceRepo gitports.NamespaceRepository
+	BranchRepo    gitports.ProjectBranchProtectionRepository
+	Events        gitports.DomainEventPublisher
 }
 
 type CreateInput struct {
@@ -57,17 +65,47 @@ type CreateFileCommitInput struct {
 	AuthorEmail string `json:"author_email"`
 }
 
-func NewService(logger *slog.Logger, repo *projectrepo.Repository, gitRunner *gitexec.Runner, gitRepository *gitrepo.Service, namespaceRepo *namespacerepo.Repository, branchRepo *projectbranchprotectionrepo.Repository) *Service {
-	return &Service{logger: logger, repo: repo, gitRunner: gitRunner, gitRepository: gitRepository, namespaceRepo: namespaceRepo, branchRepo: branchRepo}
+func NewGitDependencies(runner gitports.GitRunner, repository gitports.GitRepository) GitDependencies {
+	return GitDependencies{Runner: runner, Repository: repository}
+}
+
+func NewDependencies(logger *slog.Logger, repo gitports.ProjectRepository, git GitDependencies, namespaceRepo gitports.NamespaceRepository, branchRepo gitports.ProjectBranchProtectionRepository, events gitports.DomainEventPublisher) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, Git: git, NamespaceRepo: namespaceRepo, BranchRepo: branchRepo, Events: events}
+}
+
+func NewServiceWithDependencies(deps Dependencies) *Service {
+	return newService(deps)
+}
+
+func NewService(logger *slog.Logger, repo gitports.ProjectRepository, gitRunner gitports.GitRunner, gitRepository gitports.GitRepository, namespaceRepo gitports.NamespaceRepository, branchRepo gitports.ProjectBranchProtectionRepository) *Service {
+	return newService(Dependencies{
+		Logger:        logger,
+		Repo:          repo,
+		Git:           NewGitDependencies(gitRunner, gitRepository),
+		NamespaceRepo: namespaceRepo,
+		BranchRepo:    branchRepo,
+		Events:        gitports.NoopDomainEventPublisher{},
+	})
+}
+
+func newService(deps Dependencies) *Service {
+	events := deps.Events
+	if events == nil {
+		events = gitports.NoopDomainEventPublisher{}
+	}
+	return &Service{
+		logger:        deps.Logger,
+		repo:          deps.Repo,
+		gitRunner:     deps.Git.Runner,
+		gitRepository: deps.Git.Repository,
+		namespaceRepo: deps.NamespaceRepo,
+		branchRepo:    deps.BranchRepo,
+		events:        events,
+	}
 }
 
 func (s *Service) List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error) {
-	filter := sql.NullInt64{}
-	if namespaceID != nil {
-		filter.Valid = true
-		filter.Int64 = *namespaceID
-	}
-	return s.repo.List(ctx, filter)
+	return s.repo.List(ctx, namespaceID)
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (projectdomain.Project, error) {
@@ -95,7 +133,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 	if err != nil {
 		return projectdomain.Project{}, fmt.Errorf("load project namespace: %w", err)
 	}
-	project, err := s.repo.Create(ctx, projectrepo.CreateInput{
+	project, err := s.repo.Create(ctx, gitports.CreateProjectInput{
 		NamespaceID:   input.NamespaceID,
 		Name:          input.Name,
 		PathKey:       input.PathKey,
@@ -111,6 +149,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 		_ = s.repo.DeleteByID(ctx, project.ID)
 		return projectdomain.Project{}, fmt.Errorf("provision bare repo: %w", err)
 	}
+	_ = s.events.PublishAsync(ctx, projectdomain.NewProjectCreatedEvent(project))
 	return project, nil
 }
 
@@ -118,13 +157,17 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return fmt.Errorf("project id is required")
 	}
-	return s.repo.DeleteByID(ctx, id)
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
+		return err
+	}
+	_ = s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(id))
+	return nil
 }
 
 func (s *Service) ListBranches(ctx context.Context, id int64) ([]Branch, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	gitBranches, err := s.gitRepository.ListBranches(ctx, repositoryPath(project), project.DefaultBranch)
 	if err != nil {
@@ -150,7 +193,7 @@ func (s *Service) ListBranches(ctx context.Context, id int64) ([]Branch, error) 
 func (s *Service) CreateBranch(ctx context.Context, id int64, branchName string, sourceRef string) (Branch, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return Branch{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return Branch{}, apperror.NotFound("project not found", err)
 	}
 	branchName = strings.TrimSpace(branchName)
 	if branchName == "" {
@@ -193,13 +236,13 @@ func (s *Service) GetBranch(ctx context.Context, id int64, branchName string) (B
 			return branch, nil
 		}
 	}
-	return Branch{}, httpx.NewError(http.StatusNotFound, "branch not found", gitrepo.ErrReferenceNotFound)
+	return Branch{}, apperror.NotFound("branch not found", gitports.ErrReferenceNotFound)
 }
 
 func (s *Service) CreateFileCommit(ctx context.Context, id int64, input CreateFileCommitInput) error {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return httpx.NewError(http.StatusNotFound, "project not found", err)
+		return apperror.NotFound("project not found", err)
 	}
 	branchName := strings.TrimSpace(input.BranchName)
 	if branchName == "" {
@@ -210,9 +253,9 @@ func (s *Service) CreateFileCommit(ctx context.Context, id int64, input CreateFi
 		return err
 	}
 	if protected {
-		return httpx.NewError(http.StatusForbidden, "protected branch cannot be updated", fmt.Errorf("branch is protected: %s", branchName))
+		return apperror.Forbidden("protected branch cannot be updated", fmt.Errorf("branch is protected: %s", branchName))
 	}
-	err = s.gitRunner.CreateFileCommit(ctx, repositoryPath(project), gitexec.CreateFileCommitInput{
+	err = s.gitRunner.CreateFileCommit(ctx, repositoryPath(project), gitports.CreateFileCommitInput{
 		BranchName:  branchName,
 		FilePath:    input.Path,
 		Content:     input.Content,
@@ -229,16 +272,16 @@ func (s *Service) CreateFileCommit(ctx context.Context, id int64, input CreateFi
 func (s *Service) isBranchProtected(ctx context.Context, projectID int64, branchName string) (bool, error) {
 	if _, err := s.branchRepo.GetByProjectAndBranch(ctx, projectID, branchName); err == nil {
 		return true, nil
-	} else if err != dbxrepo.ErrNotFound {
+	} else if err != gitports.ErrNotFound {
 		return false, err
 	}
 	return false, nil
 }
 
-func (s *Service) ListTree(ctx context.Context, id int64, refName string, treePath string) ([]gitrepo.TreeEntry, error) {
+func (s *Service) ListTree(ctx context.Context, id int64, refName string, treePath string) ([]gitports.TreeEntry, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	entries, err := s.gitRepository.ListTree(ctx, repositoryPath(project), refName, project.DefaultBranch, treePath)
 	if err != nil {
@@ -247,12 +290,12 @@ func (s *Service) ListTree(ctx context.Context, id int64, refName string, treePa
 	return entries, nil
 }
 
-func (s *Service) Search(ctx context.Context, id int64, refName string, query string, path string, limit int, maxFiles int, maxFileSize int64, matchCase bool, useRegex bool) ([]gitrepo.SearchResult, error) {
+func (s *Service) Search(ctx context.Context, id int64, refName string, query string, path string, limit int, maxFiles int, maxFileSize int64, matchCase bool, useRegex bool) ([]gitports.SearchResult, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
-	results, err := s.gitRepository.Search(ctx, repositoryPath(project), refName, project.DefaultBranch, gitrepo.SearchParams{
+	results, err := s.gitRepository.Search(ctx, repositoryPath(project), refName, project.DefaultBranch, gitports.SearchParams{
 		Query:       query,
 		Path:        path,
 		Limit:       limit,
@@ -267,34 +310,34 @@ func (s *Service) Search(ctx context.Context, id int64, refName string, query st
 	return results, nil
 }
 
-func (s *Service) GetBlob(ctx context.Context, id int64, refName string, blobPath string) (gitrepo.Blob, error) {
+func (s *Service) GetBlob(ctx context.Context, id int64, refName string, blobPath string) (gitports.Blob, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return gitrepo.Blob{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return gitports.Blob{}, apperror.NotFound("project not found", err)
 	}
 	blob, err := s.gitRepository.GetBlob(ctx, repositoryPath(project), refName, project.DefaultBranch, blobPath)
 	if err != nil {
-		return gitrepo.Blob{}, mapGitError(err)
+		return gitports.Blob{}, mapGitError(err)
 	}
 	return blob, nil
 }
 
-func (s *Service) GetReadme(ctx context.Context, id int64, refName string) (gitrepo.Blob, error) {
+func (s *Service) GetReadme(ctx context.Context, id int64, refName string) (gitports.Blob, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return gitrepo.Blob{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return gitports.Blob{}, apperror.NotFound("project not found", err)
 	}
 	blob, err := s.gitRepository.GetReadme(ctx, repositoryPath(project), refName, project.DefaultBranch)
 	if err != nil {
-		return gitrepo.Blob{}, mapGitError(err)
+		return gitports.Blob{}, mapGitError(err)
 	}
 	return blob, nil
 }
 
-func (s *Service) ListCommits(ctx context.Context, id int64, refName string, limit int) ([]gitrepo.Commit, error) {
+func (s *Service) ListCommits(ctx context.Context, id int64, refName string, limit int) ([]gitports.Commit, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	commits, err := s.gitRepository.ListCommits(ctx, repositoryPath(project), refName, project.DefaultBranch, limit)
 	if err != nil {
@@ -303,14 +346,14 @@ func (s *Service) ListCommits(ctx context.Context, id int64, refName string, lim
 	return commits, nil
 }
 
-func (s *Service) AnalyzeLanguages(ctx context.Context, id int64, refName string) (gitrepo.LanguageAnalysis, error) {
+func (s *Service) AnalyzeLanguages(ctx context.Context, id int64, refName string) (gitports.LanguageAnalysis, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
-		return gitrepo.LanguageAnalysis{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return gitports.LanguageAnalysis{}, apperror.NotFound("project not found", err)
 	}
 	analysis, err := s.gitRepository.AnalyzeLanguages(ctx, repositoryPath(project), refName, project.DefaultBranch)
 	if err != nil {
-		return gitrepo.LanguageAnalysis{}, mapGitError(err)
+		return gitports.LanguageAnalysis{}, mapGitError(err)
 	}
 	return analysis, nil
 }
@@ -321,20 +364,20 @@ func repositoryPath(project projectdomain.Project) string {
 
 func mapGitError(err error) error {
 	switch {
-	case errors.Is(err, gitrepo.ErrRepositoryNotFound):
-		return httpx.NewError(http.StatusNotFound, "repository not found", err)
-	case errors.Is(err, gitrepo.ErrReferenceNotFound):
-		return httpx.NewError(http.StatusNotFound, "git reference not found", err)
-	case errors.Is(err, gitrepo.ErrEmptyRepository):
-		return httpx.NewError(http.StatusNotFound, "repository has no commits", err)
-	case errors.Is(err, gitrepo.ErrInvalidSearchQuery):
-		return httpx.NewError(http.StatusBadRequest, "invalid search query", err)
-	case errors.Is(err, gitrepo.ErrInvalidSearchRegexp):
-		return httpx.NewError(http.StatusBadRequest, "invalid search regex", err)
-	case errors.Is(err, gitrepo.ErrPathNotFound):
-		return httpx.NewError(http.StatusNotFound, "repository path not found", err)
-	case errors.Is(err, gitrepo.ErrReadmeNotFound):
-		return httpx.NewError(http.StatusNotFound, "repository readme not found", err)
+	case errors.Is(err, gitports.ErrRepositoryNotFound):
+		return apperror.NotFound("repository not found", err)
+	case errors.Is(err, gitports.ErrReferenceNotFound):
+		return apperror.NotFound("git reference not found", err)
+	case errors.Is(err, gitports.ErrEmptyRepository):
+		return apperror.NotFound("repository has no commits", err)
+	case errors.Is(err, gitports.ErrInvalidSearchQuery):
+		return apperror.BadRequest("invalid search query", err)
+	case errors.Is(err, gitports.ErrInvalidSearchRegexp):
+		return apperror.BadRequest("invalid search regex", err)
+	case errors.Is(err, gitports.ErrPathNotFound):
+		return apperror.NotFound("repository path not found", err)
+	case errors.Is(err, gitports.ErrReadmeNotFound):
+		return apperror.NotFound("repository readme not found", err)
 	default:
 		return err
 	}
@@ -342,14 +385,14 @@ func mapGitError(err error) error {
 
 func mapGitExecError(err error) error {
 	switch {
-	case errors.Is(err, gitexec.ErrBranchExists):
-		return httpx.NewError(http.StatusConflict, "branch already exists", err)
-	case errors.Is(err, gitexec.ErrInvalidBranchName):
-		return httpx.NewError(http.StatusBadRequest, "invalid branch name", err)
-	case errors.Is(err, gitexec.ErrSourceReferenceNotFound):
-		return httpx.NewError(http.StatusNotFound, "git reference not found", err)
-	case errors.Is(err, gitexec.ErrFileAlreadyExists):
-		return httpx.NewError(http.StatusConflict, "repository file already exists", err)
+	case errors.Is(err, gitports.ErrBranchExists):
+		return apperror.Conflict("branch already exists", err)
+	case errors.Is(err, gitports.ErrInvalidBranchName):
+		return apperror.BadRequest("invalid branch name", err)
+	case errors.Is(err, gitports.ErrSourceReferenceNotFound):
+		return apperror.NotFound("git reference not found", err)
+	case errors.Is(err, gitports.ErrFileAlreadyExists):
+		return apperror.Conflict("repository file already exists", err)
 	default:
 		return err
 	}

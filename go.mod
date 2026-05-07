@@ -10,6 +10,7 @@ require (
 	github.com/arcgolabs/configx v0.3.2
 	github.com/arcgolabs/dbx v0.1.5
 	github.com/arcgolabs/dix v0.7.2
+	github.com/arcgolabs/eventx v0.1.2
 	github.com/arcgolabs/httpx v0.1.4
 	github.com/arcgolabs/httpx/adapter/fiber v0.1.4
 	github.com/arcgolabs/logx v0.1.2
@@ -106,6 +107,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
+	github.com/panjf2000/ants/v2 v2.12.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/pjbgf/sha1cd v0.5.0 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect

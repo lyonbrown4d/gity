@@ -8,6 +8,7 @@ func Module() dix.Module {
 		dix.Description("Namespace persistence"),
 		dix.Providers(
 			dix.ProviderErr1(NewRepository),
+			dix.Provider1(NewNamespaceRepository),
 		),
 	)
 }

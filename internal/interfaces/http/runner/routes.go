@@ -8,7 +8,7 @@ import (
 	runnerservice "github.com/DaiYuANg/gity/internal/application/runner"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
+	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 )

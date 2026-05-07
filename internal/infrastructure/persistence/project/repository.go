@@ -2,10 +2,12 @@ package project
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	projectports "github.com/DaiYuANg/gity/internal/application/ports"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
+	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
@@ -15,42 +17,39 @@ import (
 )
 
 type Repository struct {
-	base *dbxrepo.Base[projectdomain.Project, projectdomain.ProjectSchemaDef]
+	base *dbxrepo.Base[projectdomain.Project, dbschema.ProjectSchemaDef]
 }
 
-type CreateInput struct {
-	NamespaceID   int64
-	Name          string
-	PathKey       string
-	Visibility    string
-	Description   string
-	DefaultBranch string
-}
+type CreateInput = projectports.CreateProjectInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[projectdomain.Project](db, projectdomain.ProjectSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[projectdomain.Project](db, dbschema.ProjectSchema, dbxrepo.WithByIDNotFoundAsError(true)),
 	}, nil
 }
 
-func (r *Repository) List(ctx context.Context, namespaceID sql.NullInt64) (*collectionx.List[projectdomain.Project], error) {
-	query := querydsl.Select(projectdomain.ProjectSchema.AllColumns().Values()...).
-		From(projectdomain.ProjectSchema).
-		OrderBy(projectdomain.ProjectSchema.ID.Desc())
-	if namespaceID.Valid {
-		query = query.Where(projectdomain.ProjectSchema.NamespaceID.Eq(namespaceID.Int64))
+func NewProjectRepository(repo *Repository) projectports.ProjectRepository {
+	return repo
+}
+
+func (r *Repository) List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error) {
+	query := querydsl.Select(dbschema.ProjectSchema.AllColumns().Values()...).
+		From(dbschema.ProjectSchema).
+		OrderBy(dbschema.ProjectSchema.ID.Desc())
+	if namespaceID != nil {
+		query = query.Where(dbschema.ProjectSchema.NamespaceID.Eq(*namespaceID))
 	}
-	return r.base.List(ctx, query)
+	return persistence.Many(r.base.List(ctx, query))
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (projectdomain.Project, error) {
-	return r.base.GetByID(ctx, id)
+	return persistence.One(r.base.GetByID(ctx, id))
 }
 
 func (r *Repository) GetByFullPath(ctx context.Context, fullPath string) (projectdomain.Project, error) {
-	return r.base.GetByKey(ctx, dbxrepo.Key{
+	return persistence.One(r.base.GetByKey(ctx, dbxrepo.Key{
 		"full_path": strings.TrimSpace(fullPath),
-	})
+	}))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput, namespace namespacedomain.Namespace) (projectdomain.Project, error) {

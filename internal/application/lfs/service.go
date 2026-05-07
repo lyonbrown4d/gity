@@ -3,16 +3,11 @@ package lfs
 import (
 	"context"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfslock"
-	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfsobject"
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	setx "github.com/arcgolabs/collectionx/set"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
 	"net/http"
 	"path"
 	"strconv"
@@ -28,10 +23,10 @@ const (
 var supportedBatchOperations = setx.NewSet("upload", "download")
 
 type Service struct {
-	projectRepo *projectrepo.Repository
-	objectRepo  *projectlfsobjectrepo.Repository
-	lockRepo    *projectlfslockrepo.Repository
-	userRepo    *userrepo.Repository
+	projectRepo storageports.ProjectRepository
+	objectRepo  storageports.ProjectLFSObjectRepository
+	lockRepo    storageports.ProjectLFSLockRepository
+	userRepo    storageports.UserRepository
 	storage     storageports.ObjectStorage
 }
 
@@ -115,13 +110,13 @@ type VerifyLocksResult struct {
 	NextCursor string     `json:"next_cursor,omitempty"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, objectRepo *projectlfsobjectrepo.Repository, lockRepo *projectlfslockrepo.Repository, userRepo *userrepo.Repository, storage storageports.ObjectStorage) *Service {
+func NewService(projectRepo storageports.ProjectRepository, objectRepo storageports.ProjectLFSObjectRepository, lockRepo storageports.ProjectLFSLockRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
 	return &Service{projectRepo: projectRepo, objectRepo: objectRepo, lockRepo: lockRepo, userRepo: userRepo, storage: storage}
 }
 
 func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request BatchRequest, baseURL string, repoHTTPPath string) (BatchResponse, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return BatchResponse{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return BatchResponse{}, apperror.NotFound("project not found", err)
 	}
 	operation := strings.TrimSpace(strings.ToLower(request.Operation))
 	if !supportedBatchOperations.Contains(operation) {
@@ -143,7 +138,7 @@ func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request Bat
 		}
 		record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 		exists := err == nil
-		if err != nil && err != dbxrepo.ErrNotFound {
+		if err != nil && err != storageports.ErrNotFound {
 			return BatchResponse{}, err
 		}
 		endpoint := strings.TrimRight(baseURL, "/") + "/" + strings.Trim(strings.ReplaceAll(repoHTTPPath, "\\", "/"), "/") + "/info/lfs/objects/" + oid
@@ -168,11 +163,11 @@ func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request Bat
 func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string, content []byte) (lfsdomain.ProjectLFSObject, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
-		return lfsdomain.ProjectLFSObject{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return lfsdomain.ProjectLFSObject{}, apperror.NotFound("project not found", err)
 	}
 	oid = strings.TrimSpace(oid)
 	if err := validateOID(oid); err != nil {
-		return lfsdomain.ProjectLFSObject{}, httpx.NewError(http.StatusBadRequest, "invalid lfs oid", err)
+		return lfsdomain.ProjectLFSObject{}, apperror.BadRequest("invalid lfs oid", err)
 	}
 	storageKey := storageports.BuildLFSStorageKey(project.FullPath, oid)
 	if err := s.storage.SaveObject(ctx, storageKey, content, "application/octet-stream"); err != nil {
@@ -185,7 +180,7 @@ func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string,
 		}
 		return s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 	}
-	if err != nil && err != dbxrepo.ErrNotFound {
+	if err != nil && err != storageports.ErrNotFound {
 		return lfsdomain.ProjectLFSObject{}, err
 	}
 	return s.objectRepo.Create(ctx, projectID, oid, int64(len(content)), storageKey)
@@ -193,44 +188,44 @@ func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string,
 
 func (s *Service) DownloadObject(ctx context.Context, projectID int64, oid string) (DownloadObject, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return DownloadObject{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return DownloadObject{}, apperror.NotFound("project not found", err)
 	}
 	oid = strings.TrimSpace(oid)
 	if err := validateOID(oid); err != nil {
-		return DownloadObject{}, httpx.NewError(http.StatusBadRequest, "invalid lfs oid", err)
+		return DownloadObject{}, apperror.BadRequest("invalid lfs oid", err)
 	}
 	record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return DownloadObject{}, httpx.NewError(http.StatusNotFound, "lfs object not found", err)
+		if err == storageports.ErrNotFound {
+			return DownloadObject{}, apperror.NotFound("lfs object not found", err)
 		}
 		return DownloadObject{}, err
 	}
 	content, err := s.storage.Load(ctx, record.StorageKey)
 	if err != nil {
-		return DownloadObject{}, httpx.NewError(http.StatusNotFound, "lfs object content not found", err)
+		return DownloadObject{}, apperror.NotFound("lfs object content not found", err)
 	}
 	return DownloadObject{Object: record, Content: content}, nil
 }
 
 func (s *Service) CreateLock(ctx context.Context, projectID int64, ownerUserID int64, input CreateLockInput) (LockEnvelope, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return LockEnvelope{}, apperror.NotFound("project not found", err)
 	}
 	owner, err := s.userRepo.GetByID(ctx, ownerUserID)
 	if err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusNotFound, "lock owner not found", err)
+		return LockEnvelope{}, apperror.NotFound("lock owner not found", err)
 	}
 	lockPath, err := normalizeLockPath(input.Path)
 	if err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusBadRequest, "invalid lock path", err)
+		return LockEnvelope{}, apperror.BadRequest("invalid lock path", err)
 	}
 	if _, err := s.lockRepo.GetByProjectAndPath(ctx, projectID, lockPath); err == nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusConflict, "lfs lock already exists", fmt.Errorf("lfs lock path already exists: %s", lockPath))
-	} else if err != nil && err != dbxrepo.ErrNotFound {
+		return LockEnvelope{}, apperror.Conflict("lfs lock already exists", fmt.Errorf("lfs lock path already exists: %s", lockPath))
+	} else if err != nil && err != storageports.ErrNotFound {
 		return LockEnvelope{}, err
 	}
-	lock, err := s.lockRepo.Create(ctx, projectlfslockrepo.CreateInput{ProjectID: projectID, OwnerUserID: ownerUserID, Path: lockPath})
+	lock, err := s.lockRepo.Create(ctx, storageports.CreateProjectLFSLockInput{ProjectID: projectID, OwnerUserID: ownerUserID, Path: lockPath})
 	if err != nil {
 		return LockEnvelope{}, err
 	}
@@ -275,25 +270,25 @@ func (s *Service) VerifyLocks(ctx context.Context, projectID int64, currentUserI
 
 func (s *Service) Unlock(ctx context.Context, projectID int64, actorUserID int64, lockID string, input UnlockInput) (LockEnvelope, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return LockEnvelope{}, apperror.NotFound("project not found", err)
 	}
 	parsedID, err := parseLockID(lockID)
 	if err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusBadRequest, "invalid lock id", err)
+		return LockEnvelope{}, apperror.BadRequest("invalid lock id", err)
 	}
 	item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, parsedID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return LockEnvelope{}, httpx.NewError(http.StatusNotFound, "lfs lock not found", err)
+		if err == storageports.ErrNotFound {
+			return LockEnvelope{}, apperror.NotFound("lfs lock not found", err)
 		}
 		return LockEnvelope{}, err
 	}
 	if item.OwnerUserID != actorUserID && !input.Force {
-		return LockEnvelope{}, httpx.NewError(http.StatusForbidden, "lfs lock is owned by another user", fmt.Errorf("lock owner mismatch"))
+		return LockEnvelope{}, apperror.Forbidden("lfs lock is owned by another user", fmt.Errorf("lock owner mismatch"))
 	}
 	owner, err := s.userRepo.GetByID(ctx, item.OwnerUserID)
 	if err != nil {
-		return LockEnvelope{}, httpx.NewError(http.StatusNotFound, "lock owner not found", err)
+		return LockEnvelope{}, apperror.NotFound("lock owner not found", err)
 	}
 	if err := s.lockRepo.DeleteByID(ctx, item.ID); err != nil {
 		return LockEnvelope{}, err
@@ -303,16 +298,16 @@ func (s *Service) Unlock(ctx context.Context, projectID int64, actorUserID int64
 
 func (s *Service) listLockEntities(ctx context.Context, projectID int64, input LockListInput) ([]lfsdomain.ProjectLFSLock, string, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, "", httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, "", apperror.NotFound("project not found", err)
 	}
 	if strings.TrimSpace(input.ID) != "" {
 		lockID, err := parseLockID(input.ID)
 		if err != nil {
-			return nil, "", httpx.NewError(http.StatusBadRequest, "invalid lock id", err)
+			return nil, "", apperror.BadRequest("invalid lock id", err)
 		}
 		item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, lockID)
 		if err != nil {
-			if err == dbxrepo.ErrNotFound {
+			if err == storageports.ErrNotFound {
 				return []lfsdomain.ProjectLFSLock{}, "", nil
 			}
 			return nil, "", err
@@ -325,15 +320,15 @@ func (s *Service) listLockEntities(ctx context.Context, projectID int64, input L
 		var err error
 		lockPath, err = normalizeLockPath(input.Path)
 		if err != nil {
-			return nil, "", httpx.NewError(http.StatusBadRequest, "invalid lock path", err)
+			return nil, "", apperror.BadRequest("invalid lock path", err)
 		}
 	}
 	afterID, err := parseCursor(input.Cursor)
 	if err != nil {
-		return nil, "", httpx.NewError(http.StatusBadRequest, "invalid lock cursor", err)
+		return nil, "", apperror.BadRequest("invalid lock cursor", err)
 	}
 	limit := normalizeLockLimit(input.Limit)
-	items, err := s.lockRepo.ListByProjectID(ctx, projectlfslockrepo.ListInput{ProjectID: projectID, Path: lockPath, AfterID: afterID, Limit: limit + 1})
+	items, err := s.lockRepo.ListByProjectID(ctx, storageports.ListProjectLFSLocksInput{ProjectID: projectID, Path: lockPath, AfterID: afterID, Limit: limit + 1})
 	if err != nil {
 		return nil, "", err
 	}
@@ -348,7 +343,7 @@ func (s *Service) listLockEntities(ctx context.Context, projectID int64, input L
 func (s *Service) buildLockView(ctx context.Context, item lfsdomain.ProjectLFSLock) (LockView, error) {
 	owner, err := s.userRepo.GetByID(ctx, item.OwnerUserID)
 	if err != nil {
-		return LockView{}, httpx.NewError(http.StatusNotFound, "lock owner not found", err)
+		return LockView{}, apperror.NotFound("lock owner not found", err)
 	}
 	return buildLockView(item, owner), nil
 }

@@ -8,7 +8,7 @@ import (
 
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
+	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 )
 

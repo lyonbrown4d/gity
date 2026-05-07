@@ -3,15 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	identity "github.com/DaiYuANg/gity/internal/domain/identity"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
-	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
-	packagedomain "github.com/DaiYuANg/gity/internal/domain/packageregistry"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
+	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/schemamigrate"
@@ -52,7 +44,7 @@ func migrations() []Migration {
 			Version: "0001_core",
 			Name:    "bootstrap core namespace project auth schema",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, identity.UserSchema, namespacedomain.NamespaceSchema, projectdomain.ProjectSchema, namespacedomain.NamespaceMemberSchema, identity.UserAccessTokenSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.UserSchema, dbschema.NamespaceSchema, dbschema.ProjectSchema, dbschema.NamespaceMemberSchema, dbschema.UserAccessTokenSchema)
 				return err
 			},
 		},
@@ -60,7 +52,7 @@ func migrations() []Migration {
 			Version: "0002_project_issues",
 			Name:    "add project issues comments and attachments",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, issuedomain.ProjectIssueSchema, issuedomain.ProjectIssueCommentSchema, issuedomain.ProjectIssueAttachmentSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectIssueSchema, dbschema.ProjectIssueCommentSchema, dbschema.ProjectIssueAttachmentSchema)
 				return err
 			},
 		},
@@ -68,7 +60,7 @@ func migrations() []Migration {
 			Version: "0003_project_merge_requests",
 			Name:    "add project merge requests",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, mergedomain.ProjectMergeRequestSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectMergeRequestSchema)
 				return err
 			},
 		},
@@ -76,7 +68,7 @@ func migrations() []Migration {
 			Version: "0004_project_packages",
 			Name:    "add project package registry",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, packagedomain.ProjectPackageSchema, packagedomain.ProjectPackageVersionSchema, packagedomain.ProjectPackageFileSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectPackageSchema, dbschema.ProjectPackageVersionSchema, dbschema.ProjectPackageFileSchema)
 				return err
 			},
 		},
@@ -84,7 +76,7 @@ func migrations() []Migration {
 			Version: "0005_project_lfs",
 			Name:    "add project git lfs objects",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, lfsdomain.ProjectLFSObjectSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectLFSObjectSchema)
 				return err
 			},
 		},
@@ -92,7 +84,7 @@ func migrations() []Migration {
 			Version: "0006_project_lfs_locks",
 			Name:    "add project git lfs locks",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, lfsdomain.ProjectLFSLockSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectLFSLockSchema)
 				return err
 			},
 		},
@@ -100,7 +92,7 @@ func migrations() []Migration {
 			Version: "0007_project_jobs",
 			Name:    "add project jobs",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, cidomain.ProjectJobSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectJobSchema)
 				return err
 			},
 		},
@@ -108,7 +100,7 @@ func migrations() []Migration {
 			Version: "0008_project_wiki_pages",
 			Name:    "add project wiki pages",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, wikidomain.ProjectWikiPageSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectWikiPageSchema)
 				return err
 			},
 		},
@@ -116,7 +108,7 @@ func migrations() []Migration {
 			Version: "0009_project_runners",
 			Name:    "add project runners",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, cidomain.ProjectRunnerSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectRunnerSchema)
 				return err
 			},
 		},
@@ -124,7 +116,7 @@ func migrations() []Migration {
 			Version: "0010_project_pipelines",
 			Name:    "add project pipelines",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, cidomain.ProjectPipelineSchema, cidomain.ProjectPipelineJobSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectPipelineSchema, dbschema.ProjectPipelineJobSchema)
 				return err
 			},
 		},
@@ -132,7 +124,7 @@ func migrations() []Migration {
 			Version: "0011_project_job_logs_artifacts",
 			Name:    "add project job logs and artifacts",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, cidomain.ProjectJobLogSchema, cidomain.ProjectJobArtifactSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectJobLogSchema, dbschema.ProjectJobArtifactSchema)
 				return err
 			},
 		},
@@ -140,7 +132,7 @@ func migrations() []Migration {
 			Version: "0012_project_branch_protections",
 			Name:    "add project branch protections",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, projectdomain.ProjectBranchProtectionSchema)
+				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectBranchProtectionSchema)
 				return err
 			},
 		},

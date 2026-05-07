@@ -14,9 +14,9 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjob"
-	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjobartifact"
-	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectjoblog"
+	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
+	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_artifact"
+	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_log"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
 
 	"github.com/arcgolabs/dbx"

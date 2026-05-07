@@ -6,25 +6,21 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
+	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	"github.com/DaiYuANg/gity/internal/infrastructure/gitexec"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectrunnerrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectrunner"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
-	"net/http"
 	"strings"
 	"time"
 )
 
 type Service struct {
-	projectRepo *projectrepo.Repository
-	runnerRepo  *projectrunnerrepo.Repository
+	projectRepo gitports.ProjectRepository
+	runnerRepo  gitports.ProjectRunnerRepository
 	jobService  *jobservice.Service
 	pipelineSvc *pipelineservice.Service
-	gitRunner   *gitexec.Runner
+	gitRunner   gitports.GitRunner
 }
 
 type RegisterInput struct {
@@ -83,13 +79,13 @@ type ClaimView struct {
 	Job     cidomain.ProjectJob `json:"job,omitempty"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, runnerRepo *projectrunnerrepo.Repository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner *gitexec.Runner) *Service {
+func NewService(projectRepo gitports.ProjectRepository, runnerRepo gitports.ProjectRunnerRepository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner gitports.GitRunner) *Service {
 	return &Service{projectRepo: projectRepo, runnerRepo: runnerRepo, jobService: jobService, pipelineSvc: pipelineSvc, gitRunner: gitRunner}
 }
 
 func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]RunnerView, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	items, err := s.runnerRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
@@ -104,17 +100,17 @@ func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]Ru
 
 func (s *Service) RegisterProjectRunner(ctx context.Context, projectID int64, input RegisterInput) (RegistrationView, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return RegistrationView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return RegistrationView{}, apperror.NotFound("project not found", err)
 	}
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
-		return RegistrationView{}, httpx.NewError(http.StatusBadRequest, "runner name is required", fmt.Errorf("runner name is required"))
+		return RegistrationView{}, apperror.BadRequest("runner name is required", fmt.Errorf("runner name is required"))
 	}
 	token, err := generateRunnerToken()
 	if err != nil {
 		return RegistrationView{}, err
 	}
-	item, err := s.runnerRepo.Create(ctx, projectrunnerrepo.CreateInput{
+	item, err := s.runnerRepo.Create(ctx, gitports.CreateProjectRunnerInput{
 		ProjectID:   projectID,
 		Name:        name,
 		Description: input.Description,
@@ -130,8 +126,8 @@ func (s *Service) RegisterProjectRunner(ctx context.Context, projectID int64, in
 func (s *Service) DeleteProjectRunner(ctx context.Context, projectID int64, runnerID int64) (RunnerView, error) {
 	item, err := s.runnerRepo.GetByProjectAndID(ctx, projectID, runnerID)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return RunnerView{}, httpx.NewError(http.StatusNotFound, "project runner not found", err)
+		if err == gitports.ErrNotFound {
+			return RunnerView{}, apperror.NotFound("project runner not found", err)
 		}
 		return RunnerView{}, err
 	}
@@ -289,22 +285,22 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 		return SourceArchiveView{}, err
 	}
 	if s.gitRunner == nil {
-		return SourceArchiveView{}, httpx.NewError(http.StatusInternalServerError, "git runner is not configured")
+		return SourceArchiveView{}, apperror.Internal("git runner is not configured")
 	}
 	project, err := s.projectRepo.GetByID(ctx, runner.ProjectID)
 	if err != nil {
-		return SourceArchiveView{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return SourceArchiveView{}, apperror.NotFound("project not found", err)
 	}
 	payload, err := decodeScriptSourcePayload(job)
 	if err != nil {
 		return SourceArchiveView{}, err
 	}
 	if payload.ProjectFullPath != "" && payload.ProjectFullPath != project.FullPath {
-		return SourceArchiveView{}, httpx.NewError(http.StatusBadRequest, "job project path does not match runner project", fmt.Errorf("payload project=%q expected=%q", payload.ProjectFullPath, project.FullPath))
+		return SourceArchiveView{}, apperror.BadRequest("job project path does not match runner project", fmt.Errorf("payload project=%q expected=%q", payload.ProjectFullPath, project.FullPath))
 	}
 	revision := firstNonEmpty(payload.CommitSHA, payload.RefName)
 	if revision == "" {
-		return SourceArchiveView{}, httpx.NewError(http.StatusBadRequest, "job source revision is required", fmt.Errorf("job source revision is required"))
+		return SourceArchiveView{}, apperror.BadRequest("job source revision is required", fmt.Errorf("job source revision is required"))
 	}
 	if err := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); err != nil {
 		return SourceArchiveView{}, err
@@ -323,28 +319,28 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 func (s *Service) authenticateRunner(ctx context.Context, token string) (cidomain.ProjectRunner, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return cidomain.ProjectRunner{}, httpx.NewError(http.StatusUnauthorized, "runner token is required", fmt.Errorf("runner token is required"))
+		return cidomain.ProjectRunner{}, apperror.Unauthorized("runner token is required", fmt.Errorf("runner token is required"))
 	}
 	runner, err := s.runnerRepo.GetByToken(ctx, token)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return cidomain.ProjectRunner{}, httpx.NewError(http.StatusUnauthorized, "invalid runner token", err)
+		if err == gitports.ErrNotFound {
+			return cidomain.ProjectRunner{}, apperror.Unauthorized("invalid runner token", err)
 		}
 		return cidomain.ProjectRunner{}, err
 	}
 	if runner.Active != 1 {
-		return cidomain.ProjectRunner{}, httpx.NewError(http.StatusForbidden, "runner is disabled", fmt.Errorf("runner is disabled"))
+		return cidomain.ProjectRunner{}, apperror.Forbidden("runner is disabled", fmt.Errorf("runner is disabled"))
 	}
 	return runner, nil
 }
 
 func decodeScriptSourcePayload(job cidomain.ProjectJob) (scriptSourcePayload, error) {
 	if strings.TrimSpace(job.Kind) != jobservice.KindScript {
-		return scriptSourcePayload{}, httpx.NewError(http.StatusBadRequest, "job source archive is only available for script jobs", fmt.Errorf("job kind: %s", job.Kind))
+		return scriptSourcePayload{}, apperror.BadRequest("job source archive is only available for script jobs", fmt.Errorf("job kind: %s", job.Kind))
 	}
 	var payload scriptSourcePayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
-		return scriptSourcePayload{}, httpx.NewError(http.StatusBadRequest, "invalid script job payload", err)
+		return scriptSourcePayload{}, apperror.BadRequest("invalid script job payload", err)
 	}
 	payload.ProjectFullPath = strings.Trim(strings.ReplaceAll(payload.ProjectFullPath, "\\", "/"), "/")
 	payload.RefName = strings.TrimSpace(payload.RefName)
@@ -364,7 +360,7 @@ func firstNonEmpty(values ...string) string {
 func ensureRunnerOwnsJob(runner cidomain.ProjectRunner, job cidomain.ProjectJob) error {
 	expected := runnerWorkerID(runner)
 	if strings.TrimSpace(job.LockedBy) != expected {
-		return httpx.NewError(http.StatusConflict, "project job is not claimed by runner", fmt.Errorf("project job locked_by=%q expected=%q", job.LockedBy, expected))
+		return apperror.Conflict("project job is not claimed by runner", fmt.Errorf("project job locked_by=%q expected=%q", job.LockedBy, expected))
 	}
 	return nil
 }

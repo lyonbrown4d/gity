@@ -6,20 +6,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	identityports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	"log/slog"
 	"strings"
 
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/usertoken"
 	collectionx "github.com/arcgolabs/collectionx/list"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
 )
 
 type Service struct {
 	logger    *slog.Logger
-	repo      *userrepo.Repository
-	tokenRepo *usertokenrepo.Repository
+	repo      identityports.UserRepository
+	tokenRepo identityports.UserAccessTokenRepository
 }
 
 type CreateInput struct {
@@ -45,7 +43,7 @@ type AuthSession struct {
 	RefreshToken identity.UserAccessToken
 }
 
-func NewService(logger *slog.Logger, repo *userrepo.Repository, tokenRepo *usertokenrepo.Repository) *Service {
+func NewService(logger *slog.Logger, repo identityports.UserRepository, tokenRepo identityports.UserAccessTokenRepository) *Service {
 	return &Service{logger: logger, repo: repo, tokenRepo: tokenRepo}
 }
 
@@ -68,7 +66,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User,
 	if strings.TrimSpace(input.DisplayName) == "" {
 		input.DisplayName = input.Username
 	}
-	return s.repo.Create(ctx, userrepo.CreateInput{
+	return s.repo.Create(ctx, identityports.CreateUserInput{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
@@ -86,7 +84,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 		}
 		input.DisplayName = &displayName
 	}
-	if err := s.repo.UpdateByID(ctx, id, userrepo.UpdateInput{
+	if err := s.repo.UpdateByID(ctx, id, identityports.UpdateUserInput{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
@@ -110,7 +108,7 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 	}
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
-		if !errors.Is(err, dbxrepo.ErrNotFound) {
+		if !errors.Is(err, identityports.ErrNotFound) {
 			return AuthSession{}, err
 		}
 		user, err = s.Create(ctx, CreateInput{
@@ -143,7 +141,7 @@ func (s *Service) RevokeToken(ctx context.Context, token string) error {
 	if token == "" {
 		return nil
 	}
-	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, dbxrepo.ErrNotFound) {
+	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
 		return err
 	}
 	return nil
@@ -180,7 +178,7 @@ func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTok
 	if err != nil {
 		return identity.UserAccessToken{}, err
 	}
-	return s.tokenRepo.Create(ctx, usertokenrepo.CreateInput{
+	return s.tokenRepo.Create(ctx, identityports.CreateUserAccessTokenInput{
 		UserID: userID,
 		Name:   name,
 		Token:  token,

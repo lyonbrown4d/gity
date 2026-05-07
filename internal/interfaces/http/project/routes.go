@@ -11,8 +11,8 @@ import (
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	"github.com/DaiYuANg/gity/internal/config"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/infrastructure/gitrepo"
-	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
+	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
+	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 )
 

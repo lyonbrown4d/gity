@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/DaiYuANg/gity/internal/config"
-	"github.com/DaiYuANg/gity/internal/interfaces/httpapi"
+	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 )
 

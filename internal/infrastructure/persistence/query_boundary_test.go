@@ -1,4 +1,4 @@
-package repository_test
+package persistence_test
 
 import (
 	"context"
@@ -9,12 +9,12 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectissue"
-	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfslock"
-	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectlfsobject"
-	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectmergerequest"
-	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpackage"
-	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectpackageversion"
+	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
+	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_lock"
+	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_object"
+	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request"
+	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package"
+	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package_version"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 
 	"github.com/arcgolabs/dbx"

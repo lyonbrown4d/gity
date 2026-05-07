@@ -3,21 +3,17 @@ package wiki
 import (
 	"context"
 	"fmt"
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
+	appports "github.com/DaiYuANg/gity/internal/application/ports"
 	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
-	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/projectwikipage"
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"github.com/arcgolabs/httpx"
-	"net/http"
 	"strings"
 	"unicode"
 )
 
 type Service struct {
-	projectRepo *projectrepo.Repository
-	pageRepo    *projectwikipagerepo.Repository
-	userRepo    *userrepo.Repository
+	projectRepo appports.ProjectRepository
+	pageRepo    appports.ProjectWikiPageRepository
+	userRepo    appports.UserRepository
 }
 
 type CreatePageInput struct {
@@ -34,13 +30,13 @@ type UpdatePageInput struct {
 	EditorUserID int64   `json:"editor_user_id"`
 }
 
-func NewService(projectRepo *projectrepo.Repository, pageRepo *projectwikipagerepo.Repository, userRepo *userrepo.Repository) *Service {
+func NewService(projectRepo appports.ProjectRepository, pageRepo appports.ProjectWikiPageRepository, userRepo appports.UserRepository) *Service {
 	return &Service{projectRepo: projectRepo, pageRepo: pageRepo, userRepo: userRepo}
 }
 
 func (s *Service) ListPages(ctx context.Context, projectID int64) ([]wikidomain.ProjectWikiPage, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return nil, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return nil, apperror.NotFound("project not found", err)
 	}
 	items, err := s.pageRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
@@ -51,43 +47,43 @@ func (s *Service) ListPages(ctx context.Context, projectID int64) ([]wikidomain.
 
 func (s *Service) GetPage(ctx context.Context, projectID int64, slug string) (wikidomain.ProjectWikiPage, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return wikidomain.ProjectWikiPage{}, apperror.NotFound("project not found", err)
 	}
 	normalizedSlug, err := normalizeSlug(slug, "")
 	if err != nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusBadRequest, "invalid wiki page slug", err)
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("invalid wiki page slug", err)
 	}
 	return s.loadPage(ctx, projectID, normalizedSlug)
 }
 
 func (s *Service) CreatePage(ctx context.Context, projectID int64, input CreatePageInput) (wikidomain.ProjectWikiPage, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusNotFound, "project not found", err)
+		return wikidomain.ProjectWikiPage{}, apperror.NotFound("project not found", err)
 	}
 	if _, err := s.userRepo.GetByID(ctx, input.AuthorUserID); err != nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusNotFound, "wiki author not found", err)
+		return wikidomain.ProjectWikiPage{}, apperror.NotFound("wiki author not found", err)
 	}
 	title := strings.TrimSpace(input.Title)
 	if title == "" {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusBadRequest, "wiki page title is required", fmt.Errorf("wiki page title is required"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", fmt.Errorf("wiki page title is required"))
 	}
 	format := strings.TrimSpace(strings.ToLower(input.Format))
 	if format == "" {
 		format = "markdown"
 	}
 	if format != "markdown" {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusBadRequest, "wiki page format must be markdown", fmt.Errorf("wiki page format must be markdown"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page format must be markdown", fmt.Errorf("wiki page format must be markdown"))
 	}
 	slug, err := normalizeSlug(input.Slug, title)
 	if err != nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusBadRequest, "invalid wiki page slug", err)
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("invalid wiki page slug", err)
 	}
 	if _, err := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug); err == nil {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusConflict, "wiki page already exists", fmt.Errorf("wiki page already exists: %s", slug))
-	} else if err != nil && err != dbxrepo.ErrNotFound {
+		return wikidomain.ProjectWikiPage{}, apperror.Conflict("wiki page already exists", fmt.Errorf("wiki page already exists: %s", slug))
+	} else if err != nil && err != appports.ErrNotFound {
 		return wikidomain.ProjectWikiPage{}, err
 	}
-	return s.pageRepo.Create(ctx, projectwikipagerepo.CreateInput{
+	return s.pageRepo.Create(ctx, appports.CreateProjectWikiPageInput{
 		ProjectID:    projectID,
 		Slug:         slug,
 		Title:        title,
@@ -103,14 +99,14 @@ func (s *Service) UpdatePage(ctx context.Context, projectID int64, slug string, 
 		return wikidomain.ProjectWikiPage{}, err
 	}
 	if input.Title != nil && strings.TrimSpace(*input.Title) == "" {
-		return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusBadRequest, "wiki page title is required", fmt.Errorf("wiki page title is required"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", fmt.Errorf("wiki page title is required"))
 	}
 	if input.EditorUserID > 0 {
 		if _, err := s.userRepo.GetByID(ctx, input.EditorUserID); err != nil {
-			return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusNotFound, "wiki editor not found", err)
+			return wikidomain.ProjectWikiPage{}, apperror.NotFound("wiki editor not found", err)
 		}
 	}
-	if err := s.pageRepo.UpdateByID(ctx, page.ID, projectwikipagerepo.UpdateInput{Title: input.Title, Content: input.Content, LastEditedByUserID: input.EditorUserID}); err != nil {
+	if err := s.pageRepo.UpdateByID(ctx, page.ID, appports.UpdateProjectWikiPageInput{Title: input.Title, Content: input.Content, LastEditedByUserID: input.EditorUserID}); err != nil {
 		return wikidomain.ProjectWikiPage{}, err
 	}
 	return s.GetPage(ctx, projectID, page.Slug)
@@ -130,8 +126,8 @@ func (s *Service) DeletePage(ctx context.Context, projectID int64, slug string) 
 func (s *Service) loadPage(ctx context.Context, projectID int64, slug string) (wikidomain.ProjectWikiPage, error) {
 	page, err := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug)
 	if err != nil {
-		if err == dbxrepo.ErrNotFound {
-			return wikidomain.ProjectWikiPage{}, httpx.NewError(http.StatusNotFound, "wiki page not found", err)
+		if err == appports.ErrNotFound {
+			return wikidomain.ProjectWikiPage{}, apperror.NotFound("wiki page not found", err)
 		}
 		return wikidomain.ProjectWikiPage{}, err
 	}

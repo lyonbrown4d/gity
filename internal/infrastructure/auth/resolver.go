@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespacemember"
+	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/usertoken"
+	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	"github.com/arcgolabs/authx"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"

@@ -1,12 +1,6 @@
 package ci
 
-import (
-	"time"
-
-	"github.com/arcgolabs/dbx/column"
-	"github.com/arcgolabs/dbx/idgen"
-	"github.com/arcgolabs/dbx/schema"
-)
+import "time"
 
 type ProjectPipeline struct {
 	ID            int64     `dbx:"id" json:"id"`
@@ -24,23 +18,3 @@ type ProjectPipeline struct {
 	StartedAt     time.Time `dbx:"started_at" json:"started_at"`
 	FinishedAt    time.Time `dbx:"finished_at" json:"finished_at"`
 }
-
-type ProjectPipelineSchemaDef struct {
-	schema.Schema[ProjectPipeline]
-	ID            column.IDColumn[ProjectPipeline, int64, idgen.IDSnowflake] `dbx:"id,pk"`
-	ProjectID     column.Column[ProjectPipeline, int64]                      `dbx:"project_id,index,ref=projects.id,ondelete=cascade"`
-	IID           column.Column[ProjectPipeline, int64]                      `dbx:"iid,index"`
-	Name          column.Column[ProjectPipeline, string]                     `dbx:"name"`
-	Source        column.Column[ProjectPipeline, string]                     `dbx:"source,index"`
-	RefName       column.Column[ProjectPipeline, string]                     `dbx:"ref_name,index,null"`
-	CommitSHA     column.Column[ProjectPipeline, string]                     `dbx:"commit_sha,index,null"`
-	Status        column.Column[ProjectPipeline, string]                     `dbx:"status,index"`
-	ConfigSource  column.Column[ProjectPipeline, string]                     `dbx:"config_source"`
-	ConfigContent column.Column[ProjectPipeline, string]                     `dbx:"config_content,type=TEXT"`
-	CreatedAt     column.Column[ProjectPipeline, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
-	UpdatedAt     column.Column[ProjectPipeline, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
-	StartedAt     column.Column[ProjectPipeline, time.Time]                  `dbx:"started_at,type=TIMESTAMP"`
-	FinishedAt    column.Column[ProjectPipeline, time.Time]                  `dbx:"finished_at,type=TIMESTAMP"`
-}
-
-var ProjectPipelineSchema = schema.MustSchema("project_pipelines", ProjectPipelineSchemaDef{})

@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	namespaceports "github.com/DaiYuANg/gity/internal/application/ports"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespacemember"
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
-	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"log/slog"
 	"strings"
 )
@@ -19,9 +16,9 @@ var namespaceMemberRoles = setx.NewSet("guest", "reporter", "developer", "mainta
 
 type Service struct {
 	logger     *slog.Logger
-	repo       *namespacerepo.Repository
-	memberRepo *namespacememberrepo.Repository
-	userRepo   *userrepo.Repository
+	repo       namespaceports.NamespaceRepository
+	memberRepo namespaceports.NamespaceMemberRepository
+	userRepo   namespaceports.UserRepository
 }
 
 type CreateInput struct {
@@ -53,7 +50,7 @@ type MemberView struct {
 	Role        string `json:"role"`
 }
 
-func NewService(logger *slog.Logger, repo *namespacerepo.Repository, memberRepo *namespacememberrepo.Repository, userRepo *userrepo.Repository) *Service {
+func NewService(logger *slog.Logger, repo namespaceports.NamespaceRepository, memberRepo namespaceports.NamespaceMemberRepository, userRepo namespaceports.UserRepository) *Service {
 	return &Service{logger: logger, repo: repo, memberRepo: memberRepo, userRepo: userRepo}
 }
 
@@ -75,7 +72,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomai
 	if strings.TrimSpace(input.Kind) == "" {
 		input.Kind = "group"
 	}
-	item, err := s.repo.Create(ctx, namespacerepo.CreateInput{
+	item, err := s.repo.Create(ctx, namespaceports.CreateNamespaceInput{
 		Kind:        input.Kind,
 		Name:        input.Name,
 		PathKey:     input.PathKey,
@@ -99,7 +96,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (name
 	if input.PathKey != nil && strings.TrimSpace(*input.PathKey) == "" {
 		return namespacedomain.Namespace{}, fmt.Errorf("namespace path_key is required")
 	}
-	if err := s.repo.UpdateByID(ctx, id, namespacerepo.UpdateInput{
+	if err := s.repo.UpdateByID(ctx, id, namespaceports.UpdateNamespaceInput{
 		Kind:        input.Kind,
 		Name:        input.Name,
 		PathKey:     input.PathKey,
@@ -170,10 +167,10 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 	}
 	if _, err := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); err == nil {
 		return MemberView{}, fmt.Errorf("namespace member already exists")
-	} else if err != nil && !errors.Is(err, dbxrepo.ErrNotFound) {
+	} else if err != nil && !errors.Is(err, namespaceports.ErrNotFound) {
 		return MemberView{}, err
 	}
-	member, err := s.memberRepo.Create(ctx, namespacememberrepo.CreateInput{
+	member, err := s.memberRepo.Create(ctx, namespaceports.CreateNamespaceMemberInput{
 		NamespaceID: namespaceID,
 		UserID:      input.UserID,
 		Role:        role,
