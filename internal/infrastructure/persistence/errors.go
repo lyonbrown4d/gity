@@ -6,6 +6,7 @@ import (
 	appports "github.com/DaiYuANg/gity/internal/application/ports"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/samber/oops"
 )
 
 func NormalizeError(err error) error {
@@ -15,7 +16,7 @@ func NormalizeError(err error) error {
 	if IsNotFound(err) {
 		return appports.ErrNotFound
 	}
-	return err
+	return oops.In("persistence").Wrap(err)
 }
 
 func IsNotFound(err error) bool {

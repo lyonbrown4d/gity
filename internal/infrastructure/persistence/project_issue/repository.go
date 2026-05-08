@@ -25,7 +25,7 @@ type UpdateInput = issueports.UpdateProjectIssueInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssue](db, dbschema.ProjectIssueSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssue](db, dbschema.ProjectIssueSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -64,7 +64,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain
 		last, err := repo.First(ctx, query)
 		if err == nil {
 			nextIID = last.IID + 1
-		} else if err != nil && !persistence.IsNotFound(err) {
+		} else if !persistence.IsNotFound(err) {
 			return err
 		}
 		state := strings.TrimSpace(input.State)
@@ -107,7 +107,7 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.ProjectIssueSchema.State.Set(strings.TrimSpace(*input.State)))
 	}
 	assignments = append(assignments, dbschema.ProjectIssueSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectIssueSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update project issue: %w", err)
 	}
 	return nil

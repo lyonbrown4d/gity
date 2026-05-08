@@ -24,7 +24,7 @@ type CreateInput = projectports.CreateProjectInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[projectdomain.Project](db, dbschema.ProjectSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[projectdomain.Project](db, dbschema.ProjectSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -43,7 +43,7 @@ func (r *Repository) List(ctx context.Context, namespaceID *int64) (*collectionx
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (projectdomain.Project, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByFullPath(ctx context.Context, fullPath string) (projectdomain.Project, error) {
@@ -84,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, namespace na
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project: %w", err)
 	}
 	return nil

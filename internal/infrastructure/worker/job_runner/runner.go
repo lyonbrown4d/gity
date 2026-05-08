@@ -30,7 +30,7 @@ func NewRunner(logger *slog.Logger, service *jobservice.Service, settings config
 	return &Runner{logger: logger, service: service, settings: settings}
 }
 
-func (r *Runner) Start(context.Context) error {
+func (r *Runner) Start(ctx context.Context) error {
 	if !r.settings.Worker.Enabled {
 		r.logger.Info("project job runner disabled")
 		return nil
@@ -40,11 +40,11 @@ func (r *Runner) Start(context.Context) error {
 	if r.started {
 		return nil
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx)
 	r.cancel = cancel
 	r.done = make(chan struct{})
 	r.started = true
-	go r.loop(ctx)
+	go r.loop(runCtx)
 	r.logger.Info("project job runner started", slog.String("worker_id", r.workerID()))
 	return nil
 }
@@ -94,7 +94,7 @@ func (r *Runner) drain(ctx context.Context) {
 	if limit <= 0 {
 		limit = 1
 	}
-	for i := 0; i < limit; i++ {
+	for range limit {
 		claimed, err := r.service.RunNext(ctx, r.workerID(), r.leaseDuration())
 		if err != nil {
 			r.logger.Error("run project job failed", slog.String("error", err.Error()))

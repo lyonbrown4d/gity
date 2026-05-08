@@ -25,7 +25,7 @@ type AppendInput = ciports.AppendProjectJobLogInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectJobLog](db, dbschema.ProjectJobLogSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectJobLog](db, dbschema.ProjectJobLogSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -139,7 +139,7 @@ func (r *Repository) UpsertAttempt(ctx context.Context, input CreateInput) (cido
 func (r *Repository) update(ctx context.Context, item cidomain.ProjectJobLog) (cidomain.ProjectJobLog, error) {
 	now := time.Now().UTC()
 	output := strings.TrimRight(item.Output, "\r\n")
-	if _, err := r.base.UpdateByID(ctx, item.ID,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobLogSchema.ID).Update(ctx, item.ID,
 		dbschema.ProjectJobLogSchema.ExitCode.Set(item.ExitCode),
 		dbschema.ProjectJobLogSchema.Output.Set(output),
 		dbschema.ProjectJobLogSchema.OutputTruncated.Set(item.OutputTruncated),

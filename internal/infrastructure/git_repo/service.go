@@ -22,6 +22,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/samber/oops"
 )
 
 var (
@@ -115,7 +116,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 		} else {
 			file, fileErr := tree.File(entry.Name)
 			if fileErr == nil {
-				size = file.Blob.Size
+				size = file.Size
 			}
 		}
 		entryPath := entry.Name
@@ -312,12 +313,12 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 				return nil
 			}
 		}
-		if file.Blob.Size > maxFileSize {
+		if file.Size > maxFileSize {
 			return nil
 		}
 		content, readErr := readBlobContent(file)
 		if readErr != nil {
-			return nil
+			return oops.In("git_repo").With("repo_path", repoPath, "path", file.Name).Wrapf(readErr, "read searchable blob")
 		}
 		if !isReadableContent(content) {
 			return nil
@@ -375,8 +376,8 @@ func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName
 		if language == "" {
 			return nil
 		}
-		bytesByLanguage[language] += file.Blob.Size
-		total += file.Blob.Size
+		bytesByLanguage[language] += file.Size
+		total += file.Size
 		return nil
 	})
 	if err != nil {
@@ -427,7 +428,7 @@ func buildSearchMatcher(query string, matchCase bool, useRegex bool) (searchMatc
 	}
 	re, err := regexp.Compile(expression)
 	if err != nil {
-		return searchMatcher{}, fmt.Errorf("%w: %v", ErrInvalidSearchRegexp, err)
+		return searchMatcher{}, fmt.Errorf("%w: %w", ErrInvalidSearchRegexp, err)
 	}
 	return searchMatcher{regex: re, raw: query}, nil
 }
@@ -468,12 +469,20 @@ func isPathInScope(filePath string, prefix string) bool {
 	return strings.HasPrefix(filePath, prefix+"/")
 }
 
-func readBlobContent(file *object.File) ([]byte, error) {
+func readBlobContent(file *object.File) (content []byte, err error) {
 	reader, err := file.Reader()
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("git_repo").With("path", file.Name).Wrapf(oops.Join(err, closeErr), "read blob content and close reader")
+				return
+			}
+			err = oops.In("git_repo").With("path", file.Name).Wrapf(closeErr, "close blob reader")
+		}
+	}()
 	return io.ReadAll(reader)
 }
 
@@ -562,7 +571,7 @@ func (s *Service) resolveCommit(ctx context.Context, repository *git.Repository,
 
 func (s *Service) resolveRepoPath(repoPath string) (string, error) {
 	if strings.TrimSpace(repoPath) == "" {
-		return "", fmt.Errorf("repo path is required")
+		return "", errors.New("repo path is required")
 	}
 	root, err := filepath.Abs(s.repoRoot)
 	if err != nil {
@@ -573,7 +582,7 @@ func (s *Service) resolveRepoPath(repoPath string) (string, error) {
 		return "", fmt.Errorf("resolve repo path: %w", err)
 	}
 	if absRepo != root && !strings.HasPrefix(absRepo, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("repo path escapes repo root")
+		return "", errors.New("repo path escapes repo root")
 	}
 	return absRepo, nil
 }
@@ -602,22 +611,30 @@ func resolveRevisionCandidates(refName string, defaultBranch string) []string {
 	return candidates.Values()
 }
 
-func buildBlob(file *object.File) (Blob, error) {
+func buildBlob(file *object.File) (blob Blob, err error) {
 	reader, err := file.Reader()
 	if err != nil {
 		return Blob{}, fmt.Errorf("open blob reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("git_repo").With("path", file.Name).Wrapf(oops.Join(err, closeErr), "build blob and close reader")
+				return
+			}
+			err = oops.In("git_repo").With("path", file.Name).Wrapf(closeErr, "close blob reader")
+		}
+	}()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return Blob{}, fmt.Errorf("read blob content: %w", err)
 	}
 
-	blob := Blob{
+	blob = Blob{
 		Name: path.Base(file.Name),
 		Path: file.Name,
-		Size: file.Blob.Size,
+		Size: file.Size,
 	}
 	if utf8.Valid(data) && !strings.ContainsRune(string(data), '\x00') {
 		blob.Encoding = "utf-8"

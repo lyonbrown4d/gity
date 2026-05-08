@@ -241,7 +241,7 @@ func parseIDFilter(raw string) *setx.Set[int64] {
 	if raw == "" {
 		return ids
 	}
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err == nil && id > 0 {
 			ids.Add(id)

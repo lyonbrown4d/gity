@@ -115,7 +115,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create second merge request: %v", err)
 	}
-	updated, err := mergeRequestSvc.Update(ctx, project.ID, closedMR.IID, UpdateInput{State: stringPtr("closed")})
+	updated, err := mergeRequestSvc.Update(ctx, project.ID, closedMR.IID, UpdateInput{State: new("closed")})
 	if err != nil {
 		t.Fatalf("update merge request: %v", err)
 	}
@@ -256,8 +256,9 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	}
 }
 
+//go:fix inline
 func stringPtr(value string) *string {
-	return &value
+	return new(value)
 }
 
 func mergeRequestCIConfig() string {

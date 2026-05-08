@@ -3,12 +3,13 @@ package packageregistry
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
+	"errors"
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	packagedomain "github.com/DaiYuANg/gity/internal/domain/package_registry"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
+	"github.com/samber/oops"
 	"strings"
 )
 
@@ -98,18 +99,18 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	fileName := strings.TrimSpace(input.FileName)
 	filePath := strings.TrimSpace(input.FilePath)
 	if packageType == "" || packageName == "" || versionValue == "" || fileName == "" {
-		return packagedomain.ProjectPackageFile{}, fmt.Errorf("type, name, version, and file_name are required")
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName, "version", versionValue, "file_name", fileName).New("type, name, version, and file_name are required")
 	}
 	if strings.TrimSpace(input.ContentBase64) == "" {
-		return packagedomain.ProjectPackageFile{}, fmt.Errorf("content_base64 is required")
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName, "version", versionValue, "file_name", fileName).New("content_base64 is required")
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.ContentBase64))
 	if err != nil {
-		return packagedomain.ProjectPackageFile{}, fmt.Errorf("decode package file content: %w", err)
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName, "version", versionValue, "file_name", fileName).Wrapf(err, "decode package file content")
 	}
 	pkg, err := s.packageRepo.GetByProjectTypeAndName(ctx, projectID, packageType, packageName)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			pkg, err = s.packageRepo.Create(ctx, storageports.CreateProjectPackageInput{ProjectID: projectID, Type: packageType, Name: packageName})
 		}
 		if err != nil {
@@ -118,7 +119,7 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	}
 	versionRecord, err := s.versionRepo.GetByPackageAndVersion(ctx, pkg.ID, versionValue)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			versionRecord, err = s.versionRepo.Create(ctx, storageports.CreateProjectPackageVersionInput{ProjectPackageID: pkg.ID, Version: versionValue, Status: "default"})
 		}
 		if err != nil {
@@ -139,8 +140,10 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	}
 	storageKey, err := s.storage.SavePackageFile(ctx, project.FullPath, packageType, packageName, versionValue, fileRecord.ID, fileName, content, contentType)
 	if err != nil {
-		_ = s.fileRepo.DeleteByID(ctx, fileRecord.ID)
-		return packagedomain.ProjectPackageFile{}, err
+		if cleanupErr := s.fileRepo.DeleteByID(ctx, fileRecord.ID); cleanupErr != nil {
+			return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileRecord.ID, "type", packageType, "name", packageName, "version", versionValue).Wrapf(oops.Join(err, cleanupErr), "save package file and cleanup record")
+		}
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileRecord.ID, "type", packageType, "name", packageName, "version", versionValue).Wrapf(err, "save package file")
 	}
 	if err := s.fileRepo.MarkStored(ctx, fileRecord.ID, storageports.StoreProjectPackageFileInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
 		return packagedomain.ProjectPackageFile{}, err
@@ -154,7 +157,7 @@ func (s *Service) GetFileContent(ctx context.Context, projectID int64, fileID in
 	}
 	fileRecord, err := s.fileRepo.GetByID(ctx, fileID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return PackageFileContent{}, apperror.NotFound("package file not found", err)
 		}
 		return PackageFileContent{}, err
@@ -172,7 +175,7 @@ func (s *Service) loadPackage(ctx context.Context, projectID int64, packageID in
 	}
 	pkg, err := s.packageRepo.GetByID(ctx, packageID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return packagedomain.ProjectPackage{}, apperror.NotFound("package not found", err)
 		}
 		return packagedomain.ProjectPackage{}, err

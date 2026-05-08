@@ -12,6 +12,7 @@ import (
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 	"github.com/gofiber/fiber/v2"
+	"github.com/samber/oops"
 	"io"
 	"mime"
 	"net/http"
@@ -316,10 +317,13 @@ func RegisterMultipartRoutes(app *fiber.App, service *issueservice.Service, auth
 			if err != nil {
 				return fiber.NewError(http.StatusBadRequest, "open uploaded file failed")
 			}
-			defer file.Close()
 			content, err := io.ReadAll(file)
+			closeErr := file.Close()
 			if err != nil {
 				return fiber.NewError(http.StatusBadRequest, "read uploaded file failed")
+			}
+			if closeErr != nil {
+				return fiber.NewError(http.StatusBadRequest, "close uploaded file failed")
 			}
 			contentType := strings.TrimSpace(fileHeader.Header.Get("Content-Type"))
 			uploaded, err := service.UploadAttachment(c.UserContext(), projectID, issueservice.AttachmentUploadInput{
@@ -437,8 +441,11 @@ func parseOptionalInt64(value string) (int64, error) {
 		return 0, nil
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("invalid int64")
+	if err != nil {
+		return 0, oops.In("http.issue").With("value", value).Wrapf(err, "parse optional int64")
+	}
+	if parsed < 0 {
+		return 0, oops.In("http.issue").With("value", value).New("invalid int64")
 	}
 	return parsed, nil
 }

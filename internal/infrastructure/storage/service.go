@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/samber/oops"
 )
 
 type backend interface {
@@ -38,25 +38,28 @@ func NewService(settings config.Settings) (*Service, error) {
 	case "s3":
 		client, err := newS3Backend(settings)
 		if err != nil {
-			return nil, err
+			return nil, oops.In("storage").With("driver", driver).Wrapf(err, "create storage backend")
 		}
 		return &Service{backend: client}, nil
 	default:
-		return nil, fmt.Errorf("unsupported storage driver: %s", driver)
+		return nil, oops.In("storage").With("driver", driver).New("unsupported storage driver")
 	}
 }
 
 func (s *Service) SaveObject(ctx context.Context, key string, content []byte, contentType string) error {
 	if s == nil || s.backend == nil {
-		return fmt.Errorf("storage backend is not configured")
+		return oops.In("storage").With("key", key).New("storage backend is not configured")
 	}
-	return s.backend.SaveObject(ctx, key, content, contentType)
+	if err := s.backend.SaveObject(ctx, key, content, contentType); err != nil {
+		return oops.In("storage").With("key", key, "content_type", contentType, "byte_size", len(content)).Wrapf(err, "save object")
+	}
+	return nil
 }
 
 func (s *Service) SaveIssueAttachment(ctx context.Context, projectFullPath string, issueIID int64, attachmentID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildIssueStorageKey(projectFullPath, issueIID, attachmentID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
-		return "", err
+		return "", oops.In("storage").With("project", projectFullPath, "issue_iid", issueIID, "attachment_id", attachmentID).Wrapf(err, "save issue attachment")
 	}
 	return key, nil
 }
@@ -64,7 +67,7 @@ func (s *Service) SaveIssueAttachment(ctx context.Context, projectFullPath strin
 func (s *Service) SavePackageFile(ctx context.Context, projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildPackageStorageKey(projectFullPath, packageType, packageName, version, fileID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
-		return "", err
+		return "", oops.In("storage").With("project", projectFullPath, "package_type", packageType, "package_name", packageName, "version", version, "file_id", fileID).Wrapf(err, "save package file")
 	}
 	return key, nil
 }
@@ -72,7 +75,7 @@ func (s *Service) SavePackageFile(ctx context.Context, projectFullPath string, p
 func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath string, oid string, content []byte) (string, error) {
 	key := storageports.BuildLFSStorageKey(projectFullPath, oid)
 	if err := s.SaveObject(ctx, key, content, "application/octet-stream"); err != nil {
-		return "", err
+		return "", oops.In("storage").With("project", projectFullPath, "oid", oid).Wrapf(err, "save lfs object")
 	}
 	return key, nil
 }
@@ -80,16 +83,20 @@ func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath string, oid
 func (s *Service) SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID int64, artifactID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildPipelineArtifactStorageKey(projectFullPath, projectJobID, artifactID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
-		return "", err
+		return "", oops.In("storage").With("project", projectFullPath, "project_job_id", projectJobID, "artifact_id", artifactID).Wrapf(err, "save pipeline artifact")
 	}
 	return key, nil
 }
 
 func (s *Service) Load(ctx context.Context, key string) ([]byte, error) {
 	if s == nil || s.backend == nil {
-		return nil, fmt.Errorf("storage backend is not configured")
+		return nil, oops.In("storage").With("key", key).New("storage backend is not configured")
 	}
-	return s.backend.Load(ctx, key)
+	content, err := s.backend.Load(ctx, key)
+	if err != nil {
+		return nil, oops.In("storage").With("key", key).Wrapf(err, "load object")
+	}
+	return content, nil
 }
 
 type localBackend struct {
@@ -99,13 +106,13 @@ type localBackend struct {
 func (s *localBackend) SaveObject(_ context.Context, key string, content []byte, _ string) error {
 	absPath, err := s.resolveKey(key)
 	if err != nil {
-		return err
+		return oops.In("storage").With("key", key).Wrapf(err, "resolve local object key")
 	}
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return fmt.Errorf("create object directory: %w", err)
+		return oops.In("storage").With("path", filepath.Dir(absPath)).Wrapf(err, "create object directory")
 	}
 	if err := os.WriteFile(absPath, content, 0o644); err != nil {
-		return fmt.Errorf("write object file: %w", err)
+		return oops.In("storage").With("path", absPath, "byte_size", len(content)).Wrapf(err, "write object file")
 	}
 	return nil
 }
@@ -113,11 +120,11 @@ func (s *localBackend) SaveObject(_ context.Context, key string, content []byte,
 func (s *localBackend) Load(_ context.Context, key string) ([]byte, error) {
 	absPath, err := s.resolveKey(key)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("storage").With("key", key).Wrapf(err, "resolve local object key")
 	}
 	content, err := os.ReadFile(absPath)
 	if err != nil {
-		return nil, fmt.Errorf("read object file: %w", err)
+		return nil, oops.In("storage").With("path", absPath).Wrapf(err, "read object file")
 	}
 	return content, nil
 }
@@ -125,18 +132,18 @@ func (s *localBackend) Load(_ context.Context, key string) ([]byte, error) {
 func (s *localBackend) resolveKey(key string) (string, error) {
 	root, err := filepath.Abs(s.root)
 	if err != nil {
-		return "", fmt.Errorf("resolve storage root: %w", err)
+		return "", oops.In("storage").With("root", s.root).Wrapf(err, "resolve storage root")
 	}
 	relative := filepath.Clean(filepath.FromSlash(strings.Trim(strings.ReplaceAll(key, "\\", "/"), "/")))
 	if relative == "." || strings.HasPrefix(relative, "..") {
-		return "", fmt.Errorf("invalid storage key")
+		return "", oops.In("storage").With("key", key).New("invalid storage key")
 	}
 	absPath, err := filepath.Abs(filepath.Join(root, relative))
 	if err != nil {
-		return "", fmt.Errorf("resolve storage path: %w", err)
+		return "", oops.In("storage").With("root", root, "relative", relative).Wrapf(err, "resolve storage path")
 	}
 	if absPath != root && !strings.HasPrefix(absPath, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("storage key escapes storage root")
+		return "", oops.In("storage").With("root", root, "path", absPath, "key", key).New("storage key escapes storage root")
 	}
 	return absPath, nil
 }
@@ -150,7 +157,7 @@ type s3Backend struct {
 func newS3Backend(settings config.Settings) (*s3Backend, error) {
 	bucket := strings.TrimSpace(settings.Storage.S3Bucket)
 	if bucket == "" {
-		return nil, fmt.Errorf("storage s3 bucket is required when storage driver is s3")
+		return nil, oops.In("storage").New("storage s3 bucket is required when storage driver is s3")
 	}
 	loadOptions := make([]func(*awsconfig.LoadOptions) error, 0, 2)
 	if strings.TrimSpace(settings.Storage.S3Region) != "" {
@@ -165,7 +172,7 @@ func newS3Backend(settings config.Settings) (*s3Backend, error) {
 	}
 	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOptions...)
 	if err != nil {
-		return nil, fmt.Errorf("load s3 config: %w", err)
+		return nil, oops.In("storage").With("bucket", bucket).Wrapf(err, "load s3 config")
 	}
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.UsePathStyle = settings.Storage.S3UsePathStyle
@@ -185,20 +192,28 @@ func (s *s3Backend) SaveObject(ctx context.Context, key string, content []byte, 
 	}
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(normalizeStorageKey(key)), Body: bytes.NewReader(content), ContentType: aws.String(contentType)})
 	if err != nil {
-		return fmt.Errorf("put s3 object: %w", err)
+		return oops.In("storage").With("bucket", s.bucket, "key", key, "content_type", contentType, "byte_size", len(content)).Wrapf(err, "put s3 object")
 	}
 	return nil
 }
 
-func (s *s3Backend) Load(ctx context.Context, key string) ([]byte, error) {
+func (s *s3Backend) Load(ctx context.Context, key string) (content []byte, err error) {
 	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(normalizeStorageKey(key))})
 	if err != nil {
-		return nil, fmt.Errorf("get s3 object: %w", err)
+		return nil, oops.In("storage").With("bucket", s.bucket, "key", key).Wrapf(err, "get s3 object")
 	}
-	defer result.Body.Close()
-	content, err := io.ReadAll(result.Body)
+	defer func() {
+		if closeErr := result.Body.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("storage").With("bucket", s.bucket, "key", key).Wrapf(oops.Join(err, closeErr), "read s3 object body and close response")
+				return
+			}
+			err = oops.In("storage").With("bucket", s.bucket, "key", key).Wrapf(closeErr, "close s3 object body")
+		}
+	}()
+	content, err = io.ReadAll(result.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read s3 object body: %w", err)
+		return nil, oops.In("storage").With("bucket", s.bucket, "key", key).Wrapf(err, "read s3 object body")
 	}
 	return content, nil
 }
@@ -209,11 +224,11 @@ func (s *s3Backend) ensureBucket(ctx context.Context) error {
 		return nil
 	}
 	if !s.autoCreateBucket {
-		return fmt.Errorf("check s3 bucket %s: %w", s.bucket, err)
+		return oops.In("storage").With("bucket", s.bucket).Wrapf(err, "check s3 bucket")
 	}
 	_, createErr := s.client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(s.bucket)})
 	if createErr != nil {
-		return fmt.Errorf("create s3 bucket %s: %w", s.bucket, createErr)
+		return oops.In("storage").With("bucket", s.bucket).Wrapf(createErr, "create s3 bucket")
 	}
 	return nil
 }

@@ -102,7 +102,7 @@ func TestIssueFlow(t *testing.T) {
 		t.Fatalf("expected first issue iid to be 1, got %d", issue.IID)
 	}
 
-	updated, err := issueSvc.UpdateIssue(ctx, project.ID, issue.IID, UpdateIssueInput{State: stringPtr("closed")})
+	updated, err := issueSvc.UpdateIssue(ctx, project.ID, issue.IID, UpdateIssueInput{State: new("closed")})
 	if err != nil {
 		t.Fatalf("update issue: %v", err)
 	}
@@ -168,8 +168,9 @@ func TestIssueFlow(t *testing.T) {
 	}
 }
 
+//go:fix inline
 func stringPtr(value string) *string {
-	return &value
+	return new(value)
 }
 
 func pushFixtureCommit(ctx context.Context, repoRoot string, repoPath string) error {

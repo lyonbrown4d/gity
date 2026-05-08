@@ -2,7 +2,6 @@ package lfs
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	"github.com/gofiber/fiber/v2"
+	"github.com/samber/oops"
 )
 
 func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) {
@@ -65,11 +65,11 @@ func handleBatch(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runti
 	}
 
 	var request lfsservice.BatchRequest
-	if err := c.BodyParser(&request); err != nil {
+	if parseErr := c.BodyParser(&request); parseErr != nil {
 		return fiber.NewError(http.StatusBadRequest, "invalid lfs batch request")
 	}
-	if err := authorizeLFSOperation(c, authRuntime, project, request.Operation); err != nil {
-		return err
+	if authErr := authorizeLFSOperation(c, authRuntime, project, request.Operation); authErr != nil {
+		return authErr
 	}
 
 	response, err := service.PrepareBatch(c.UserContext(), project.ID, request, strings.TrimRight(c.BaseURL(), "/"), strings.Trim(repoPath, "/"))
@@ -86,8 +86,8 @@ func handleUpload(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runt
 	if err != nil {
 		return err
 	}
-	if err := authorizeLFSOperation(c, authRuntime, project, "upload"); err != nil {
-		return err
+	if authErr := authorizeLFSOperation(c, authRuntime, project, "upload"); authErr != nil {
+		return authErr
 	}
 
 	_, err = service.UploadObject(c.UserContext(), project.ID, oid, c.Body())
@@ -103,8 +103,8 @@ func handleDownload(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	if err != nil {
 		return err
 	}
-	if err := authorizeLFSOperation(c, authRuntime, project, "download"); err != nil {
-		return err
+	if authErr := authorizeLFSOperation(c, authRuntime, project, "download"); authErr != nil {
+		return authErr
 	}
 
 	result, err := service.DownloadObject(c.UserContext(), project.ID, oid)
@@ -114,7 +114,7 @@ func handleDownload(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	}
 
 	c.Set(fiber.HeaderContentType, "application/octet-stream")
-	c.Set(fiber.HeaderContentLength, fmt.Sprintf("%d", len(result.Content)))
+	c.Set(fiber.HeaderContentLength, strconv.Itoa(len(result.Content)))
 	return c.Send(result.Content)
 }
 
@@ -131,7 +131,7 @@ func handleCreateLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.
 	}
 
 	var request lfsservice.CreateLockInput
-	if err := c.BodyParser(&request); err != nil {
+	if parseErr := c.BodyParser(&request); parseErr != nil {
 		return fiber.NewError(http.StatusBadRequest, "invalid lfs lock request")
 	}
 	response, err := service.CreateLock(c.UserContext(), project.ID, principal.UserID, request)
@@ -150,8 +150,8 @@ func handleListLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.R
 	if err != nil {
 		return err
 	}
-	if _, err := requireProjectWritePrincipal(c, authRuntime, project); err != nil {
-		return err
+	if _, authErr := requireProjectWritePrincipal(c, authRuntime, project); authErr != nil {
+		return authErr
 	}
 	limit, err := parseLimit(c.Query("limit"))
 	if err != nil {
@@ -182,7 +182,7 @@ func handleVerifyLocks(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth
 		Limit  int    `json:"limit"`
 	}
 	if len(c.Body()) > 0 {
-		if err := c.BodyParser(&request); err != nil {
+		if parseErr := c.BodyParser(&request); parseErr != nil {
 			return fiber.NewError(http.StatusBadRequest, "invalid lfs lock verify request")
 		}
 	}
@@ -206,7 +206,7 @@ func handleUnlockLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.
 	}
 	var request lfsservice.UnlockInput
 	if len(c.Body()) > 0 {
-		if err := c.BodyParser(&request); err != nil {
+		if parseErr := c.BodyParser(&request); parseErr != nil {
 			return fiber.NewError(http.StatusBadRequest, "invalid lfs unlock request")
 		}
 	}
@@ -271,7 +271,7 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project
 	}
 
 	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
-	allowed := false
+	var allowed bool
 	if readOperation {
 		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
 	} else {
@@ -327,11 +327,11 @@ type projectView struct {
 func normalizeRepoFullPath(value string) (string, error) {
 	normalized := normalizeRequestPath(value)
 	if normalized == "" || !strings.HasSuffix(normalized, ".git") {
-		return "", fmt.Errorf("invalid repo path")
+		return "", oops.In("http.lfs").With("path", value).New("invalid repo path")
 	}
 	normalized = strings.TrimSuffix(normalized, ".git")
 	if normalized == "" || strings.Contains(normalized, "..") {
-		return "", fmt.Errorf("invalid repo path")
+		return "", oops.In("http.lfs").With("path", value, "normalized", normalized).New("invalid repo path")
 	}
 	return normalized, nil
 }
@@ -346,8 +346,11 @@ func parseLimit(value string) (int, error) {
 		return 0, nil
 	}
 	parsed, err := strconv.Atoi(trimmed)
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("invalid limit")
+	if err != nil {
+		return 0, oops.In("http.lfs").With("value", value).Wrapf(err, "parse lfs limit")
+	}
+	if parsed < 0 {
+		return 0, oops.In("http.lfs").With("value", value, "limit", parsed).New("invalid limit")
 	}
 	return parsed, nil
 }

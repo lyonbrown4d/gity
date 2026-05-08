@@ -10,6 +10,8 @@ import (
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	"github.com/samber/oops"
+	"log/slog"
 	"strings"
 )
 
@@ -103,15 +105,15 @@ func (s *Service) Create(ctx context.Context, projectID int64, input CreateInput
 		return mergedomain.ProjectMergeRequest{}, apperror.NotFound("merge request author not found", err)
 	}
 	if strings.TrimSpace(input.Title) == "" {
-		return mergedomain.ProjectMergeRequest{}, fmt.Errorf("merge request title is required")
+		return mergedomain.ProjectMergeRequest{}, errors.New("merge request title is required")
 	}
 	source := strings.TrimSpace(input.SourceBranch)
 	target := strings.TrimSpace(input.TargetBranch)
 	if source == "" || target == "" {
-		return mergedomain.ProjectMergeRequest{}, fmt.Errorf("source_branch and target_branch are required")
+		return mergedomain.ProjectMergeRequest{}, errors.New("source_branch and target_branch are required")
 	}
 	if source == target {
-		return mergedomain.ProjectMergeRequest{}, fmt.Errorf("source_branch and target_branch must be different")
+		return mergedomain.ProjectMergeRequest{}, errors.New("source_branch and target_branch must be different")
 	}
 	if err := s.ensureBranchExists(ctx, project, source); err != nil {
 		return mergedomain.ProjectMergeRequest{}, err
@@ -135,12 +137,12 @@ func (s *Service) Update(ctx context.Context, projectID int64, mergeIID int64, i
 		return mergedomain.ProjectMergeRequest{}, err
 	}
 	if input.Title != nil && strings.TrimSpace(*input.Title) == "" {
-		return mergedomain.ProjectMergeRequest{}, fmt.Errorf("merge request title is required")
+		return mergedomain.ProjectMergeRequest{}, errors.New("merge request title is required")
 	}
 	if input.State != nil {
 		state := strings.TrimSpace(*input.State)
 		if state != "opened" && state != "closed" && state != "merged" {
-			return mergedomain.ProjectMergeRequest{}, fmt.Errorf("merge request state must be opened, closed, or merged")
+			return mergedomain.ProjectMergeRequest{}, errors.New("merge request state must be opened, closed, or merged")
 		}
 	}
 	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{Title: input.Title, Description: input.Description, State: input.State}); err != nil {
@@ -214,7 +216,10 @@ func (s *Service) triggerTargetBranchPipeline(ctx context.Context, project proje
 	if err != nil || branch.Hash == "" {
 		return
 	}
-	_, _, _ = s.pipelineSvc.CreatePushPipeline(ctx, project.ID, branch.Name, branch.Hash)
+	if _, _, err := s.pipelineSvc.CreatePushPipeline(ctx, project.ID, branch.Name, branch.Hash); err != nil {
+		wrapped := oops.In("merge_request").With("project_id", project.ID, "merge_request_id", mr.ID, "target_branch", branch.Name, "commit_sha", branch.Hash).Wrapf(err, "trigger target branch pipeline")
+		slog.Default().Warn("trigger target branch pipeline failed", slog.String("error", wrapped.Error()))
+	}
 }
 
 func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Project, mr mergedomain.ProjectMergeRequest) (CheckStatusView, error) {
@@ -245,7 +250,7 @@ func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Proj
 	}
 	pipeline, err := s.pipelineRepo.GetLatestByProjectRefCommit(ctx, project.ID, branch.Name, branch.Hash)
 	if err != nil {
-		if err == gitports.ErrNotFound {
+		if errors.Is(err, gitports.ErrNotFound) {
 			view.Status = "missing"
 			view.BlockingReason = "required pipeline is missing"
 			return view, nil
@@ -256,7 +261,7 @@ func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Proj
 	view.Status = pipeline.Status
 	view.Mergeable = pipeline.Status == gitports.ProjectPipelineStatusSucceeded
 	if !view.Mergeable {
-		view.BlockingReason = fmt.Sprintf("pipeline status is %s", pipeline.Status)
+		view.BlockingReason = "pipeline status is " + pipeline.Status
 	}
 	return view, nil
 }
@@ -313,7 +318,7 @@ func (s *Service) loadMergeRequestRecord(ctx context.Context, projectID int64, m
 	}
 	mr, err := s.mergeRepo.GetByProjectAndIID(ctx, projectID, mergeIID)
 	if err != nil {
-		if err == gitports.ErrNotFound {
+		if errors.Is(err, gitports.ErrNotFound) {
 			return mergedomain.ProjectMergeRequest{}, apperror.NotFound("merge request not found", err)
 		}
 		return mergedomain.ProjectMergeRequest{}, err

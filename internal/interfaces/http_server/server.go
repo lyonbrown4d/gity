@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -56,12 +55,12 @@ func NewHost(server httpx.ServerRuntime, settings config.Settings, logger *slog.
 	}
 }
 
-func (h *Host) Start(context.Context) error {
+func (h *Host) Start(ctx context.Context) error {
 	if h == nil || h.server == nil {
 		return nil
 	}
 
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(ctx)
 	h.cancel = cancel
 	go func() {
 		h.done <- h.server.ListenAndServeContext(runCtx, h.address)
@@ -101,5 +100,5 @@ func (h *Host) Stop(ctx context.Context) error {
 }
 
 func DocsURL(settings config.Settings) string {
-	return fmt.Sprintf("%s/docs", settings.HTTP.BaseURL)
+	return settings.HTTP.BaseURL + "/docs"
 }

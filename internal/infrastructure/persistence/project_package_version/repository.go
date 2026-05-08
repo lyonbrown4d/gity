@@ -22,7 +22,7 @@ type Repository struct {
 type CreateInput = packageports.CreateProjectPackageVersionInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	return &Repository{base: dbxrepo.NewWithOptions[packagedomain.ProjectPackageVersion](db, dbschema.ProjectPackageVersionSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
+	return &Repository{base: dbxrepo.NewWithOptions[packagedomain.ProjectPackageVersion](db, dbschema.ProjectPackageVersionSchema, dbxrepo.WithKeyNotFoundAsError(true))}, nil
 }
 
 func NewProjectPackageVersionRepository(repo *Repository) packageports.ProjectPackageVersionRepository {
@@ -35,7 +35,7 @@ func (r *Repository) ListByPackageID(ctx context.Context, packageID int64) (*col
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackageVersion, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectPackageVersionSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByPackageAndVersion(ctx context.Context, packageID int64, version string) (packagedomain.ProjectPackageVersion, error) {

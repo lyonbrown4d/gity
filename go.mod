@@ -3,16 +3,16 @@ module github.com/DaiYuANg/gity
 go 1.26.2
 
 require (
-	github.com/arcgolabs/authx v0.2.1
+	github.com/arcgolabs/authx v0.3.0
 	github.com/arcgolabs/collectionx/list v0.8.0
 	github.com/arcgolabs/collectionx/mapping v0.8.0
 	github.com/arcgolabs/collectionx/set v0.8.0
 	github.com/arcgolabs/configx v0.3.2
-	github.com/arcgolabs/dbx v0.1.5
-	github.com/arcgolabs/dix v0.7.2
+	github.com/arcgolabs/dbx v0.1.6
+	github.com/arcgolabs/dix v0.8.0
 	github.com/arcgolabs/eventx v0.1.2
-	github.com/arcgolabs/httpx v0.1.4
-	github.com/arcgolabs/httpx/adapter/fiber v0.1.4
+	github.com/arcgolabs/httpx v0.1.5
+	github.com/arcgolabs/httpx/adapter/fiber v0.1.5
 	github.com/arcgolabs/logx v0.1.2
 	github.com/arcgolabs/mapper v0.1.2
 	github.com/arcgolabs/plano v0.7.1
@@ -25,6 +25,7 @@ require (
 	github.com/go-git/go-git/v5 v5.17.2
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gofiber/fiber/v2 v2.52.13
+	github.com/samber/oops v1.21.0
 	modernc.org/sqlite v1.48.2
 )
 
@@ -39,9 +40,7 @@ require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/arcgolabs/collectionx/graph v0.8.0 // indirect
-	github.com/arcgolabs/httpx/adapter/echo v0.1.4 // indirect
-	github.com/arcgolabs/httpx/adapter/gin v0.1.4 // indirect
-	github.com/arcgolabs/httpx/adapter/std v0.1.4 // indirect
+	github.com/arcgolabs/httpx/adapter/std v0.1.5 // indirect
 	github.com/arcgolabs/observabilityx v0.4.0 // indirect
 	github.com/arcgolabs/pkg/option v0.0.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
@@ -122,7 +121,6 @@ require (
 	github.com/samber/hot v0.13.0 // indirect
 	github.com/samber/lo v1.53.0 // indirect
 	github.com/samber/mo v1.16.0 // indirect
-	github.com/samber/oops v1.21.0 // indirect
 	github.com/samber/oops/loggers/zerolog v0.0.0-20260412154111-1460827f264f // indirect
 	github.com/samber/slog-common v0.22.0 // indirect
 	github.com/samber/slog-zerolog/v2 v2.9.2 // indirect

@@ -12,6 +12,7 @@ import (
 	"github.com/arcgolabs/authx"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/oops"
 )
 
 var (
@@ -32,11 +33,11 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 	provider := authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
 		record, err := tokenRepository.GetByToken(ctx, credential.Token)
 		if err != nil {
-			return authx.AuthenticationResult{}, err
+			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
 		}
 		user, err := userRepository.GetByID(ctx, record.UserID)
 		if err != nil {
-			return authx.AuthenticationResult{}, err
+			return authx.AuthenticationResult{}, oops.In("auth").With("user_id", record.UserID).Wrapf(err, "load token user")
 		}
 		return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username}}, nil
 	})
@@ -46,10 +47,13 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 		if !ok {
 			return authx.Decision{Allowed: false, Reason: "invalid_principal"}, nil
 		}
-		namespaceID, _ := input.Context.Get("namespace_id")
-		visibility, _ := input.Context.Get("visibility")
-		namespaceIDValue, _ := namespaceID.(int64)
-		visibilityValue, _ := visibility.(string)
+		namespaceID, namespaceIDFound := input.Context.Get("namespace_id")
+		visibility, visibilityFound := input.Context.Get("visibility")
+		namespaceIDValue, namespaceIDOK := namespaceID.(int64)
+		visibilityValue, visibilityOK := visibility.(string)
+		if !namespaceIDFound || !namespaceIDOK || !visibilityFound || !visibilityOK {
+			return authx.Decision{Allowed: false, Reason: "invalid_project_scope"}, nil
+		}
 
 		switch input.Action {
 		case "project.read":
@@ -112,11 +116,11 @@ func (r *Runtime) AuthenticateHeader(ctx context.Context, authorization string) 
 	}
 	result, err := r.Engine.Check(ctx, TokenCredential{Token: token})
 	if err != nil {
-		return Principal{}, false, err
+		return Principal{}, false, oops.In("auth").Wrapf(err, "authenticate token")
 	}
 	principal, ok := result.Principal.(Principal)
 	if !ok {
-		return Principal{}, false, fmt.Errorf("unexpected principal type")
+		return Principal{}, false, oops.In("auth").With("principal_type", fmt.Sprintf("%T", result.Principal)).New("unexpected principal type")
 	}
 	return principal, true, nil
 }
@@ -132,7 +136,7 @@ func (r *Runtime) CanReadProject(ctx context.Context, principal Principal, proje
 		}),
 	})
 	if err != nil {
-		return false, err
+		return false, oops.In("auth").With("project_id", project.ID, "namespace_id", project.NamespaceID, "user_id", principal.UserID).Wrapf(err, "authorize project read")
 	}
 	return decision.Allowed, nil
 }
@@ -148,7 +152,7 @@ func (r *Runtime) CanWriteProject(ctx context.Context, principal Principal, proj
 		}),
 	})
 	if err != nil {
-		return false, err
+		return false, oops.In("auth").With("project_id", project.ID, "namespace_id", project.NamespaceID, "user_id", principal.UserID).Wrapf(err, "authorize project write")
 	}
 	return decision.Allowed, nil
 }

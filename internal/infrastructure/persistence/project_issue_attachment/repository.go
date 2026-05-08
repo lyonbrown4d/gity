@@ -25,7 +25,7 @@ type StoreInput = issueports.StoreProjectIssueAttachmentInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssueAttachment](db, dbschema.ProjectIssueAttachmentSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssueAttachment](db, dbschema.ProjectIssueAttachmentSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -70,7 +70,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain
 }
 
 func (r *Repository) MarkStored(ctx context.Context, attachmentID int64, input StoreInput) error {
-	_, err := r.base.UpdateByID(
+	_, err := dbxrepo.By(r.base, dbschema.ProjectIssueAttachmentSchema.ID).Update(
 		ctx,
 		attachmentID,
 		dbschema.ProjectIssueAttachmentSchema.ContentType.Set(strings.TrimSpace(input.ContentType)),
@@ -85,7 +85,7 @@ func (r *Repository) MarkStored(ctx context.Context, attachmentID int64, input S
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, attachmentID int64) error {
-	if _, err := r.base.DeleteByID(ctx, attachmentID); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectIssueAttachmentSchema.ID).Delete(ctx, attachmentID); err != nil {
 		return fmt.Errorf("delete project issue attachment: %w", err)
 	}
 	return nil

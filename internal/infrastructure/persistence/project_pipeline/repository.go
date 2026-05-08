@@ -31,7 +31,7 @@ type CreateInput = ciports.CreateProjectPipelineInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectPipeline](db, dbschema.ProjectPipelineSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectPipeline](db, dbschema.ProjectPipelineSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -97,7 +97,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 		last, err := repo.First(ctx, query)
 		if err == nil {
 			nextIID = last.IID + 1
-		} else if err != nil && !persistence.IsNotFound(err) {
+		} else if !persistence.IsNotFound(err) {
 			return err
 		}
 		status := strings.TrimSpace(input.Status)
@@ -157,7 +157,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, item cidomain.ProjectPipe
 		}
 		assignments = append(assignments, dbschema.ProjectPipelineSchema.FinishedAt.Set(now))
 	}
-	if _, err := r.base.UpdateByID(ctx, item.ID, assignments...); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectPipelineSchema.ID).Update(ctx, item.ID, assignments...); err != nil {
 		return fmt.Errorf("update project pipeline status: %w", err)
 	}
 	return nil

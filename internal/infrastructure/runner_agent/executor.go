@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/samber/oops"
 	"io"
 	"os"
 	"os/exec"
@@ -61,7 +62,7 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 		return "", fmt.Errorf("decode script job payload: %w", err)
 	}
 	if len(payload.Script) == 0 {
-		return "", fmt.Errorf("script job payload requires at least one script line")
+		return "", errors.New("script job payload requires at least one script line")
 	}
 
 	timeout := time.Duration(payload.TimeoutSeconds) * time.Second
@@ -119,9 +120,9 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 		fmt.Sprintf("GITY_JOB_ID=%d", job.ID),
 		fmt.Sprintf("GITY_PROJECT_ID=%d", job.ProjectID),
 		fmt.Sprintf("GITY_JOB_ATTEMPT=%d", job.Attempts),
-		fmt.Sprintf("GITY_PROJECT_FULL_PATH=%s", payload.ProjectFullPath),
-		fmt.Sprintf("GITY_REF_NAME=%s", payload.RefName),
-		fmt.Sprintf("GITY_COMMIT_SHA=%s", payload.CommitSHA),
+		"GITY_PROJECT_FULL_PATH="+payload.ProjectFullPath,
+		"GITY_REF_NAME="+payload.RefName,
+		"GITY_COMMIT_SHA="+payload.CommitSHA,
 	)
 	for key, value := range payload.Env {
 		key = strings.TrimSpace(key)
@@ -149,7 +150,7 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	default:
 	}
 	if canceledByChecker {
-		err = fmt.Errorf("script job canceled")
+		err = errors.New("script job canceled")
 		exitCode = -1
 	} else if ctx.Err() == context.DeadlineExceeded {
 		err = fmt.Errorf("script job timed out after %s", timeout)
@@ -254,24 +255,26 @@ func ExtractSourceArchive(content []byte, workDir string) error {
 		}
 		info := file.FileInfo()
 		if info.IsDir() {
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return fmt.Errorf("create source directory: %w", err)
+			if mkdirErr := os.MkdirAll(target, 0o755); mkdirErr != nil {
+				return fmt.Errorf("create source directory: %w", mkdirErr)
 			}
 			continue
 		}
 		if !info.Mode().IsRegular() {
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return fmt.Errorf("create source parent directory: %w", err)
+		if mkdirErr := os.MkdirAll(filepath.Dir(target), 0o755); mkdirErr != nil {
+			return fmt.Errorf("create source parent directory: %w", mkdirErr)
 		}
 		rc, err := file.Open()
 		if err != nil {
 			return fmt.Errorf("open source archive entry: %w", err)
 		}
 		if err := writeArchiveFile(target, rc, info.Mode().Perm()); err != nil {
-			_ = rc.Close()
-			return err
+			if closeErr := rc.Close(); closeErr != nil {
+				return oops.In("runner_agent").With("target", target).Wrapf(oops.Join(err, closeErr), "write source archive file and close archive entry")
+			}
+			return oops.In("runner_agent").With("target", target).Wrapf(err, "write source archive file")
 		}
 		if err := rc.Close(); err != nil {
 			return fmt.Errorf("close source archive entry: %w", err)
@@ -304,7 +307,9 @@ func writeArchiveFile(target string, reader io.Reader, mode os.FileMode) error {
 		return fmt.Errorf("create source archive file: %w", err)
 	}
 	if _, err := io.Copy(file, reader); err != nil {
-		_ = file.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			return oops.In("runner_agent").With("target", target).Wrapf(oops.Join(err, closeErr), "write source archive file and close target")
+		}
 		return fmt.Errorf("write source archive file: %w", err)
 	}
 	if err := file.Close(); err != nil {
@@ -327,7 +332,7 @@ func resolveLocalBareRepo(repoRoot string, projectFullPath string) (string, erro
 		return "", fmt.Errorf("resolve runner repository path: %w", err)
 	}
 	if repoPath != root && !strings.HasPrefix(repoPath, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("runner repository path escapes repo root")
+		return "", errors.New("runner repository path escapes repo root")
 	}
 	return repoPath, nil
 }
@@ -375,21 +380,31 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 		b.truncated = true
 		if !b.truncatedSent {
 			b.truncatedSent = true
-			b.stream(nil)
+			if err := b.stream(nil); err != nil {
+				return len(p), err
+			}
 		}
 		return len(p), nil
 	}
-	captured := p
 	if len(p) > remaining {
 		b.truncated = true
 		b.truncatedSent = true
-		captured = p[:remaining]
-		_, _ = b.buffer.Write(captured)
-		b.stream(captured)
+		captured := p[:remaining]
+		if _, err := b.buffer.Write(captured); err != nil {
+			return len(p), oops.In("runner_agent").With("remaining", remaining).Wrapf(err, "capture truncated job output")
+		}
+		if err := b.stream(captured); err != nil {
+			return len(p), err
+		}
 		return len(p), nil
 	}
 	n, err := b.buffer.Write(p)
-	b.stream(p)
+	if streamErr := b.stream(p); streamErr != nil {
+		if err != nil {
+			return n, oops.In("runner_agent").Wrapf(oops.Join(err, streamErr), "capture and stream job output")
+		}
+		return n, streamErr
+	}
 	return n, err
 }
 
@@ -399,16 +414,19 @@ func (b *cappedBuffer) String() string {
 	return b.buffer.String()
 }
 
-func (b *cappedBuffer) stream(chunk []byte) {
+func (b *cappedBuffer) stream(chunk []byte) error {
 	if b.traceStreamer == nil {
-		return
+		return nil
 	}
 	if len(chunk) == 0 && !b.truncated {
-		return
+		return nil
 	}
 	duration := int64(0)
 	if !b.started.IsZero() {
 		duration = time.Since(b.started).Milliseconds()
 	}
-	_ = b.traceStreamer(b.ctx, string(chunk), b.truncated, duration)
+	if err := b.traceStreamer(b.ctx, string(chunk), b.truncated, duration); err != nil {
+		return oops.In("runner_agent").With("truncated", b.truncated, "duration_millis", duration).Wrapf(err, "stream job trace")
+	}
+	return nil
 }

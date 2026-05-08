@@ -18,8 +18,6 @@ func TestRuntimeAppsValidate(t *testing.T) {
 		"standalone": func() interface{ Validate() error } { return NewStandaloneApp() },
 	}
 	for name, factory := range cases {
-		name := name
-		factory := factory
 		t.Run(name, func(t *testing.T) {
 			tempDir := t.TempDir()
 			setRuntimeTestEnv(t, tempDir)
@@ -69,8 +67,6 @@ func TestRuntimeStartsEnsureSchema(t *testing.T) {
 		},
 	}
 	for name, factory := range cases {
-		name := name
-		factory := factory
 		t.Run(name, func(t *testing.T) {
 			tempDir := t.TempDir()
 			setRuntimeTestEnv(t, tempDir)

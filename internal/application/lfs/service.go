@@ -242,21 +242,21 @@ func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string,
 		return lfsdomain.ProjectLFSObject{}, apperror.NotFound("project not found", err)
 	}
 	oid = strings.TrimSpace(oid)
-	if err := validateOID(oid); err != nil {
-		return lfsdomain.ProjectLFSObject{}, apperror.BadRequest("invalid lfs oid", err)
+	if oidErr := validateOID(oid); oidErr != nil {
+		return lfsdomain.ProjectLFSObject{}, apperror.BadRequest("invalid lfs oid", oidErr)
 	}
 	storageKey := storageports.BuildLFSStorageKey(project.FullPath, oid)
-	if err := s.storage.SaveObject(ctx, storageKey, content, "application/octet-stream"); err != nil {
-		return lfsdomain.ProjectLFSObject{}, err
+	if saveErr := s.storage.SaveObject(ctx, storageKey, content, "application/octet-stream"); saveErr != nil {
+		return lfsdomain.ProjectLFSObject{}, saveErr
 	}
 	record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 	if err == nil {
-		if err := s.objectRepo.UpdateStored(ctx, record.ID, int64(len(content)), storageKey); err != nil {
-			return lfsdomain.ProjectLFSObject{}, err
+		if updateErr := s.objectRepo.UpdateStored(ctx, record.ID, int64(len(content)), storageKey); updateErr != nil {
+			return lfsdomain.ProjectLFSObject{}, updateErr
 		}
 		return s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 	}
-	if err != nil && err != storageports.ErrNotFound {
+	if !errors.Is(err, storageports.ErrNotFound) {
 		return lfsdomain.ProjectLFSObject{}, err
 	}
 	return s.objectRepo.Create(ctx, projectID, oid, int64(len(content)), storageKey)
@@ -272,7 +272,7 @@ func (s *Service) DownloadObject(ctx context.Context, projectID int64, oid strin
 	}
 	record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return DownloadObject{}, apperror.NotFound("lfs object not found", err)
 		}
 		return DownloadObject{}, err
@@ -296,10 +296,10 @@ func (s *Service) CreateLock(ctx context.Context, projectID int64, ownerUserID i
 	if err != nil {
 		return LockEnvelope{}, apperror.BadRequest("invalid lock path", err)
 	}
-	if _, err := s.lockRepo.GetByProjectAndPath(ctx, projectID, lockPath); err == nil {
+	if _, existingErr := s.lockRepo.GetByProjectAndPath(ctx, projectID, lockPath); existingErr == nil {
 		return LockEnvelope{}, apperror.Conflict("lfs lock already exists", fmt.Errorf("lfs lock path already exists: %s", lockPath))
-	} else if err != nil && err != storageports.ErrNotFound {
-		return LockEnvelope{}, err
+	} else if !errors.Is(existingErr, storageports.ErrNotFound) {
+		return LockEnvelope{}, existingErr
 	}
 	lock, err := s.lockRepo.Create(ctx, storageports.CreateProjectLFSLockInput{ProjectID: projectID, OwnerUserID: ownerUserID, Path: lockPath})
 	if err != nil {
@@ -318,13 +318,13 @@ func (s *Service) Unlock(ctx context.Context, projectID int64, actorUserID int64
 	}
 	item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, parsedID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return LockEnvelope{}, apperror.NotFound("lfs lock not found", err)
 		}
 		return LockEnvelope{}, err
 	}
 	if item.OwnerUserID != actorUserID && !input.Force {
-		return LockEnvelope{}, apperror.Forbidden("lfs lock is owned by another user", fmt.Errorf("lock owner mismatch"))
+		return LockEnvelope{}, apperror.Forbidden("lfs lock is owned by another user", errors.New("lock owner mismatch"))
 	}
 	owner, err := s.userRepo.GetByID(ctx, item.OwnerUserID)
 	if err != nil {
@@ -347,7 +347,7 @@ func (s *Service) listLockEntities(ctx context.Context, projectID int64, input L
 		}
 		item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, lockID)
 		if err != nil {
-			if err == storageports.ErrNotFound {
+			if errors.Is(err, storageports.ErrNotFound) {
 				return []lfsdomain.ProjectLFSLock{}, "", nil
 			}
 			return nil, "", err
@@ -400,27 +400,27 @@ func normalizeLockPath(value string) (string, error) {
 	trimmed := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
 	trimmed = strings.Trim(trimmed, "/")
 	if trimmed == "" {
-		return "", fmt.Errorf("lfs lock path is required")
+		return "", errors.New("lfs lock path is required")
 	}
-	for _, segment := range strings.Split(trimmed, "/") {
+	for segment := range strings.SplitSeq(trimmed, "/") {
 		if segment == "" || segment == "." || segment == ".." {
-			return "", fmt.Errorf("lfs lock path is invalid")
+			return "", errors.New("lfs lock path is invalid")
 		}
 	}
 	cleaned := strings.Trim(path.Clean("/"+trimmed), "/")
 	if cleaned == "" || strings.HasPrefix(cleaned, "../") || cleaned == ".." {
-		return "", fmt.Errorf("lfs lock path is invalid")
+		return "", errors.New("lfs lock path is invalid")
 	}
 	return cleaned, nil
 }
 
 func validateOID(oid string) error {
 	if len(oid) != 64 {
-		return fmt.Errorf("lfs oid must be a 64-character hex string")
+		return errors.New("lfs oid must be a 64-character hex string")
 	}
 	for _, r := range oid {
 		if !unicode.Is(unicode.ASCII_Hex_Digit, r) {
-			return fmt.Errorf("lfs oid must be a 64-character hex string")
+			return errors.New("lfs oid must be a 64-character hex string")
 		}
 	}
 	return nil
@@ -433,7 +433,7 @@ func parseCursor(value string) (int64, error) {
 	}
 	parsed, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("invalid cursor")
+		return 0, errors.New("invalid cursor")
 	}
 	return parsed, nil
 }
@@ -441,11 +441,11 @@ func parseCursor(value string) (int64, error) {
 func parseLockID(value string) (int64, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return 0, fmt.Errorf("invalid lock id")
+		return 0, errors.New("invalid lock id")
 	}
 	parsed, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil || parsed <= 0 {
-		return 0, fmt.Errorf("invalid lock id")
+		return 0, errors.New("invalid lock id")
 	}
 	return parsed, nil
 }

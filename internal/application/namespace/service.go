@@ -64,10 +64,10 @@ func (s *Service) GetByID(ctx context.Context, id int64) (namespacedomain.Namesp
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomain.Namespace, error) {
 	if strings.TrimSpace(input.Name) == "" {
-		return namespacedomain.Namespace{}, fmt.Errorf("namespace name is required")
+		return namespacedomain.Namespace{}, errors.New("namespace name is required")
 	}
 	if strings.TrimSpace(input.PathKey) == "" {
-		return namespacedomain.Namespace{}, fmt.Errorf("namespace path_key is required")
+		return namespacedomain.Namespace{}, errors.New("namespace path_key is required")
 	}
 	if strings.TrimSpace(input.Kind) == "" {
 		input.Kind = "group"
@@ -91,10 +91,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomai
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (namespacedomain.Namespace, error) {
 	if input.Name != nil && strings.TrimSpace(*input.Name) == "" {
-		return namespacedomain.Namespace{}, fmt.Errorf("namespace name is required")
+		return namespacedomain.Namespace{}, errors.New("namespace name is required")
 	}
 	if input.PathKey != nil && strings.TrimSpace(*input.PathKey) == "" {
-		return namespacedomain.Namespace{}, fmt.Errorf("namespace path_key is required")
+		return namespacedomain.Namespace{}, errors.New("namespace path_key is required")
 	}
 	if err := s.repo.UpdateByID(ctx, id, namespaceports.UpdateNamespaceInput{
 		Kind:        input.Kind,
@@ -109,7 +109,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (name
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("namespace id is required")
+		return errors.New("namespace id is required")
 	}
 	return s.repo.DeleteByID(ctx, id)
 }
@@ -140,10 +140,10 @@ func (s *Service) ListMembers(ctx context.Context, namespaceID int64) ([]MemberV
 
 func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMemberInput) (MemberView, error) {
 	if namespaceID <= 0 {
-		return MemberView{}, fmt.Errorf("namespace id is required")
+		return MemberView{}, errors.New("namespace id is required")
 	}
 	if input.UserID <= 0 {
-		return MemberView{}, fmt.Errorf("user_id is required")
+		return MemberView{}, errors.New("user_id is required")
 	}
 	role := strings.TrimSpace(input.Role)
 	if role == "" {
@@ -162,10 +162,10 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 	if err != nil {
 		return MemberView{}, fmt.Errorf("load user: %w", err)
 	}
-	if _, err := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); err == nil {
-		return MemberView{}, fmt.Errorf("namespace member already exists")
-	} else if err != nil && !errors.Is(err, namespaceports.ErrNotFound) {
-		return MemberView{}, err
+	if _, existingErr := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); existingErr == nil {
+		return MemberView{}, errors.New("namespace member already exists")
+	} else if !errors.Is(existingErr, namespaceports.ErrNotFound) {
+		return MemberView{}, existingErr
 	}
 	member, err := s.memberRepo.Create(ctx, namespaceports.CreateNamespaceMemberInput{
 		NamespaceID: namespaceID,

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	identityports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 
@@ -61,7 +62,7 @@ func (s *Service) GetByUsername(ctx context.Context, username string) (identity.
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User, error) {
 	if strings.TrimSpace(input.Username) == "" {
-		return identity.User{}, fmt.Errorf("username is required")
+		return identity.User{}, errors.New("username is required")
 	}
 	if strings.TrimSpace(input.DisplayName) == "" {
 		input.DisplayName = input.Username
@@ -75,7 +76,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User,
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (identity.User, error) {
 	if input.Username != nil && strings.TrimSpace(*input.Username) == "" {
-		return identity.User{}, fmt.Errorf("username is required")
+		return identity.User{}, errors.New("username is required")
 	}
 	if input.DisplayName != nil && strings.TrimSpace(*input.DisplayName) == "" {
 		displayName := ""
@@ -96,7 +97,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("user id is required")
+		return errors.New("user id is required")
 	}
 	return s.repo.DeleteByID(ctx, id)
 }
@@ -104,7 +105,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 func (s *Service) Login(ctx context.Context, username string) (AuthSession, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
-		return AuthSession{}, fmt.Errorf("username is required")
+		return AuthSession{}, errors.New("username is required")
 	}
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
@@ -132,7 +133,9 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (AuthSession
 	if err != nil {
 		return AuthSession{}, err
 	}
-	_ = s.tokenRepo.DeleteByToken(ctx, record.Token)
+	if err := s.tokenRepo.DeleteByToken(ctx, record.Token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
+		return AuthSession{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "revoke refresh token")
+	}
 	return s.createSession(ctx, user)
 }
 

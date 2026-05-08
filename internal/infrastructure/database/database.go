@@ -12,13 +12,14 @@ import (
 	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/samber/oops"
 	_ "modernc.org/sqlite"
 )
 
 func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error) {
 	if settings.Database.DSN == "" {
 		logger.Warn("database dsn is empty; database runtime disabled")
-		return nil, nil
+		return nil, oops.In("database").New("database dsn is required")
 	}
 
 	dialect, err := resolveDialect(settings.Database.Driver)

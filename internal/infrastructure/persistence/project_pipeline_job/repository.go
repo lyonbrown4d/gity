@@ -23,7 +23,7 @@ type CreateInput = ciports.CreateProjectPipelineJobInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectPipelineJob](db, dbschema.ProjectPipelineJobSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectPipelineJob](db, dbschema.ProjectPipelineJobSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 

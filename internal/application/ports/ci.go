@@ -13,13 +13,13 @@ const (
 	ProjectJobStatusRunning   = "running"
 	ProjectJobStatusSucceeded = "succeeded"
 	ProjectJobStatusFailed    = "failed"
-	ProjectJobStatusCancelled = "cancelled"
+	ProjectJobStatusCancelled = "canceled"
 
 	ProjectPipelineStatusPending   = "pending"
 	ProjectPipelineStatusRunning   = "running"
 	ProjectPipelineStatusSucceeded = "succeeded"
 	ProjectPipelineStatusFailed    = "failed"
-	ProjectPipelineStatusCancelled = "cancelled"
+	ProjectPipelineStatusCancelled = "canceled"
 
 	ProjectRunnerStatusOnline  = "online"
 	ProjectRunnerStatusOffline = "offline"

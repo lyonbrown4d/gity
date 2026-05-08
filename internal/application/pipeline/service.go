@@ -148,9 +148,9 @@ func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input Cre
 		return PipelineView{}, err
 	}
 	jobs, err := collectionlist.ReduceErrList(collectionlist.NewList(spec.Stages...), make([]PipelineJobView, 0, len(spec.Stages)), func(acc []PipelineJobView, index int, stage plandsl.StageSpec) ([]PipelineJobView, error) {
-		view, err := s.enqueueStage(ctx, project, pipeline, stage, index, initialRunAfter(stage))
-		if err != nil {
-			return acc, err
+		view, enqueueErr := s.enqueueStage(ctx, project, pipeline, stage, index, initialRunAfter(stage))
+		if enqueueErr != nil {
+			return acc, enqueueErr
 		}
 		return append(acc, view), nil
 	})
@@ -174,7 +174,7 @@ func (s *Service) CreatePushPipeline(ctx context.Context, projectID int64, refNa
 		view, viewErr := s.GetPipeline(ctx, projectID, existing.ID)
 		return view, false, viewErr
 	}
-	if err != gitports.ErrNotFound {
+	if !errors.Is(err, gitports.ErrNotFound) {
 		return PipelineView{}, false, err
 	}
 	view, err := s.CreatePipeline(ctx, projectID, CreatePipelineInput{
@@ -277,7 +277,7 @@ func (s *Service) CancelPipeline(ctx context.Context, projectID int64, pipelineI
 func (s *Service) RefreshProjectJob(ctx context.Context, projectID int64, projectJobID int64) error {
 	item, err := s.pipelineJobRepo.GetByProjectJobID(ctx, projectID, projectJobID)
 	if err != nil {
-		if err == gitports.ErrNotFound {
+		if errors.Is(err, gitports.ErrNotFound) {
 			return nil
 		}
 		return err
@@ -292,9 +292,9 @@ func (s *Service) listPipelineJobs(ctx context.Context, projectID int64, pipelin
 		return nil, err
 	}
 	views, err := collectionlist.ReduceErrList(items, make([]PipelineJobView, 0, items.Len()), func(acc []PipelineJobView, _ int, item cidomain.ProjectPipelineJob) ([]PipelineJobView, error) {
-		view, err := s.toPipelineJobView(ctx, item)
-		if err != nil {
-			return acc, err
+		view, viewErr := s.toPipelineJobView(ctx, item)
+		if viewErr != nil {
+			return acc, viewErr
 		}
 		return append(acc, view), nil
 	})
@@ -310,7 +310,7 @@ func (s *Service) loadPipeline(ctx context.Context, projectID int64, pipelineID 
 	}
 	item, err := s.pipelineRepo.GetByProjectAndID(ctx, projectID, pipelineID)
 	if err != nil {
-		if err == gitports.ErrNotFound {
+		if errors.Is(err, gitports.ErrNotFound) {
 			return cidomain.ProjectPipeline{}, apperror.NotFound("project pipeline not found", err)
 		}
 		return cidomain.ProjectPipeline{}, err
@@ -320,7 +320,7 @@ func (s *Service) loadPipeline(ctx context.Context, projectID int64, pipelineID 
 
 func (s *Service) compileConfig(ctx context.Context, content string) (plandsl.PipelineSpec, error) {
 	if strings.TrimSpace(content) == "" {
-		return plandsl.PipelineSpec{}, apperror.BadRequest("ci config content is required", fmt.Errorf("ci config content is required"))
+		return plandsl.PipelineSpec{}, apperror.BadRequest("ci config content is required", errors.New("ci config content is required"))
 	}
 	spec, err := plandsl.Compile(ctx, ".gity-ci.plano", content)
 	if err != nil {

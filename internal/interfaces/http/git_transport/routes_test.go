@@ -13,7 +13,7 @@ func TestParseReceivePackBranchUpdates(t *testing.T) {
 			pkt("1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 refs/tags/v1\n") +
 			"0000",
 	)
-	branches := parseReceivePackBranchUpdates(body)
+	branches := receivePackBranchNames(parseReceivePackUpdates(body))
 	if strings.Join(branches, ",") != "main,feature/test" {
 		t.Fatalf("unexpected branches: %+v", branches)
 	}
@@ -39,4 +39,14 @@ func TestParseReceivePackUpdatesMarksBranchDeletes(t *testing.T) {
 
 func pkt(payload string) string {
 	return fmt.Sprintf("%04x%s", len(payload)+4, payload)
+}
+
+func receivePackBranchNames(updates []receivePackUpdate) []string {
+	branches := make([]string, 0, len(updates))
+	for _, update := range updates {
+		if update.BranchName != "" {
+			branches = append(branches, update.BranchName)
+		}
+	}
+	return branches
 }

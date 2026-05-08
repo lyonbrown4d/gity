@@ -5,10 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 )
@@ -103,7 +104,7 @@ func (s *Service) GetIssueByIID(ctx context.Context, projectID int64, issueIID i
 
 func (s *Service) CreateIssue(ctx context.Context, projectID int64, input CreateIssueInput) (issuedomain.ProjectIssue, error) {
 	if strings.TrimSpace(input.Title) == "" {
-		return issuedomain.ProjectIssue{}, fmt.Errorf("issue title is required")
+		return issuedomain.ProjectIssue{}, oops.In("issue").With("project_id", projectID, "author_user_id", input.AuthorUserID).New("issue title is required")
 	}
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return issuedomain.ProjectIssue{}, apperror.NotFound("project not found", err)
@@ -125,12 +126,12 @@ func (s *Service) UpdateIssue(ctx context.Context, projectID int64, issueIID int
 		return issuedomain.ProjectIssue{}, err
 	}
 	if input.Title != nil && strings.TrimSpace(*input.Title) == "" {
-		return issuedomain.ProjectIssue{}, fmt.Errorf("issue title is required")
+		return issuedomain.ProjectIssue{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID).New("issue title is required")
 	}
 	if input.State != nil {
 		state := strings.TrimSpace(*input.State)
 		if state != "opened" && state != "closed" {
-			return issuedomain.ProjectIssue{}, fmt.Errorf("issue state must be opened or closed")
+			return issuedomain.ProjectIssue{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID, "state", state).New("issue state must be opened or closed")
 		}
 	}
 	if err := s.issueRepo.UpdateByID(ctx, issue.ID, storageports.UpdateProjectIssueInput{Title: input.Title, Description: input.Description, State: input.State}); err != nil {
@@ -157,7 +158,7 @@ func (s *Service) CreateComment(ctx context.Context, projectID int64, issueIID i
 		return issuedomain.ProjectIssueComment{}, err
 	}
 	if strings.TrimSpace(input.Body) == "" {
-		return issuedomain.ProjectIssueComment{}, fmt.Errorf("issue comment body is required")
+		return issuedomain.ProjectIssueComment{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID, "author_user_id", input.AuthorUserID).New("issue comment body is required")
 	}
 	if _, err := s.userRepo.GetByID(ctx, input.AuthorUserID); err != nil {
 		return issuedomain.ProjectIssueComment{}, apperror.NotFound("comment author not found", err)
@@ -179,11 +180,11 @@ func (s *Service) ListAttachments(ctx context.Context, projectID int64, issueIID
 
 func (s *Service) CreateAttachment(ctx context.Context, projectID int64, issueIID int64, input CreateAttachmentInput) (issuedomain.ProjectIssueAttachment, error) {
 	if strings.TrimSpace(input.ContentBase64) == "" {
-		return issuedomain.ProjectIssueAttachment{}, fmt.Errorf("attachment content_base64 is required")
+		return issuedomain.ProjectIssueAttachment{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID, "file_name", input.FileName).New("attachment content_base64 is required")
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.ContentBase64))
 	if err != nil {
-		return issuedomain.ProjectIssueAttachment{}, fmt.Errorf("decode attachment content: %w", err)
+		return issuedomain.ProjectIssueAttachment{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID, "file_name", input.FileName).Wrapf(err, "decode attachment content")
 	}
 	uploaded, err := s.UploadAttachment(ctx, projectID, AttachmentUploadInput{
 		UploadedByUserID: input.UploadedByUserID,
@@ -196,7 +197,7 @@ func (s *Service) CreateAttachment(ctx context.Context, projectID int64, issueII
 		return issuedomain.ProjectIssueAttachment{}, err
 	}
 	if uploaded.Attachment == nil {
-		return issuedomain.ProjectIssueAttachment{}, fmt.Errorf("issue attachment record was not created")
+		return issuedomain.ProjectIssueAttachment{}, oops.In("issue").With("project_id", projectID, "issue_iid", issueIID, "file_name", input.FileName).New("issue attachment record was not created")
 	}
 	return *uploaded.Attachment, nil
 }
@@ -206,14 +207,14 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 	if err != nil {
 		return AttachmentUploadView{}, apperror.NotFound("project not found", err)
 	}
-	if _, err := s.userRepo.GetByID(ctx, input.UploadedByUserID); err != nil {
-		return AttachmentUploadView{}, apperror.NotFound("attachment uploader not found", err)
+	if _, lookupErr := s.userRepo.GetByID(ctx, input.UploadedByUserID); lookupErr != nil {
+		return AttachmentUploadView{}, apperror.NotFound("attachment uploader not found", lookupErr)
 	}
 	if strings.TrimSpace(input.FileName) == "" {
-		return AttachmentUploadView{}, fmt.Errorf("attachment file_name is required")
+		return AttachmentUploadView{}, oops.In("issue").With("project_id", projectID, "issue_iid", input.IssueIID, "uploaded_by_user_id", input.UploadedByUserID).New("attachment file_name is required")
 	}
 	if len(input.Content) == 0 {
-		return AttachmentUploadView{}, fmt.Errorf("attachment content is required")
+		return AttachmentUploadView{}, oops.In("issue").With("project_id", projectID, "issue_iid", input.IssueIID, "file_name", input.FileName).New("attachment content is required")
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
@@ -221,13 +222,13 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 	}
 
 	if input.IssueIID <= 0 {
-		token, err := randomToken()
-		if err != nil {
-			return AttachmentUploadView{}, err
+		token, tokenErr := randomToken()
+		if tokenErr != nil {
+			return AttachmentUploadView{}, tokenErr
 		}
 		storageKey := storageports.BuildIssueDraftStorageKey(project.FullPath, token, input.FileName)
-		if err := s.storage.SaveObject(ctx, storageKey, input.Content, contentType); err != nil {
-			return AttachmentUploadView{}, err
+		if saveErr := s.storage.SaveObject(ctx, storageKey, input.Content, contentType); saveErr != nil {
+			return AttachmentUploadView{}, saveErr
 		}
 		return AttachmentUploadView{
 			ObjectKey:   storageKey,
@@ -247,11 +248,13 @@ func (s *Service) UploadAttachment(ctx context.Context, projectID int64, input A
 	}
 	storageKey, err := s.storage.SaveIssueAttachment(ctx, project.FullPath, issue.IID, attachment.ID, attachment.FileName, input.Content, contentType)
 	if err != nil {
-		_ = s.attachmentRepo.DeleteByID(ctx, attachment.ID)
-		return AttachmentUploadView{}, err
+		if cleanupErr := s.attachmentRepo.DeleteByID(ctx, attachment.ID); cleanupErr != nil {
+			return AttachmentUploadView{}, oops.In("issue").With("project_id", projectID, "issue_id", issue.ID, "attachment_id", attachment.ID).Wrapf(oops.Join(err, cleanupErr), "save issue attachment and cleanup record")
+		}
+		return AttachmentUploadView{}, oops.In("issue").With("project_id", projectID, "issue_id", issue.ID, "attachment_id", attachment.ID).Wrapf(err, "save issue attachment")
 	}
-	if err := s.attachmentRepo.MarkStored(ctx, attachment.ID, storageports.StoreProjectIssueAttachmentInput{ContentType: contentType, ByteSize: int64(len(input.Content)), StorageKey: storageKey}); err != nil {
-		return AttachmentUploadView{}, err
+	if storeErr := s.attachmentRepo.MarkStored(ctx, attachment.ID, storageports.StoreProjectIssueAttachmentInput{ContentType: contentType, ByteSize: int64(len(input.Content)), StorageKey: storageKey}); storeErr != nil {
+		return AttachmentUploadView{}, storeErr
 	}
 	stored, err := s.attachmentRepo.GetByIssueAndID(ctx, issue.ID, attachment.ID)
 	if err != nil {
@@ -308,7 +311,7 @@ func (s *Service) loadAttachmentRaw(ctx context.Context, projectID int64, issueI
 	}
 	attachment, err := s.attachmentRepo.GetByIssueAndID(ctx, issue.ID, attachmentID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, apperror.NotFound("issue attachment not found", err)
 		}
 		return AttachmentRawContent{}, issuedomain.ProjectIssueAttachment{}, err
@@ -327,7 +330,7 @@ func (s *Service) loadIssue(ctx context.Context, projectID int64, issueIID int64
 	}
 	issue, err := s.issueRepo.GetByProjectAndIID(ctx, projectID, issueIID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return issuedomain.ProjectIssue{}, apperror.NotFound("issue not found", err)
 		}
 		return issuedomain.ProjectIssue{}, err
@@ -338,7 +341,7 @@ func (s *Service) loadIssue(ctx context.Context, projectID int64, issueIID int64
 func randomToken() (string, error) {
 	var data [16]byte
 	if _, err := rand.Read(data[:]); err != nil {
-		return "", fmt.Errorf("generate attachment token: %w", err)
+		return "", oops.In("issue").Wrapf(err, "generate attachment token")
 	}
 	return hex.EncodeToString(data[:]), nil
 }

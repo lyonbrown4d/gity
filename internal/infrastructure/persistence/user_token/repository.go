@@ -24,7 +24,7 @@ type CreateInput = identityports.CreateUserAccessTokenInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[identity.UserAccessToken](db, dbschema.UserAccessTokenSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[identity.UserAccessToken](db, dbschema.UserAccessTokenSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -66,7 +66,7 @@ func (r *Repository) DeleteByToken(ctx context.Context, token string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := r.base.DeleteByID(ctx, record.ID); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.UserAccessTokenSchema.ID).Delete(ctx, record.ID); err != nil {
 		return fmt.Errorf("delete user token: %w", err)
 	}
 	return nil

@@ -25,7 +25,7 @@ type StoreInput = ciports.StoreProjectJobArtifactInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectJobArtifact](db, dbschema.ProjectJobArtifactSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectJobArtifact](db, dbschema.ProjectJobArtifactSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -57,7 +57,7 @@ func (r *Repository) GetByProjectJobAndID(ctx context.Context, projectID int64, 
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (cidomain.ProjectJobArtifact, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectJobArtifactSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectJobArtifact, error) {
@@ -82,7 +82,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 }
 
 func (r *Repository) MarkStored(ctx context.Context, id int64, input StoreInput) error {
-	if _, err := r.base.UpdateByID(ctx, id,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobArtifactSchema.ID).Update(ctx, id,
 		dbschema.ProjectJobArtifactSchema.ContentType.Set(strings.TrimSpace(input.ContentType)),
 		dbschema.ProjectJobArtifactSchema.ByteSize.Set(input.ByteSize),
 		dbschema.ProjectJobArtifactSchema.StorageKey.Set(strings.TrimSpace(input.StorageKey)),
@@ -94,7 +94,7 @@ func (r *Repository) MarkStored(ctx context.Context, id int64, input StoreInput)
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobArtifactSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project job artifact: %w", err)
 	}
 	return nil

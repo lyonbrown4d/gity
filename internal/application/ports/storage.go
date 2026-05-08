@@ -2,7 +2,8 @@ package ports
 
 import (
 	"context"
-	"fmt"
+	"strconv"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"path"
 	"strings"
@@ -18,7 +19,7 @@ type ObjectStorage interface {
 }
 
 func BuildIssueStorageKey(projectFullPath string, issueIID int64, attachmentID int64, fileName string) string {
-	return path.Join("issues", sanitizeNestedPath(projectFullPath), fmt.Sprintf("%d", issueIID), fmt.Sprintf("%d", attachmentID), sanitizeFileName(fileName))
+	return path.Join("issues", sanitizeNestedPath(projectFullPath), strconv.FormatInt(issueIID, 10), strconv.FormatInt(attachmentID, 10), sanitizeFileName(fileName))
 }
 
 func BuildIssueDraftStorageKey(projectFullPath string, token string, fileName string) string {
@@ -30,7 +31,7 @@ func BuildIssueDraftStoragePrefix(projectFullPath string) string {
 }
 
 func BuildPackageStorageKey(projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string) string {
-	return path.Join("packages", sanitizeNestedPath(projectFullPath), sanitizePathSegment(packageType), sanitizePathSegment(packageName), sanitizePathSegment(version), fmt.Sprintf("%d", fileID), sanitizeFileName(fileName))
+	return path.Join("packages", sanitizeNestedPath(projectFullPath), sanitizePathSegment(packageType), sanitizePathSegment(packageName), sanitizePathSegment(version), strconv.FormatInt(fileID, 10), sanitizeFileName(fileName))
 }
 
 func BuildLFSStorageKey(projectFullPath string, oid string) string {
@@ -38,7 +39,7 @@ func BuildLFSStorageKey(projectFullPath string, oid string) string {
 }
 
 func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID int64, artifactID int64, fileName string) string {
-	return path.Join("pipelines", sanitizeNestedPath(projectFullPath), "jobs", fmt.Sprintf("%d", projectJobID), "artifacts", fmt.Sprintf("%d", artifactID), sanitizeFileName(fileName))
+	return path.Join("pipelines", sanitizeNestedPath(projectFullPath), "jobs", strconv.FormatInt(projectJobID, 10), "artifacts", strconv.FormatInt(artifactID, 10), sanitizeFileName(fileName))
 }
 
 func DetectContentType(fileName string) string {

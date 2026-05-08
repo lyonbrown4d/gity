@@ -24,7 +24,7 @@ type UpdateInput = namespaceports.UpdateNamespaceInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[namespacedomain.Namespace](db, dbschema.NamespaceSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[namespacedomain.Namespace](db, dbschema.NamespaceSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -40,7 +40,7 @@ func (r *Repository) List(ctx context.Context) (*collectionx.List[namespacedomai
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (namespacedomain.Namespace, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.NamespaceSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (namespacedomain.Namespace, error) {
@@ -79,14 +79,14 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.NamespaceSchema.Description.Set(strings.TrimSpace(*input.Description)))
 	}
 	assignments = append(assignments, dbschema.NamespaceSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.NamespaceSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update namespace: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.NamespaceSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete namespace: %w", err)
 	}
 	return nil

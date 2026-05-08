@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/samber/oops"
 )
 
 type Client struct {
@@ -114,7 +116,7 @@ func (c *Client) UploadArtifact(ctx context.Context, jobID int64, artifact Artif
 	}, &out)
 }
 
-func (c *Client) get(ctx context.Context, path string, out any) error {
+func (c *Client) get(ctx context.Context, path string, out any) (err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return fmt.Errorf("create runner request: %w", err)
@@ -123,7 +125,15 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	if err != nil {
 		return fmt.Errorf("send runner request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("runner_agent").With("path", path).Wrapf(oops.Join(err, closeErr), "runner get request and close response body")
+				return
+			}
+			err = oops.In("runner_agent").With("path", path).Wrapf(closeErr, "close runner get response body")
+		}
+	}()
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read runner response: %w", err)
@@ -140,7 +150,7 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	return nil
 }
 
-func (c *Client) post(ctx context.Context, path string, payload any, out any) error {
+func (c *Client) post(ctx context.Context, path string, payload any, out any) (err error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("encode runner request: %w", err)
@@ -154,7 +164,15 @@ func (c *Client) post(ctx context.Context, path string, payload any, out any) er
 	if err != nil {
 		return fmt.Errorf("send runner request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("runner_agent").With("path", path).Wrapf(oops.Join(err, closeErr), "runner post request and close response body")
+				return
+			}
+			err = oops.In("runner_agent").With("path", path).Wrapf(closeErr, "close runner post response body")
+		}
+	}()
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read runner response: %w", err)

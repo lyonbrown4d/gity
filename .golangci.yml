@@ -134,6 +134,21 @@ linters:
       checks:
         - all
         - -ST1000
+    wrapcheck:
+      extra-ignore-sigs:
+        - github.com/samber/oops.New(
+        - github.com/samber/oops.Errorf(
+        - github.com/samber/oops.Wrap(
+        - github.com/samber/oops.Wrapf(
+        - github.com/samber/oops.Join(
+        - (github.com/samber/oops.OopsErrorBuilder).New(
+        - (github.com/samber/oops.OopsErrorBuilder).Errorf(
+        - (github.com/samber/oops.OopsErrorBuilder).Wrap(
+        - (github.com/samber/oops.OopsErrorBuilder).Wrapf(
+        - (github.com/samber/oops.OopsErrorBuilder).Join(
+        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.One(
+        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.Many(
+        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.NormalizeError(
   exclusions:
     rules:
       - path: _test\.go

@@ -2,10 +2,11 @@ package wiki
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	appports "github.com/DaiYuANg/gity/internal/application/ports"
 	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
+	"github.com/samber/oops"
 	"strings"
 	"unicode"
 )
@@ -65,22 +66,22 @@ func (s *Service) CreatePage(ctx context.Context, projectID int64, input CreateP
 	}
 	title := strings.TrimSpace(input.Title)
 	if title == "" {
-		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", fmt.Errorf("wiki page title is required"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", oops.In("wiki").With("project_id", projectID, "author_user_id", input.AuthorUserID).New("wiki page title is required"))
 	}
 	format := strings.TrimSpace(strings.ToLower(input.Format))
 	if format == "" {
 		format = "markdown"
 	}
 	if format != "markdown" {
-		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page format must be markdown", fmt.Errorf("wiki page format must be markdown"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page format must be markdown", oops.In("wiki").With("project_id", projectID, "format", format).New("wiki page format must be markdown"))
 	}
 	slug, err := normalizeSlug(input.Slug, title)
 	if err != nil {
 		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("invalid wiki page slug", err)
 	}
 	if _, err := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug); err == nil {
-		return wikidomain.ProjectWikiPage{}, apperror.Conflict("wiki page already exists", fmt.Errorf("wiki page already exists: %s", slug))
-	} else if err != nil && err != appports.ErrNotFound {
+		return wikidomain.ProjectWikiPage{}, apperror.Conflict("wiki page already exists", oops.In("wiki").With("project_id", projectID, "slug", slug).New("wiki page already exists"))
+	} else if !errors.Is(err, appports.ErrNotFound) {
 		return wikidomain.ProjectWikiPage{}, err
 	}
 	return s.pageRepo.Create(ctx, appports.CreateProjectWikiPageInput{
@@ -99,7 +100,7 @@ func (s *Service) UpdatePage(ctx context.Context, projectID int64, slug string, 
 		return wikidomain.ProjectWikiPage{}, err
 	}
 	if input.Title != nil && strings.TrimSpace(*input.Title) == "" {
-		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", fmt.Errorf("wiki page title is required"))
+		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("wiki page title is required", oops.In("wiki").With("project_id", projectID, "slug", slug).New("wiki page title is required"))
 	}
 	if input.EditorUserID > 0 {
 		if _, err := s.userRepo.GetByID(ctx, input.EditorUserID); err != nil {
@@ -126,7 +127,7 @@ func (s *Service) DeletePage(ctx context.Context, projectID int64, slug string) 
 func (s *Service) loadPage(ctx context.Context, projectID int64, slug string) (wikidomain.ProjectWikiPage, error) {
 	page, err := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug)
 	if err != nil {
-		if err == appports.ErrNotFound {
+		if errors.Is(err, appports.ErrNotFound) {
 			return wikidomain.ProjectWikiPage{}, apperror.NotFound("wiki page not found", err)
 		}
 		return wikidomain.ProjectWikiPage{}, err
@@ -146,26 +147,39 @@ func normalizeSlug(value string, fallbackTitle string) (string, error) {
 	for _, r := range source {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
-			builder.WriteRune(unicode.ToLower(r))
+			if err := appendSlugRune(&builder, unicode.ToLower(r)); err != nil {
+				return "", err
+			}
 			lastDash = false
 		case r == '-' || r == '_' || unicode.IsSpace(r):
 			if !lastDash && builder.Len() > 0 {
-				builder.WriteRune('-')
+				if err := appendSlugRune(&builder, '-'); err != nil {
+					return "", err
+				}
 				lastDash = true
 			}
 		default:
 			if !lastDash && builder.Len() > 0 {
-				builder.WriteRune('-')
+				if err := appendSlugRune(&builder, '-'); err != nil {
+					return "", err
+				}
 				lastDash = true
 			}
 		}
 	}
 	slug := strings.Trim(builder.String(), "-")
 	if slug == "" || slug == "." || slug == ".." {
-		return "", fmt.Errorf("wiki page slug is required")
+		return "", oops.In("wiki").With("value", value, "fallback_title", fallbackTitle).New("wiki page slug is required")
 	}
 	if len(slug) > 160 {
-		return "", fmt.Errorf("wiki page slug is too long")
+		return "", oops.In("wiki").With("slug", slug, "length", len(slug)).New("wiki page slug is too long")
 	}
 	return slug, nil
+}
+
+func appendSlugRune(builder *strings.Builder, value rune) error {
+	if _, err := builder.WriteRune(value); err != nil {
+		return oops.In("wiki").With("rune", string(value)).Wrapf(err, "append wiki slug rune")
+	}
+	return nil
 }

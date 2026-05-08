@@ -25,7 +25,7 @@ type UpdateInput = identityports.UpdateUserInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[identity.User](db, dbschema.UserSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[identity.User](db, dbschema.UserSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -41,7 +41,7 @@ func (r *Repository) List(ctx context.Context) (*collectionx.List[identity.User]
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (identity.User, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.UserSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByUsername(ctx context.Context, username string) (identity.User, error) {
@@ -77,14 +77,14 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.UserSchema.Email.Set(strings.TrimSpace(*input.Email)))
 	}
 	assignments = append(assignments, dbschema.UserSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.UserSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.UserSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	return nil

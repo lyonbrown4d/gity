@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 	"sync/atomic"
@@ -73,7 +74,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		result, err := ExecuteScriptJobWithSource(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
 			current, err := a.client.GetProjectJob(checkCtx, job.ProjectID, job.ID)
 			if err != nil {
-				return false, nil
+				return false, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "check claimed job status")
 			}
 			if strings.TrimSpace(current.LockedBy) != expectedLocker {
 				return true, nil
@@ -101,7 +102,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		if err != nil {
 			reportErr := a.client.FailJob(ctx, job.ID, err.Error(), result, 0)
 			if reportErr != nil {
-				return fmt.Errorf("report script job failure: %w; execution error: %v", reportErr, err)
+				return fmt.Errorf("report script job failure: %w; execution error: %w", reportErr, err)
 			}
 			if artifactErr != nil {
 				a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
@@ -112,7 +113,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		if artifactErr != nil {
 			reportErr := a.client.FailJob(ctx, job.ID, "artifact upload failed: "+artifactErr.Error(), result, 0)
 			if reportErr != nil {
-				return fmt.Errorf("report artifact upload failure: %w; artifact error: %v", reportErr, artifactErr)
+				return fmt.Errorf("report artifact upload failure: %w; artifact error: %w", reportErr, artifactErr)
 			}
 			a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
 			return nil
@@ -123,7 +124,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		a.logger.Info("runner job completed", slog.Int64("job_id", job.ID))
 		return nil
 	default:
-		message := fmt.Sprintf("runner does not support job kind: %s", job.Kind)
+		message := "runner does not support job kind: " + job.Kind
 		if err := a.client.FailJob(ctx, job.ID, message, "", 0); err != nil {
 			return err
 		}

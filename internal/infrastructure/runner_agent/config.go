@@ -2,11 +2,12 @@ package runneragent
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/samber/oops"
 )
 
 type Config struct {
@@ -42,13 +43,13 @@ func ConfigFromEnv(args []string) (Config, error) {
 	flags.IntVar(&cfg.MaxOutputBytes, "max-output-bytes", cfg.MaxOutputBytes, "maximum captured job output bytes")
 	flags.BoolVar(&cfg.Once, "once", cfg.Once, "claim and run at most one job")
 	if err := flags.Parse(args); err != nil {
-		return Config{}, err
+		return Config{}, oops.In("runner_agent").Wrapf(err, "parse runner config flags")
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
-		return Config{}, fmt.Errorf("runner token is required")
+		return Config{}, oops.In("runner_agent").New("runner token is required")
 	}
 	if strings.TrimSpace(cfg.ServerURL) == "" {
-		return Config{}, fmt.Errorf("runner server URL is required")
+		return Config{}, oops.In("runner_agent").New("runner server URL is required")
 	}
 	if cfg.PollInterval <= 0 {
 		cfg.PollInterval = time.Second

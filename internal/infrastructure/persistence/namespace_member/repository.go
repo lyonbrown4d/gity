@@ -22,7 +22,7 @@ type CreateInput = namespaceports.CreateNamespaceMemberInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[namespacedomain.NamespaceMember](db, dbschema.NamespaceMemberSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[namespacedomain.NamespaceMember](db, dbschema.NamespaceMemberSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 

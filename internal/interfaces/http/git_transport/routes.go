@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"github.com/gofiber/fiber/v2"
+	"github.com/samber/oops"
 )
 
 const (
@@ -77,8 +79,8 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	if err != nil {
 		return err
 	}
-	if err := authorizeProject(c, authRuntime, project, service); err != nil {
-		return err
+	if authErr := authorizeProject(c, authRuntime, project, service); authErr != nil {
+		return authErr
 	}
 
 	var stdout bytes.Buffer
@@ -103,8 +105,8 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 
 func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *infragittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
-	service := ""
-	repoPath := ""
+	var service string
+	var repoPath string
 	switch {
 	case strings.HasSuffix(path, "/git-upload-pack"):
 		service = serviceUploadPack
@@ -119,8 +121,8 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime
 	if err != nil {
 		return err
 	}
-	if err := authorizeProject(c, authRuntime, project, service); err != nil {
-		return err
+	if authErr := authorizeProject(c, authRuntime, project, service); authErr != nil {
+		return authErr
 	}
 
 	updates := parseReceivePackUpdates(c.Body())
@@ -130,8 +132,8 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime
 	case serviceUploadPack:
 		err = transport.UploadPack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
 	case serviceReceivePack:
-		if err := rejectProtectedBranchUpdates(c.UserContext(), project, services.branchProtectionRepo, updates); err != nil {
-			return err
+		if protectionErr := rejectProtectedBranchUpdates(c.UserContext(), project, services.branchProtectionRepo, updates); protectionErr != nil {
+			return protectionErr
 		}
 		err = transport.ReceivePack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), &stdout, &stderr)
 	}
@@ -156,7 +158,7 @@ func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo
 		}
 		if _, err := repo.GetByProjectAndBranch(ctx, project.ID, update.BranchName); err == nil {
 			return fiber.NewError(http.StatusForbidden, "protected branch cannot be updated: "+update.BranchName)
-		} else if err != dbxrepo.ErrNotFound {
+		} else if !errors.Is(err, dbxrepo.ErrNotFound) {
 			return fiber.NewError(http.StatusInternalServerError, "check branch protection failed")
 		}
 	}
@@ -213,11 +215,11 @@ type projectView struct {
 func normalizeRepoFullPath(value string) (string, error) {
 	normalized := strings.Trim(strings.ReplaceAll(value, "\\", "/"), "/")
 	if normalized == "" || !strings.HasSuffix(normalized, ".git") {
-		return "", fmt.Errorf("invalid repo path")
+		return "", oops.In("http.git_transport").With("path", value).New("invalid repo path")
 	}
 	normalized = strings.TrimSuffix(normalized, ".git")
 	if normalized == "" || strings.Contains(normalized, "..") {
-		return "", fmt.Errorf("invalid repo path")
+		return "", oops.In("http.git_transport").With("path", value, "normalized", normalized).New("invalid repo path")
 	}
 	return normalized, nil
 }
@@ -233,16 +235,6 @@ type receivePackUpdate struct {
 	RefName    string
 	BranchName string
 	Delete     bool
-}
-
-func parseReceivePackBranchUpdates(body []byte) []string {
-	updates := parseReceivePackUpdates(body)
-	return collectionlist.FilterMapList(collectionlist.NewList(updates...), func(_ int, update receivePackUpdate) (string, bool) {
-		if update.BranchName != "" {
-			return update.BranchName, true
-		}
-		return "", false
-	}).Values()
 }
 
 func parseReceivePackUpdates(body []byte) []receivePackUpdate {

@@ -19,7 +19,7 @@ type Repository struct {
 }
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	return &Repository{base: dbxrepo.NewWithOptions[lfsdomain.ProjectLFSObject](db, dbschema.ProjectLFSObjectSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
+	return &Repository{base: dbxrepo.NewWithOptions[lfsdomain.ProjectLFSObject](db, dbschema.ProjectLFSObjectSchema, dbxrepo.WithKeyNotFoundAsError(true))}, nil
 }
 
 func NewProjectLFSObjectRepository(repo *Repository) lfsports.ProjectLFSObjectRepository {
@@ -41,7 +41,7 @@ func (r *Repository) Create(ctx context.Context, projectID int64, oid string, by
 }
 
 func (r *Repository) UpdateStored(ctx context.Context, id int64, byteSize int64, storageKey string) error {
-	_, err := r.base.UpdateByID(ctx, id,
+	_, err := dbxrepo.By(r.base, dbschema.ProjectLFSObjectSchema.ID).Update(ctx, id,
 		dbschema.ProjectLFSObjectSchema.ByteSize.Set(byteSize),
 		dbschema.ProjectLFSObjectSchema.StorageKey.Set(strings.TrimSpace(storageKey)),
 		dbschema.ProjectLFSObjectSchema.UpdatedAt.Set(time.Now().UTC()),

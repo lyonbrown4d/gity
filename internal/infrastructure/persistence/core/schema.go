@@ -7,6 +7,7 @@ import (
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/schemamigrate"
+	"github.com/samber/oops"
 	"time"
 )
 
@@ -152,13 +153,21 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	return nil
 }
 
-func appliedMigrationSet(ctx context.Context, db *dbx.DB) (*setx.Set[string], error) {
+func appliedMigrationSet(ctx context.Context, db *dbx.DB) (applied *setx.Set[string], err error) {
 	rows, err := db.QueryContext(ctx, `SELECT version FROM schema_migrations`)
 	if err != nil {
 		return nil, fmt.Errorf("list applied migrations: %w", err)
 	}
-	defer rows.Close()
-	applied := setx.NewSet[string]()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			if err != nil {
+				err = oops.In("persistence.schema").Wrapf(oops.Join(err, closeErr), "list applied migrations and close rows")
+				return
+			}
+			err = oops.In("persistence.schema").Wrapf(closeErr, "close applied migration rows")
+		}
+	}()
+	applied = setx.NewSet[string]()
 	for rows.Next() {
 		var version string
 		if err := rows.Scan(&version); err != nil {
@@ -172,7 +181,7 @@ func appliedMigrationSet(ctx context.Context, db *dbx.DB) (*setx.Set[string], er
 	return applied, nil
 }
 
-func applyMigration(ctx context.Context, db *dbx.DB, migration Migration) error {
+func applyMigration(ctx context.Context, db *dbx.DB, migration Migration) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin migration %s: %w", migration.Version, err)
@@ -180,7 +189,13 @@ func applyMigration(ctx context.Context, db *dbx.DB, migration Migration) error 
 	committed := false
 	defer func() {
 		if !committed {
-			_ = tx.RollbackContext(ctx)
+			if rollbackErr := tx.RollbackContext(ctx); rollbackErr != nil {
+				if err != nil {
+					err = oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(oops.Join(err, rollbackErr), "apply migration and rollback")
+					return
+				}
+				err = oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(rollbackErr, "rollback migration")
+			}
 		}
 	}()
 	if err := migration.Apply(ctx, tx); err != nil {

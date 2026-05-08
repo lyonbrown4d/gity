@@ -251,18 +251,18 @@ func TestProjectPipelineFailureCancelsPendingJobs(t *testing.T) {
 	if view.Pipeline.Status != projectpipelinerepo.StatusFailed {
 		t.Fatalf("pipeline status = %s", view.Pipeline.Status)
 	}
-	cancelled := 0
+	canceled := 0
 	failed := 0
 	for _, item := range view.Jobs {
 		switch item.Status {
 		case projectjobrepo.StatusFailed:
 			failed++
 		case projectjobrepo.StatusCancelled:
-			cancelled++
+			canceled++
 		}
 	}
-	if failed != 1 || cancelled != 1 {
-		t.Fatalf("expected one failed and one cancelled job: %+v", view.Jobs)
+	if failed != 1 || canceled != 1 {
+		t.Fatalf("expected one failed and one canceled job: %+v", view.Jobs)
 	}
 }
 
@@ -289,7 +289,7 @@ func TestCancelPipelineCancelsPendingJobs(t *testing.T) {
 	}
 	for _, item := range view.Jobs {
 		if item.Status != projectjobrepo.StatusCancelled {
-			t.Fatalf("expected cancelled job: %+v", item)
+			t.Fatalf("expected canceled job: %+v", item)
 		}
 	}
 }

@@ -24,7 +24,7 @@ type CreateInput = packageports.CreateProjectPackageFileInput
 type StoreInput = packageports.StoreProjectPackageFileInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	return &Repository{base: dbxrepo.NewWithOptions[packagedomain.ProjectPackageFile](db, dbschema.ProjectPackageFileSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
+	return &Repository{base: dbxrepo.NewWithOptions[packagedomain.ProjectPackageFile](db, dbschema.ProjectPackageFileSchema, dbxrepo.WithKeyNotFoundAsError(true))}, nil
 }
 
 func NewProjectPackageFileRepository(repo *Repository) packageports.ProjectPackageFileRepository {
@@ -45,7 +45,7 @@ func (r *Repository) ListByVersionIDs(ctx context.Context, versionIDs ...int64) 
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackageFile, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectPackageFileSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (packagedomain.ProjectPackageFile, error) {
@@ -58,7 +58,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (packagedoma
 }
 
 func (r *Repository) MarkStored(ctx context.Context, fileID int64, input StoreInput) error {
-	_, err := r.base.UpdateByID(ctx, fileID,
+	_, err := dbxrepo.By(r.base, dbschema.ProjectPackageFileSchema.ID).Update(ctx, fileID,
 		dbschema.ProjectPackageFileSchema.ContentType.Set(strings.TrimSpace(input.ContentType)),
 		dbschema.ProjectPackageFileSchema.ByteSize.Set(input.ByteSize),
 		dbschema.ProjectPackageFileSchema.StorageKey.Set(strings.TrimSpace(input.StorageKey)),
@@ -71,7 +71,7 @@ func (r *Repository) MarkStored(ctx context.Context, fileID int64, input StoreIn
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, fileID int64) error {
-	if _, err := r.base.DeleteByID(ctx, fileID); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectPackageFileSchema.ID).Delete(ctx, fileID); err != nil {
 		return fmt.Errorf("delete project package file: %w", err)
 	}
 	return nil

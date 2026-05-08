@@ -89,7 +89,7 @@ func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Ru
 				if !ok {
 					return nil, httpx.NewError(http.StatusUnauthorized, "authentication required")
 				}
-				allowed := false
+				var allowed bool
 				if read {
 					allowed, err = authRuntime.CanReadProject(ctx, principal, scope)
 				} else {

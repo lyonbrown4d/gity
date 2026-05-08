@@ -31,7 +31,7 @@ type CreateInput = ciports.CreateProjectJobInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectJob](db, dbschema.ProjectJobSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectJob](db, dbschema.ProjectJobSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -59,7 +59,7 @@ func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id 
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (cidomain.ProjectJob, error) {
-	return persistence.One(r.base.GetByID(ctx, id))
+	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectJob, error) {
@@ -138,7 +138,7 @@ func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []str
 	item.LockedUntil = now.Add(lease)
 	item.StartedAt = now
 	item.UpdatedAt = now
-	if _, err := r.base.UpdateByID(ctx, item.ID,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, item.ID,
 		dbschema.ProjectJobSchema.Status.Set(item.Status),
 		dbschema.ProjectJobSchema.Attempts.Set(item.Attempts),
 		dbschema.ProjectJobSchema.LockedBy.Set(item.LockedBy),
@@ -153,7 +153,7 @@ func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []str
 
 func (r *Repository) MarkSucceeded(ctx context.Context, id int64, result string) error {
 	now := time.Now().UTC()
-	if _, err := r.base.UpdateByID(ctx, id,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, id,
 		dbschema.ProjectJobSchema.Status.Set(StatusSucceeded),
 		dbschema.ProjectJobSchema.Result.Set(strings.TrimSpace(result)),
 		dbschema.ProjectJobSchema.LockedBy.Set(""),
@@ -173,7 +173,7 @@ func (r *Repository) ScheduleByID(ctx context.Context, id int64, runAfter time.T
 	} else {
 		runAfter = runAfter.UTC()
 	}
-	if _, err := r.base.UpdateByID(ctx, id,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, id,
 		dbschema.ProjectJobSchema.RunAfter.Set(runAfter),
 		dbschema.ProjectJobSchema.UpdatedAt.Set(time.Now().UTC()),
 	); err != nil {
@@ -196,7 +196,7 @@ func (r *Repository) MarkFailed(ctx context.Context, item cidomain.ProjectJob, m
 		finishedAt = time.Time{}
 		runAfter = now.Add(retryAfter)
 	}
-	if _, err := r.base.UpdateByID(ctx, item.ID,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, item.ID,
 		dbschema.ProjectJobSchema.Status.Set(status),
 		dbschema.ProjectJobSchema.RunAfter.Set(runAfter),
 		dbschema.ProjectJobSchema.LockedBy.Set(""),
@@ -212,7 +212,7 @@ func (r *Repository) MarkFailed(ctx context.Context, item cidomain.ProjectJob, m
 
 func (r *Repository) CancelByID(ctx context.Context, id int64) error {
 	now := time.Now().UTC()
-	if _, err := r.base.UpdateByID(ctx, id,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, id,
 		dbschema.ProjectJobSchema.Status.Set(StatusCancelled),
 		dbschema.ProjectJobSchema.LockedBy.Set(""),
 		dbschema.ProjectJobSchema.LockedUntil.Set(time.Time{}),
@@ -231,7 +231,7 @@ func (r *Repository) RetryByID(ctx context.Context, id int64, runAfter time.Time
 	} else {
 		runAfter = runAfter.UTC()
 	}
-	if _, err := r.base.UpdateByID(ctx, id,
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Update(ctx, id,
 		dbschema.ProjectJobSchema.Status.Set(StatusPending),
 		dbschema.ProjectJobSchema.Attempts.Set(0),
 		dbschema.ProjectJobSchema.Result.Set(""),

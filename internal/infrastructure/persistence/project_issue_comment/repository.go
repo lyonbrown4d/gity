@@ -23,7 +23,7 @@ type CreateInput = issueports.CreateProjectIssueCommentInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssueComment](db, dbschema.ProjectIssueCommentSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[issuedomain.ProjectIssueComment](db, dbschema.ProjectIssueCommentSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 

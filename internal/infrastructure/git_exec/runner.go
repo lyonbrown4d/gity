@@ -12,6 +12,7 @@ import (
 
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/samber/oops"
 )
 
 var (
@@ -99,14 +100,14 @@ func (r *Runner) CreateBranch(ctx context.Context, repoPath string, branchName s
 
 type CreateFileCommitInput = gitports.CreateFileCommitInput
 
-func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input CreateFileCommitInput) error {
+func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input CreateFileCommitInput) (err error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
 	}
 	branchName := strings.TrimSpace(input.BranchName)
-	if err := r.validateBranchName(ctx, absRepo, branchName); err != nil {
-		return err
+	if branchErr := r.validateBranchName(ctx, absRepo, branchName); branchErr != nil {
+		return branchErr
 	}
 	filePath, err := normalizeWorktreePath(input.FilePath)
 	if err != nil {
@@ -114,14 +115,18 @@ func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input Cr
 	}
 	message := strings.TrimSpace(input.Message)
 	if message == "" {
-		return fmt.Errorf("commit message is required")
+		return oops.In("git_exec").With("repo_path", repoPath, "branch", branchName, "file_path", filePath).New("commit message is required")
 	}
 
 	tmpParent, err := os.MkdirTemp("", "gity-file-commit-*")
 	if err != nil {
 		return fmt.Errorf("create temporary worktree: %w", err)
 	}
-	defer os.RemoveAll(tmpParent)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpParent); cleanupErr != nil && err == nil {
+			err = oops.In("git_exec").With("tmp_parent", tmpParent).Wrapf(cleanupErr, "remove temporary file commit worktree")
+		}
+	}()
 
 	worktree := filepath.Join(tmpParent, "worktree")
 	if err := r.runGit(ctx, tmpParent, "clone", absRepo, worktree); err != nil {
@@ -149,7 +154,7 @@ func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input Cr
 	absFile := filepath.Join(worktree, filepath.FromSlash(filePath))
 	if _, err := os.Stat(absFile); err == nil {
 		return ErrFileAlreadyExists
-	} else if err != nil && !os.IsNotExist(err) {
+	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat target file: %w", err)
 	}
 	if err := os.MkdirAll(filepath.Dir(absFile), 0o755); err != nil {
@@ -177,11 +182,11 @@ func (r *Runner) DiffBranches(ctx context.Context, repoPath string, targetBranch
 	}
 	targetBranch = strings.TrimSpace(targetBranch)
 	sourceBranch = strings.TrimSpace(sourceBranch)
-	if err := r.validateBranchName(ctx, absRepo, targetBranch); err != nil {
-		return "", err
+	if targetErr := r.validateBranchName(ctx, absRepo, targetBranch); targetErr != nil {
+		return "", targetErr
 	}
-	if err := r.validateBranchName(ctx, absRepo, sourceBranch); err != nil {
-		return "", err
+	if sourceErr := r.validateBranchName(ctx, absRepo, sourceBranch); sourceErr != nil {
+		return "", sourceErr
 	}
 	output, err := r.runGitOutput(ctx, absRepo, "diff", "--find-renames", "refs/heads/"+targetBranch+"...refs/heads/"+sourceBranch)
 	if err != nil {
@@ -206,32 +211,36 @@ func (r *Runner) Archive(ctx context.Context, repoPath string, revision string) 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%w: archive %s: %v: %s", ErrSourceReferenceNotFound, revision, err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("%w: archive %s: %w: %s", ErrSourceReferenceNotFound, revision, err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.Bytes(), nil
 }
 
 type MergeBranchesInput = gitports.MergeBranchesInput
 
-func (r *Runner) MergeBranches(ctx context.Context, repoPath string, input MergeBranchesInput) error {
+func (r *Runner) MergeBranches(ctx context.Context, repoPath string, input MergeBranchesInput) (err error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
 	}
 	targetBranch := strings.TrimSpace(input.TargetBranch)
 	sourceBranch := strings.TrimSpace(input.SourceBranch)
-	if err := r.validateBranchName(ctx, absRepo, targetBranch); err != nil {
-		return err
+	if targetErr := r.validateBranchName(ctx, absRepo, targetBranch); targetErr != nil {
+		return targetErr
 	}
-	if err := r.validateBranchName(ctx, absRepo, sourceBranch); err != nil {
-		return err
+	if sourceErr := r.validateBranchName(ctx, absRepo, sourceBranch); sourceErr != nil {
+		return sourceErr
 	}
 
 	tmpParent, err := os.MkdirTemp("", "gity-merge-*")
 	if err != nil {
 		return fmt.Errorf("create temporary merge worktree: %w", err)
 	}
-	defer os.RemoveAll(tmpParent)
+	defer func() {
+		if cleanupErr := os.RemoveAll(tmpParent); cleanupErr != nil && err == nil {
+			err = oops.In("git_exec").With("tmp_parent", tmpParent).Wrapf(cleanupErr, "remove temporary merge worktree")
+		}
+	}()
 
 	worktree := filepath.Join(tmpParent, "worktree")
 	if err := r.runGit(ctx, tmpParent, "clone", absRepo, worktree); err != nil {
@@ -279,7 +288,7 @@ func (r *Runner) MergeBranches(ctx context.Context, repoPath string, input Merge
 
 func (r *Runner) resolveRepoPath(repoPath string) (string, error) {
 	if strings.TrimSpace(repoPath) == "" {
-		return "", fmt.Errorf("repo path is required")
+		return "", oops.In("git_exec").New("repo path is required")
 	}
 	root, err := filepath.Abs(r.repoRoot)
 	if err != nil {
@@ -290,7 +299,7 @@ func (r *Runner) resolveRepoPath(repoPath string) (string, error) {
 		return "", fmt.Errorf("resolve repo path: %w", err)
 	}
 	if absRepo != root && !strings.HasPrefix(absRepo, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("repo path escapes repo root")
+		return "", oops.In("git_exec").With("repo_path", repoPath, "root", root, "abs_repo", absRepo).New("repo path escapes repo root")
 	}
 	return absRepo, nil
 }
@@ -323,10 +332,10 @@ func (r *Runner) runGitOutput(ctx context.Context, dir string, args ...string) (
 func normalizeWorktreePath(value string) (string, error) {
 	normalized := strings.Trim(strings.ReplaceAll(value, "\\", "/"), "/")
 	if normalized == "" || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") || normalized == ".." {
-		return "", fmt.Errorf("invalid file path")
+		return "", oops.In("git_exec").With("file_path", value, "normalized", normalized).New("invalid file path")
 	}
 	if filepath.IsAbs(normalized) {
-		return "", fmt.Errorf("invalid file path")
+		return "", oops.In("git_exec").With("file_path", value, "normalized", normalized).New("invalid file path")
 	}
 	return normalized, nil
 }

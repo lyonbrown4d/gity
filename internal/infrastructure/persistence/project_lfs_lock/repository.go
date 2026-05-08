@@ -24,7 +24,7 @@ type CreateInput = lfsports.CreateProjectLFSLockInput
 type ListInput = lfsports.ListProjectLFSLocksInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	return &Repository{base: dbxrepo.NewWithOptions[lfsdomain.ProjectLFSLock](db, dbschema.ProjectLFSLockSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
+	return &Repository{base: dbxrepo.NewWithOptions[lfsdomain.ProjectLFSLock](db, dbschema.ProjectLFSLockSchema, dbxrepo.WithKeyNotFoundAsError(true))}, nil
 }
 
 func NewProjectLFSLockRepository(repo *Repository) lfsports.ProjectLFSLockRepository {
@@ -67,7 +67,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (lfsdomain.P
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectLFSLockSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project lfs lock: %w", err)
 	}
 	return nil

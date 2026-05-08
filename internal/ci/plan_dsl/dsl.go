@@ -9,6 +9,7 @@ import (
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/plano/compiler"
 	"github.com/arcgolabs/plano/schema"
+	"github.com/samber/oops"
 )
 
 const defaultTimeoutSeconds = 600
@@ -42,20 +43,20 @@ func Compile(ctx context.Context, filename string, source string) (PipelineSpec,
 	}
 	result := c.CompileStringDetailed(ctx, filename, source)
 	if result.Diagnostics.HasError() {
-		return PipelineSpec{}, fmt.Errorf("compile ci plano: %s", result.Diagnostics.Error())
+		return PipelineSpec{}, oops.In("ci_plan_dsl").With("filename", filename).Errorf("compile ci plano: %s", result.Diagnostics.Error())
 	}
 	if result.HIR == nil {
-		return PipelineSpec{}, fmt.Errorf("compile ci plano: missing HIR")
+		return PipelineSpec{}, oops.In("ci_plan_dsl").With("filename", filename).New("compile ci plano: missing HIR")
 	}
 	return Lower(result.HIR)
 }
 
 func Register(c *compiler.Compiler) error {
 	if err := c.RegisterForms(forms()); err != nil {
-		return fmt.Errorf("register ci plano forms: %w", err)
+		return oops.In("ci_plan_dsl").Wrapf(err, "register ci plano forms")
 	}
 	if err := c.RegisterActions(actions()); err != nil {
-		return fmt.Errorf("register ci plano actions: %w", err)
+		return oops.In("ci_plan_dsl").Wrapf(err, "register ci plano actions")
 	}
 	return nil
 }
@@ -139,7 +140,7 @@ func actions() list.List[compiler.ActionSpec] {
 
 func Lower(hir *compiler.HIR) (PipelineSpec, error) {
 	if hir == nil {
-		return PipelineSpec{}, fmt.Errorf("ci plano HIR is nil")
+		return PipelineSpec{}, oops.In("ci_plan_dsl").New("ci plano HIR is nil")
 	}
 	spec := PipelineSpec{}
 	for idx := range hir.Forms.Len() {
@@ -151,7 +152,7 @@ func Lower(hir *compiler.HIR) (PipelineSpec, error) {
 				return PipelineSpec{}, err
 			}
 			if spec.Name != "" {
-				return PipelineSpec{}, fmt.Errorf("only one pipeline form is allowed")
+				return PipelineSpec{}, oops.In("ci_plan_dsl").New("only one pipeline form is allowed")
 			}
 			spec.Name = name
 		case "stage":
@@ -163,10 +164,10 @@ func Lower(hir *compiler.HIR) (PipelineSpec, error) {
 		}
 	}
 	if spec.Name == "" {
-		return PipelineSpec{}, fmt.Errorf("pipeline form is required")
+		return PipelineSpec{}, oops.In("ci_plan_dsl").New("pipeline form is required")
 	}
 	if len(spec.Stages) == 0 {
-		return PipelineSpec{}, fmt.Errorf("at least one stage form is required")
+		return PipelineSpec{}, oops.In("ci_plan_dsl").New("at least one stage form is required")
 	}
 	if err := validateStageGraph(spec.Stages); err != nil {
 		return PipelineSpec{}, err
@@ -176,7 +177,7 @@ func Lower(hir *compiler.HIR) (PipelineSpec, error) {
 
 func lowerStage(form compiler.HIRForm) (StageSpec, error) {
 	if form.Symbol == nil {
-		return StageSpec{}, fmt.Errorf("stage form requires symbol label")
+		return StageSpec{}, oops.In("ci_plan_dsl").With("form_kind", form.Kind).New("stage form requires symbol label")
 	}
 	needs, err := needsField(form)
 	if err != nil {
@@ -203,7 +204,7 @@ func lowerStage(form compiler.HIRForm) (StageSpec, error) {
 		return StageSpec{}, err
 	}
 	if len(script) == 0 {
-		return StageSpec{}, fmt.Errorf("stage %q requires at least one shell or exec action", form.Symbol.Name)
+		return StageSpec{}, oops.In("ci_plan_dsl").With("stage", form.Symbol.Name).New("stage requires at least one shell or exec action")
 	}
 	return StageSpec{
 		Name:           form.Symbol.Name,
@@ -246,7 +247,7 @@ func callsToCommands(calls list.List[compiler.HIRCall]) ([]CommandSpec, error) {
 			arg, _ := call.Args.Get(argIdx)
 			text, ok := arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("action %q expects string args, got %T", call.Name, arg.Value)
+				return nil, oops.In("ci_plan_dsl").With("action", call.Name, "arg_type", fmt.Sprintf("%T", arg.Value)).New("action expects string args")
 			}
 			args = append(args, text)
 		}
@@ -261,16 +262,16 @@ func commandsToScript(commands []CommandSpec) ([]string, error) {
 		switch command.Name {
 		case "shell":
 			if len(command.Args) != 1 {
-				return nil, fmt.Errorf("shell expects exactly one argument")
+				return nil, oops.In("ci_plan_dsl").With("action", command.Name, "arg_count", len(command.Args)).New("shell expects exactly one argument")
 			}
 			script = append(script, strings.TrimSpace(command.Args[0]))
 		case "exec":
 			if len(command.Args) == 0 {
-				return nil, fmt.Errorf("exec expects at least one argument")
+				return nil, oops.In("ci_plan_dsl").With("action", command.Name).New("exec expects at least one argument")
 			}
 			script = append(script, shellJoin(command.Args))
 		default:
-			return nil, fmt.Errorf("unsupported ci action: %s", command.Name)
+			return nil, oops.In("ci_plan_dsl").With("action", command.Name).New("unsupported ci action")
 		}
 	}
 	return script, nil
@@ -297,7 +298,7 @@ func requiredStringField(form compiler.HIRForm, name string) (string, error) {
 		return "", err
 	}
 	if value == "" {
-		return "", fmt.Errorf("%s.%s is required", form.Kind, name)
+		return "", oops.In("ci_plan_dsl").With("form_kind", form.Kind, "field", name).New("field is required")
 	}
 	return value, nil
 }
@@ -309,7 +310,7 @@ func stringField(form compiler.HIRForm, name string) (string, error) {
 	}
 	value, ok := field.Value.(string)
 	if !ok {
-		return "", fmt.Errorf("%s.%s must be string", form.Kind, name)
+		return "", oops.In("ci_plan_dsl").With("form_kind", form.Kind, "field", name).New("field must be string")
 	}
 	return strings.TrimSpace(value), nil
 }
@@ -325,7 +326,7 @@ func intField(form compiler.HIRForm, name string) (int, error) {
 	case int64:
 		return int(value), nil
 	default:
-		return 0, fmt.Errorf("%s.%s must be int", form.Kind, name)
+		return 0, oops.In("ci_plan_dsl").With("form_kind", form.Kind, "field", name).New("field must be int")
 	}
 }
 
@@ -336,16 +337,16 @@ func needsField(form compiler.HIRForm) ([]string, error) {
 	}
 	items, ok := field.Value.([]any)
 	if !ok {
-		return nil, fmt.Errorf("stage.needs must be list<ref<stage>>, got %T", field.Value)
+		return nil, oops.In("ci_plan_dsl").With("field", "stage.needs", "value_type", fmt.Sprintf("%T", field.Value)).New("stage.needs must be list<ref<stage>>")
 	}
 	needs := make([]string, 0, len(items))
 	for _, item := range items {
 		ref, ok := item.(schema.Ref)
 		if !ok {
-			return nil, fmt.Errorf("stage.needs expects ref<stage>, got %T", item)
+			return nil, oops.In("ci_plan_dsl").With("field", "stage.needs", "value_type", fmt.Sprintf("%T", item)).New("stage.needs expects ref<stage>")
 		}
 		if ref.Kind != "stage" {
-			return nil, fmt.Errorf("stage.needs expects ref<stage>, got ref<%s>", ref.Kind)
+			return nil, oops.In("ci_plan_dsl").With("field", "stage.needs", "ref_kind", ref.Kind).New("stage.needs expects ref<stage>")
 		}
 		needs = append(needs, ref.Name)
 	}
@@ -359,13 +360,13 @@ func stringListField(form compiler.HIRForm, name string) ([]string, error) {
 	}
 	items, ok := field.Value.([]any)
 	if !ok {
-		return nil, fmt.Errorf("%s.%s must be list<string>, got %T", form.Kind, name, field.Value)
+		return nil, oops.In("ci_plan_dsl").With("form_kind", form.Kind, "field", name, "value_type", fmt.Sprintf("%T", field.Value)).New("field must be list<string>")
 	}
 	values := make([]string, 0, len(items))
 	for _, item := range items {
 		text, ok := item.(string)
 		if !ok {
-			return nil, fmt.Errorf("%s.%s expects string, got %T", form.Kind, name, item)
+			return nil, oops.In("ci_plan_dsl").With("form_kind", form.Kind, "field", name, "value_type", fmt.Sprintf("%T", item)).New("field expects string")
 		}
 		text = strings.TrimSpace(text)
 		if text != "" {
@@ -379,7 +380,7 @@ func validateStringArgs(name string) func(args list.List[any]) error {
 	return func(args list.List[any]) error {
 		for _, arg := range args.Values() {
 			if _, ok := arg.(string); !ok {
-				return fmt.Errorf("action %q expects string arguments, got %T", name, arg)
+				return oops.In("ci_plan_dsl").With("action", name, "arg_type", fmt.Sprintf("%T", arg)).New("action expects string arguments")
 			}
 		}
 		return nil
@@ -390,14 +391,14 @@ func validateStageGraph(stages []StageSpec) error {
 	names := make(map[string]struct{}, len(stages))
 	for _, stage := range stages {
 		if _, exists := names[stage.Name]; exists {
-			return fmt.Errorf("duplicate stage %q", stage.Name)
+			return oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
 		}
 		names[stage.Name] = struct{}{}
 	}
 	for _, stage := range stages {
 		for _, need := range stage.Needs {
 			if _, exists := names[need]; !exists {
-				return fmt.Errorf("stage %q needs unknown stage %q", stage.Name, need)
+				return oops.In("ci_plan_dsl").With("stage", stage.Name, "need", need).New("stage needs unknown stage")
 			}
 		}
 	}
@@ -413,7 +414,7 @@ func validateStageGraph(stages []StageSpec) error {
 			return nil
 		}
 		if visiting[name] {
-			return fmt.Errorf("stage dependency cycle includes %q", name)
+			return oops.In("ci_plan_dsl").With("stage", name).New("stage dependency cycle")
 		}
 		visiting[name] = true
 		for _, need := range byName[name].Needs {

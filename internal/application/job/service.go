@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	setx "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 	"time"
@@ -104,7 +106,7 @@ func (s *Service) GetProjectJob(ctx context.Context, projectID int64, jobID int6
 	}
 	item, err := s.jobRepo.GetByProjectAndID(ctx, projectID, jobID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return cidomain.ProjectJob{}, apperror.NotFound("project job not found", err)
 		}
 		return cidomain.ProjectJob{}, err
@@ -121,7 +123,7 @@ func (s *Service) EnqueueProjectJob(ctx context.Context, projectID int64, input 
 		kind = KindNoop
 	}
 	if !supportedKinds.Contains(kind) {
-		return cidomain.ProjectJob{}, fmt.Errorf("unsupported project job kind: %s", kind)
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "kind", kind).New("unsupported project job kind")
 	}
 	maxAttempts := input.MaxAttempts
 	if maxAttempts <= 0 {
@@ -207,7 +209,7 @@ func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID in
 	}
 	artifact, err := s.artifactRepo.GetByProjectJobAndID(ctx, projectID, jobID, artifactID)
 	if err != nil {
-		if err == storageports.ErrNotFound {
+		if errors.Is(err, storageports.ErrNotFound) {
 			return ProjectJobArtifactContent{}, apperror.NotFound("project job artifact not found", err)
 		}
 		return ProjectJobArtifactContent{}, err
@@ -224,19 +226,19 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 	if err != nil {
 		return cidomain.ProjectJobArtifact{}, apperror.NotFound("project not found", err)
 	}
-	if _, err := s.GetProjectJob(ctx, projectID, jobID); err != nil {
-		return cidomain.ProjectJobArtifact{}, err
+	if _, jobErr := s.GetProjectJob(ctx, projectID, jobID); jobErr != nil {
+		return cidomain.ProjectJobArtifact{}, jobErr
 	}
 	fileName := strings.TrimSpace(input.FileName)
 	if fileName == "" {
-		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact file_name is required", fmt.Errorf("artifact file_name is required"))
+		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact file_name is required", oops.In("job").With("project_id", projectID, "job_id", jobID).New("artifact file_name is required"))
 	}
 	if strings.TrimSpace(input.ContentBase64) == "" {
-		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact content_base64 is required", fmt.Errorf("artifact content_base64 is required"))
+		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact content_base64 is required", oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).New("artifact content_base64 is required"))
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.ContentBase64))
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, fmt.Errorf("decode artifact content: %w", err)
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).Wrapf(err, "decode artifact content")
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
@@ -255,8 +257,10 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 	}
 	storageKey, err := s.storage.SavePipelineArtifact(ctx, project.FullPath, jobID, artifact.ID, fileName, content, contentType)
 	if err != nil {
-		_ = s.artifactRepo.DeleteByID(ctx, artifact.ID)
-		return cidomain.ProjectJobArtifact{}, err
+		if cleanupErr := s.artifactRepo.DeleteByID(ctx, artifact.ID); cleanupErr != nil {
+			return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(oops.Join(err, cleanupErr), "save project job artifact and cleanup record")
+		}
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(err, "save project job artifact")
 	}
 	if err := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
 		return cidomain.ProjectJobArtifact{}, err
@@ -302,7 +306,7 @@ func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Durat
 	result, execErr := s.execute(ctx, job)
 	if execErr != nil {
 		if err := s.jobRepo.MarkFailed(ctx, job, execErr.Error(), retryDelay(job.Attempts)); err != nil {
-			return true, fmt.Errorf("record project job failure after execution error %q: %w", execErr.Error(), err)
+			return true, oops.In("job").With("project_id", job.ProjectID, "job_id", job.ID, "execution_error", execErr.Error()).Wrapf(err, "record project job failure after execution error")
 		}
 		s.logger.Warn("project job failed", slog.Int64("job_id", job.ID), slog.String("kind", job.Kind), slog.String("error", execErr.Error()))
 		return true, nil
@@ -368,7 +372,7 @@ func (s *Service) execute(ctx context.Context, item cidomain.ProjectJob) (string
 	case KindNoop:
 		return `{"message":"noop completed"}`, nil
 	default:
-		return "", fmt.Errorf("unsupported project job kind: %s", item.Kind)
+		return "", oops.In("job").With("project_id", item.ProjectID, "job_id", item.ID, "kind", item.Kind).New("unsupported project job kind")
 	}
 }
 

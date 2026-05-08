@@ -21,7 +21,7 @@ type Repository struct {
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[projectdomain.ProjectBranchProtection](db, dbschema.ProjectBranchProtectionSchema, dbxrepo.WithByIDNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[projectdomain.ProjectBranchProtection](db, dbschema.ProjectBranchProtectionSchema, dbxrepo.WithKeyNotFoundAsError(true)),
 	}, nil
 }
 
@@ -76,7 +76,7 @@ func (r *Repository) Unprotect(ctx context.Context, projectID int64, branchName 
 		}
 		return err
 	}
-	if _, err := r.base.DeleteByID(ctx, item.ID); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectBranchProtectionSchema.ID).Delete(ctx, item.ID); err != nil {
 		return fmt.Errorf("delete project branch protection: %w", err)
 	}
 	return nil

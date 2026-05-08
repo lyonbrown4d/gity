@@ -9,6 +9,7 @@ import (
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 )
@@ -114,13 +115,13 @@ func (s *Service) GetByID(ctx context.Context, id int64) (projectdomain.Project,
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.Project, error) {
 	if input.NamespaceID <= 0 {
-		return projectdomain.Project{}, fmt.Errorf("project namespace_id is required")
+		return projectdomain.Project{}, errors.New("project namespace_id is required")
 	}
 	if strings.TrimSpace(input.Name) == "" {
-		return projectdomain.Project{}, fmt.Errorf("project name is required")
+		return projectdomain.Project{}, errors.New("project name is required")
 	}
 	if strings.TrimSpace(input.PathKey) == "" {
-		return projectdomain.Project{}, fmt.Errorf("project path_key is required")
+		return projectdomain.Project{}, errors.New("project path_key is required")
 	}
 	visibility := strings.TrimSpace(strings.ToLower(input.Visibility))
 	if visibility == "" {
@@ -146,21 +147,29 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 	}
 	repoPath := project.FullPath + ".git"
 	if err := s.gitRunner.InitBare(ctx, repoPath, project.DefaultBranch); err != nil {
-		_ = s.repo.DeleteByID(ctx, project.ID)
-		return projectdomain.Project{}, fmt.Errorf("provision bare repo: %w", err)
+		if cleanupErr := s.repo.DeleteByID(ctx, project.ID); cleanupErr != nil {
+			return projectdomain.Project{}, oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(oops.Join(err, cleanupErr), "provision bare repo and cleanup project")
+		}
+		return projectdomain.Project{}, oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(err, "provision bare repo")
 	}
-	_ = s.events.PublishAsync(ctx, projectdomain.NewProjectCreatedEvent(project))
+	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectCreatedEvent(project)); err != nil {
+		wrapped := oops.In("project").With("project_id", project.ID).Wrapf(err, "publish project created event")
+		s.logger.Warn("publish project created event failed", slog.String("error", wrapped.Error()))
+	}
 	return project, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return fmt.Errorf("project id is required")
+		return errors.New("project id is required")
 	}
 	if err := s.repo.DeleteByID(ctx, id); err != nil {
 		return err
 	}
-	_ = s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(id))
+	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(id)); err != nil {
+		wrapped := oops.In("project").With("project_id", id).Wrapf(err, "publish project deleted event")
+		s.logger.Warn("publish project deleted event failed", slog.String("error", wrapped.Error()))
+	}
 	return nil
 }
 
@@ -195,7 +204,7 @@ func (s *Service) CreateBranch(ctx context.Context, id int64, branchName string,
 	}
 	branchName = strings.TrimSpace(branchName)
 	if branchName == "" {
-		return Branch{}, fmt.Errorf("branch name is required")
+		return Branch{}, errors.New("branch name is required")
 	}
 	if strings.TrimSpace(sourceRef) == "" {
 		sourceRef = project.DefaultBranch
@@ -223,7 +232,7 @@ func (s *Service) SetBranchProtection(ctx context.Context, id int64, branchName 
 func (s *Service) GetBranch(ctx context.Context, id int64, branchName string) (Branch, error) {
 	branchName = strings.TrimSpace(branchName)
 	if branchName == "" {
-		return Branch{}, fmt.Errorf("branch name is required")
+		return Branch{}, errors.New("branch name is required")
 	}
 	branches, err := s.ListBranches(ctx, id)
 	if err != nil {
@@ -270,7 +279,7 @@ func (s *Service) CreateFileCommit(ctx context.Context, id int64, input CreateFi
 func (s *Service) isBranchProtected(ctx context.Context, projectID int64, branchName string) (bool, error) {
 	if _, err := s.branchRepo.GetByProjectAndBranch(ctx, projectID, branchName); err == nil {
 		return true, nil
-	} else if err != gitports.ErrNotFound {
+	} else if !errors.Is(err, gitports.ErrNotFound) {
 		return false, err
 	}
 	return false, nil

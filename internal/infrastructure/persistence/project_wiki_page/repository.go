@@ -24,7 +24,7 @@ type CreateInput = wikiports.CreateProjectWikiPageInput
 type UpdateInput = wikiports.UpdateProjectWikiPageInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
-	return &Repository{base: dbxrepo.NewWithOptions[wikidomain.ProjectWikiPage](db, dbschema.ProjectWikiPageSchema, dbxrepo.WithByIDNotFoundAsError(true))}, nil
+	return &Repository{base: dbxrepo.NewWithOptions[wikidomain.ProjectWikiPage](db, dbschema.ProjectWikiPageSchema, dbxrepo.WithKeyNotFoundAsError(true))}, nil
 }
 
 func NewProjectWikiPageRepository(repo *Repository) wikiports.ProjectWikiPageRepository {
@@ -89,14 +89,14 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.ProjectWikiPageSchema.LastEditedByUserID.Set(input.LastEditedByUserID))
 	}
 	assignments = append(assignments, dbschema.ProjectWikiPageSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := r.base.UpdateByID(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectWikiPageSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update project wiki page: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := r.base.DeleteByID(ctx, id); err != nil {
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectWikiPageSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project wiki page: %w", err)
 	}
 	return nil

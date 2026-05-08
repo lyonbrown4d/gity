@@ -2,11 +2,11 @@ package runneragent
 
 import (
 	"encoding/json"
-	"fmt"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/samber/oops"
 	"io/fs"
 	"net/http"
 	"os"
@@ -26,18 +26,18 @@ type ArtifactFile struct {
 func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, error) {
 	var payload ScriptPayload
 	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
-		return nil, fmt.Errorf("decode script job payload: %w", err)
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "decode script job payload")
 	}
 	if len(payload.Artifacts) == 0 {
 		return nil, nil
 	}
 	var scriptResult ScriptResult
 	if err := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); err != nil {
-		return nil, fmt.Errorf("decode script result: %w", err)
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "decode script result")
 	}
 	workDir := strings.TrimSpace(scriptResult.WorkDir)
 	if workDir == "" {
-		return nil, fmt.Errorf("script result does not include work_dir")
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).New("script result does not include work_dir")
 	}
 	root := os.DirFS(workDir)
 	files := collectionlist.NewList[ArtifactFile]()
@@ -45,7 +45,7 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 	for _, pattern := range payload.Artifacts {
 		matches, err := doublestar.Glob(root, normalizeArtifactPattern(pattern), doublestar.WithFilesOnly())
 		if err != nil {
-			return nil, fmt.Errorf("match artifact pattern %q: %w", pattern, err)
+			return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "pattern", pattern).Wrapf(err, "match artifact pattern")
 		}
 		for _, match := range matches {
 			relative := normalizeArtifactPath(match)
@@ -62,7 +62,7 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 			}
 			content, err := os.ReadFile(filepath.Join(workDir, filepath.FromSlash(relative)))
 			if err != nil {
-				return nil, fmt.Errorf("read artifact %q: %w", relative, err)
+				return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", relative).Wrapf(err, "read artifact")
 			}
 			files.Add(ArtifactFile{
 				Name:        relative,
