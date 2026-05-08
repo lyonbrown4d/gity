@@ -45,7 +45,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectRunner, error) {
+func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectRunner, error) {
 	query := querydsl.Select(dbschema.ProjectRunnerSchema.AllColumns().Values()...).
 		From(dbschema.ProjectRunnerSchema).
 		Where(querydsl.And(

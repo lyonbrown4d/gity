@@ -22,6 +22,7 @@ import (
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_log"
 	projectrunnerrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_runner"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -33,9 +34,9 @@ func TestProjectRunnerFlow(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -71,18 +72,18 @@ func TestProjectRunnerFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if err := gitRunner.InitBare(ctx, project.FullPath+".git", "main"); err != nil {
-		t.Fatalf("init bare repo: %v", err)
+	if initErr := gitRunner.InitBare(ctx, project.FullPath+".git", "main"); initErr != nil {
+		t.Fatalf("init bare repo: %v", initErr)
 	}
-	if err := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+	if createCommitErr := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
 		BranchName:  "main",
 		FilePath:    "README.md",
 		Content:     "hello source archive\n",
 		Message:     "Add README",
 		AuthorName:  "Gity Test",
 		AuthorEmail: "test@gity.dev",
-	}); err != nil {
-		t.Fatalf("create source commit: %v", err)
+	}); createCommitErr != nil {
+		t.Fatalf("create source commit: %v", createCommitErr)
 	}
 
 	registration, err := runnerSvc.RegisterProjectRunner(ctx, project.ID, runnerservice.RegisterInput{Name: "linux-amd64", Tags: "go, linux, go"})
@@ -120,8 +121,8 @@ func TestProjectRunnerFlow(t *testing.T) {
 	if noopClaim.Claimed {
 		t.Fatalf("runner should not claim internal noop jobs: %+v", noopClaim)
 	}
-	if _, err := jobSvc.RunNext(ctx, "worker-a", time.Minute); err != nil {
-		t.Fatalf("run internal noop job: %v", err)
+	if _, runErr := jobSvc.RunNext(ctx, "worker-a", time.Minute); runErr != nil {
+		t.Fatalf("run internal noop job: %v", runErr)
 	}
 	completedNoop, err := jobSvc.GetProjectJob(ctx, project.ID, created.ID)
 	if err != nil {
@@ -179,8 +180,8 @@ func TestProjectRunnerFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enqueue retryable job: %v", err)
 	}
-	if _, err := runnerSvc.ClaimJob(ctx, registration.Token, time.Minute); err != nil {
-		t.Fatalf("claim retryable job: %v", err)
+	if _, claimErr := runnerSvc.ClaimJob(ctx, registration.Token, time.Minute); claimErr != nil {
+		t.Fatalf("claim retryable job: %v", claimErr)
 	}
 	failed, err := runnerSvc.FailJob(ctx, registration.Token, retryable.ID, "executor failed", "", time.Millisecond)
 	if err != nil {
@@ -191,7 +192,7 @@ func TestProjectRunnerFlow(t *testing.T) {
 	}
 }
 
-func zipContainsFile(t *testing.T, content []byte, fileName string, contains string) bool {
+func zipContainsFile(t *testing.T, content []byte, fileName, contains string) bool {
 	t.Helper()
 	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
 	if err != nil {
@@ -207,7 +208,9 @@ func zipContainsFile(t *testing.T, content []byte, fileName string, contains str
 		}
 		var buffer bytes.Buffer
 		if _, err := buffer.ReadFrom(rc); err != nil {
-			_ = rc.Close()
+			if closeErr := rc.Close(); closeErr != nil {
+				t.Fatalf("read source archive file: %v; close source archive file: %v", err, closeErr)
+			}
 			t.Fatalf("read source archive file: %v", err)
 		}
 		if err := rc.Close(); err != nil {

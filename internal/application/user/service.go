@@ -49,34 +49,50 @@ func NewService(logger *slog.Logger, repo identityports.UserRepository, tokenRep
 }
 
 func (s *Service) List(ctx context.Context) (*collectionx.List[identity.User], error) {
-	return s.repo.List(ctx)
+	items, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, oops.In("user").Wrapf(err, "list users")
+	}
+	return items, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (identity.User, error) {
-	return s.repo.GetByID(ctx, id)
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return identity.User{}, oops.In("user").With("user_id", id).Wrapf(err, "load user")
+	}
+	return item, nil
 }
 
 func (s *Service) GetByUsername(ctx context.Context, username string) (identity.User, error) {
-	return s.repo.GetByUsername(ctx, username)
+	item, err := s.repo.GetByUsername(ctx, username)
+	if err != nil {
+		return identity.User{}, oops.In("user").With("username", username).Wrapf(err, "load user by username")
+	}
+	return item, nil
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User, error) {
 	if strings.TrimSpace(input.Username) == "" {
-		return identity.User{}, errors.New("username is required")
+		return identity.User{}, oops.In("user").New("username is required")
 	}
 	if strings.TrimSpace(input.DisplayName) == "" {
 		input.DisplayName = input.Username
 	}
-	return s.repo.Create(ctx, identityports.CreateUserInput{
+	item, err := s.repo.Create(ctx, identityports.CreateUserInput{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
 	})
+	if err != nil {
+		return identity.User{}, oops.In("user").With("username", input.Username, "email", input.Email).Wrapf(err, "create user")
+	}
+	return item, nil
 }
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (identity.User, error) {
 	if input.Username != nil && strings.TrimSpace(*input.Username) == "" {
-		return identity.User{}, errors.New("username is required")
+		return identity.User{}, oops.In("user").With("user_id", id).New("username is required")
 	}
 	if input.DisplayName != nil && strings.TrimSpace(*input.DisplayName) == "" {
 		displayName := ""
@@ -90,27 +106,34 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 		DisplayName: input.DisplayName,
 		Email:       input.Email,
 	}); err != nil {
-		return identity.User{}, err
+		return identity.User{}, oops.In("user").With("user_id", id).Wrapf(err, "update user")
 	}
-	return s.repo.GetByID(ctx, id)
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return identity.User{}, oops.In("user").With("user_id", id).Wrapf(err, "reload user")
+	}
+	return item, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return errors.New("user id is required")
+		return oops.In("user").With("user_id", id).New("user id is required")
 	}
-	return s.repo.DeleteByID(ctx, id)
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
+		return oops.In("user").With("user_id", id).Wrapf(err, "delete user")
+	}
+	return nil
 }
 
 func (s *Service) Login(ctx context.Context, username string) (AuthSession, error) {
 	username = strings.TrimSpace(username)
 	if username == "" {
-		return AuthSession{}, errors.New("username is required")
+		return AuthSession{}, oops.In("user").New("username is required")
 	}
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
 		if !errors.Is(err, identityports.ErrNotFound) {
-			return AuthSession{}, err
+			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "load login user")
 		}
 		user, err = s.Create(ctx, CreateInput{
 			Username:    username,
@@ -118,7 +141,7 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 			Email:       username + "@local.gity",
 		})
 		if err != nil {
-			return AuthSession{}, err
+			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "create login user")
 		}
 	}
 	return s.createSession(ctx, user)
@@ -127,11 +150,11 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (AuthSession, error) {
 	record, err := s.tokenRepo.GetByToken(ctx, strings.TrimSpace(refreshToken))
 	if err != nil {
-		return AuthSession{}, err
+		return AuthSession{}, oops.In("user").Wrapf(err, "load refresh token")
 	}
 	user, err := s.repo.GetByID(ctx, record.UserID)
 	if err != nil {
-		return AuthSession{}, err
+		return AuthSession{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "load refresh user")
 	}
 	if err := s.tokenRepo.DeleteByToken(ctx, record.Token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
 		return AuthSession{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "revoke refresh token")
@@ -145,7 +168,7 @@ func (s *Service) RevokeToken(ctx context.Context, token string) error {
 		return nil
 	}
 	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
-		return err
+		return oops.In("user").Wrapf(err, "revoke token")
 	}
 	return nil
 }
@@ -153,25 +176,29 @@ func (s *Service) RevokeToken(ctx context.Context, token string) error {
 func (s *Service) GetByToken(ctx context.Context, token string) (identity.User, error) {
 	record, err := s.tokenRepo.GetByToken(ctx, strings.TrimSpace(token))
 	if err != nil {
-		return identity.User{}, err
+		return identity.User{}, oops.In("user").Wrapf(err, "load access token")
 	}
-	return s.repo.GetByID(ctx, record.UserID)
+	item, err := s.repo.GetByID(ctx, record.UserID)
+	if err != nil {
+		return identity.User{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "load token user")
+	}
+	return item, nil
 }
 
 func (s *Service) ListTokens(ctx context.Context, userID int64) ([]identity.UserAccessToken, error) {
 	if _, err := s.repo.GetByID(ctx, userID); err != nil {
-		return nil, fmt.Errorf("load user: %w", err)
+		return nil, oops.In("user").With("user_id", userID).Wrapf(err, "load user")
 	}
 	items, err := s.tokenRepo.ListByUserID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("user").With("user_id", userID).Wrapf(err, "list user access tokens")
 	}
 	return items.Values(), nil
 }
 
 func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTokenInput) (identity.UserAccessToken, error) {
 	if _, err := s.repo.GetByID(ctx, userID); err != nil {
-		return identity.UserAccessToken{}, fmt.Errorf("load user: %w", err)
+		return identity.UserAccessToken{}, oops.In("user").With("user_id", userID).Wrapf(err, "load user")
 	}
 	name := strings.TrimSpace(input.Name)
 	if name == "" {
@@ -179,13 +206,17 @@ func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTok
 	}
 	token, err := generateToken()
 	if err != nil {
-		return identity.UserAccessToken{}, err
+		return identity.UserAccessToken{}, oops.In("user").With("user_id", userID).Wrapf(err, "generate access token")
 	}
-	return s.tokenRepo.Create(ctx, identityports.CreateUserAccessTokenInput{
+	record, err := s.tokenRepo.Create(ctx, identityports.CreateUserAccessTokenInput{
 		UserID: userID,
 		Name:   name,
 		Token:  token,
 	})
+	if err != nil {
+		return identity.UserAccessToken{}, oops.In("user").With("user_id", userID, "token_name", name).Wrapf(err, "create user access token")
+	}
+	return record, nil
 }
 
 func (s *Service) createSession(ctx context.Context, user identity.User) (AuthSession, error) {

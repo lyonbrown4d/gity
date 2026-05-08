@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/samber/oops"
+	"golang.org/x/sys/execabs"
 )
 
 var (
@@ -35,12 +35,12 @@ func NewRunner(settings config.Settings) *Runner {
 	}
 }
 
-func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, r.gitBin, args...)
+	cmd := execabs.CommandContext(ctx, r.gitBin, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
@@ -51,7 +51,7 @@ func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin 
 	return nil
 }
 
-func (r *Runner) InitBare(ctx context.Context, repoPath string, initialBranch string) error {
+func (r *Runner) InitBare(ctx context.Context, repoPath, initialBranch string) error {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (r *Runner) InitBare(ctx context.Context, repoPath string, initialBranch st
 	if err != nil {
 		return fmt.Errorf("resolve repo root: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(absRepo), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absRepo), 0o750); err != nil {
 		return fmt.Errorf("create repo parent dir: %w", err)
 	}
 	args := []string{"init", "--bare"}
@@ -68,7 +68,7 @@ func (r *Runner) InitBare(ctx context.Context, repoPath string, initialBranch st
 		args = append(args, "--initial-branch", strings.TrimSpace(initialBranch))
 	}
 	args = append(args, absRepo)
-	cmd := exec.CommandContext(ctx, r.gitBin, args...)
+	cmd := execabs.CommandContext(ctx, r.gitBin, args...)
 	cmd.Dir = root
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("init bare repo %s: %w", repoPath, err)
@@ -76,7 +76,7 @@ func (r *Runner) InitBare(ctx context.Context, repoPath string, initialBranch st
 	return nil
 }
 
-func (r *Runner) CreateBranch(ctx context.Context, repoPath string, branchName string, sourceRef string) error {
+func (r *Runner) CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
@@ -157,10 +157,10 @@ func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input Cr
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat target file: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(absFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absFile), 0o750); err != nil {
 		return fmt.Errorf("create target directory: %w", err)
 	}
-	if err := os.WriteFile(absFile, []byte(input.Content), 0o644); err != nil {
+	if err := os.WriteFile(absFile, []byte(input.Content), 0o600); err != nil {
 		return fmt.Errorf("write target file: %w", err)
 	}
 	if err := r.runGit(ctx, worktree, "add", "--", filePath); err != nil {
@@ -175,7 +175,7 @@ func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input Cr
 	return nil
 }
 
-func (r *Runner) DiffBranches(ctx context.Context, repoPath string, targetBranch string, sourceBranch string) (string, error) {
+func (r *Runner) DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return "", err
@@ -195,7 +195,7 @@ func (r *Runner) DiffBranches(ctx context.Context, repoPath string, targetBranch
 	return output, nil
 }
 
-func (r *Runner) Archive(ctx context.Context, repoPath string, revision string) ([]byte, error) {
+func (r *Runner) Archive(ctx context.Context, repoPath, revision string) ([]byte, error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (r *Runner) Archive(ctx context.Context, repoPath string, revision string) 
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, r.gitBin, "archive", "--format=zip", revision)
+	cmd := execabs.CommandContext(ctx, r.gitBin, "archive", "--format=zip", revision)
 	cmd.Dir = absRepo
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -304,7 +304,7 @@ func (r *Runner) resolveRepoPath(repoPath string) (string, error) {
 	return absRepo, nil
 }
 
-func (r *Runner) validateBranchName(ctx context.Context, dir string, branchName string) error {
+func (r *Runner) validateBranchName(ctx context.Context, dir, branchName string) error {
 	if branchName == "" || strings.HasPrefix(branchName, "-") || strings.Contains(branchName, "..") {
 		return ErrInvalidBranchName
 	}
@@ -320,7 +320,7 @@ func (r *Runner) runGit(ctx context.Context, dir string, args ...string) error {
 }
 
 func (r *Runner) runGitOutput(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, r.gitBin, args...)
+	cmd := execabs.CommandContext(ctx, r.gitBin, args...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
 	if err != nil {

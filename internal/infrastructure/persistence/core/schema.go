@@ -45,99 +45,94 @@ func migrations() []Migration {
 			Version: "0001_core",
 			Name:    "bootstrap core namespace project auth schema",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.UserSchema, dbschema.NamespaceSchema, dbschema.ProjectSchema, dbschema.NamespaceMemberSchema, dbschema.UserAccessTokenSchema)
-				return err
+				return autoMigrate(ctx, tx, "0001_core", dbschema.UserSchema, dbschema.NamespaceSchema, dbschema.ProjectSchema, dbschema.NamespaceMemberSchema, dbschema.UserAccessTokenSchema)
 			},
 		},
 		{
 			Version: "0002_project_issues",
 			Name:    "add project issues comments and attachments",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectIssueSchema, dbschema.ProjectIssueCommentSchema, dbschema.ProjectIssueAttachmentSchema)
-				return err
+				return autoMigrate(ctx, tx, "0002_project_issues", dbschema.ProjectIssueSchema, dbschema.ProjectIssueCommentSchema, dbschema.ProjectIssueAttachmentSchema)
 			},
 		},
 		{
 			Version: "0003_project_merge_requests",
 			Name:    "add project merge requests",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectMergeRequestSchema)
-				return err
+				return autoMigrate(ctx, tx, "0003_project_merge_requests", dbschema.ProjectMergeRequestSchema)
 			},
 		},
 		{
 			Version: "0004_project_packages",
 			Name:    "add project package registry",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectPackageSchema, dbschema.ProjectPackageVersionSchema, dbschema.ProjectPackageFileSchema)
-				return err
+				return autoMigrate(ctx, tx, "0004_project_packages", dbschema.ProjectPackageSchema, dbschema.ProjectPackageVersionSchema, dbschema.ProjectPackageFileSchema)
 			},
 		},
 		{
 			Version: "0005_project_lfs",
 			Name:    "add project git lfs objects",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectLFSObjectSchema)
-				return err
+				return autoMigrate(ctx, tx, "0005_project_lfs", dbschema.ProjectLFSObjectSchema)
 			},
 		},
 		{
 			Version: "0006_project_lfs_locks",
 			Name:    "add project git lfs locks",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectLFSLockSchema)
-				return err
+				return autoMigrate(ctx, tx, "0006_project_lfs_locks", dbschema.ProjectLFSLockSchema)
 			},
 		},
 		{
 			Version: "0007_project_jobs",
 			Name:    "add project jobs",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectJobSchema)
-				return err
+				return autoMigrate(ctx, tx, "0007_project_jobs", dbschema.ProjectJobSchema)
 			},
 		},
 		{
 			Version: "0008_project_wiki_pages",
 			Name:    "add project wiki pages",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectWikiPageSchema)
-				return err
+				return autoMigrate(ctx, tx, "0008_project_wiki_pages", dbschema.ProjectWikiPageSchema)
 			},
 		},
 		{
 			Version: "0009_project_runners",
 			Name:    "add project runners",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectRunnerSchema)
-				return err
+				return autoMigrate(ctx, tx, "0009_project_runners", dbschema.ProjectRunnerSchema)
 			},
 		},
 		{
 			Version: "0010_project_pipelines",
 			Name:    "add project pipelines",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectPipelineSchema, dbschema.ProjectPipelineJobSchema)
-				return err
+				return autoMigrate(ctx, tx, "0010_project_pipelines", dbschema.ProjectPipelineSchema, dbschema.ProjectPipelineJobSchema)
 			},
 		},
 		{
 			Version: "0011_project_job_logs_artifacts",
 			Name:    "add project job logs and artifacts",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectJobLogSchema, dbschema.ProjectJobArtifactSchema)
-				return err
+				return autoMigrate(ctx, tx, "0011_project_job_logs_artifacts", dbschema.ProjectJobLogSchema, dbschema.ProjectJobArtifactSchema)
 			},
 		},
 		{
 			Version: "0012_project_branch_protections",
 			Name:    "add project branch protections",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				_, err := schemamigrate.AutoMigrate(ctx, tx, dbschema.ProjectBranchProtectionSchema)
-				return err
+				return autoMigrate(ctx, tx, "0012_project_branch_protections", dbschema.ProjectBranchProtectionSchema)
 			},
 		},
 	}
+}
+
+func autoMigrate(ctx context.Context, tx *dbx.Tx, migrationVersion string, schemas ...schemamigrate.Resource) error {
+	if _, err := schemamigrate.AutoMigrate(ctx, tx, schemas...); err != nil {
+		return oops.In("persistence.schema").With("migration_version", migrationVersion).Wrapf(err, "auto migrate schema")
+	}
+	return nil
 }
 
 func ensureMigrationTable(ctx context.Context, db *dbx.DB) error {

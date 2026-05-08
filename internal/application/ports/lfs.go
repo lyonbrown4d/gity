@@ -10,11 +10,11 @@ import (
 type ProjectLFSObjectRepository interface {
 	GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (lfsdomain.ProjectLFSObject, error)
 	Create(ctx context.Context, projectID int64, oid string, byteSize int64, storageKey string) (lfsdomain.ProjectLFSObject, error)
-	UpdateStored(ctx context.Context, id int64, byteSize int64, storageKey string) error
+	UpdateStored(ctx context.Context, id, byteSize int64, storageKey string) error
 }
 
 type ProjectLFSLockRepository interface {
-	GetByProjectAndID(ctx context.Context, projectID int64, id int64) (lfsdomain.ProjectLFSLock, error)
+	GetByProjectAndID(ctx context.Context, projectID, id int64) (lfsdomain.ProjectLFSLock, error)
 	GetByProjectAndPath(ctx context.Context, projectID int64, path string) (lfsdomain.ProjectLFSLock, error)
 	ListByProjectID(ctx context.Context, input ListProjectLFSLocksInput) (*collectionx.List[lfsdomain.ProjectLFSLock], error)
 	Create(ctx context.Context, input CreateProjectLFSLockInput) (lfsdomain.ProjectLFSLock, error)

@@ -2,13 +2,13 @@ package runneragent
 
 import (
 	"context"
-	"fmt"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/samber/oops"
 )
 
 const (
@@ -45,7 +45,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return oops.In("runner_agent").Wrap(ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -54,14 +54,14 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) RunOnce(ctx context.Context) (bool, error) {
 	claim, err := a.client.ClaimJob(ctx, a.cfg.LeaseSeconds)
 	if err != nil {
-		return false, err
+		return false, oops.In("runner_agent").Wrapf(err, "claim runner job")
 	}
 	if !claim.Claimed {
 		return false, nil
 	}
 	a.logger.Info("runner claimed job", slog.Int64("job_id", claim.Job.ID), slog.String("kind", claim.Job.Kind))
 	if err := a.executeClaimedJob(ctx, claim.Job); err != nil {
-		return true, err
+		return true, oops.In("runner_agent").With("project_id", claim.Job.ProjectID, "job_id", claim.Job.ID).Wrapf(err, "execute claimed job")
 	}
 	return true, nil
 }
@@ -94,7 +94,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		}, func(sourceCtx context.Context, job cidomain.ProjectJob, _ ScriptPayload, workDir string) error {
 			content, err := a.client.DownloadSourceArchive(sourceCtx, job.ID)
 			if err != nil {
-				return err
+				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "download source archive")
 			}
 			return ExtractSourceArchive(content, workDir)
 		})
@@ -102,7 +102,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		if err != nil {
 			reportErr := a.client.FailJob(ctx, job.ID, err.Error(), result, 0)
 			if reportErr != nil {
-				return fmt.Errorf("report script job failure: %w; execution error: %w", reportErr, err)
+				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, err), "report script job failure")
 			}
 			if artifactErr != nil {
 				a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
@@ -113,20 +113,20 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 		if artifactErr != nil {
 			reportErr := a.client.FailJob(ctx, job.ID, "artifact upload failed: "+artifactErr.Error(), result, 0)
 			if reportErr != nil {
-				return fmt.Errorf("report artifact upload failure: %w; artifact error: %w", reportErr, artifactErr)
+				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, artifactErr), "report artifact upload failure")
 			}
 			a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
 			return nil
 		}
 		if err := a.client.CompleteJob(ctx, job.ID, result); err != nil {
-			return err
+			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "complete runner job")
 		}
 		a.logger.Info("runner job completed", slog.Int64("job_id", job.ID))
 		return nil
 	default:
 		message := "runner does not support job kind: " + job.Kind
 		if err := a.client.FailJob(ctx, job.ID, message, "", 0); err != nil {
-			return err
+			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "kind", job.Kind).Wrapf(err, "report unsupported runner job kind")
 		}
 		return nil
 	}
@@ -138,11 +138,11 @@ func (a *Agent) uploadArtifacts(ctx context.Context, job cidomain.ProjectJob, re
 	}
 	artifacts, err := CollectArtifacts(job, result)
 	if err != nil {
-		return err
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "collect runner artifacts")
 	}
 	for _, artifact := range artifacts {
 		if err := a.client.UploadArtifact(ctx, job.ID, artifact); err != nil {
-			return err
+			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", artifact.FilePath).Wrapf(err, "upload runner artifact")
 		}
 		a.logger.Info("runner artifact uploaded", slog.Int64("job_id", job.ID), slog.String("path", artifact.FilePath))
 	}

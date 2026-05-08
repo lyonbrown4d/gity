@@ -40,7 +40,7 @@ func (r *Repository) Create(ctx context.Context, projectID int64, oid string, by
 	return item, nil
 }
 
-func (r *Repository) UpdateStored(ctx context.Context, id int64, byteSize int64, storageKey string) error {
+func (r *Repository) UpdateStored(ctx context.Context, id, byteSize int64, storageKey string) error {
 	_, err := dbxrepo.By(r.base, dbschema.ProjectLFSObjectSchema.ID).Update(ctx, id,
 		dbschema.ProjectLFSObjectSchema.ByteSize.Set(byteSize),
 		dbschema.ProjectLFSObjectSchema.StorageKey.Set(strings.TrimSpace(storageKey)),

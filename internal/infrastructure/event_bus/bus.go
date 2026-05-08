@@ -7,6 +7,7 @@ import (
 	appports "github.com/DaiYuANg/gity/internal/application/ports"
 	domainevent "github.com/DaiYuANg/gity/internal/domain/event"
 	"github.com/arcgolabs/eventx"
+	"github.com/samber/oops"
 )
 
 type Publisher struct {
@@ -34,12 +35,18 @@ func (p Publisher) Publish(ctx context.Context, event domainevent.Event) error {
 	if p.bus == nil || event == nil {
 		return nil
 	}
-	return p.bus.Publish(ctx, event)
+	if err := p.bus.Publish(ctx, event); err != nil {
+		return oops.In("event_bus").With("event", event.Name()).Wrapf(err, "publish domain event")
+	}
+	return nil
 }
 
 func (p Publisher) PublishAsync(ctx context.Context, event domainevent.Event) error {
 	if p.bus == nil || event == nil {
 		return nil
 	}
-	return p.bus.PublishAsync(ctx, event)
+	if err := p.bus.PublishAsync(ctx, event); err != nil {
+		return oops.In("event_bus").With("event", event.Name()).Wrapf(err, "publish domain event async")
+	}
+	return nil
 }

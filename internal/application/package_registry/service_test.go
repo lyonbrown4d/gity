@@ -28,6 +28,7 @@ import (
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -46,23 +47,23 @@ func TestPackageRegistryFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	logger := slog.Default()
-	namespaceRepository, _ := namespacerepo.NewRepository(db)
-	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
-	projectRepository, _ := projectrepo.NewRepository(db)
-	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
-	packageRepository, _ := projectpackagerepo.NewRepository(db)
-	versionRepository, _ := projectpackageversionrepo.NewRepository(db)
-	fileRepository, _ := projectpackagefilerepo.NewRepository(db)
-	userRepository, _ := userrepo.NewRepository(db)
-	userTokenRepository, _ := usertokenrepo.NewRepository(db)
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
+	packageRepository := testutil.Must(projectpackagerepo.NewRepository(db))
+	versionRepository := testutil.Must(projectpackageversionrepo.NewRepository(db))
+	fileRepository := testutil.Must(projectpackagefilerepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	storageRoot := filepath.Join(t.TempDir(), "storage")
@@ -90,8 +91,8 @@ func TestPackageRegistryFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if err := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); err != nil {
-		t.Fatalf("push fixture commit: %v", err)
+	if pushErr := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
+		t.Fatalf("push fixture commit: %v", pushErr)
 	}
 
 	fileRecord, err := packageSvc.UploadFile(ctx, project.ID, UploadFileInput{
@@ -139,10 +140,10 @@ func TestPackageRegistryFlow(t *testing.T) {
 	}
 }
 
-func pushFixtureCommit(ctx context.Context, repoRoot string, repoPath string) error {
+func pushFixtureCommit(ctx context.Context, repoRoot, repoPath string) error {
 	worktree := filepath.Join(filepath.Dir(repoRoot), "fixture-worktree-package")
-	if err := os.MkdirAll(worktree, 0o755); err != nil {
-		return err
+	if err := os.MkdirAll(worktree, 0o750); err != nil {
+		return fmt.Errorf("create fixture worktree: %w", err)
 	}
 	if err := runGit(ctx, worktree, "init", "-b", "main"); err != nil {
 		return err
@@ -153,8 +154,8 @@ func pushFixtureCommit(ctx context.Context, repoRoot string, repoPath string) er
 	if err := runGit(ctx, worktree, "config", "user.email", "test@gity.dev"); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o600); err != nil {
+		return fmt.Errorf("write fixture readme: %w", err)
 	}
 	if err := runGit(ctx, worktree, "add", "."); err != nil {
 		return err

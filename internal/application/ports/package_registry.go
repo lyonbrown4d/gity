@@ -10,7 +10,7 @@ import (
 type ProjectPackageRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[packagedomain.ProjectPackage], error)
 	GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackage, error)
-	GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType string, name string) (packagedomain.ProjectPackage, error)
+	GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType, name string) (packagedomain.ProjectPackage, error)
 	Create(ctx context.Context, input CreateProjectPackageInput) (packagedomain.ProjectPackage, error)
 }
 

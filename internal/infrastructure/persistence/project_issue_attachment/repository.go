@@ -41,7 +41,7 @@ func (r *Repository) ListByIssueID(ctx context.Context, issueID int64) (*collect
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByIssueAndID(ctx context.Context, issueID int64, attachmentID int64) (issuedomain.ProjectIssueAttachment, error) {
+func (r *Repository) GetByIssueAndID(ctx context.Context, issueID, attachmentID int64) (issuedomain.ProjectIssueAttachment, error) {
 	query := querydsl.Select(dbschema.ProjectIssueAttachmentSchema.AllColumns().Values()...).
 		From(dbschema.ProjectIssueAttachmentSchema).
 		Where(querydsl.And(

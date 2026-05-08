@@ -23,6 +23,7 @@ import (
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -41,11 +42,11 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	logger := slog.Default()
@@ -136,11 +137,11 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if project.Visibility != "private" {
 		t.Fatalf("unexpected project visibility: %s", project.Visibility)
 	}
-	if _, err := os.Stat(filepath.Join(repoRoot, "core-team", "gity.git")); err != nil {
-		t.Fatalf("expected bare repo to exist: %v", err)
+	if _, statErr := os.Stat(filepath.Join(repoRoot, "core-team", "gity.git")); statErr != nil {
+		t.Fatalf("expected bare repo to exist: %v", statErr)
 	}
-	if err := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); err != nil {
-		t.Fatalf("push fixture commit: %v", err)
+	if pushErr := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
+		t.Fatalf("push fixture commit: %v", pushErr)
 	}
 
 	namespaces, err := namespaceSvc.List(ctx)
@@ -181,13 +182,13 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if featureBranch.Name != "feature/editor" || featureBranch.LastCommitSHA == "" {
 		t.Fatalf("unexpected created branch: %+v", featureBranch)
 	}
-	if err := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+	if createCommitErr := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
 		BranchName: "feature/editor",
 		Path:       "docs/new.md",
 		Content:    "New file from API\n",
 		Message:    "Add new file",
-	}); err != nil {
-		t.Fatalf("create file commit: %v", err)
+	}); createCommitErr != nil {
+		t.Fatalf("create file commit: %v", createCommitErr)
 	}
 	createdBlob, err := projectSvc.GetBlob(ctx, project.ID, "feature/editor", "docs/new.md")
 	if err != nil {
@@ -203,12 +204,12 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if !protectedBranch.IsProtected {
 		t.Fatalf("expected branch to be protected: %+v", protectedBranch)
 	}
-	if err := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+	if createCommitErr := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
 		BranchName: "feature/editor",
 		Path:       "docs/protected.md",
 		Content:    "blocked\n",
 		Message:    "Try protected branch",
-	}); err == nil {
+	}); createCommitErr == nil {
 		t.Fatalf("expected protected branch file commit to fail")
 	}
 
@@ -260,10 +261,10 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	}
 }
 
-func pushFixtureCommit(ctx context.Context, repoRoot string, repoPath string) error {
+func pushFixtureCommit(ctx context.Context, repoRoot, repoPath string) error {
 	worktree := filepath.Join(filepath.Dir(repoRoot), "fixture-worktree")
-	if err := os.MkdirAll(worktree, 0o755); err != nil {
-		return err
+	if err := os.MkdirAll(worktree, 0o750); err != nil {
+		return fmt.Errorf("create fixture worktree: %w", err)
 	}
 	if err := runGit(ctx, worktree, "init", "-b", "main"); err != nil {
 		return err
@@ -274,14 +275,14 @@ func pushFixtureCommit(ctx context.Context, repoRoot string, repoPath string) er
 	if err := runGit(ctx, worktree, "config", "user.email", "test@gity.dev"); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o600); err != nil {
+		return fmt.Errorf("write fixture readme: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Join(worktree, "docs"), 0o755); err != nil {
-		return err
+	if err := os.MkdirAll(filepath.Join(worktree, "docs"), 0o750); err != nil {
+		return fmt.Errorf("create fixture docs directory: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "docs", "guide.md"), []byte("Repository guide\n"), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(worktree, "docs", "guide.md"), []byte("Repository guide\n"), 0o600); err != nil {
+		return fmt.Errorf("write fixture guide: %w", err)
 	}
 	if err := runGit(ctx, worktree, "add", "."); err != nil {
 		return err

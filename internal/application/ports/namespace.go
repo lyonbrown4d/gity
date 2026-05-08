@@ -17,7 +17,7 @@ type NamespaceRepository interface {
 
 type NamespaceMemberRepository interface {
 	ListByNamespaceID(ctx context.Context, namespaceID int64) (*collectionx.List[namespacedomain.NamespaceMember], error)
-	FindByNamespaceAndUser(ctx context.Context, namespaceID int64, userID int64) (namespacedomain.NamespaceMember, error)
+	FindByNamespaceAndUser(ctx context.Context, namespaceID, userID int64) (namespacedomain.NamespaceMember, error)
 	Create(ctx context.Context, input CreateNamespaceMemberInput) (namespacedomain.NamespaceMember, error)
 }
 

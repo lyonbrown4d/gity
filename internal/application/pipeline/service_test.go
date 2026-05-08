@@ -20,6 +20,7 @@ import (
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
 	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline_job"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -31,9 +32,9 @@ func TestProjectPipelineFlow(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -116,11 +117,11 @@ func TestProjectPipelineFlow(t *testing.T) {
 	if len(jobs) != 2 || jobs[0].Status != projectjobrepo.StatusRunning || jobs[1].Status != "blocked" {
 		t.Fatalf("unexpected listed pipeline jobs: %+v", jobs)
 	}
-	if _, err := jobSvc.CompleteProjectJob(ctx, project.ID, first.ProjectJob.ID, `{"ok":true}`); err != nil {
-		t.Fatalf("complete first job: %v", err)
+	if _, completeErr := jobSvc.CompleteProjectJob(ctx, project.ID, first.ProjectJob.ID, `{"ok":true}`); completeErr != nil {
+		t.Fatalf("complete first job: %v", completeErr)
 	}
-	if err := service.RefreshProjectJob(ctx, project.ID, first.ProjectJob.ID); err != nil {
-		t.Fatalf("refresh pipeline job: %v", err)
+	if refreshErr := service.RefreshProjectJob(ctx, project.ID, first.ProjectJob.ID); refreshErr != nil {
+		t.Fatalf("refresh pipeline job: %v", refreshErr)
 	}
 	claimed, ok, err = jobSvc.ClaimProjectJob(ctx, project.ID, "runner-a", time.Minute)
 	if err != nil {
@@ -136,9 +137,9 @@ func TestCreatePushPipelineFromRepositoryConfig(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -176,18 +177,18 @@ func TestCreatePushPipelineFromRepositoryConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if err := gitRunner.InitBare(ctx, project.FullPath+".git", project.DefaultBranch); err != nil {
-		t.Fatalf("init bare repo: %v", err)
+	if initErr := gitRunner.InitBare(ctx, project.FullPath+".git", project.DefaultBranch); initErr != nil {
+		t.Fatalf("init bare repo: %v", initErr)
 	}
-	if err := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+	if createCommitErr := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
 		BranchName:  "main",
 		FilePath:    ".gity-ci.plano",
 		Content:     pipelineConfig(),
 		Message:     "Add CI config",
 		AuthorName:  "Gity Test",
 		AuthorEmail: "test@gity.dev",
-	}); err != nil {
-		t.Fatalf("create ci config commit: %v", err)
+	}); createCommitErr != nil {
+		t.Fatalf("create ci config commit: %v", createCommitErr)
 	}
 	branch, err := gitRepository.ListBranches(ctx, project.FullPath+".git", project.DefaultBranch)
 	if err != nil {
@@ -238,11 +239,11 @@ func TestProjectPipelineFailureCancelsPendingJobs(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected first job to be claimed")
 	}
-	if _, err := env.JobService.FailProjectJob(ctx, env.ProjectID, claimed.ID, "failed", time.Second); err != nil {
-		t.Fatalf("fail first job: %v", err)
+	if _, failErr := env.JobService.FailProjectJob(ctx, env.ProjectID, claimed.ID, "failed", time.Second); failErr != nil {
+		t.Fatalf("fail first job: %v", failErr)
 	}
-	if err := env.Service.RefreshProjectJob(ctx, env.ProjectID, claimed.ID); err != nil {
-		t.Fatalf("refresh failed job: %v", err)
+	if refreshErr := env.Service.RefreshProjectJob(ctx, env.ProjectID, claimed.ID); refreshErr != nil {
+		t.Fatalf("refresh failed job: %v", refreshErr)
 	}
 	view, err := env.Service.GetPipeline(ctx, env.ProjectID, created.Pipeline.ID)
 	if err != nil {
@@ -315,11 +316,11 @@ func TestRetryPipelineResetsJobs(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected first job to be claimed")
 	}
-	if _, err := env.JobService.FailProjectJob(ctx, env.ProjectID, claimed.ID, "failed", time.Second); err != nil {
-		t.Fatalf("fail first job: %v", err)
+	if _, failErr := env.JobService.FailProjectJob(ctx, env.ProjectID, claimed.ID, "failed", time.Second); failErr != nil {
+		t.Fatalf("fail first job: %v", failErr)
 	}
-	if err := env.Service.RefreshProjectJob(ctx, env.ProjectID, claimed.ID); err != nil {
-		t.Fatalf("refresh failed job: %v", err)
+	if refreshErr := env.Service.RefreshProjectJob(ctx, env.ProjectID, claimed.ID); refreshErr != nil {
+		t.Fatalf("refresh failed job: %v", refreshErr)
 	}
 	retried, err := env.Service.RetryPipeline(ctx, env.ProjectID, created.Pipeline.ID)
 	if err != nil {
@@ -401,11 +402,9 @@ type pipelineTestEnv struct {
 func setupPipelineTest(t *testing.T, ctx context.Context) pipelineTestEnv {
 	t.Helper()
 	db := openTestDB(t)
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 	namespaceRepository, err := namespacerepo.NewRepository(db)
 	if err != nil {

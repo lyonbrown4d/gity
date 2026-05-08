@@ -27,7 +27,7 @@ const (
 
 type ProjectJobRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[cidomain.ProjectJob], error)
-	GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectJob, error)
+	GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectJob, error)
 	GetByID(ctx context.Context, id int64) (cidomain.ProjectJob, error)
 	Create(ctx context.Context, input CreateProjectJobInput) (cidomain.ProjectJob, error)
 	ClaimNext(ctx context.Context, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
@@ -42,8 +42,8 @@ type ProjectJobRepository interface {
 }
 
 type ProjectJobArtifactRepository interface {
-	ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[cidomain.ProjectJobArtifact], error)
-	GetByProjectJobAndID(ctx context.Context, projectID int64, projectJobID int64, artifactID int64) (cidomain.ProjectJobArtifact, error)
+	ListByProjectJobID(ctx context.Context, projectID, projectJobID int64) (*collectionx.List[cidomain.ProjectJobArtifact], error)
+	GetByProjectJobAndID(ctx context.Context, projectID, projectJobID, artifactID int64) (cidomain.ProjectJobArtifact, error)
 	GetByID(ctx context.Context, id int64) (cidomain.ProjectJobArtifact, error)
 	Create(ctx context.Context, input CreateProjectJobArtifactInput) (cidomain.ProjectJobArtifact, error)
 	MarkStored(ctx context.Context, id int64, input StoreProjectJobArtifactInput) error
@@ -51,9 +51,9 @@ type ProjectJobArtifactRepository interface {
 }
 
 type ProjectJobLogRepository interface {
-	ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[cidomain.ProjectJobLog], error)
-	LatestByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (cidomain.ProjectJobLog, error)
-	GetByProjectJobAttempt(ctx context.Context, projectID int64, projectJobID int64, attempt int) (cidomain.ProjectJobLog, error)
+	ListByProjectJobID(ctx context.Context, projectID, projectJobID int64) (*collectionx.List[cidomain.ProjectJobLog], error)
+	LatestByProjectJobID(ctx context.Context, projectID, projectJobID int64) (cidomain.ProjectJobLog, error)
+	GetByProjectJobAttempt(ctx context.Context, projectID, projectJobID int64, attempt int) (cidomain.ProjectJobLog, error)
 	Create(ctx context.Context, input CreateProjectJobLogInput) (cidomain.ProjectJobLog, error)
 	Append(ctx context.Context, input AppendProjectJobLogInput) (cidomain.ProjectJobLog, error)
 	UpsertAttempt(ctx context.Context, input CreateProjectJobLogInput) (cidomain.ProjectJobLog, error)
@@ -61,22 +61,22 @@ type ProjectJobLogRepository interface {
 
 type ProjectPipelineRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[cidomain.ProjectPipeline], error)
-	GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectPipeline, error)
-	GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source string, refName string, commitSHA string) (cidomain.ProjectPipeline, error)
-	GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName string, commitSHA string) (cidomain.ProjectPipeline, error)
+	GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectPipeline, error)
+	GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source, refName, commitSHA string) (cidomain.ProjectPipeline, error)
+	GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName, commitSHA string) (cidomain.ProjectPipeline, error)
 	Create(ctx context.Context, input CreateProjectPipelineInput) (cidomain.ProjectPipeline, error)
 	UpdateStatus(ctx context.Context, item cidomain.ProjectPipeline, status string) error
 }
 
 type ProjectPipelineJobRepository interface {
-	ListByPipelineID(ctx context.Context, projectID int64, pipelineID int64) (*collectionx.List[cidomain.ProjectPipelineJob], error)
-	GetByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (cidomain.ProjectPipelineJob, error)
+	ListByPipelineID(ctx context.Context, projectID, pipelineID int64) (*collectionx.List[cidomain.ProjectPipelineJob], error)
+	GetByProjectJobID(ctx context.Context, projectID, projectJobID int64) (cidomain.ProjectPipelineJob, error)
 	Create(ctx context.Context, input CreateProjectPipelineJobInput) (cidomain.ProjectPipelineJob, error)
 }
 
 type ProjectRunnerRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[cidomain.ProjectRunner], error)
-	GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectRunner, error)
+	GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectRunner, error)
 	GetByToken(ctx context.Context, token string) (cidomain.ProjectRunner, error)
 	Create(ctx context.Context, input CreateProjectRunnerInput) (cidomain.ProjectRunner, error)
 	MarkHeartbeat(ctx context.Context, id int64) error

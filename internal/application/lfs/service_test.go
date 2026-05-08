@@ -23,6 +23,7 @@ import (
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -41,22 +42,22 @@ func TestLFSFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	logger := slog.Default()
-	namespaceRepository, _ := namespacerepo.NewRepository(db)
-	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
-	projectRepository, _ := projectrepo.NewRepository(db)
-	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
-	projectLFSObjectRepository, _ := projectlfsobjectrepo.NewRepository(db)
-	projectLFSLockRepository, _ := projectlfslockrepo.NewRepository(db)
-	userRepository, _ := userrepo.NewRepository(db)
-	userTokenRepository, _ := usertokenrepo.NewRepository(db)
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
+	projectLFSObjectRepository := testutil.Must(projectlfsobjectrepo.NewRepository(db))
+	projectLFSLockRepository := testutil.Must(projectlfslockrepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	storageRoot := filepath.Join(t.TempDir(), "storage")
@@ -136,7 +137,7 @@ func TestLFSFlow(t *testing.T) {
 		t.Fatalf("unexpected created lock: %+v", createdLock)
 	}
 
-	if _, err := lfsSvc.CreateLock(ctx, project.ID, other.ID, CreateLockInput{Path: "assets/big.bin"}); err == nil {
+	if _, createLockErr := lfsSvc.CreateLock(ctx, project.ID, other.ID, CreateLockInput{Path: "assets/big.bin"}); createLockErr == nil {
 		t.Fatalf("expected duplicate lock create to fail")
 	}
 
@@ -161,7 +162,7 @@ func TestLFSFlow(t *testing.T) {
 		t.Fatalf("unexpected lfs verify result: %+v", verified)
 	}
 
-	if _, err := lfsSvc.Unlock(ctx, project.ID, owner.ID, createdOtherLock.Lock.ID, UnlockInput{}); err == nil {
+	if _, unlockErr := lfsSvc.Unlock(ctx, project.ID, owner.ID, createdOtherLock.Lock.ID, UnlockInput{}); unlockErr == nil {
 		t.Fatalf("expected unlocking another user's lock without force to fail")
 	}
 

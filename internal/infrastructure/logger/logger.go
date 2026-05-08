@@ -5,11 +5,20 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/arcgolabs/logx"
+	"github.com/samber/oops"
 )
 
 func NewLogger(settings config.Settings) (*slog.Logger, error) {
 	if settings.App.Environment == "production" {
-		return logx.NewProduction()
+		logger, err := logx.NewProduction()
+		if err != nil {
+			return nil, oops.In("logger").With("environment", settings.App.Environment).Wrapf(err, "initialize production logger")
+		}
+		return logger, nil
 	}
-	return logx.NewDevelopment()
+	logger, err := logx.NewDevelopment()
+	if err != nil {
+		return nil, oops.In("logger").With("environment", settings.App.Environment).Wrapf(err, "initialize development logger")
+	}
+	return logger, nil
 }

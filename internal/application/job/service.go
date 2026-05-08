@@ -95,12 +95,12 @@ func (s *Service) ListProjectJobs(ctx context.Context, projectID int64) ([]cidom
 	}
 	items, err := s.jobRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("job").With("project_id", projectID).Wrapf(err, "list project jobs")
 	}
 	return items.Values(), nil
 }
 
-func (s *Service) GetProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
+func (s *Service) GetProjectJob(ctx context.Context, projectID, jobID int64) (cidomain.ProjectJob, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return cidomain.ProjectJob{}, apperror.NotFound("project not found", err)
 	}
@@ -109,7 +109,7 @@ func (s *Service) GetProjectJob(ctx context.Context, projectID int64, jobID int6
 		if errors.Is(err, storageports.ErrNotFound) {
 			return cidomain.ProjectJob{}, apperror.NotFound("project job not found", err)
 		}
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "job_id", jobID).Wrapf(err, "get project job")
 	}
 	return item, nil
 }
@@ -129,16 +129,20 @@ func (s *Service) EnqueueProjectJob(ctx context.Context, projectID int64, input 
 	if maxAttempts <= 0 {
 		maxAttempts = 3
 	}
-	return s.jobRepo.Create(ctx, storageports.CreateProjectJobInput{
+	item, err := s.jobRepo.Create(ctx, storageports.CreateProjectJobInput{
 		ProjectID:   projectID,
 		Kind:        kind,
 		Payload:     input.Payload,
 		MaxAttempts: maxAttempts,
 		RunAfter:    input.RunAfter,
 	})
+	if err != nil {
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "kind", kind).Wrapf(err, "enqueue project job")
+	}
+	return item, nil
 }
 
-func (s *Service) CancelProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
+func (s *Service) CancelProjectJob(ctx context.Context, projectID, jobID int64) (cidomain.ProjectJob, error) {
 	item, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return cidomain.ProjectJob{}, err
@@ -148,12 +152,12 @@ func (s *Service) CancelProjectJob(ctx context.Context, projectID int64, jobID i
 		return item, nil
 	}
 	if err := s.jobRepo.CancelByID(ctx, item.ID); err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "job_id", item.ID).Wrapf(err, "cancel project job")
 	}
 	return s.GetProjectJob(ctx, projectID, jobID)
 }
 
-func (s *Service) RetryProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
+func (s *Service) RetryProjectJob(ctx context.Context, projectID, jobID int64) (cidomain.ProjectJob, error) {
 	item, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return cidomain.ProjectJob{}, err
@@ -165,19 +169,19 @@ func (s *Service) RetryProjectJob(ctx context.Context, projectID int64, jobID in
 		return item, nil
 	}
 	if err := s.jobRepo.RetryByID(ctx, item.ID, time.Now().UTC()); err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "job_id", item.ID).Wrapf(err, "retry project job")
 	}
 	return s.GetProjectJob(ctx, projectID, jobID)
 }
 
-func (s *Service) GetProjectJobTrace(ctx context.Context, projectID int64, jobID int64) (ProjectJobTrace, error) {
+func (s *Service) GetProjectJobTrace(ctx context.Context, projectID, jobID int64) (ProjectJobTrace, error) {
 	job, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return ProjectJobTrace{}, err
 	}
 	logs, err := s.logRepo.ListByProjectJobID(ctx, projectID, jobID)
 	if err != nil {
-		return ProjectJobTrace{}, err
+		return ProjectJobTrace{}, oops.In("job").With("project_id", projectID, "job_id", jobID).Wrapf(err, "list project job trace")
 	}
 	trace := ProjectJobTrace{Job: job, Logs: logs.Values()}
 	if logs.Len() == 0 {
@@ -192,18 +196,18 @@ func (s *Service) GetProjectJobTrace(ctx context.Context, projectID int64, jobID
 	return trace, nil
 }
 
-func (s *Service) ListProjectJobArtifacts(ctx context.Context, projectID int64, jobID int64) ([]cidomain.ProjectJobArtifact, error) {
+func (s *Service) ListProjectJobArtifacts(ctx context.Context, projectID, jobID int64) ([]cidomain.ProjectJobArtifact, error) {
 	if _, err := s.GetProjectJob(ctx, projectID, jobID); err != nil {
 		return nil, err
 	}
 	items, err := s.artifactRepo.ListByProjectJobID(ctx, projectID, jobID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("job").With("project_id", projectID, "job_id", jobID).Wrapf(err, "list project job artifacts")
 	}
 	return items.Values(), nil
 }
 
-func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID int64, jobID int64, artifactID int64) (ProjectJobArtifactContent, error) {
+func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID, jobID, artifactID int64) (ProjectJobArtifactContent, error) {
 	if _, err := s.GetProjectJob(ctx, projectID, jobID); err != nil {
 		return ProjectJobArtifactContent{}, err
 	}
@@ -212,7 +216,7 @@ func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID in
 		if errors.Is(err, storageports.ErrNotFound) {
 			return ProjectJobArtifactContent{}, apperror.NotFound("project job artifact not found", err)
 		}
-		return ProjectJobArtifactContent{}, err
+		return ProjectJobArtifactContent{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifactID).Wrapf(err, "get project job artifact")
 	}
 	content, err := s.storage.Load(ctx, artifact.StorageKey)
 	if err != nil {
@@ -221,7 +225,7 @@ func (s *Service) GetProjectJobArtifactContent(ctx context.Context, projectID in
 	return ProjectJobArtifactContent{Artifact: artifact, ContentBase64: base64.StdEncoding.EncodeToString(content)}, nil
 }
 
-func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64, jobID int64, input UploadArtifactInput) (cidomain.ProjectJobArtifact, error) {
+func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID, jobID int64, input UploadArtifactInput) (cidomain.ProjectJobArtifact, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
 		return cidomain.ProjectJobArtifact{}, apperror.NotFound("project not found", err)
@@ -253,7 +257,7 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 		ContentType:  contentType,
 	})
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, err
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).Wrapf(err, "create project job artifact")
 	}
 	storageKey, err := s.storage.SavePipelineArtifact(ctx, project.FullPath, jobID, artifact.ID, fileName, content, contentType)
 	if err != nil {
@@ -262,13 +266,17 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID int64,
 		}
 		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(err, "save project job artifact")
 	}
-	if err := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
-		return cidomain.ProjectJobArtifact{}, err
+	if storeErr := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); storeErr != nil {
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID, "storage_key", storageKey).Wrapf(storeErr, "mark project job artifact stored")
 	}
-	return s.artifactRepo.GetByID(ctx, artifact.ID)
+	stored, err := s.artifactRepo.GetByID(ctx, artifact.ID)
+	if err != nil {
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(err, "load stored project job artifact")
+	}
+	return stored, nil
 }
 
-func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID int64, jobID int64, input AppendTraceInput) (ProjectJobTrace, error) {
+func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID, jobID int64, input AppendTraceInput) (ProjectJobTrace, error) {
 	item, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return ProjectJobTrace{}, err
@@ -293,15 +301,18 @@ func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID int64, jo
 		OutputTruncated: input.OutputTruncated,
 		DurationMillis:  input.DurationMillis,
 	}); err != nil {
-		return ProjectJobTrace{}, err
+		return ProjectJobTrace{}, oops.In("job").With("project_id", projectID, "job_id", jobID).Wrapf(err, "append project job trace")
 	}
 	return s.GetProjectJobTrace(ctx, projectID, jobID)
 }
 
 func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Duration) (bool, error) {
 	job, claimed, err := s.jobRepo.ClaimNextByKinds(ctx, []string{KindNoop}, normalizeWorkerID(workerID), lease)
-	if err != nil || !claimed {
-		return claimed, err
+	if err != nil {
+		return claimed, oops.In("job").With("worker_id", normalizeWorkerID(workerID)).Wrapf(err, "claim next project job")
+	}
+	if !claimed {
+		return claimed, nil
 	}
 	result, execErr := s.execute(ctx, job)
 	if execErr != nil {
@@ -312,7 +323,7 @@ func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Durat
 		return true, nil
 	}
 	if err := s.jobRepo.MarkSucceeded(ctx, job.ID, result); err != nil {
-		return true, err
+		return true, oops.In("job").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "mark project job succeeded")
 	}
 	s.logger.Info("project job completed", slog.Int64("job_id", job.ID), slog.String("kind", job.Kind))
 	return true, nil
@@ -322,10 +333,14 @@ func (s *Service) ClaimProjectJob(ctx context.Context, projectID int64, workerID
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return cidomain.ProjectJob{}, false, apperror.NotFound("project not found", err)
 	}
-	return s.jobRepo.ClaimNextByProjectIDAndKinds(ctx, projectID, []string{KindScript}, normalizeWorkerID(workerID), lease)
+	job, claimed, err := s.jobRepo.ClaimNextByProjectIDAndKinds(ctx, projectID, []string{KindScript}, normalizeWorkerID(workerID), lease)
+	if err != nil {
+		return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "worker_id", normalizeWorkerID(workerID)).Wrapf(err, "claim project script job")
+	}
+	return job, claimed, nil
 }
 
-func (s *Service) CompleteProjectJob(ctx context.Context, projectID int64, jobID int64, result string) (cidomain.ProjectJob, error) {
+func (s *Service) CompleteProjectJob(ctx context.Context, projectID, jobID int64, result string) (cidomain.ProjectJob, error) {
 	item, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return cidomain.ProjectJob{}, err
@@ -334,7 +349,7 @@ func (s *Service) CompleteProjectJob(ctx context.Context, projectID int64, jobID
 		return cidomain.ProjectJob{}, apperror.Conflict("project job is not running", fmt.Errorf("project job is not running: %s", item.Status))
 	}
 	if err := s.jobRepo.MarkSucceeded(ctx, item.ID, result); err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "job_id", item.ID).Wrapf(err, "complete project job")
 	}
 	if err := s.recordScriptLog(ctx, item, result, ""); err != nil {
 		return cidomain.ProjectJob{}, err
@@ -342,11 +357,11 @@ func (s *Service) CompleteProjectJob(ctx context.Context, projectID int64, jobID
 	return s.GetProjectJob(ctx, projectID, jobID)
 }
 
-func (s *Service) FailProjectJob(ctx context.Context, projectID int64, jobID int64, message string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
+func (s *Service) FailProjectJob(ctx context.Context, projectID, jobID int64, message string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
 	return s.FailProjectJobWithResult(ctx, projectID, jobID, message, "", retryAfter)
 }
 
-func (s *Service) FailProjectJobWithResult(ctx context.Context, projectID int64, jobID int64, message string, result string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
+func (s *Service) FailProjectJobWithResult(ctx context.Context, projectID, jobID int64, message, result string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
 	item, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return cidomain.ProjectJob{}, err
@@ -358,7 +373,7 @@ func (s *Service) FailProjectJobWithResult(ctx context.Context, projectID int64,
 		retryAfter = retryDelay(item.Attempts)
 	}
 	if err := s.jobRepo.MarkFailed(ctx, item, message, retryAfter); err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("job").With("project_id", projectID, "job_id", item.ID).Wrapf(err, "fail project job")
 	}
 	if err := s.recordScriptLog(ctx, item, result, message); err != nil {
 		return cidomain.ProjectJob{}, err
@@ -376,7 +391,7 @@ func (s *Service) execute(ctx context.Context, item cidomain.ProjectJob) (string
 	}
 }
 
-func (s *Service) recordScriptLog(ctx context.Context, item cidomain.ProjectJob, result string, fallback string) error {
+func (s *Service) recordScriptLog(ctx context.Context, item cidomain.ProjectJob, result, fallback string) error {
 	if item.Kind != KindScript || s.logRepo == nil {
 		return nil
 	}
@@ -390,32 +405,47 @@ func (s *Service) recordScriptLog(ctx context.Context, item cidomain.ProjectJob,
 		OutputTruncated: parsed.OutputTruncated,
 		DurationMillis:  parsed.DurationMillis,
 	})
-	return err
+	if err != nil {
+		return oops.In("job").With("project_id", item.ProjectID, "job_id", item.ID, "attempt", item.Attempts).Wrapf(err, "record project job script log")
+	}
+	return nil
 }
 
-func parseScriptResult(result string, fallback string) scriptResult {
-	var parsed scriptResult
+func parseScriptResult(result, fallback string) scriptResult {
 	trimmed := strings.TrimSpace(result)
-	if trimmed != "" {
-		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
-			return parsed
-		}
-		if index := strings.LastIndex(trimmed, "\n{"); index >= 0 {
-			if err := json.Unmarshal([]byte(strings.TrimSpace(trimmed[index+1:])), &parsed); err == nil {
-				if prefix := strings.TrimSpace(trimmed[:index]); prefix != "" && parsed.Output == "" {
-					parsed.Output = prefix
-				}
-				return parsed
-			}
-		}
-		parsed.Output = trimmed
+	if trimmed == "" {
+		return fallbackScriptResult(fallback)
+	}
+	if parsed, ok := decodeScriptResult(trimmed); ok {
 		return parsed
 	}
-	parsed.Output = strings.TrimSpace(fallback)
+	return scriptResult{Output: trimmed}
+}
+
+func fallbackScriptResult(fallback string) scriptResult {
+	parsed := scriptResult{Output: strings.TrimSpace(fallback)}
 	if parsed.Output != "" {
 		parsed.ExitCode = 1
 	}
 	return parsed
+}
+
+func decodeScriptResult(trimmed string) (scriptResult, bool) {
+	var parsed scriptResult
+	if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+		return parsed, true
+	}
+	index := strings.LastIndex(trimmed, "\n{")
+	if index < 0 {
+		return scriptResult{}, false
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(trimmed[index+1:])), &parsed); err != nil {
+		return scriptResult{}, false
+	}
+	if prefix := strings.TrimSpace(trimmed[:index]); prefix != "" && parsed.Output == "" {
+		parsed.Output = prefix
+	}
+	return parsed, true
 }
 
 func fallbackTrace(job cidomain.ProjectJob) string {

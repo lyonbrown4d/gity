@@ -56,26 +56,26 @@ func (s *Service) ListPackages(ctx context.Context, projectID int64) ([]packaged
 	}
 	items, err := s.packageRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("package_registry").With("project_id", projectID).Wrapf(err, "list project packages")
 	}
 	return items.Values(), nil
 }
 
-func (s *Service) GetPackage(ctx context.Context, projectID int64, packageID int64) (PackageDetail, error) {
+func (s *Service) GetPackage(ctx context.Context, projectID, packageID int64) (PackageDetail, error) {
 	pkg, err := s.loadPackage(ctx, projectID, packageID)
 	if err != nil {
 		return PackageDetail{}, err
 	}
 	versions, err := s.versionRepo.ListByPackageID(ctx, pkg.ID)
 	if err != nil {
-		return PackageDetail{}, err
+		return PackageDetail{}, oops.In("package_registry").With("project_id", projectID, "package_id", packageID).Wrapf(err, "list package versions")
 	}
 	versionIDs := collectionlist.MapList(versions, func(_ int, version packagedomain.ProjectPackageVersion) int64 {
 		return version.ID
 	}).Values()
 	files, err := s.fileRepo.ListByVersionIDs(ctx, versionIDs...)
 	if err != nil {
-		return PackageDetail{}, err
+		return PackageDetail{}, oops.In("package_registry").With("project_id", projectID, "package_id", packageID).Wrapf(err, "list package version files")
 	}
 	filesByVersion := mappingx.GroupByList(files, func(_ int, file packagedomain.ProjectPackageFile) int64 {
 		return file.ProjectPackageVersionID
@@ -110,20 +110,24 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	}
 	pkg, err := s.packageRepo.GetByProjectTypeAndName(ctx, projectID, packageType, packageName)
 	if err != nil {
-		if errors.Is(err, storageports.ErrNotFound) {
-			pkg, err = s.packageRepo.Create(ctx, storageports.CreateProjectPackageInput{ProjectID: projectID, Type: packageType, Name: packageName})
+		if !errors.Is(err, storageports.ErrNotFound) {
+			return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName).Wrapf(err, "load package")
 		}
+
+		pkg, err = s.packageRepo.Create(ctx, storageports.CreateProjectPackageInput{ProjectID: projectID, Type: packageType, Name: packageName})
 		if err != nil {
-			return packagedomain.ProjectPackageFile{}, err
+			return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName).Wrapf(err, "create package")
 		}
 	}
 	versionRecord, err := s.versionRepo.GetByPackageAndVersion(ctx, pkg.ID, versionValue)
 	if err != nil {
-		if errors.Is(err, storageports.ErrNotFound) {
-			versionRecord, err = s.versionRepo.Create(ctx, storageports.CreateProjectPackageVersionInput{ProjectPackageID: pkg.ID, Version: versionValue, Status: "default"})
+		if !errors.Is(err, storageports.ErrNotFound) {
+			return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "package_id", pkg.ID, "version", versionValue).Wrapf(err, "load package version")
 		}
+
+		versionRecord, err = s.versionRepo.Create(ctx, storageports.CreateProjectPackageVersionInput{ProjectPackageID: pkg.ID, Version: versionValue, Status: "default"})
 		if err != nil {
-			return packagedomain.ProjectPackageFile{}, err
+			return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "package_id", pkg.ID, "version", versionValue).Wrapf(err, "create package version")
 		}
 	}
 	contentType := strings.TrimSpace(input.ContentType)
@@ -136,7 +140,7 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 	}
 	fileRecord, err := s.fileRepo.Create(ctx, storageports.CreateProjectPackageFileInput{ProjectPackageVersionID: versionRecord.ID, FileName: fileName, FilePath: storedPath, ContentType: contentType})
 	if err != nil {
-		return packagedomain.ProjectPackageFile{}, err
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "package_id", pkg.ID, "version_id", versionRecord.ID, "file_name", fileName).Wrapf(err, "create package file record")
 	}
 	storageKey, err := s.storage.SavePackageFile(ctx, project.FullPath, packageType, packageName, versionValue, fileRecord.ID, fileName, content, contentType)
 	if err != nil {
@@ -145,13 +149,17 @@ func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadF
 		}
 		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileRecord.ID, "type", packageType, "name", packageName, "version", versionValue).Wrapf(err, "save package file")
 	}
-	if err := s.fileRepo.MarkStored(ctx, fileRecord.ID, storageports.StoreProjectPackageFileInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); err != nil {
-		return packagedomain.ProjectPackageFile{}, err
+	if storeErr := s.fileRepo.MarkStored(ctx, fileRecord.ID, storageports.StoreProjectPackageFileInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); storeErr != nil {
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileRecord.ID, "storage_key", storageKey).Wrapf(storeErr, "mark package file stored")
 	}
-	return s.fileRepo.GetByID(ctx, fileRecord.ID)
+	storedFile, err := s.fileRepo.GetByID(ctx, fileRecord.ID)
+	if err != nil {
+		return packagedomain.ProjectPackageFile{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileRecord.ID).Wrapf(err, "reload package file")
+	}
+	return storedFile, nil
 }
 
-func (s *Service) GetFileContent(ctx context.Context, projectID int64, fileID int64) (PackageFileContent, error) {
+func (s *Service) GetFileContent(ctx context.Context, projectID, fileID int64) (PackageFileContent, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return PackageFileContent{}, apperror.NotFound("project not found", err)
 	}
@@ -160,7 +168,7 @@ func (s *Service) GetFileContent(ctx context.Context, projectID int64, fileID in
 		if errors.Is(err, storageports.ErrNotFound) {
 			return PackageFileContent{}, apperror.NotFound("package file not found", err)
 		}
-		return PackageFileContent{}, err
+		return PackageFileContent{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileID).Wrapf(err, "load package file")
 	}
 	content, err := s.storage.Load(ctx, fileRecord.StorageKey)
 	if err != nil {
@@ -169,7 +177,7 @@ func (s *Service) GetFileContent(ctx context.Context, projectID int64, fileID in
 	return PackageFileContent{File: fileRecord, Content: base64.StdEncoding.EncodeToString(content)}, nil
 }
 
-func (s *Service) loadPackage(ctx context.Context, projectID int64, packageID int64) (packagedomain.ProjectPackage, error) {
+func (s *Service) loadPackage(ctx context.Context, projectID, packageID int64) (packagedomain.ProjectPackage, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return packagedomain.ProjectPackage{}, apperror.NotFound("project not found", err)
 	}
@@ -178,7 +186,7 @@ func (s *Service) loadPackage(ctx context.Context, projectID int64, packageID in
 		if errors.Is(err, storageports.ErrNotFound) {
 			return packagedomain.ProjectPackage{}, apperror.NotFound("package not found", err)
 		}
-		return packagedomain.ProjectPackage{}, err
+		return packagedomain.ProjectPackage{}, oops.In("package_registry").With("project_id", projectID, "package_id", packageID).Wrapf(err, "load package")
 	}
 	if pkg.ProjectID != projectID {
 		return packagedomain.ProjectPackage{}, apperror.NotFound("package not found", nil)

@@ -22,22 +22,22 @@ var (
 )
 
 type GitRepository interface {
-	ListBranches(ctx context.Context, repoPath string, defaultBranch string) ([]Branch, error)
-	ListTree(ctx context.Context, repoPath string, refName string, defaultBranch string, treePath string) ([]TreeEntry, error)
-	GetBlob(ctx context.Context, repoPath string, refName string, defaultBranch string, blobPath string) (Blob, error)
-	GetReadme(ctx context.Context, repoPath string, refName string, defaultBranch string) (Blob, error)
-	ListCommits(ctx context.Context, repoPath string, refName string, defaultBranch string, limit int) ([]Commit, error)
-	Search(ctx context.Context, repoPath string, refName string, defaultBranch string, input SearchParams) ([]SearchResult, error)
-	AnalyzeLanguages(ctx context.Context, repoPath string, refName string, defaultBranch string) (LanguageAnalysis, error)
+	ListBranches(ctx context.Context, repoPath, defaultBranch string) ([]Branch, error)
+	ListTree(ctx context.Context, repoPath, refName, defaultBranch, treePath string) ([]TreeEntry, error)
+	GetBlob(ctx context.Context, repoPath, refName, defaultBranch, blobPath string) (Blob, error)
+	GetReadme(ctx context.Context, repoPath, refName, defaultBranch string) (Blob, error)
+	ListCommits(ctx context.Context, repoPath, refName, defaultBranch string, limit int) ([]Commit, error)
+	Search(ctx context.Context, repoPath, refName, defaultBranch string, input SearchParams) ([]SearchResult, error)
+	AnalyzeLanguages(ctx context.Context, repoPath, refName, defaultBranch string) (LanguageAnalysis, error)
 }
 
 type GitRunner interface {
-	Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
-	InitBare(ctx context.Context, repoPath string, initialBranch string) error
-	CreateBranch(ctx context.Context, repoPath string, branchName string, sourceRef string) error
+	Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout, stderr io.Writer) error
+	InitBare(ctx context.Context, repoPath, initialBranch string) error
+	CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error
 	CreateFileCommit(ctx context.Context, repoPath string, input CreateFileCommitInput) error
-	DiffBranches(ctx context.Context, repoPath string, targetBranch string, sourceBranch string) (string, error)
-	Archive(ctx context.Context, repoPath string, revision string) ([]byte, error)
+	DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error)
+	Archive(ctx context.Context, repoPath, revision string) ([]byte, error)
 	MergeBranches(ctx context.Context, repoPath string, input MergeBranchesInput) error
 }
 

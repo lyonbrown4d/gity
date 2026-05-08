@@ -87,12 +87,12 @@ func (s *Service) List(ctx context.Context, projectID int64) ([]mergedomain.Proj
 	}
 	items, err := s.mergeRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("merge_request").With("project_id", projectID).Wrapf(err, "list merge requests")
 	}
 	return items.Values(), nil
 }
 
-func (s *Service) GetByIID(ctx context.Context, projectID int64, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
+func (s *Service) GetByIID(ctx context.Context, projectID, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
 }
 
@@ -101,27 +101,27 @@ func (s *Service) Create(ctx context.Context, projectID int64, input CreateInput
 	if err != nil {
 		return mergedomain.ProjectMergeRequest{}, apperror.NotFound("project not found", err)
 	}
-	if _, err := s.userRepo.GetByID(ctx, input.AuthorUserID); err != nil {
-		return mergedomain.ProjectMergeRequest{}, apperror.NotFound("merge request author not found", err)
+	if _, authorErr := s.userRepo.GetByID(ctx, input.AuthorUserID); authorErr != nil {
+		return mergedomain.ProjectMergeRequest{}, apperror.NotFound("merge request author not found", authorErr)
 	}
 	if strings.TrimSpace(input.Title) == "" {
-		return mergedomain.ProjectMergeRequest{}, errors.New("merge request title is required")
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "author_user_id", input.AuthorUserID).New("merge request title is required")
 	}
 	source := strings.TrimSpace(input.SourceBranch)
 	target := strings.TrimSpace(input.TargetBranch)
 	if source == "" || target == "" {
-		return mergedomain.ProjectMergeRequest{}, errors.New("source_branch and target_branch are required")
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "source_branch", source, "target_branch", target).New("source_branch and target_branch are required")
 	}
 	if source == target {
-		return mergedomain.ProjectMergeRequest{}, errors.New("source_branch and target_branch must be different")
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "source_branch", source, "target_branch", target).New("source_branch and target_branch must be different")
 	}
-	if err := s.ensureBranchExists(ctx, project, source); err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
+	if sourceErr := s.ensureBranchExists(ctx, project, source); sourceErr != nil {
+		return mergedomain.ProjectMergeRequest{}, sourceErr
 	}
-	if err := s.ensureBranchExists(ctx, project, target); err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
+	if targetErr := s.ensureBranchExists(ctx, project, target); targetErr != nil {
+		return mergedomain.ProjectMergeRequest{}, targetErr
 	}
-	return s.mergeRepo.Create(ctx, gitports.CreateProjectMergeRequestInput{
+	mr, err := s.mergeRepo.Create(ctx, gitports.CreateProjectMergeRequestInput{
 		ProjectID:    projectID,
 		AuthorUserID: input.AuthorUserID,
 		Title:        input.Title,
@@ -129,9 +129,13 @@ func (s *Service) Create(ctx context.Context, projectID int64, input CreateInput
 		SourceBranch: source,
 		TargetBranch: target,
 	})
+	if err != nil {
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "author_user_id", input.AuthorUserID, "source_branch", source, "target_branch", target).Wrapf(err, "create merge request")
+	}
+	return mr, nil
 }
 
-func (s *Service) Update(ctx context.Context, projectID int64, mergeIID int64, input UpdateInput) (mergedomain.ProjectMergeRequest, error) {
+func (s *Service) Update(ctx context.Context, projectID, mergeIID int64, input UpdateInput) (mergedomain.ProjectMergeRequest, error) {
 	mr, err := s.loadMergeRequest(ctx, projectID, mergeIID)
 	if err != nil {
 		return mergedomain.ProjectMergeRequest{}, err
@@ -142,16 +146,16 @@ func (s *Service) Update(ctx context.Context, projectID int64, mergeIID int64, i
 	if input.State != nil {
 		state := strings.TrimSpace(*input.State)
 		if state != "opened" && state != "closed" && state != "merged" {
-			return mergedomain.ProjectMergeRequest{}, errors.New("merge request state must be opened, closed, or merged")
+			return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_iid", mergeIID, "state", state).New("merge request state must be opened, closed, or merged")
 		}
 	}
 	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{Title: input.Title, Description: input.Description, State: input.State}); err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_request_id", mr.ID, "merge_iid", mergeIID).Wrapf(err, "update merge request")
 	}
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
 }
 
-func (s *Service) GetDiff(ctx context.Context, projectID int64, mergeIID int64) (DiffView, error) {
+func (s *Service) GetDiff(ctx context.Context, projectID, mergeIID int64) (DiffView, error) {
 	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	if err != nil {
 		return DiffView{}, err
@@ -163,7 +167,7 @@ func (s *Service) GetDiff(ctx context.Context, projectID int64, mergeIID int64) 
 	return DiffView{MergeRequest: mr, Diff: diff}, nil
 }
 
-func (s *Service) GetChecks(ctx context.Context, projectID int64, mergeIID int64) (CheckStatusView, error) {
+func (s *Service) GetChecks(ctx context.Context, projectID, mergeIID int64) (CheckStatusView, error) {
 	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	if err != nil {
 		return CheckStatusView{}, err
@@ -171,7 +175,7 @@ func (s *Service) GetChecks(ctx context.Context, projectID int64, mergeIID int64
 	return s.evaluateChecks(ctx, project, mr)
 }
 
-func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, input MergeInput) (mergedomain.ProjectMergeRequest, error) {
+func (s *Service) Merge(ctx context.Context, projectID, mergeIID int64, input MergeInput) (mergedomain.ProjectMergeRequest, error) {
 	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	if err != nil {
 		return mergedomain.ProjectMergeRequest{}, err
@@ -202,7 +206,7 @@ func (s *Service) Merge(ctx context.Context, projectID int64, mergeIID int64, in
 	}
 	merged := "merged"
 	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{State: &merged}); err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_request_id", mr.ID, "merge_iid", mergeIID).Wrapf(err, "mark merge request merged")
 	}
 	s.triggerTargetBranchPipeline(ctx, project, mr)
 	return s.loadMergeRequest(ctx, projectID, mergeIID)
@@ -255,7 +259,7 @@ func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Proj
 			view.BlockingReason = "required pipeline is missing"
 			return view, nil
 		}
-		return CheckStatusView{}, err
+		return CheckStatusView{}, oops.In("merge_request").With("project_id", project.ID, "merge_request_id", mr.ID, "ref", branch.Name, "commit_sha", branch.Hash).Wrapf(err, "load merge request pipeline")
 	}
 	view.Pipeline = &pipeline
 	view.Status = pipeline.Status
@@ -274,13 +278,13 @@ func (s *Service) hasCIConfig(ctx context.Context, project projectdomain.Project
 	if errors.Is(err, gitports.ErrPathNotFound) || errors.Is(err, gitports.ErrReferenceNotFound) || errors.Is(err, gitports.ErrEmptyRepository) {
 		return false, nil
 	}
-	return false, err
+	return false, oops.In("merge_request").With("project_id", project.ID, "commit_sha", commitSHA, "path", defaultCIConfigPath).Wrapf(err, "check ci config")
 }
 
 func (s *Service) resolveBranch(ctx context.Context, project projectdomain.Project, branch string) (gitports.Branch, error) {
 	branches, err := s.gitRepo.ListBranches(ctx, project.FullPath+".git", project.DefaultBranch)
 	if err != nil {
-		return gitports.Branch{}, err
+		return gitports.Branch{}, oops.In("merge_request").With("project_id", project.ID, "branch", branch).Wrapf(err, "list branches")
 	}
 	for _, item := range branches {
 		if item.Name == branch {
@@ -295,12 +299,12 @@ func (s *Service) ensureBranchExists(ctx context.Context, project projectdomain.
 	return err
 }
 
-func (s *Service) loadMergeRequest(ctx context.Context, projectID int64, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
+func (s *Service) loadMergeRequest(ctx context.Context, projectID, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
 	_, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	return mr, err
 }
 
-func (s *Service) loadProjectMergeRequest(ctx context.Context, projectID int64, mergeIID int64) (projectdomain.Project, mergedomain.ProjectMergeRequest, error) {
+func (s *Service) loadProjectMergeRequest(ctx context.Context, projectID, mergeIID int64) (projectdomain.Project, mergedomain.ProjectMergeRequest, error) {
 	project, err := s.projectRepo.GetByID(ctx, projectID)
 	if err != nil {
 		return projectdomain.Project{}, mergedomain.ProjectMergeRequest{}, apperror.NotFound("project not found", err)
@@ -312,7 +316,7 @@ func (s *Service) loadProjectMergeRequest(ctx context.Context, projectID int64, 
 	return project, mr, nil
 }
 
-func (s *Service) loadMergeRequestRecord(ctx context.Context, projectID int64, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
+func (s *Service) loadMergeRequestRecord(ctx context.Context, projectID, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return mergedomain.ProjectMergeRequest{}, apperror.NotFound("project not found", err)
 	}
@@ -321,7 +325,7 @@ func (s *Service) loadMergeRequestRecord(ctx context.Context, projectID int64, m
 		if errors.Is(err, gitports.ErrNotFound) {
 			return mergedomain.ProjectMergeRequest{}, apperror.NotFound("merge request not found", err)
 		}
-		return mergedomain.ProjectMergeRequest{}, err
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_iid", mergeIID).Wrapf(err, "load merge request")
 	}
 	return mr, nil
 }

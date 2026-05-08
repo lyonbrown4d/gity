@@ -10,6 +10,7 @@ import (
 
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/samber/oops"
 )
 
 type Runner struct {
@@ -63,7 +64,7 @@ func (r *Runner) Stop(ctx context.Context) error {
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return ctx.Err()
+		return oops.In("job_runner").Wrap(ctx.Err())
 	}
 
 	r.mu.Lock()

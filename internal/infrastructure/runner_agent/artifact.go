@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -23,23 +22,32 @@ type ArtifactFile struct {
 	Content     []byte
 }
 
-func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, error) {
+func CollectArtifacts(job cidomain.ProjectJob, result string) (artifacts []ArtifactFile, err error) {
 	var payload ScriptPayload
-	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
-		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "decode script job payload")
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); decodeErr != nil {
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script job payload")
 	}
 	if len(payload.Artifacts) == 0 {
 		return nil, nil
 	}
 	var scriptResult ScriptResult
-	if err := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); err != nil {
-		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "decode script result")
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); decodeErr != nil {
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script result")
 	}
 	workDir := strings.TrimSpace(scriptResult.WorkDir)
 	if workDir == "" {
 		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).New("script result does not include work_dir")
 	}
-	root := os.DirFS(workDir)
+	rootHandle, err := os.OpenRoot(workDir)
+	if err != nil {
+		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "work_dir", workDir).Wrapf(err, "open artifact work dir")
+	}
+	defer func() {
+		if closeErr := rootHandle.Close(); closeErr != nil && err == nil {
+			err = oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "work_dir", workDir).Wrapf(closeErr, "close artifact work dir")
+		}
+	}()
+	root := rootHandle.FS()
 	files := collectionlist.NewList[ArtifactFile]()
 	seen := setx.NewSet[string]()
 	for _, pattern := range payload.Artifacts {
@@ -60,7 +68,7 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 			if err != nil || info.IsDir() {
 				continue
 			}
-			content, err := os.ReadFile(filepath.Join(workDir, filepath.FromSlash(relative)))
+			content, err := rootHandle.ReadFile(relative)
 			if err != nil {
 				return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", relative).Wrapf(err, "read artifact")
 			}

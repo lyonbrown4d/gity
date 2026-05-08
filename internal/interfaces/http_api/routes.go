@@ -44,7 +44,7 @@ func Delete[I, O any](path string, handler httpx.TypedHandler[I, O], options ...
 	return Route(httpx.MethodDelete, path, handler, options...)
 }
 
-func Route[I, O any](method string, path string, handler httpx.TypedHandler[I, O], options ...RouteOption[I, O]) EndpointRoute {
+func Route[I, O any](method, path string, handler httpx.TypedHandler[I, O], options ...RouteOption[I, O]) EndpointRoute {
 	cfg := routeConfig[I, O]{}
 	for _, option := range options {
 		if option != nil {

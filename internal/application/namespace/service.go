@@ -3,11 +3,11 @@ package namespace
 import (
 	"context"
 	"errors"
-	"fmt"
 	namespaceports "github.com/DaiYuANg/gity/internal/application/ports"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
+	"github.com/samber/oops"
 	"log/slog"
 	"strings"
 )
@@ -55,19 +55,27 @@ func NewService(logger *slog.Logger, repo namespaceports.NamespaceRepository, me
 }
 
 func (s *Service) List(ctx context.Context) (*collectionx.List[namespacedomain.Namespace], error) {
-	return s.repo.List(ctx)
+	items, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, oops.In("namespace").Wrapf(err, "list namespaces")
+	}
+	return items, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (namespacedomain.Namespace, error) {
-	return s.repo.GetByID(ctx, id)
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", id).Wrapf(err, "load namespace")
+	}
+	return item, nil
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomain.Namespace, error) {
 	if strings.TrimSpace(input.Name) == "" {
-		return namespacedomain.Namespace{}, errors.New("namespace name is required")
+		return namespacedomain.Namespace{}, oops.In("namespace").New("namespace name is required")
 	}
 	if strings.TrimSpace(input.PathKey) == "" {
-		return namespacedomain.Namespace{}, errors.New("namespace path_key is required")
+		return namespacedomain.Namespace{}, oops.In("namespace").With("name", input.Name).New("namespace path_key is required")
 	}
 	if strings.TrimSpace(input.Kind) == "" {
 		input.Kind = "group"
@@ -79,11 +87,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomai
 		Description: input.Description,
 	})
 	if err != nil {
-		return namespacedomain.Namespace{}, err
+		return namespacedomain.Namespace{}, oops.In("namespace").With("kind", input.Kind, "name", input.Name, "path_key", input.PathKey).Wrapf(err, "create namespace")
 	}
 	if input.OwnerUserID > 0 {
 		if _, err := s.AddMember(ctx, item.ID, AddMemberInput{UserID: input.OwnerUserID, Role: "owner"}); err != nil {
-			return namespacedomain.Namespace{}, err
+			return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", item.ID, "owner_user_id", input.OwnerUserID).Wrapf(err, "add namespace owner")
 		}
 	}
 	return item, nil
@@ -91,10 +99,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (namespacedomai
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (namespacedomain.Namespace, error) {
 	if input.Name != nil && strings.TrimSpace(*input.Name) == "" {
-		return namespacedomain.Namespace{}, errors.New("namespace name is required")
+		return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", id).New("namespace name is required")
 	}
 	if input.PathKey != nil && strings.TrimSpace(*input.PathKey) == "" {
-		return namespacedomain.Namespace{}, errors.New("namespace path_key is required")
+		return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", id).New("namespace path_key is required")
 	}
 	if err := s.repo.UpdateByID(ctx, id, namespaceports.UpdateNamespaceInput{
 		Kind:        input.Kind,
@@ -102,25 +110,32 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (name
 		PathKey:     input.PathKey,
 		Description: input.Description,
 	}); err != nil {
-		return namespacedomain.Namespace{}, err
+		return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", id).Wrapf(err, "update namespace")
 	}
-	return s.repo.GetByID(ctx, id)
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return namespacedomain.Namespace{}, oops.In("namespace").With("namespace_id", id).Wrapf(err, "reload namespace")
+	}
+	return item, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return errors.New("namespace id is required")
+		return oops.In("namespace").With("namespace_id", id).New("namespace id is required")
 	}
-	return s.repo.DeleteByID(ctx, id)
+	if err := s.repo.DeleteByID(ctx, id); err != nil {
+		return oops.In("namespace").With("namespace_id", id).Wrapf(err, "delete namespace")
+	}
+	return nil
 }
 
 func (s *Service) ListMembers(ctx context.Context, namespaceID int64) ([]MemberView, error) {
 	if _, err := s.repo.GetByID(ctx, namespaceID); err != nil {
-		return nil, fmt.Errorf("load namespace: %w", err)
+		return nil, oops.In("namespace").With("namespace_id", namespaceID).Wrapf(err, "load namespace")
 	}
 	members, err := s.memberRepo.ListByNamespaceID(ctx, namespaceID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("namespace").With("namespace_id", namespaceID).Wrapf(err, "list namespace members")
 	}
 	return collectionx.FilterMapList(members, func(_ int, item namespacedomain.NamespaceMember) (MemberView, bool) {
 		user, userErr := s.userRepo.GetByID(ctx, item.UserID)
@@ -140,10 +155,10 @@ func (s *Service) ListMembers(ctx context.Context, namespaceID int64) ([]MemberV
 
 func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMemberInput) (MemberView, error) {
 	if namespaceID <= 0 {
-		return MemberView{}, errors.New("namespace id is required")
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID).New("namespace id is required")
 	}
 	if input.UserID <= 0 {
-		return MemberView{}, errors.New("user_id is required")
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).New("user_id is required")
 	}
 	role := strings.TrimSpace(input.Role)
 	if role == "" {
@@ -153,19 +168,19 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 		role = "developer"
 	}
 	if !namespaceMemberRoles.Contains(role) {
-		return MemberView{}, fmt.Errorf("unsupported namespace member role: %s", role)
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID, "role", role).New("unsupported namespace member role")
 	}
 	if _, err := s.repo.GetByID(ctx, namespaceID); err != nil {
-		return MemberView{}, fmt.Errorf("load namespace: %w", err)
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID).Wrapf(err, "load namespace")
 	}
 	user, err := s.userRepo.GetByID(ctx, input.UserID)
 	if err != nil {
-		return MemberView{}, fmt.Errorf("load user: %w", err)
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).Wrapf(err, "load namespace member user")
 	}
 	if _, existingErr := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); existingErr == nil {
-		return MemberView{}, errors.New("namespace member already exists")
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).New("namespace member already exists")
 	} else if !errors.Is(existingErr, namespaceports.ErrNotFound) {
-		return MemberView{}, existingErr
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).Wrapf(existingErr, "check namespace member")
 	}
 	member, err := s.memberRepo.Create(ctx, namespaceports.CreateNamespaceMemberInput{
 		NamespaceID: namespaceID,
@@ -173,7 +188,7 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 		Role:        role,
 	})
 	if err != nil {
-		return MemberView{}, err
+		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID, "role", role).Wrapf(err, "create namespace member")
 	}
 	return MemberView{
 		ID:          member.ID,

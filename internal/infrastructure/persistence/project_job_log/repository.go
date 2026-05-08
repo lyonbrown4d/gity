@@ -33,7 +33,7 @@ func NewProjectJobLogRepository(repo *Repository) ciports.ProjectJobLogRepositor
 	return repo
 }
 
-func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[cidomain.ProjectJobLog], error) {
+func (r *Repository) ListByProjectJobID(ctx context.Context, projectID, projectJobID int64) (*collectionx.List[cidomain.ProjectJobLog], error) {
 	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobLogSchema).
 		Where(querydsl.And(
@@ -44,7 +44,7 @@ func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, pr
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (cidomain.ProjectJobLog, error) {
+func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID, projectJobID int64) (cidomain.ProjectJobLog, error) {
 	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobLogSchema).
 		Where(querydsl.And(
@@ -56,7 +56,7 @@ func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID int64, 
 	return persistence.One(r.base.First(ctx, query))
 }
 
-func (r *Repository) GetByProjectJobAttempt(ctx context.Context, projectID int64, projectJobID int64, attempt int) (cidomain.ProjectJobLog, error) {
+func (r *Repository) GetByProjectJobAttempt(ctx context.Context, projectID, projectJobID int64, attempt int) (cidomain.ProjectJobLog, error) {
 	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobLogSchema).
 		Where(querydsl.And(

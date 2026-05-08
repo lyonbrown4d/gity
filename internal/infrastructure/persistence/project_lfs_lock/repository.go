@@ -31,7 +31,7 @@ func NewProjectLFSLockRepository(repo *Repository) lfsports.ProjectLFSLockReposi
 	return repo
 }
 
-func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (lfsdomain.ProjectLFSLock, error) {
+func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (lfsdomain.ProjectLFSLock, error) {
 	query := querydsl.Select(dbschema.ProjectLFSLockSchema.AllColumns().Values()...).From(dbschema.ProjectLFSLockSchema).Where(querydsl.And(dbschema.ProjectLFSLockSchema.ProjectID.Eq(projectID), dbschema.ProjectLFSLockSchema.ID.Eq(id))).Limit(1)
 	return persistence.One(r.base.First(ctx, query))
 }

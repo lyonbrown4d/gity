@@ -11,18 +11,18 @@ import (
 
 type ObjectStorage interface {
 	SaveObject(ctx context.Context, key string, content []byte, contentType string) error
-	SaveIssueAttachment(ctx context.Context, projectFullPath string, issueIID int64, attachmentID int64, fileName string, content []byte, contentType string) (string, error)
-	SavePackageFile(ctx context.Context, projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string, content []byte, contentType string) (string, error)
-	SaveLFSObject(ctx context.Context, projectFullPath string, oid string, content []byte) (string, error)
-	SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID int64, artifactID int64, fileName string, content []byte, contentType string) (string, error)
+	SaveIssueAttachment(ctx context.Context, projectFullPath string, issueIID, attachmentID int64, fileName string, content []byte, contentType string) (string, error)
+	SavePackageFile(ctx context.Context, projectFullPath, packageType, packageName, version string, fileID int64, fileName string, content []byte, contentType string) (string, error)
+	SaveLFSObject(ctx context.Context, projectFullPath, oid string, content []byte) (string, error)
+	SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID, artifactID int64, fileName string, content []byte, contentType string) (string, error)
 	Load(ctx context.Context, key string) ([]byte, error)
 }
 
-func BuildIssueStorageKey(projectFullPath string, issueIID int64, attachmentID int64, fileName string) string {
+func BuildIssueStorageKey(projectFullPath string, issueIID, attachmentID int64, fileName string) string {
 	return path.Join("issues", sanitizeNestedPath(projectFullPath), strconv.FormatInt(issueIID, 10), strconv.FormatInt(attachmentID, 10), sanitizeFileName(fileName))
 }
 
-func BuildIssueDraftStorageKey(projectFullPath string, token string, fileName string) string {
+func BuildIssueDraftStorageKey(projectFullPath, token, fileName string) string {
 	return path.Join(BuildIssueDraftStoragePrefix(projectFullPath), sanitizePathSegment(token), sanitizeFileName(fileName))
 }
 
@@ -30,15 +30,15 @@ func BuildIssueDraftStoragePrefix(projectFullPath string) string {
 	return path.Join("issues", "drafts", sanitizeNestedPath(projectFullPath))
 }
 
-func BuildPackageStorageKey(projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string) string {
+func BuildPackageStorageKey(projectFullPath, packageType, packageName, version string, fileID int64, fileName string) string {
 	return path.Join("packages", sanitizeNestedPath(projectFullPath), sanitizePathSegment(packageType), sanitizePathSegment(packageName), sanitizePathSegment(version), strconv.FormatInt(fileID, 10), sanitizeFileName(fileName))
 }
 
-func BuildLFSStorageKey(projectFullPath string, oid string) string {
+func BuildLFSStorageKey(projectFullPath, oid string) string {
 	return path.Join("lfs", sanitizeNestedPath(projectFullPath), sanitizePathSegment(oid))
 }
 
-func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID int64, artifactID int64, fileName string) string {
+func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID, artifactID int64, fileName string) string {
 	return path.Join("pipelines", sanitizeNestedPath(projectFullPath), "jobs", strconv.FormatInt(projectJobID, 10), "artifacts", strconv.FormatInt(artifactID, 10), sanitizeFileName(fileName))
 }
 

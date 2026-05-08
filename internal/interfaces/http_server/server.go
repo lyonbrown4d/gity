@@ -12,6 +12,7 @@ import (
 	"github.com/arcgolabs/httpx/adapter"
 	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/samber/oops"
 )
 
 type Host struct {
@@ -91,7 +92,7 @@ func (h *Host) Stop(ctx context.Context) error {
 			return nil
 		}
 	case <-ctx.Done():
-		return ctx.Err()
+		return oops.In("http_server").Wrap(ctx.Err())
 	case <-time.After(5 * time.Second):
 	}
 

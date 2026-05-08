@@ -17,7 +17,7 @@ func TestEndpointRegistersSystemRoutes(t *testing.T) {
 	assertRoute(t, server, http.MethodGet, "/api/v1/rewrite/info")
 }
 
-func assertRoute(t *testing.T, server httpx.ServerRuntime, method string, path string) {
+func assertRoute(t *testing.T, server httpx.ServerRuntime, method, path string) {
 	t.Helper()
 	if !server.HasRoute(method, path) {
 		t.Fatalf("expected route %s %s", method, path)

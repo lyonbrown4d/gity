@@ -9,7 +9,7 @@ import (
 
 type ProjectMergeRequestRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[mergedomain.ProjectMergeRequest], error)
-	GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (mergedomain.ProjectMergeRequest, error)
+	GetByProjectAndIID(ctx context.Context, projectID, iid int64) (mergedomain.ProjectMergeRequest, error)
 	Create(ctx context.Context, input CreateProjectMergeRequestInput) (mergedomain.ProjectMergeRequest, error)
 	UpdateByID(ctx context.Context, id int64, input UpdateProjectMergeRequestInput) error
 }

@@ -22,7 +22,7 @@ func Configure(server httpx.ServerRuntime) {
 	})
 }
 
-func EndpointSpec(prefix string, tag string, summaryPrefix string, description string) httpx.EndpointSpec {
+func EndpointSpec(prefix, tag, summaryPrefix, description string) httpx.EndpointSpec {
 	return httpx.EndpointSpec{
 		Prefix:        prefix,
 		Tags:          httpx.Tags(tag),

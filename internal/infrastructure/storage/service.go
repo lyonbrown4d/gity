@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -56,7 +57,7 @@ func (s *Service) SaveObject(ctx context.Context, key string, content []byte, co
 	return nil
 }
 
-func (s *Service) SaveIssueAttachment(ctx context.Context, projectFullPath string, issueIID int64, attachmentID int64, fileName string, content []byte, contentType string) (string, error) {
+func (s *Service) SaveIssueAttachment(ctx context.Context, projectFullPath string, issueIID, attachmentID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildIssueStorageKey(projectFullPath, issueIID, attachmentID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
 		return "", oops.In("storage").With("project", projectFullPath, "issue_iid", issueIID, "attachment_id", attachmentID).Wrapf(err, "save issue attachment")
@@ -64,7 +65,7 @@ func (s *Service) SaveIssueAttachment(ctx context.Context, projectFullPath strin
 	return key, nil
 }
 
-func (s *Service) SavePackageFile(ctx context.Context, projectFullPath string, packageType string, packageName string, version string, fileID int64, fileName string, content []byte, contentType string) (string, error) {
+func (s *Service) SavePackageFile(ctx context.Context, projectFullPath, packageType, packageName, version string, fileID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildPackageStorageKey(projectFullPath, packageType, packageName, version, fileID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
 		return "", oops.In("storage").With("project", projectFullPath, "package_type", packageType, "package_name", packageName, "version", version, "file_id", fileID).Wrapf(err, "save package file")
@@ -72,7 +73,7 @@ func (s *Service) SavePackageFile(ctx context.Context, projectFullPath string, p
 	return key, nil
 }
 
-func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath string, oid string, content []byte) (string, error) {
+func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath, oid string, content []byte) (string, error) {
 	key := storageports.BuildLFSStorageKey(projectFullPath, oid)
 	if err := s.SaveObject(ctx, key, content, "application/octet-stream"); err != nil {
 		return "", oops.In("storage").With("project", projectFullPath, "oid", oid).Wrapf(err, "save lfs object")
@@ -80,7 +81,7 @@ func (s *Service) SaveLFSObject(ctx context.Context, projectFullPath string, oid
 	return key, nil
 }
 
-func (s *Service) SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID int64, artifactID int64, fileName string, content []byte, contentType string) (string, error) {
+func (s *Service) SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID, artifactID int64, fileName string, content []byte, contentType string) (string, error) {
 	key := storageports.BuildPipelineArtifactStorageKey(projectFullPath, projectJobID, artifactID, fileName)
 	if err := s.SaveObject(ctx, key, content, contentType); err != nil {
 		return "", oops.In("storage").With("project", projectFullPath, "project_job_id", projectJobID, "artifact_id", artifactID).Wrapf(err, "save pipeline artifact")
@@ -103,49 +104,72 @@ type localBackend struct {
 	root string
 }
 
-func (s *localBackend) SaveObject(_ context.Context, key string, content []byte, _ string) error {
-	absPath, err := s.resolveKey(key)
+func (s *localBackend) SaveObject(_ context.Context, key string, content []byte, _ string) (err error) {
+	rootPath, relative, err := s.resolveKey(key)
 	if err != nil {
 		return oops.In("storage").With("key", key).Wrapf(err, "resolve local object key")
 	}
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return oops.In("storage").With("path", filepath.Dir(absPath)).Wrapf(err, "create object directory")
+	if mkdirErr := os.MkdirAll(rootPath, 0o750); mkdirErr != nil {
+		return oops.In("storage").With("root", rootPath).Wrapf(mkdirErr, "create storage root")
 	}
-	if err := os.WriteFile(absPath, content, 0o644); err != nil {
-		return oops.In("storage").With("path", absPath, "byte_size", len(content)).Wrapf(err, "write object file")
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return oops.In("storage").With("root", rootPath).Wrapf(err, "open storage root")
+	}
+	defer func() {
+		if closeErr := root.Close(); closeErr != nil && err == nil {
+			err = oops.In("storage").With("root", rootPath).Wrapf(closeErr, "close storage root")
+		}
+	}()
+	if parent := path.Dir(relative); parent != "." {
+		if mkdirErr := root.MkdirAll(parent, 0o750); mkdirErr != nil {
+			return oops.In("storage").With("path", parent).Wrapf(mkdirErr, "create object directory")
+		}
+	}
+	if writeErr := root.WriteFile(relative, content, 0o600); writeErr != nil {
+		return oops.In("storage").With("path", relative, "byte_size", len(content)).Wrapf(writeErr, "write object file")
 	}
 	return nil
 }
 
-func (s *localBackend) Load(_ context.Context, key string) ([]byte, error) {
-	absPath, err := s.resolveKey(key)
+func (s *localBackend) Load(_ context.Context, key string) (content []byte, err error) {
+	rootPath, relative, err := s.resolveKey(key)
 	if err != nil {
 		return nil, oops.In("storage").With("key", key).Wrapf(err, "resolve local object key")
 	}
-	content, err := os.ReadFile(absPath)
+	root, err := os.OpenRoot(rootPath)
 	if err != nil {
-		return nil, oops.In("storage").With("path", absPath).Wrapf(err, "read object file")
+		return nil, oops.In("storage").With("root", rootPath).Wrapf(err, "open storage root")
+	}
+	defer func() {
+		if closeErr := root.Close(); closeErr != nil && err == nil {
+			err = oops.In("storage").With("root", rootPath).Wrapf(closeErr, "close storage root")
+		}
+	}()
+	content, err = root.ReadFile(relative)
+	if err != nil {
+		return nil, oops.In("storage").With("path", relative).Wrapf(err, "read object file")
 	}
 	return content, nil
 }
 
-func (s *localBackend) resolveKey(key string) (string, error) {
+func (s *localBackend) resolveKey(key string) (string, string, error) {
 	root, err := filepath.Abs(s.root)
 	if err != nil {
-		return "", oops.In("storage").With("root", s.root).Wrapf(err, "resolve storage root")
+		return "", "", oops.In("storage").With("root", s.root).Wrapf(err, "resolve storage root")
 	}
-	relative := filepath.Clean(filepath.FromSlash(strings.Trim(strings.ReplaceAll(key, "\\", "/"), "/")))
-	if relative == "." || strings.HasPrefix(relative, "..") {
-		return "", oops.In("storage").With("key", key).New("invalid storage key")
+	relative := path.Clean(strings.Trim(strings.ReplaceAll(key, "\\", "/"), "/"))
+	if relative == "." || relative == ".." || strings.HasPrefix(relative, "../") || filepath.IsAbs(relative) {
+		return "", "", oops.In("storage").With("key", key).New("invalid storage key")
 	}
-	absPath, err := filepath.Abs(filepath.Join(root, relative))
+	absPath, err := filepath.Abs(filepath.Join(root, filepath.FromSlash(relative)))
 	if err != nil {
-		return "", oops.In("storage").With("root", root, "relative", relative).Wrapf(err, "resolve storage path")
+		return "", "", oops.In("storage").With("root", root, "relative", relative).Wrapf(err, "resolve storage path")
 	}
 	if absPath != root && !strings.HasPrefix(absPath, root+string(filepath.Separator)) {
-		return "", oops.In("storage").With("root", root, "path", absPath, "key", key).New("storage key escapes storage root")
+		return "", "", oops.In("storage").With("root", root, "path", absPath, "key", key).New("storage key escapes storage root")
 	}
-	return absPath, nil
+	return root, relative, nil
 }
 
 type s3Backend struct {

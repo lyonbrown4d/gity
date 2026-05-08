@@ -186,7 +186,7 @@ func (in createJobInput) ProjectIDValue() int64 {
 	return in.ProjectID
 }
 
-func (e *Endpoint) refreshPipelineForJob(ctx context.Context, projectID int64, jobID int64) error {
+func (e *Endpoint) refreshPipelineForJob(ctx context.Context, projectID, jobID int64) error {
 	if e.pipelineService == nil {
 		return nil
 	}

@@ -38,7 +38,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.Proje
 	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectPackageSchema.ID).Get(ctx, id))
 }
 
-func (r *Repository) GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType string, name string) (packagedomain.ProjectPackage, error) {
+func (r *Repository) GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType, name string) (packagedomain.ProjectPackage, error) {
 	query := querydsl.Select(dbschema.ProjectPackageSchema.AllColumns().Values()...).From(dbschema.ProjectPackageSchema).Where(querydsl.And(dbschema.ProjectPackageSchema.ProjectID.Eq(projectID), dbschema.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType)), dbschema.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name)))).Limit(1)
 	return persistence.One(r.base.First(ctx, query))
 }

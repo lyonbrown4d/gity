@@ -16,6 +16,7 @@ import (
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package_version"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -27,20 +28,20 @@ func TestProjectScopedRepositoryQueriesDoNotLeakAcrossProjects(t *testing.T) {
 
 	ctx := context.Background()
 	db := openBoundaryTestDB(t)
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 	if err := core.EnsureSchema(ctx, db); err != nil {
 		t.Fatalf("ensure schema: %v", err)
 	}
 
-	namespaces, _ := namespacerepo.NewRepository(db)
-	projects, _ := projectrepo.NewRepository(db)
-	users, _ := userrepo.NewRepository(db)
-	issues, _ := projectissuerepo.NewRepository(db)
-	mergeRequests, _ := projectmergerequestrepo.NewRepository(db)
-	packages, _ := projectpackagerepo.NewRepository(db)
-	versions, _ := projectpackageversionrepo.NewRepository(db)
-	lfsObjects, _ := projectlfsobjectrepo.NewRepository(db)
-	lfsLocks, _ := projectlfslockrepo.NewRepository(db)
+	namespaces := testutil.Must(namespacerepo.NewRepository(db))
+	projects := testutil.Must(projectrepo.NewRepository(db))
+	users := testutil.Must(userrepo.NewRepository(db))
+	issues := testutil.Must(projectissuerepo.NewRepository(db))
+	mergeRequests := testutil.Must(projectmergerequestrepo.NewRepository(db))
+	packages := testutil.Must(projectpackagerepo.NewRepository(db))
+	versions := testutil.Must(projectpackageversionrepo.NewRepository(db))
+	lfsObjects := testutil.Must(projectlfsobjectrepo.NewRepository(db))
+	lfsLocks := testutil.Must(projectlfslockrepo.NewRepository(db))
 
 	owner, err := users.Create(ctx, userrepo.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
 	if err != nil {

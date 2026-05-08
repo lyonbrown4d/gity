@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/samber/oops"
 	"strings"
 	"time"
 )
@@ -47,7 +48,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectPipeline, error) {
+func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectPipeline, error) {
 	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
 		From(dbschema.ProjectPipelineSchema).
 		Where(querydsl.And(
@@ -58,7 +59,7 @@ func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id 
 	return persistence.One(r.base.First(ctx, query))
 }
 
-func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source string, refName string, commitSHA string) (cidomain.ProjectPipeline, error) {
+func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source, refName, commitSHA string) (cidomain.ProjectPipeline, error) {
 	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
 		From(dbschema.ProjectPipelineSchema).
 		Where(querydsl.And(
@@ -72,7 +73,7 @@ func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID 
 	return persistence.One(r.base.First(ctx, query))
 }
 
-func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName string, commitSHA string) (cidomain.ProjectPipeline, error) {
+func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName, commitSHA string) (cidomain.ProjectPipeline, error) {
 	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
 		From(dbschema.ProjectPipelineSchema).
 		Where(querydsl.And(
@@ -98,7 +99,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 		if err == nil {
 			nextIID = last.IID + 1
 		} else if !persistence.IsNotFound(err) {
-			return err
+			return oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "load last pipeline")
 		}
 		status := strings.TrimSpace(input.Status)
 		if status == "" {
@@ -133,7 +134,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 		return nil
 	})
 	if err != nil {
-		return cidomain.ProjectPipeline{}, err
+		return cidomain.ProjectPipeline{}, oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "create pipeline")
 	}
 	return created, nil
 }

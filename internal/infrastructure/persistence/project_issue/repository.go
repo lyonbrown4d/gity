@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/samber/oops"
 	"strings"
 	"time"
 )
@@ -41,7 +42,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (issuedomain.ProjectIssue, error) {
+func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int64) (issuedomain.ProjectIssue, error) {
 	query := querydsl.Select(dbschema.ProjectIssueSchema.AllColumns().Values()...).
 		From(dbschema.ProjectIssueSchema).
 		Where(querydsl.And(
@@ -65,7 +66,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain
 		if err == nil {
 			nextIID = last.IID + 1
 		} else if !persistence.IsNotFound(err) {
-			return err
+			return oops.In("persistence.project_issue").With("project_id", input.ProjectID).Wrapf(err, "load last project issue")
 		}
 		state := strings.TrimSpace(input.State)
 		if state == "" {
@@ -90,7 +91,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain
 		return nil
 	})
 	if err != nil {
-		return issuedomain.ProjectIssue{}, err
+		return issuedomain.ProjectIssue{}, oops.In("persistence.project_issue").With("project_id", input.ProjectID).Wrapf(err, "create project issue")
 	}
 	return created, nil
 }

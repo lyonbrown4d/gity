@@ -6,11 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"io"
 	"net/http"
 	"strings"
 
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
 
@@ -31,7 +31,7 @@ type SourceArchiveResponse struct {
 	ContentBase64 string `json:"content_base64"`
 }
 
-func NewClient(baseURL string, token string) *Client {
+func NewClient(baseURL, token string) *Client {
 	return &Client{
 		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		token:   strings.TrimSpace(token),
@@ -53,7 +53,7 @@ func (c *Client) ClaimJob(ctx context.Context, leaseSeconds int) (ClaimResponse,
 	return out, err
 }
 
-func (c *Client) GetProjectJob(ctx context.Context, projectID int64, jobID int64) (cidomain.ProjectJob, error) {
+func (c *Client) GetProjectJob(ctx context.Context, projectID, jobID int64) (cidomain.ProjectJob, error) {
 	var out cidomain.ProjectJob
 	err := c.get(ctx, fmt.Sprintf("/projects/%d/jobs/%d", projectID, jobID), &out)
 	return out, err
@@ -67,7 +67,7 @@ func (c *Client) CompleteJob(ctx context.Context, jobID int64, result string) er
 	}, &out)
 }
 
-func (c *Client) FailJob(ctx context.Context, jobID int64, message string, result string, retryAfterSeconds int) error {
+func (c *Client) FailJob(ctx context.Context, jobID int64, message, result string, retryAfterSeconds int) error {
 	var out cidomain.ProjectJob
 	return c.post(ctx, fmt.Sprintf("/runners/jobs/%d/fail", jobID), map[string]any{
 		"token":               c.token,
@@ -92,14 +92,14 @@ func (c *Client) DownloadSourceArchive(ctx context.Context, jobID int64) ([]byte
 	if err := c.post(ctx, fmt.Sprintf("/runners/jobs/%d/source-archive", jobID), map[string]any{
 		"token": c.token,
 	}, &out); err != nil {
-		return nil, err
+		return nil, oops.In("runner_agent").With("job_id", jobID).Wrapf(err, "request source archive")
 	}
 	if strings.TrimSpace(out.Encoding) != "" && strings.TrimSpace(out.Encoding) != "base64" {
-		return nil, fmt.Errorf("unsupported source archive encoding: %s", out.Encoding)
+		return nil, oops.In("runner_agent").With("job_id", jobID, "encoding", out.Encoding).New("unsupported source archive encoding")
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(out.ContentBase64))
 	if err != nil {
-		return nil, fmt.Errorf("decode source archive: %w", err)
+		return nil, oops.In("runner_agent").With("job_id", jobID).Wrapf(err, "decode source archive")
 	}
 	return content, nil
 }
@@ -119,11 +119,11 @@ func (c *Client) UploadArtifact(ctx context.Context, jobID int64, artifact Artif
 func (c *Client) get(ctx context.Context, path string, out any) (err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, http.NoBody)
 	if err != nil {
-		return fmt.Errorf("create runner request: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "create runner request")
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("send runner request: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "send runner request")
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -136,33 +136,33 @@ func (c *Client) get(ctx context.Context, path string, out any) (err error) {
 	}()
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read runner response: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "read runner response")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("runner request failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(content)))
+		return oops.In("runner_agent").With("method", http.MethodGet, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
 	}
 	if out == nil {
 		return nil
 	}
 	if err := decodeBody(content, out); err != nil {
-		return fmt.Errorf("decode runner response: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "decode runner response")
 	}
 	return nil
 }
 
-func (c *Client) post(ctx context.Context, path string, payload any, out any) (err error) {
+func (c *Client) post(ctx context.Context, path string, payload, out any) (err error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("encode runner request: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "encode runner request")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create runner request: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "create runner request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("send runner request: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "send runner request")
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -175,16 +175,16 @@ func (c *Client) post(ctx context.Context, path string, payload any, out any) (e
 	}()
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read runner response: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "read runner response")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("runner request failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(content)))
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
 	}
 	if out == nil {
 		return nil
 	}
 	if err := decodeBody(content, out); err != nil {
-		return fmt.Errorf("decode runner response: %w", err)
+		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "decode runner response")
 	}
 	return nil
 }
@@ -194,10 +194,16 @@ func decodeBody(content []byte, out any) error {
 		Body json.RawMessage `json:"body"`
 	}
 	if err := json.Unmarshal(content, &wrapper); err != nil {
-		return err
+		return oops.In("runner_agent").Wrapf(err, "decode response wrapper")
 	}
 	if len(wrapper.Body) == 0 {
-		return json.Unmarshal(content, out)
+		if err := json.Unmarshal(content, out); err != nil {
+			return oops.In("runner_agent").Wrapf(err, "decode raw response body")
+		}
+		return nil
 	}
-	return json.Unmarshal(wrapper.Body, out)
+	if err := json.Unmarshal(wrapper.Body, out); err != nil {
+		return oops.In("runner_agent").Wrapf(err, "decode wrapped response body")
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/samber/oops"
 	"strings"
 	"time"
 )
@@ -47,7 +48,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectAndID(ctx context.Context, projectID int64, id int64) (cidomain.ProjectJob, error) {
+func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectJob, error) {
 	query := querydsl.Select(dbschema.ProjectJobSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobSchema).
 		Where(querydsl.And(
@@ -130,7 +131,7 @@ func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []str
 		if persistence.IsNotFound(err) {
 			return cidomain.ProjectJob{}, false, nil
 		}
-		return cidomain.ProjectJob{}, false, err
+		return cidomain.ProjectJob{}, false, oops.In("persistence.project_job").With("project_id", projectID, "worker_id", workerID).Wrapf(err, "claim next project job")
 	}
 	item.Status = StatusRunning
 	item.Attempts++

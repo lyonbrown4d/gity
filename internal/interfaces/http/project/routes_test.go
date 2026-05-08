@@ -30,7 +30,7 @@ func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/branches/{branch_name}/protect")
 }
 
-func assertRoute(t *testing.T, server httpx.ServerRuntime, method string, path string) {
+func assertRoute(t *testing.T, server httpx.ServerRuntime, method, path string) {
 	t.Helper()
 	if !server.HasRoute(method, path) {
 		t.Fatalf("expected route %s %s", method, path)

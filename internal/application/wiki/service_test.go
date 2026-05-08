@@ -13,6 +13,7 @@ import (
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -24,9 +25,9 @@ func TestProjectWikiPageFlow(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -85,12 +86,12 @@ func TestProjectWikiPageFlow(t *testing.T) {
 		t.Fatalf("unexpected created wiki page: %+v", created)
 	}
 
-	if _, err := service.CreatePage(ctx, project.ID, wikiservice.CreatePageInput{
+	if _, createPageErr := service.CreatePage(ctx, project.ID, wikiservice.CreatePageInput{
 		Slug:         "getting-started",
 		Title:        "Duplicate",
 		Content:      "duplicate",
 		AuthorUserID: author.ID,
-	}); err == nil {
+	}); createPageErr == nil {
 		t.Fatalf("expected duplicate wiki page slug to fail")
 	}
 
@@ -131,7 +132,7 @@ func TestProjectWikiPageFlow(t *testing.T) {
 	if deleted.ID != created.ID {
 		t.Fatalf("unexpected deleted wiki page: %+v", deleted)
 	}
-	if _, err := service.GetPage(ctx, project.ID, "getting-started"); err == nil {
+	if _, getPageErr := service.GetPage(ctx, project.ID, "getting-started"); getPageErr == nil {
 		t.Fatalf("expected deleted wiki page to be missing")
 	}
 }

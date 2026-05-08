@@ -79,7 +79,7 @@ type RegistrationView struct {
 type ClaimView struct {
 	Claimed bool                `json:"claimed"`
 	Runner  RunnerView          `json:"runner"`
-	Job     cidomain.ProjectJob `json:"job,omitempty"`
+	Job     cidomain.ProjectJob `json:"job,omitzero"`
 }
 
 func NewService(projectRepo gitports.ProjectRepository, runnerRepo gitports.ProjectRunnerRepository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner gitports.GitRunner) *Service {
@@ -92,7 +92,7 @@ func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]Ru
 	}
 	items, err := s.runnerRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("runner").With("project_id", projectID).Wrapf(err, "list project runners")
 	}
 	return collectionlist.MapList(items, func(_ int, item cidomain.ProjectRunner) RunnerView {
 		return toRunnerView(item)
@@ -109,7 +109,7 @@ func (s *Service) RegisterProjectRunner(ctx context.Context, projectID int64, in
 	}
 	token, err := generateRunnerToken()
 	if err != nil {
-		return RegistrationView{}, err
+		return RegistrationView{}, oops.In("runner").With("project_id", projectID).Wrapf(err, "generate runner token")
 	}
 	item, err := s.runnerRepo.Create(ctx, gitports.CreateProjectRunnerInput{
 		ProjectID:   projectID,
@@ -119,21 +119,21 @@ func (s *Service) RegisterProjectRunner(ctx context.Context, projectID int64, in
 		Token:       token,
 	})
 	if err != nil {
-		return RegistrationView{}, err
+		return RegistrationView{}, oops.In("runner").With("project_id", projectID, "name", name).Wrapf(err, "create project runner")
 	}
 	return RegistrationView{Runner: toRunnerView(item), Token: token}, nil
 }
 
-func (s *Service) DeleteProjectRunner(ctx context.Context, projectID int64, runnerID int64) (RunnerView, error) {
+func (s *Service) DeleteProjectRunner(ctx context.Context, projectID, runnerID int64) (RunnerView, error) {
 	item, err := s.runnerRepo.GetByProjectAndID(ctx, projectID, runnerID)
 	if err != nil {
 		if errors.Is(err, gitports.ErrNotFound) {
 			return RunnerView{}, apperror.NotFound("project runner not found", err)
 		}
-		return RunnerView{}, err
+		return RunnerView{}, oops.In("runner").With("project_id", projectID, "runner_id", runnerID).Wrapf(err, "load project runner")
 	}
 	if deleteErr := s.runnerRepo.DeleteByID(ctx, item.ID); deleteErr != nil {
-		return RunnerView{}, deleteErr
+		return RunnerView{}, oops.In("runner").With("project_id", projectID, "runner_id", item.ID).Wrapf(deleteErr, "delete project runner")
 	}
 	return toRunnerView(item), nil
 }
@@ -144,11 +144,11 @@ func (s *Service) Heartbeat(ctx context.Context, token string) (RunnerView, erro
 		return RunnerView{}, err
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return RunnerView{}, heartbeatErr
+		return RunnerView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
 	runner, err = s.runnerRepo.GetByToken(ctx, token)
 	if err != nil {
-		return RunnerView{}, err
+		return RunnerView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(err, "reload runner")
 	}
 	return toRunnerView(runner), nil
 }
@@ -159,11 +159,11 @@ func (s *Service) ClaimJob(ctx context.Context, token string, lease time.Duratio
 		return ClaimView{}, err
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return ClaimView{}, heartbeatErr
+		return ClaimView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
 	job, claimed, err := s.jobService.ClaimProjectJob(ctx, runner.ProjectID, runnerWorkerID(runner), lease)
 	if err != nil {
-		return ClaimView{}, err
+		return ClaimView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(err, "claim project job")
 	}
 	if claimed {
 		if refreshErr := s.refreshPipelineForJob(ctx, runner.ProjectID, job.ID); refreshErr != nil {
@@ -172,7 +172,7 @@ func (s *Service) ClaimJob(ctx context.Context, token string, lease time.Duratio
 	}
 	runner, err = s.runnerRepo.GetByToken(ctx, token)
 	if err != nil {
-		return ClaimView{}, err
+		return ClaimView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(err, "reload runner")
 	}
 	return ClaimView{Claimed: claimed, Runner: toRunnerView(runner), Job: job}, nil
 }
@@ -184,17 +184,17 @@ func (s *Service) CompleteJob(ctx context.Context, token string, jobID int64, re
 	}
 	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
 	if err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
 	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
 		return cidomain.ProjectJob{}, ownershipErr
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return cidomain.ProjectJob{}, heartbeatErr
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
 	completed, err := s.jobService.CompleteProjectJob(ctx, runner.ProjectID, jobID, result)
 	if err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "complete project job")
 	}
 	if refreshErr := s.refreshPipelineForJob(ctx, runner.ProjectID, jobID); refreshErr != nil {
 		return cidomain.ProjectJob{}, refreshErr
@@ -202,24 +202,24 @@ func (s *Service) CompleteJob(ctx context.Context, token string, jobID int64, re
 	return completed, nil
 }
 
-func (s *Service) FailJob(ctx context.Context, token string, jobID int64, message string, result string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
+func (s *Service) FailJob(ctx context.Context, token string, jobID int64, message, result string, retryAfter time.Duration) (cidomain.ProjectJob, error) {
 	runner, err := s.authenticateRunner(ctx, token)
 	if err != nil {
 		return cidomain.ProjectJob{}, err
 	}
 	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
 	if err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
 	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
 		return cidomain.ProjectJob{}, ownershipErr
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return cidomain.ProjectJob{}, heartbeatErr
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
 	failed, err := s.jobService.FailProjectJobWithResult(ctx, runner.ProjectID, jobID, message, result, retryAfter)
 	if err != nil {
-		return cidomain.ProjectJob{}, err
+		return cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "fail project job")
 	}
 	if refreshErr := s.refreshPipelineForJob(ctx, runner.ProjectID, jobID); refreshErr != nil {
 		return cidomain.ProjectJob{}, refreshErr
@@ -234,21 +234,25 @@ func (s *Service) UploadArtifact(ctx context.Context, token string, jobID int64,
 	}
 	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, err
+		return cidomain.ProjectJobArtifact{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
 	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
 		return cidomain.ProjectJobArtifact{}, ownershipErr
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return cidomain.ProjectJobArtifact{}, heartbeatErr
+		return cidomain.ProjectJobArtifact{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
-	return s.jobService.UploadProjectJobArtifact(ctx, runner.ProjectID, jobID, jobservice.UploadArtifactInput{
+	artifact, err := s.jobService.UploadProjectJobArtifact(ctx, runner.ProjectID, jobID, jobservice.UploadArtifactInput{
 		Name:          input.Name,
 		FileName:      input.FileName,
 		FilePath:      input.FilePath,
 		ContentType:   input.ContentType,
 		ContentBase64: input.ContentBase64,
 	})
+	if err != nil {
+		return cidomain.ProjectJobArtifact{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "upload project job artifact")
+	}
+	return artifact, nil
 }
 
 func (s *Service) AppendTrace(ctx context.Context, token string, jobID int64, input AppendTraceInput) (jobservice.ProjectJobTrace, error) {
@@ -258,19 +262,23 @@ func (s *Service) AppendTrace(ctx context.Context, token string, jobID int64, in
 	}
 	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
 	if err != nil {
-		return jobservice.ProjectJobTrace{}, err
+		return jobservice.ProjectJobTrace{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
 	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
 		return jobservice.ProjectJobTrace{}, ownershipErr
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return jobservice.ProjectJobTrace{}, heartbeatErr
+		return jobservice.ProjectJobTrace{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
-	return s.jobService.AppendProjectJobTrace(ctx, runner.ProjectID, jobID, jobservice.AppendTraceInput{
+	trace, err := s.jobService.AppendProjectJobTrace(ctx, runner.ProjectID, jobID, jobservice.AppendTraceInput{
 		Output:          input.Output,
 		OutputTruncated: input.OutputTruncated,
 		DurationMillis:  input.DurationMillis,
 	})
+	if err != nil {
+		return jobservice.ProjectJobTrace{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "append project job trace")
+	}
+	return trace, nil
 }
 
 func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID int64) (SourceArchiveView, error) {
@@ -280,7 +288,7 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 	}
 	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
 	if err != nil {
-		return SourceArchiveView{}, err
+		return SourceArchiveView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
 	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
 		return SourceArchiveView{}, ownershipErr
@@ -304,11 +312,11 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 		return SourceArchiveView{}, apperror.BadRequest("job source revision is required", oops.In("runner").With("project_id", runner.ProjectID, "job_id", jobID).New("job source revision is required"))
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
-		return SourceArchiveView{}, heartbeatErr
+		return SourceArchiveView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
 	}
 	content, err := s.gitRunner.Archive(ctx, project.FullPath+".git", revision)
 	if err != nil {
-		return SourceArchiveView{}, err
+		return SourceArchiveView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID, "revision", revision).Wrapf(err, "archive project source")
 	}
 	return SourceArchiveView{
 		FileName:      fmt.Sprintf("project-%d-job-%d-source.zip", project.ID, job.ID),
@@ -327,7 +335,7 @@ func (s *Service) authenticateRunner(ctx context.Context, token string) (cidomai
 		if errors.Is(err, gitports.ErrNotFound) {
 			return cidomain.ProjectRunner{}, apperror.Unauthorized("invalid runner token", err)
 		}
-		return cidomain.ProjectRunner{}, err
+		return cidomain.ProjectRunner{}, oops.In("runner").Wrapf(err, "authenticate runner")
 	}
 	if runner.Active != 1 {
 		return cidomain.ProjectRunner{}, apperror.Forbidden("runner is disabled", oops.In("runner").With("runner_id", runner.ID, "project_id", runner.ProjectID).New("runner is disabled"))
@@ -366,11 +374,14 @@ func ensureRunnerOwnsJob(runner cidomain.ProjectRunner, job cidomain.ProjectJob)
 	return nil
 }
 
-func (s *Service) refreshPipelineForJob(ctx context.Context, projectID int64, jobID int64) error {
+func (s *Service) refreshPipelineForJob(ctx context.Context, projectID, jobID int64) error {
 	if s.pipelineSvc == nil {
 		return nil
 	}
-	return s.pipelineSvc.RefreshProjectJob(ctx, projectID, jobID)
+	if err := s.pipelineSvc.RefreshProjectJob(ctx, projectID, jobID); err != nil {
+		return oops.In("runner").With("project_id", projectID, "job_id", jobID).Wrapf(err, "refresh pipeline for job")
+	}
+	return nil
 }
 
 func toRunnerView(item cidomain.ProjectRunner) RunnerView {

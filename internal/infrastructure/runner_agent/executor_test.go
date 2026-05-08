@@ -157,7 +157,7 @@ func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 	ctx := context.Background()
 	repoRoot := t.TempDir()
 	bareRepo := filepath.Join(repoRoot, "core", "gity.git")
-	if err := os.MkdirAll(filepath.Dir(bareRepo), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(bareRepo), 0o750); err != nil {
 		t.Fatalf("create bare repo parent: %v", err)
 	}
 	if err := runGit(ctx, filepath.Dir(bareRepo), "init", "--bare", bareRepo); err != nil {
@@ -165,7 +165,7 @@ func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 	}
 
 	worktree := filepath.Join(t.TempDir(), "worktree")
-	if err := os.MkdirAll(worktree, 0o755); err != nil {
+	if err := os.MkdirAll(worktree, 0o750); err != nil {
 		t.Fatalf("create worktree: %v", err)
 	}
 	if err := runGit(ctx, worktree, "init", "-b", "main"); err != nil {
@@ -177,7 +177,7 @@ func TestExecuteScriptJobChecksOutLocalRepository(t *testing.T) {
 	if err := runGit(ctx, worktree, "config", "user.email", "test@gity.dev"); err != nil {
 		t.Fatalf("config user email: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("hello checkout\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("hello checkout\n"), 0o600); err != nil {
 		t.Fatalf("write readme: %v", err)
 	}
 	if err := runGit(ctx, worktree, "add", "README.md"); err != nil {

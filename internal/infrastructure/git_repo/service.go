@@ -53,7 +53,7 @@ func NewService(settings config.Settings) *Service {
 	return &Service{repoRoot: settings.Git.RepoRoot}
 }
 
-func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBranch string) ([]Branch, error) {
+func (s *Service) ListBranches(ctx context.Context, repoPath, defaultBranch string) ([]Branch, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBran
 	if err != nil {
 		return nil, fmt.Errorf("iterate branches: %w", err)
 	}
-	branches.Sort(func(a Branch, b Branch) int {
+	branches.Sort(func(a, b Branch) int {
 		if a.IsDefault && !b.IsDefault {
 			return -1
 		}
@@ -94,7 +94,7 @@ func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBran
 	return branches.Values(), nil
 }
 
-func (s *Service) ListTree(ctx context.Context, repoPath string, refName string, defaultBranch string, treePath string) ([]TreeEntry, error) {
+func (s *Service) ListTree(ctx context.Context, repoPath, refName, defaultBranch, treePath string) ([]TreeEntry, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 			Size: size,
 		})
 	}
-	entries.Sort(func(a TreeEntry, b TreeEntry) int {
+	entries.Sort(func(a, b TreeEntry) int {
 		if a.Type != b.Type {
 			if a.Type == "tree" {
 				return -1
@@ -143,7 +143,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 	return entries.Values(), nil
 }
 
-func (s *Service) GetBlob(ctx context.Context, repoPath string, refName string, defaultBranch string, blobPath string) (Blob, error) {
+func (s *Service) GetBlob(ctx context.Context, repoPath, refName, defaultBranch, blobPath string) (Blob, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return Blob{}, err
@@ -166,7 +166,7 @@ func (s *Service) GetBlob(ctx context.Context, repoPath string, refName string, 
 	return buildBlob(file)
 }
 
-func (s *Service) GetReadme(ctx context.Context, repoPath string, refName string, defaultBranch string) (Blob, error) {
+func (s *Service) GetReadme(ctx context.Context, repoPath, refName, defaultBranch string) (Blob, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return Blob{}, err
@@ -190,7 +190,7 @@ func (s *Service) GetReadme(ctx context.Context, repoPath string, refName string
 	return Blob{}, ErrReadmeNotFound
 }
 
-func (s *Service) ListCommits(ctx context.Context, repoPath string, refName string, defaultBranch string, limit int) ([]Commit, error) {
+func (s *Service) ListCommits(ctx context.Context, repoPath, refName, defaultBranch string, limit int) ([]Commit, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (s *Service) ListCommits(ctx context.Context, repoPath string, refName stri
 	return commits.Values(), nil
 }
 
-func (s *Service) Search(ctx context.Context, repoPath string, refName string, defaultBranch string, input SearchParams) ([]SearchResult, error) {
+func (s *Service) Search(ctx context.Context, repoPath, refName, defaultBranch string, input SearchParams) ([]SearchResult, error) {
 	query := strings.TrimSpace(input.Query)
 	if query == "" {
 		return nil, fmt.Errorf("%w: query is required", ErrInvalidSearchQuery)
@@ -350,7 +350,7 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 	return results.Values(), nil
 }
 
-func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName string, defaultBranch string) (LanguageAnalysis, error) {
+func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath, refName, defaultBranch string) (LanguageAnalysis, error) {
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return LanguageAnalysis{}, err
@@ -391,7 +391,7 @@ func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName
 		}
 		languages.Add(LanguageStat{Language: language, Bytes: bytes, Percentage: percentage})
 	}
-	languages.Sort(func(a LanguageStat, b LanguageStat) int {
+	languages.Sort(func(a, b LanguageStat) int {
 		if a.Bytes != b.Bytes {
 			if a.Bytes > b.Bytes {
 				return -1
@@ -413,7 +413,7 @@ type searchMatcher struct {
 	raw   string
 }
 
-func buildSearchMatcher(query string, matchCase bool, useRegex bool) (searchMatcher, error) {
+func buildSearchMatcher(query string, matchCase, useRegex bool) (searchMatcher, error) {
 	if !useRegex {
 		pattern := query
 		if !matchCase {
@@ -462,7 +462,7 @@ func matchLine(line string, matcher searchMatcher) (int, int, bool) {
 	return start, length, true
 }
 
-func isPathInScope(filePath string, prefix string) bool {
+func isPathInScope(filePath, prefix string) bool {
 	if filePath == prefix {
 		return true
 	}
@@ -472,7 +472,7 @@ func isPathInScope(filePath string, prefix string) bool {
 func readBlobContent(file *object.File) (content []byte, err error) {
 	reader, err := file.Reader()
 	if err != nil {
-		return nil, err
+		return nil, oops.In("git_repo").With("path", file.Name).Wrapf(err, "open blob reader")
 	}
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil {
@@ -483,7 +483,11 @@ func readBlobContent(file *object.File) (content []byte, err error) {
 			err = oops.In("git_repo").With("path", file.Name).Wrapf(closeErr, "close blob reader")
 		}
 	}()
-	return io.ReadAll(reader)
+	content, err = io.ReadAll(reader)
+	if err != nil {
+		return nil, oops.In("git_repo").With("path", file.Name).Wrapf(err, "read blob content")
+	}
+	return content, nil
 }
 
 func normalizePathPrefix(value string) string {
@@ -512,7 +516,7 @@ func (s *Service) openRepository(repoPath string) (*git.Repository, error) {
 	return repository, nil
 }
 
-func (s *Service) resolveTree(ctx context.Context, repository *git.Repository, refName string, defaultBranch string, treePath string) (*object.Tree, error) {
+func (s *Service) resolveTree(ctx context.Context, repository *git.Repository, refName, defaultBranch, treePath string) (*object.Tree, error) {
 	commit, err := s.resolveCommit(ctx, repository, refName, defaultBranch)
 	if err != nil {
 		return nil, err
@@ -535,10 +539,10 @@ func (s *Service) resolveTree(ctx context.Context, repository *git.Repository, r
 	return subTree, nil
 }
 
-func (s *Service) resolveCommit(ctx context.Context, repository *git.Repository, refName string, defaultBranch string) (*object.Commit, error) {
+func (s *Service) resolveCommit(ctx context.Context, repository *git.Repository, refName, defaultBranch string) (*object.Commit, error) {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, oops.In("git_repo").Wrap(ctx.Err())
 	default:
 	}
 
@@ -587,7 +591,7 @@ func (s *Service) resolveRepoPath(repoPath string) (string, error) {
 	return absRepo, nil
 }
 
-func resolveRevisionCandidates(refName string, defaultBranch string) []string {
+func resolveRevisionCandidates(refName, defaultBranch string) []string {
 	normalizedRef := strings.TrimSpace(refName)
 	candidates := setx.NewOrderedSetWithCapacity[string](5)
 	add := func(value string) {

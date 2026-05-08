@@ -149,11 +149,36 @@ linters:
         - github.com/DaiYuANg/gity/internal/infrastructure/persistence.One(
         - github.com/DaiYuANg/gity/internal/infrastructure/persistence.Many(
         - github.com/DaiYuANg/gity/internal/infrastructure/persistence.NormalizeError(
+        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.One[
+        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.Many[
+        - persistence.One(
+        - persistence.Many(
+        - persistence.NormalizeError(
+        - persistence.One[
+        - persistence.Many[
+      ignore-package-globs:
+        - github.com/DaiYuANg/gity/internal/application/*
+        - github.com/DaiYuANg/gity/internal/application/**
+        - github.com/DaiYuANg/gity/internal/interfaces/http_api
+        - github.com/DaiYuANg/gity/internal/infrastructure/auth
+        - github.com/gofiber/fiber/v2
   exclusions:
     rules:
       - path: _test\.go
         linters:
           - godoclint
+      - path: _test\.go
+        text: "G204:"
+        linters:
+          - gosec
+      - path: internal[\\/]infrastructure[\\/]git_exec[\\/]runner\.go
+        text: "G204:"
+        linters:
+          - gosec
+      - path: internal[\\/]infrastructure[\\/]runner_agent[\\/]executor\.go
+        text: "G204:"
+        linters:
+          - gosec
 
 issues:
   max-issues-per-linter: 0

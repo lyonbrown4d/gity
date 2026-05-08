@@ -355,7 +355,7 @@ func parseLimit(value string) (int, error) {
 	return parsed, nil
 }
 
-func isLFSPath(path string, method string) bool {
+func isLFSPath(path, method string) bool {
 	normalized := normalizeRequestPath(path)
 	if normalized == "" || !strings.Contains(normalized, ".git/") {
 		return false

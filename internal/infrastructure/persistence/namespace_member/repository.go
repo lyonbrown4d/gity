@@ -38,7 +38,7 @@ func (r *Repository) ListByNamespaceID(ctx context.Context, namespaceID int64) (
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) FindByNamespaceAndUser(ctx context.Context, namespaceID int64, userID int64) (namespacedomain.NamespaceMember, error) {
+func (r *Repository) FindByNamespaceAndUser(ctx context.Context, namespaceID, userID int64) (namespacedomain.NamespaceMember, error) {
 	return persistence.One(r.base.GetByKey(ctx, dbxrepo.Key{
 		"namespace_id": namespaceID,
 		"user_id":      userID,

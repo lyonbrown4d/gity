@@ -33,7 +33,7 @@ func NewProjectJobArtifactRepository(repo *Repository) ciports.ProjectJobArtifac
 	return repo
 }
 
-func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (*collectionx.List[cidomain.ProjectJobArtifact], error) {
+func (r *Repository) ListByProjectJobID(ctx context.Context, projectID, projectJobID int64) (*collectionx.List[cidomain.ProjectJobArtifact], error) {
 	query := querydsl.Select(dbschema.ProjectJobArtifactSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobArtifactSchema).
 		Where(querydsl.And(
@@ -44,7 +44,7 @@ func (r *Repository) ListByProjectJobID(ctx context.Context, projectID int64, pr
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectJobAndID(ctx context.Context, projectID int64, projectJobID int64, artifactID int64) (cidomain.ProjectJobArtifact, error) {
+func (r *Repository) GetByProjectJobAndID(ctx context.Context, projectID, projectJobID, artifactID int64) (cidomain.ProjectJobArtifact, error) {
 	query := querydsl.Select(dbschema.ProjectJobArtifactSchema.AllColumns().Values()...).
 		From(dbschema.ProjectJobArtifactSchema).
 		Where(querydsl.And(

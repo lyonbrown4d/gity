@@ -7,16 +7,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	"github.com/samber/oops"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"time"
+
+	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/samber/oops"
+	"golang.org/x/sys/execabs"
 )
 
 type ScriptPayload struct {
@@ -106,7 +109,7 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	}
 
 	workDir := filepath.Join(cfg.WorkDir, fmt.Sprintf("job-%d-attempt-%d", job.ID, job.Attempts))
-	if err := os.MkdirAll(workDir, 0o755); err != nil {
+	if err := os.MkdirAll(workDir, 0o750); err != nil {
 		return "", fmt.Errorf("create job workspace: %w", err)
 	}
 	if err := checkoutProjectSource(ctx, cfg, job, payload, workDir, sourceFetcher); err != nil {
@@ -174,30 +177,30 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	return string(encoded), nil
 }
 
-func scriptCommand(ctx context.Context, shell string, script string) *exec.Cmd {
+func scriptCommand(ctx context.Context, shell, script string) *exec.Cmd {
 	normalized := strings.ToLower(strings.TrimSpace(shell))
 	if normalized == "" {
 		if runtime.GOOS == "windows" {
-			return exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
+			return execabs.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 		}
-		return exec.CommandContext(ctx, "/bin/sh", "-lc", script)
+		return execabs.CommandContext(ctx, "/bin/sh", "-lc", script)
 	}
 	switch normalized {
 	case "powershell", "powershell.exe":
-		return exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
+		return execabs.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 	case "pwsh", "pwsh.exe":
-		return exec.CommandContext(ctx, "pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
+		return execabs.CommandContext(ctx, "pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
 	case "cmd", "cmd.exe":
-		return exec.CommandContext(ctx, "cmd.exe", "/C", script)
+		return execabs.CommandContext(ctx, "cmd.exe", "/C", script)
 	case "bash":
-		return exec.CommandContext(ctx, "bash", "-lc", script)
+		return execabs.CommandContext(ctx, "bash", "-lc", script)
 	case "sh":
-		return exec.CommandContext(ctx, "/bin/sh", "-lc", script)
+		return execabs.CommandContext(ctx, "/bin/sh", "-lc", script)
 	default:
 		if runtime.GOOS == "windows" {
-			return exec.CommandContext(ctx, shell, "/C", script)
+			return execabs.CommandContext(ctx, shell, "/C", script)
 		}
-		return exec.CommandContext(ctx, shell, "-lc", script)
+		return execabs.CommandContext(ctx, shell, "-lc", script)
 	}
 }
 
@@ -239,7 +242,7 @@ func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.Project
 	return runGit(ctx, workDir, "checkout", "-B", refName, "origin/"+refName)
 }
 
-func ExtractSourceArchive(content []byte, workDir string) error {
+func ExtractSourceArchive(content []byte, workDir string) (err error) {
 	reader, err := zip.NewReader(bytes.NewReader(content), int64(len(content)))
 	if err != nil {
 		return fmt.Errorf("open source archive: %w", err)
@@ -248,14 +251,23 @@ func ExtractSourceArchive(content []byte, workDir string) error {
 	if err != nil {
 		return fmt.Errorf("resolve source archive target: %w", err)
 	}
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		return fmt.Errorf("open source archive target: %w", err)
+	}
+	defer func() {
+		if closeErr := rootHandle.Close(); closeErr != nil && err == nil {
+			err = oops.In("runner_agent").With("root", root).Wrapf(closeErr, "close source archive target")
+		}
+	}()
 	for _, file := range reader.File {
-		target, err := archiveTargetPath(root, file.Name)
+		relative, err := archiveTargetPath(file.Name)
 		if err != nil {
 			return err
 		}
 		info := file.FileInfo()
 		if info.IsDir() {
-			if mkdirErr := os.MkdirAll(target, 0o755); mkdirErr != nil {
+			if mkdirErr := rootHandle.MkdirAll(relative, 0o750); mkdirErr != nil {
 				return fmt.Errorf("create source directory: %w", mkdirErr)
 			}
 			continue
@@ -263,18 +275,20 @@ func ExtractSourceArchive(content []byte, workDir string) error {
 		if !info.Mode().IsRegular() {
 			continue
 		}
-		if mkdirErr := os.MkdirAll(filepath.Dir(target), 0o755); mkdirErr != nil {
-			return fmt.Errorf("create source parent directory: %w", mkdirErr)
+		if parent := path.Dir(relative); parent != "." {
+			if mkdirErr := rootHandle.MkdirAll(parent, 0o750); mkdirErr != nil {
+				return fmt.Errorf("create source parent directory: %w", mkdirErr)
+			}
 		}
 		rc, err := file.Open()
 		if err != nil {
 			return fmt.Errorf("open source archive entry: %w", err)
 		}
-		if err := writeArchiveFile(target, rc, info.Mode().Perm()); err != nil {
+		if err := writeArchiveFile(rootHandle, relative, rc, archiveFileMode(info.Mode().Perm())); err != nil {
 			if closeErr := rc.Close(); closeErr != nil {
-				return oops.In("runner_agent").With("target", target).Wrapf(oops.Join(err, closeErr), "write source archive file and close archive entry")
+				return oops.In("runner_agent").With("target", relative).Wrapf(oops.Join(err, closeErr), "write source archive file and close archive entry")
 			}
-			return oops.In("runner_agent").With("target", target).Wrapf(err, "write source archive file")
+			return oops.In("runner_agent").With("target", relative).Wrapf(err, "write source archive file")
 		}
 		if err := rc.Close(); err != nil {
 			return fmt.Errorf("close source archive entry: %w", err)
@@ -283,26 +297,16 @@ func ExtractSourceArchive(content []byte, workDir string) error {
 	return nil
 }
 
-func archiveTargetPath(root string, name string) (string, error) {
+func archiveTargetPath(name string) (string, error) {
 	normalized := strings.Trim(strings.ReplaceAll(name, "\\", "/"), "/")
 	if normalized == "" || normalized == "." || strings.HasPrefix(normalized, "../") || strings.Contains(normalized, "/../") || filepath.IsAbs(normalized) {
 		return "", fmt.Errorf("invalid source archive path: %s", name)
 	}
-	target, err := filepath.Abs(filepath.Join(root, filepath.FromSlash(normalized)))
-	if err != nil {
-		return "", fmt.Errorf("resolve source archive path: %w", err)
-	}
-	if target != root && !strings.HasPrefix(target, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("source archive path escapes workspace: %s", name)
-	}
-	return target, nil
+	return path.Clean(normalized), nil
 }
 
-func writeArchiveFile(target string, reader io.Reader, mode os.FileMode) error {
-	if mode == 0 {
-		mode = 0o644
-	}
-	file, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
+func writeArchiveFile(root *os.Root, target string, reader io.Reader, mode os.FileMode) error {
+	file, err := root.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return fmt.Errorf("create source archive file: %w", err)
 	}
@@ -318,7 +322,7 @@ func writeArchiveFile(target string, reader io.Reader, mode os.FileMode) error {
 	return nil
 }
 
-func resolveLocalBareRepo(repoRoot string, projectFullPath string) (string, error) {
+func resolveLocalBareRepo(repoRoot, projectFullPath string) (string, error) {
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return "", fmt.Errorf("resolve runner repo root: %w", err)
@@ -338,13 +342,20 @@ func resolveLocalBareRepo(repoRoot string, projectFullPath string) (string, erro
 }
 
 func runGit(ctx context.Context, dir string, args ...string) error {
-	command := exec.CommandContext(ctx, "git", args...)
+	command := execabs.CommandContext(ctx, "git", args...)
 	command.Dir = dir
 	output, err := command.CombinedOutput()
 	if err == nil {
 		return nil
 	}
 	return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+}
+
+func archiveFileMode(mode os.FileMode) os.FileMode {
+	if mode&0o111 != 0 {
+		return 0o700
+	}
+	return 0o600
 }
 
 func exitCodeFromError(err error) int {
@@ -381,7 +392,7 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 		if !b.truncatedSent {
 			b.truncatedSent = true
 			if err := b.stream(nil); err != nil {
-				return len(p), err
+				return len(p), oops.In("runner_agent").Wrapf(err, "stream truncated job output")
 			}
 		}
 		return len(p), nil
@@ -394,7 +405,7 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 			return len(p), oops.In("runner_agent").With("remaining", remaining).Wrapf(err, "capture truncated job output")
 		}
 		if err := b.stream(captured); err != nil {
-			return len(p), err
+			return len(p), oops.In("runner_agent").Wrapf(err, "stream captured truncated job output")
 		}
 		return len(p), nil
 	}
@@ -403,9 +414,12 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 		if err != nil {
 			return n, oops.In("runner_agent").Wrapf(oops.Join(err, streamErr), "capture and stream job output")
 		}
-		return n, streamErr
+		return n, oops.In("runner_agent").Wrapf(streamErr, "stream job output")
 	}
-	return n, err
+	if err != nil {
+		return n, oops.In("runner_agent").Wrapf(err, "capture job output")
+	}
+	return n, nil
 }
 
 func (b *cappedBuffer) String() string {

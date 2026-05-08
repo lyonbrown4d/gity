@@ -98,7 +98,7 @@ func NewStandaloneApp() *dix.App {
 	)
 }
 
-func newApp(name string, description string, modules []dix.Module) *dix.App {
+func newApp(name, description string, modules []dix.Module) *dix.App {
 	return dix.New(
 		name,
 		dix.WithVersion("0.1.0"),

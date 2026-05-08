@@ -18,6 +18,7 @@ import (
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_artifact"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_log"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -29,9 +30,9 @@ func TestProjectJobFlow(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -102,9 +103,9 @@ func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -162,8 +163,8 @@ func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 	if streamed.Trace != "streaming" || streamed.DurationMillis != 12 {
 		t.Fatalf("unexpected streamed trace: %+v", streamed)
 	}
-	if _, err := service.CompleteProjectJob(ctx, project.ID, claimed.ID, `{"exit_code":0,"output":"ok\n","output_truncated":false,"duration_millis":42,"work_dir":"."}`); err != nil {
-		t.Fatalf("complete script job: %v", err)
+	if _, completeErr := service.CompleteProjectJob(ctx, project.ID, claimed.ID, `{"exit_code":0,"output":"ok\n","output_truncated":false,"duration_millis":42,"work_dir":"."}`); completeErr != nil {
+		t.Fatalf("complete script job: %v", completeErr)
 	}
 	trace, err := service.GetProjectJobTrace(ctx, project.ID, claimed.ID)
 	if err != nil {
@@ -205,9 +206,9 @@ func TestProjectJobRetry(t *testing.T) {
 
 	ctx := context.Background()
 	db := openTestDB(t)
-	defer db.Close()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	testutil.CleanupClose(t, "db", db)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	namespaceRepository, err := namespacerepo.NewRepository(db)
@@ -248,8 +249,8 @@ func TestProjectJobRetry(t *testing.T) {
 	if !ok || claimed.ID != created.ID {
 		t.Fatalf("unexpected claim result: ok=%v job=%+v", ok, claimed)
 	}
-	if _, err := service.FailProjectJob(ctx, project.ID, claimed.ID, "failed", time.Second); err != nil {
-		t.Fatalf("fail job: %v", err)
+	if _, failErr := service.FailProjectJob(ctx, project.ID, claimed.ID, "failed", time.Second); failErr != nil {
+		t.Fatalf("fail job: %v", failErr)
 	}
 	retried, err := service.RetryProjectJob(ctx, project.ID, claimed.ID)
 	if err != nil {

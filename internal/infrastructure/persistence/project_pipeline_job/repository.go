@@ -31,7 +31,7 @@ func NewProjectPipelineJobRepository(repo *Repository) ciports.ProjectPipelineJo
 	return repo
 }
 
-func (r *Repository) ListByPipelineID(ctx context.Context, projectID int64, pipelineID int64) (*collectionx.List[cidomain.ProjectPipelineJob], error) {
+func (r *Repository) ListByPipelineID(ctx context.Context, projectID, pipelineID int64) (*collectionx.List[cidomain.ProjectPipelineJob], error) {
 	query := querydsl.Select(dbschema.ProjectPipelineJobSchema.AllColumns().Values()...).
 		From(dbschema.ProjectPipelineJobSchema).
 		Where(querydsl.And(
@@ -42,7 +42,7 @@ func (r *Repository) ListByPipelineID(ctx context.Context, projectID int64, pipe
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectJobID(ctx context.Context, projectID int64, projectJobID int64) (cidomain.ProjectPipelineJob, error) {
+func (r *Repository) GetByProjectJobID(ctx context.Context, projectID, projectJobID int64) (cidomain.ProjectPipelineJob, error) {
 	query := querydsl.Select(dbschema.ProjectPipelineJobSchema.AllColumns().Values()...).
 		From(dbschema.ProjectPipelineJobSchema).
 		Where(querydsl.And(

@@ -311,7 +311,7 @@ func isZeroOID(value string) bool {
 	return value == "" || value == "0000000000000000000000000000000000000000"
 }
 
-func isGitProtocolPath(path string, method string) bool {
+func isGitProtocolPath(path, method string) bool {
 	normalized := strings.Trim(strings.ReplaceAll(path, "\\", "/"), "/")
 	if normalized == "" || !strings.Contains(normalized, ".git/") {
 		return false

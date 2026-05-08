@@ -11,6 +11,7 @@ import (
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	"github.com/samber/oops"
 	"strings"
 	"time"
 )
@@ -36,7 +37,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 	return persistence.Many(r.base.List(ctx, query))
 }
 
-func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID int64, iid int64) (mergedomain.ProjectMergeRequest, error) {
+func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int64) (mergedomain.ProjectMergeRequest, error) {
 	query := querydsl.Select(dbschema.ProjectMergeRequestSchema.AllColumns().Values()...).From(dbschema.ProjectMergeRequestSchema).Where(querydsl.And(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(projectID), dbschema.ProjectMergeRequestSchema.IID.Eq(iid))).Limit(1)
 	return persistence.One(r.base.First(ctx, query))
 }
@@ -50,7 +51,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (mergedomain
 		if err == nil {
 			nextIID = last.IID + 1
 		} else if !persistence.IsNotFound(err) {
-			return err
+			return oops.In("persistence.merge_request").With("project_id", input.ProjectID).Wrapf(err, "load last merge request")
 		}
 		now := time.Now().UTC()
 		item := mergedomain.ProjectMergeRequest{
@@ -72,7 +73,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (mergedomain
 		return nil
 	})
 	if err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
+		return mergedomain.ProjectMergeRequest{}, oops.In("persistence.merge_request").With("project_id", input.ProjectID).Wrapf(err, "create merge request")
 	}
 	return created, nil
 }

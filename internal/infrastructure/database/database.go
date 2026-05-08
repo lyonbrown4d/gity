@@ -22,7 +22,7 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		return nil, oops.In("database").New("database dsn is required")
 	}
 
-	dialect, err := resolveDialect(settings.Database.Driver)
+	dbDialect, err := resolveDialect(settings.Database.Driver)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 	db, err := dbx.Open(
 		dbx.WithDriver(settings.Database.Driver),
 		dbx.WithDSN(settings.Database.DSN),
-		dbx.WithDialect(dialect),
+		dbx.WithDialect(dbDialect),
 		dbx.ApplyOptions(
 			dbx.WithLogger(logger),
 			dbx.WithDebug(settings.App.Environment == "development"),

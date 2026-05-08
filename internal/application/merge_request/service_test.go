@@ -29,6 +29,7 @@ import (
 	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline_job"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
+	"github.com/DaiYuANg/gity/internal/testutil"
 
 	"github.com/arcgolabs/dbx"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
@@ -47,22 +48,22 @@ func TestMergeRequestFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	logger := slog.Default()
-	namespaceRepository, _ := namespacerepo.NewRepository(db)
-	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
-	projectRepository, _ := projectrepo.NewRepository(db)
-	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
-	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
-	pipelineRepository, _ := projectpipelinerepo.NewRepository(db)
-	userRepository, _ := userrepo.NewRepository(db)
-	userTokenRepository, _ := usertokenrepo.NewRepository(db)
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
+	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
+	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
@@ -85,8 +86,8 @@ func TestMergeRequestFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if err := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); err != nil {
-		t.Fatalf("push fixture branches: %v", err)
+	if pushErr := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
+		t.Fatalf("push fixture branches: %v", pushErr)
 	}
 
 	mr, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "merge feature", Description: "merge feature into main", SourceBranch: "feature", TargetBranch: "main"})
@@ -144,24 +145,24 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
+	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
+		t.Fatalf("ensure schema: %v", schemaErr)
 	}
 
 	logger := slog.Default()
-	namespaceRepository, _ := namespacerepo.NewRepository(db)
-	namespaceMemberRepository, _ := namespacememberrepo.NewRepository(db)
-	projectRepository, _ := projectrepo.NewRepository(db)
-	projectBranchProtectionRepository, _ := projectbranchprotectionrepo.NewRepository(db)
-	mergeRequestRepository, _ := projectmergerequestrepo.NewRepository(db)
-	pipelineRepository, _ := projectpipelinerepo.NewRepository(db)
-	pipelineJobRepository, _ := projectpipelinejobrepo.NewRepository(db)
-	jobRepository, _ := projectjobrepo.NewRepository(db)
-	userRepository, _ := userrepo.NewRepository(db)
-	userTokenRepository, _ := usertokenrepo.NewRepository(db)
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
+	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
+	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
+	pipelineJobRepository := testutil.Must(projectpipelinejobrepo.NewRepository(db))
+	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
@@ -186,18 +187,18 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if err := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); err != nil {
-		t.Fatalf("push fixture branches: %v", err)
+	if pushErr := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
+		t.Fatalf("push fixture branches: %v", pushErr)
 	}
-	if err := runner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+	if createCommitErr := runner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
 		BranchName:  "feature",
 		FilePath:    ".gity-ci.plano",
 		Content:     mergeRequestCIConfig(),
 		Message:     "Add CI config",
 		AuthorName:  "Gity Test",
 		AuthorEmail: "test@gity.dev",
-	}); err != nil {
-		t.Fatalf("add ci config: %v", err)
+	}); createCommitErr != nil {
+		t.Fatalf("add ci config: %v", createCommitErr)
 	}
 	sourceBranch := findBranch(t, ctx, gitRepository, project.FullPath+".git", project.DefaultBranch, "feature")
 
@@ -212,7 +213,7 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	if !checks.Required || checks.Mergeable || checks.Status != "missing" {
 		t.Fatalf("expected missing required checks: %+v", checks)
 	}
-	if _, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); err == nil {
+	if _, mergeErr := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); mergeErr == nil {
 		t.Fatalf("expected merge to be blocked before pipeline exists")
 	}
 
@@ -236,8 +237,8 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	if checks.Mergeable || checks.Status != projectpipelinerepo.StatusFailed || checks.Pipeline == nil {
 		t.Fatalf("expected failed checks: %+v", checks)
 	}
-	if err := pipelineRepository.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusSucceeded); err != nil {
-		t.Fatalf("mark pipeline succeeded: %v", err)
+	if updateErr := pipelineRepository.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusSucceeded); updateErr != nil {
+		t.Fatalf("mark pipeline succeeded: %v", updateErr)
 	}
 	merged, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"})
 	if err != nil {
@@ -256,11 +257,6 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	}
 }
 
-//go:fix inline
-func stringPtr(value string) *string {
-	return new(value)
-}
-
 func mergeRequestCIConfig() string {
 	return `
 pipeline {
@@ -275,7 +271,7 @@ stage test {
 `
 }
 
-func findBranch(t *testing.T, ctx context.Context, gitRepository *gitrepo.Service, repoPath string, defaultBranch string, branchName string) gitrepo.Branch {
+func findBranch(t *testing.T, ctx context.Context, gitRepository *gitrepo.Service, repoPath, defaultBranch, branchName string) gitrepo.Branch {
 	t.Helper()
 	branches, err := gitRepository.ListBranches(ctx, repoPath, defaultBranch)
 	if err != nil {
@@ -290,10 +286,10 @@ func findBranch(t *testing.T, ctx context.Context, gitRepository *gitrepo.Servic
 	return gitrepo.Branch{}
 }
 
-func pushFixtureBranches(ctx context.Context, repoRoot string, repoPath string) error {
+func pushFixtureBranches(ctx context.Context, repoRoot, repoPath string) error {
 	worktree := filepath.Join(filepath.Dir(repoRoot), "fixture-worktree-mr")
-	if err := os.MkdirAll(worktree, 0o755); err != nil {
-		return err
+	if err := os.MkdirAll(worktree, 0o750); err != nil {
+		return fmt.Errorf("create fixture worktree: %w", err)
 	}
 	if err := runGit(ctx, worktree, "init", "-b", "main"); err != nil {
 		return err
@@ -304,8 +300,8 @@ func pushFixtureBranches(ctx context.Context, repoRoot string, repoPath string) 
 	if err := runGit(ctx, worktree, "config", "user.email", "test@gity.dev"); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(worktree, "README.md"), []byte("# Hello Gity\n"), 0o600); err != nil {
+		return fmt.Errorf("write fixture readme: %w", err)
 	}
 	if err := runGit(ctx, worktree, "add", "."); err != nil {
 		return err
@@ -319,8 +315,8 @@ func pushFixtureBranches(ctx context.Context, repoRoot string, repoPath string) 
 	if err := runGit(ctx, worktree, "checkout", "feature"); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(worktree, "feature.txt"), []byte("feature branch\n"), 0o644); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(worktree, "feature.txt"), []byte("feature branch\n"), 0o600); err != nil {
+		return fmt.Errorf("write fixture feature file: %w", err)
 	}
 	if err := runGit(ctx, worktree, "add", "."); err != nil {
 		return err

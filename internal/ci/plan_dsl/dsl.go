@@ -36,7 +36,7 @@ type CommandSpec struct {
 	Args []string `json:"args"`
 }
 
-func Compile(ctx context.Context, filename string, source string) (PipelineSpec, error) {
+func Compile(ctx context.Context, filename, source string) (PipelineSpec, error) {
 	c := compiler.New(compiler.Options{})
 	if err := Register(c); err != nil {
 		return PipelineSpec{}, err
@@ -389,13 +389,15 @@ func validateStringArgs(name string) func(args list.List[any]) error {
 
 func validateStageGraph(stages []StageSpec) error {
 	names := make(map[string]struct{}, len(stages))
-	for _, stage := range stages {
+	for i := range stages {
+		stage := &stages[i]
 		if _, exists := names[stage.Name]; exists {
 			return oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
 		}
 		names[stage.Name] = struct{}{}
 	}
-	for _, stage := range stages {
+	for i := range stages {
+		stage := &stages[i]
 		for _, need := range stage.Needs {
 			if _, exists := names[need]; !exists {
 				return oops.In("ci_plan_dsl").With("stage", stage.Name, "need", need).New("stage needs unknown stage")
@@ -404,8 +406,9 @@ func validateStageGraph(stages []StageSpec) error {
 	}
 	visiting := map[string]bool{}
 	visited := map[string]bool{}
-	byName := make(map[string]StageSpec, len(stages))
-	for _, stage := range stages {
+	byName := make(map[string]*StageSpec, len(stages))
+	for i := range stages {
+		stage := &stages[i]
 		byName[stage.Name] = stage
 	}
 	var visit func(string) error
@@ -426,7 +429,8 @@ func validateStageGraph(stages []StageSpec) error {
 		visited[name] = true
 		return nil
 	}
-	for _, stage := range stages {
+	for i := range stages {
+		stage := &stages[i]
 		if err := visit(stage.Name); err != nil {
 			return err
 		}

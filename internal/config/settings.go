@@ -1,6 +1,9 @@
 package config
 
-import "github.com/arcgolabs/configx"
+import (
+	"github.com/arcgolabs/configx"
+	"github.com/samber/oops"
+)
 
 type Settings struct {
 	App      AppSettings      `json:"app"      koanf:"app"      mapstructure:"app"`
@@ -88,12 +91,16 @@ func DefaultSettings() Settings {
 }
 
 func NewConfig() (*configx.Config, error) {
-	return configx.NewConfig(
+	cfg, err := configx.NewConfig(
 		configx.WithDotenv(".env"),
 		configx.WithEnvPrefix("GITY"),
 		configx.WithEnvSeparator("__"),
 		configx.WithTypedDefaults(DefaultSettings()),
 	)
+	if err != nil {
+		return nil, oops.In("config").Wrapf(err, "initialize config")
+	}
+	return cfg, nil
 }
 
 func NewSettings(cfg *configx.Config) (Settings, error) {
@@ -103,7 +110,7 @@ func NewSettings(cfg *configx.Config) (Settings, error) {
 	}
 	loaded, err := configx.GetAs[Settings](cfg, "")
 	if err != nil {
-		return settings, err
+		return settings, oops.In("config").Wrapf(err, "load settings")
 	}
 	return loaded, nil
 }

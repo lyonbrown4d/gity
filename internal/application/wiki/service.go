@@ -41,7 +41,7 @@ func (s *Service) ListPages(ctx context.Context, projectID int64) ([]wikidomain.
 	}
 	items, err := s.pageRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("wiki").With("project_id", projectID).Wrapf(err, "list wiki pages")
 	}
 	return items.Values(), nil
 }
@@ -79,12 +79,12 @@ func (s *Service) CreatePage(ctx context.Context, projectID int64, input CreateP
 	if err != nil {
 		return wikidomain.ProjectWikiPage{}, apperror.BadRequest("invalid wiki page slug", err)
 	}
-	if _, err := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug); err == nil {
+	if _, existingErr := s.pageRepo.GetByProjectAndSlug(ctx, projectID, slug); existingErr == nil {
 		return wikidomain.ProjectWikiPage{}, apperror.Conflict("wiki page already exists", oops.In("wiki").With("project_id", projectID, "slug", slug).New("wiki page already exists"))
-	} else if !errors.Is(err, appports.ErrNotFound) {
-		return wikidomain.ProjectWikiPage{}, err
+	} else if !errors.Is(existingErr, appports.ErrNotFound) {
+		return wikidomain.ProjectWikiPage{}, oops.In("wiki").With("project_id", projectID, "slug", slug).Wrapf(existingErr, "check wiki page")
 	}
-	return s.pageRepo.Create(ctx, appports.CreateProjectWikiPageInput{
+	page, err := s.pageRepo.Create(ctx, appports.CreateProjectWikiPageInput{
 		ProjectID:    projectID,
 		Slug:         slug,
 		Title:        title,
@@ -92,6 +92,10 @@ func (s *Service) CreatePage(ctx context.Context, projectID int64, input CreateP
 		Format:       format,
 		AuthorUserID: input.AuthorUserID,
 	})
+	if err != nil {
+		return wikidomain.ProjectWikiPage{}, oops.In("wiki").With("project_id", projectID, "slug", slug, "author_user_id", input.AuthorUserID).Wrapf(err, "create wiki page")
+	}
+	return page, nil
 }
 
 func (s *Service) UpdatePage(ctx context.Context, projectID int64, slug string, input UpdatePageInput) (wikidomain.ProjectWikiPage, error) {
@@ -108,7 +112,7 @@ func (s *Service) UpdatePage(ctx context.Context, projectID int64, slug string, 
 		}
 	}
 	if err := s.pageRepo.UpdateByID(ctx, page.ID, appports.UpdateProjectWikiPageInput{Title: input.Title, Content: input.Content, LastEditedByUserID: input.EditorUserID}); err != nil {
-		return wikidomain.ProjectWikiPage{}, err
+		return wikidomain.ProjectWikiPage{}, oops.In("wiki").With("project_id", projectID, "page_id", page.ID, "slug", page.Slug).Wrapf(err, "update wiki page")
 	}
 	return s.GetPage(ctx, projectID, page.Slug)
 }
@@ -119,7 +123,7 @@ func (s *Service) DeletePage(ctx context.Context, projectID int64, slug string) 
 		return wikidomain.ProjectWikiPage{}, err
 	}
 	if err := s.pageRepo.DeleteByID(ctx, page.ID); err != nil {
-		return wikidomain.ProjectWikiPage{}, err
+		return wikidomain.ProjectWikiPage{}, oops.In("wiki").With("project_id", projectID, "page_id", page.ID, "slug", page.Slug).Wrapf(err, "delete wiki page")
 	}
 	return page, nil
 }
@@ -130,12 +134,12 @@ func (s *Service) loadPage(ctx context.Context, projectID int64, slug string) (w
 		if errors.Is(err, appports.ErrNotFound) {
 			return wikidomain.ProjectWikiPage{}, apperror.NotFound("wiki page not found", err)
 		}
-		return wikidomain.ProjectWikiPage{}, err
+		return wikidomain.ProjectWikiPage{}, oops.In("wiki").With("project_id", projectID, "slug", slug).Wrapf(err, "load wiki page")
 	}
 	return page, nil
 }
 
-func normalizeSlug(value string, fallbackTitle string) (string, error) {
+func normalizeSlug(value, fallbackTitle string) (string, error) {
 	source := strings.TrimSpace(value)
 	if source == "" {
 		source = strings.TrimSpace(fallbackTitle)

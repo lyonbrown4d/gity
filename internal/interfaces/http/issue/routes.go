@@ -450,7 +450,7 @@ func parseOptionalInt64(value string) (int64, error) {
 	return parsed, nil
 }
 
-func toIssueAttachmentUploadView(projectID int64, issueIID int64, item issueservice.AttachmentUploadView) issueAttachmentUploadView {
+func toIssueAttachmentUploadView(projectID, issueIID int64, item issueservice.AttachmentUploadView) issueAttachmentUploadView {
 	downloadURL := fmt.Sprintf("/api/v1/repos/%d/issues/attachments/raw?object_key=%s", projectID, url.QueryEscape(item.ObjectKey))
 	if item.Attachment != nil {
 		downloadURL = fmt.Sprintf("/api/v1/repos/%d/issues/%d/attachments/%d/raw", projectID, issueIID, item.Attachment.ID)
@@ -465,7 +465,7 @@ func toIssueAttachmentUploadView(projectID int64, issueIID int64, item issueserv
 	}
 }
 
-func buildAttachmentMarkdown(fileName string, contentType string, downloadURL string) string {
+func buildAttachmentMarkdown(fileName, contentType, downloadURL string) string {
 	escapedName := strings.ReplaceAll(strings.TrimSpace(fileName), "]", "\\]")
 	if escapedName == "" {
 		escapedName = "attachment"

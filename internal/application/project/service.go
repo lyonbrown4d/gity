@@ -106,33 +106,41 @@ func newService(deps Dependencies) *Service {
 }
 
 func (s *Service) List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error) {
-	return s.repo.List(ctx, namespaceID)
+	items, err := s.repo.List(ctx, namespaceID)
+	if err != nil {
+		return nil, oops.In("project").With("namespace_id", namespaceID).Wrapf(err, "list projects")
+	}
+	return items, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id int64) (projectdomain.Project, error) {
-	return s.repo.GetByID(ctx, id)
+	item, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return projectdomain.Project{}, oops.In("project").With("project_id", id).Wrapf(err, "load project")
+	}
+	return item, nil
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.Project, error) {
 	if input.NamespaceID <= 0 {
-		return projectdomain.Project{}, errors.New("project namespace_id is required")
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).New("project namespace_id is required")
 	}
 	if strings.TrimSpace(input.Name) == "" {
-		return projectdomain.Project{}, errors.New("project name is required")
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).New("project name is required")
 	}
 	if strings.TrimSpace(input.PathKey) == "" {
-		return projectdomain.Project{}, errors.New("project path_key is required")
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name).New("project path_key is required")
 	}
 	visibility := strings.TrimSpace(strings.ToLower(input.Visibility))
 	if visibility == "" {
 		visibility = "private"
 	}
 	if !projectVisibilities.Contains(visibility) {
-		return projectdomain.Project{}, fmt.Errorf("unsupported project visibility: %s", visibility)
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "visibility", visibility).New("unsupported project visibility")
 	}
 	namespace, err := s.namespaceRepo.GetByID(ctx, input.NamespaceID)
 	if err != nil {
-		return projectdomain.Project{}, fmt.Errorf("load project namespace: %w", err)
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).Wrapf(err, "load project namespace")
 	}
 	project, err := s.repo.Create(ctx, gitports.CreateProjectInput{
 		NamespaceID:   input.NamespaceID,
@@ -143,7 +151,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 		DefaultBranch: input.DefaultBranch,
 	}, namespace)
 	if err != nil {
-		return projectdomain.Project{}, err
+		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name, "path_key", input.PathKey).Wrapf(err, "create project")
 	}
 	repoPath := project.FullPath + ".git"
 	if err := s.gitRunner.InitBare(ctx, repoPath, project.DefaultBranch); err != nil {
@@ -161,10 +169,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
-		return errors.New("project id is required")
+		return oops.In("project").With("project_id", id).New("project id is required")
 	}
 	if err := s.repo.DeleteByID(ctx, id); err != nil {
-		return err
+		return oops.In("project").With("project_id", id).Wrapf(err, "delete project")
 	}
 	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(id)); err != nil {
 		wrapped := oops.In("project").With("project_id", id).Wrapf(err, "publish project deleted event")
@@ -197,7 +205,7 @@ func (s *Service) ListBranches(ctx context.Context, id int64) ([]Branch, error) 
 	}).Values(), nil
 }
 
-func (s *Service) CreateBranch(ctx context.Context, id int64, branchName string, sourceRef string) (Branch, error) {
+func (s *Service) CreateBranch(ctx context.Context, id int64, branchName, sourceRef string) (Branch, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return Branch{}, apperror.NotFound("project not found", err)
@@ -221,10 +229,10 @@ func (s *Service) SetBranchProtection(ctx context.Context, id int64, branchName 
 	}
 	if protected {
 		if _, err := s.branchRepo.Protect(ctx, id, branchName); err != nil {
-			return Branch{}, err
+			return Branch{}, oops.In("project").With("project_id", id, "branch", branchName).Wrapf(err, "protect branch")
 		}
 	} else if err := s.branchRepo.Unprotect(ctx, id, branchName); err != nil {
-		return Branch{}, err
+		return Branch{}, oops.In("project").With("project_id", id, "branch", branchName).Wrapf(err, "unprotect branch")
 	}
 	return s.GetBranch(ctx, id, branchName)
 }
@@ -280,12 +288,12 @@ func (s *Service) isBranchProtected(ctx context.Context, projectID int64, branch
 	if _, err := s.branchRepo.GetByProjectAndBranch(ctx, projectID, branchName); err == nil {
 		return true, nil
 	} else if !errors.Is(err, gitports.ErrNotFound) {
-		return false, err
+		return false, oops.In("project").With("project_id", projectID, "branch", branchName).Wrapf(err, "check branch protection")
 	}
 	return false, nil
 }
 
-func (s *Service) ListTree(ctx context.Context, id int64, refName string, treePath string) ([]gitports.TreeEntry, error) {
+func (s *Service) ListTree(ctx context.Context, id int64, refName, treePath string) ([]gitports.TreeEntry, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, apperror.NotFound("project not found", err)
@@ -297,7 +305,7 @@ func (s *Service) ListTree(ctx context.Context, id int64, refName string, treePa
 	return entries, nil
 }
 
-func (s *Service) Search(ctx context.Context, id int64, refName string, query string, path string, limit int, maxFiles int, maxFileSize int64, matchCase bool, useRegex bool) ([]gitports.SearchResult, error) {
+func (s *Service) Search(ctx context.Context, id int64, refName, query, path string, limit, maxFiles int, maxFileSize int64, matchCase, useRegex bool) ([]gitports.SearchResult, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, apperror.NotFound("project not found", err)
@@ -312,12 +320,12 @@ func (s *Service) Search(ctx context.Context, id int64, refName string, query st
 		UseRegex:    useRegex,
 	})
 	if err != nil {
-		return nil, err
+		return nil, mapGitError(err)
 	}
 	return results, nil
 }
 
-func (s *Service) GetBlob(ctx context.Context, id int64, refName string, blobPath string) (gitports.Blob, error) {
+func (s *Service) GetBlob(ctx context.Context, id int64, refName, blobPath string) (gitports.Blob, error) {
 	project, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return gitports.Blob{}, apperror.NotFound("project not found", err)
@@ -408,7 +416,7 @@ func mapGitExecError(err error) error {
 func (s *Service) protectedBranchSet(ctx context.Context, projectID int64) (*setx.Set[string], error) {
 	items, err := s.branchRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
-		return nil, err
+		return nil, oops.In("project").With("project_id", projectID).Wrapf(err, "list protected branches")
 	}
 	return setx.NewSetWithCapacity[string](items.Len(), collectionx.MapList(items, func(_ int, item projectdomain.ProjectBranchProtection) string {
 		return item.BranchName
