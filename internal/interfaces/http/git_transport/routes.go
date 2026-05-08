@@ -14,6 +14,7 @@ import (
 	infragittransport "github.com/DaiYuANg/gity/internal/infrastructure/git_transport"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
@@ -236,17 +237,16 @@ type receivePackUpdate struct {
 
 func parseReceivePackBranchUpdates(body []byte) []string {
 	updates := parseReceivePackUpdates(body)
-	branches := make([]string, 0)
-	for _, update := range updates {
+	return collectionlist.FilterMapList(collectionlist.NewList(updates...), func(_ int, update receivePackUpdate) (string, bool) {
 		if update.BranchName != "" {
-			branches = append(branches, update.BranchName)
+			return update.BranchName, true
 		}
-	}
-	return branches
+		return "", false
+	}).Values()
 }
 
 func parseReceivePackUpdates(body []byte) []receivePackUpdate {
-	updates := make([]receivePackUpdate, 0)
+	updates := collectionlist.NewList[receivePackUpdate]()
 	offset := 0
 	for offset+4 <= len(body) {
 		rawLength := string(body[offset : offset+4])
@@ -278,7 +278,7 @@ func parseReceivePackUpdates(body []byte) []receivePackUpdate {
 		refName := fields[2]
 		if strings.HasPrefix(refName, "refs/heads/") {
 			newSHA := fields[1]
-			updates = append(updates, receivePackUpdate{
+			updates.Add(receivePackUpdate{
 				OldSHA:     fields[0],
 				NewSHA:     newSHA,
 				RefName:    refName,
@@ -287,7 +287,7 @@ func parseReceivePackUpdates(body []byte) []receivePackUpdate {
 			})
 		}
 	}
-	return updates
+	return updates.Values()
 }
 
 func triggerPushPipelines(ctx context.Context, logger *slog.Logger, service *pipelineservice.Service, project projectView, updates []receivePackUpdate) {

@@ -177,17 +177,15 @@ func (s *Service) ListBranches(ctx context.Context, id int64) ([]Branch, error) 
 	if err != nil {
 		return nil, err
 	}
-	branches := make([]Branch, 0, len(gitBranches))
-	for _, branch := range gitBranches {
-		branches = append(branches, Branch{
+	return collectionx.MapList(collectionx.NewList(gitBranches...), func(_ int, branch gitports.Branch) Branch {
+		return Branch{
 			Name:          branch.Name,
 			Hash:          branch.Hash,
 			IsDefault:     branch.IsDefault,
-			IsProtected:   protected[branch.Name],
+			IsProtected:   protected.Contains(branch.Name),
 			LastCommitSHA: branch.Hash,
-		})
-	}
-	return branches, nil
+		}
+	}).Values(), nil
 }
 
 func (s *Service) CreateBranch(ctx context.Context, id int64, branchName string, sourceRef string) (Branch, error) {
@@ -398,15 +396,12 @@ func mapGitExecError(err error) error {
 	}
 }
 
-func (s *Service) protectedBranchSet(ctx context.Context, projectID int64) (map[string]bool, error) {
+func (s *Service) protectedBranchSet(ctx context.Context, projectID int64) (*setx.Set[string], error) {
 	items, err := s.branchRepo.ListByProjectID(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	protected := map[string]bool{}
-	items.Range(func(_ int, item projectdomain.ProjectBranchProtection) bool {
-		protected[item.BranchName] = true
-		return true
-	})
-	return protected, nil
+	return setx.NewSetWithCapacity[string](items.Len(), collectionx.MapList(items, func(_ int, item projectdomain.ProjectBranchProtection) string {
+		return item.BranchName
+	}).Values()...), nil
 }

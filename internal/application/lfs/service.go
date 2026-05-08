@@ -2,11 +2,13 @@ package lfs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"net/http"
 	"path"
@@ -122,42 +124,116 @@ func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request Bat
 	if !supportedBatchOperations.Contains(operation) {
 		return BatchResponse{}, fmt.Errorf("unsupported lfs operation: %s", request.Operation)
 	}
-	response := BatchResponse{Transfer: "basic", Objects: make([]BatchObjectResult, 0, len(request.Objects))}
-	for _, object := range request.Objects {
-		oid := strings.TrimSpace(object.OID)
-		item := BatchObjectResult{OID: oid, Size: object.Size}
-		if err := validateOID(oid); err != nil {
-			item.Error = &ActionError{Code: http.StatusBadRequest, Message: err.Error()}
-			response.Objects = append(response.Objects, item)
-			continue
-		}
-		if object.Size < 0 {
-			item.Error = &ActionError{Code: http.StatusBadRequest, Message: "lfs object size must be non-negative"}
-			response.Objects = append(response.Objects, item)
-			continue
-		}
-		record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
-		exists := err == nil
-		if err != nil && err != storageports.ErrNotFound {
-			return BatchResponse{}, err
-		}
-		endpoint := strings.TrimRight(baseURL, "/") + "/" + strings.Trim(strings.ReplaceAll(repoHTTPPath, "\\", "/"), "/") + "/info/lfs/objects/" + oid
-		switch operation {
-		case "upload":
-			if !exists {
-				item.Actions = map[string]ActionDetail{"upload": {Href: endpoint}}
+	response, err := collectionlist.ReduceErrList(
+		collectionlist.NewList(request.Objects...),
+		BatchResponse{Transfer: "basic", Objects: make([]BatchObjectResult, 0, len(request.Objects))},
+		func(response BatchResponse, _ int, object BatchObjectRequest) (BatchResponse, error) {
+			item, err := s.prepareBatchObject(ctx, projectID, operation, object, baseURL, repoHTTPPath)
+			if err != nil {
+				return BatchResponse{}, err
 			}
-		case "download":
-			if !exists {
-				item.Error = &ActionError{Code: http.StatusNotFound, Message: "lfs object not found"}
-			} else {
-				item.Size = record.ByteSize
-				item.Actions = map[string]ActionDetail{"download": {Href: endpoint}}
-			}
-		}
-		response.Objects = append(response.Objects, item)
+			response.Objects = append(response.Objects, item)
+			return response, nil
+		},
+	)
+	if err != nil {
+		return BatchResponse{}, fmt.Errorf("prepare lfs batch objects: %w", err)
 	}
 	return response, nil
+}
+
+func (s *Service) prepareBatchObject(ctx context.Context, projectID int64, operation string, object BatchObjectRequest, baseURL, repoHTTPPath string) (BatchObjectResult, error) {
+	oid := strings.TrimSpace(object.OID)
+	item := BatchObjectResult{OID: oid, Size: object.Size}
+	oidErrorMessage := ""
+	if oidErr := validateOID(oid); oidErr != nil {
+		oidErrorMessage = oidErr.Error()
+	}
+	if oidErrorMessage != "" {
+		item.Error = &ActionError{Code: http.StatusBadRequest, Message: oidErrorMessage}
+		return item, nil
+	}
+	if object.Size < 0 {
+		item.Error = &ActionError{Code: http.StatusBadRequest, Message: "lfs object size must be non-negative"}
+		return item, nil
+	}
+	record, err := s.objectRepo.GetByProjectAndOID(ctx, projectID, oid)
+	exists := err == nil
+	if err != nil && !errors.Is(err, storageports.ErrNotFound) {
+		return BatchObjectResult{}, fmt.Errorf("load lfs object: %w", err)
+	}
+	endpoint := strings.TrimRight(baseURL, "/") + "/" + strings.Trim(strings.ReplaceAll(repoHTTPPath, "\\", "/"), "/") + "/info/lfs/objects/" + oid
+	if operation == "upload" {
+		return uploadBatchObjectResult(item, exists, endpoint), nil
+	}
+	return downloadBatchObjectResult(item, exists, record.ByteSize, endpoint), nil
+}
+
+func uploadBatchObjectResult(item BatchObjectResult, exists bool, endpoint string) BatchObjectResult {
+	if !exists {
+		item.Actions = map[string]ActionDetail{"upload": {Href: endpoint}}
+	}
+	return item
+}
+
+func downloadBatchObjectResult(item BatchObjectResult, exists bool, byteSize int64, endpoint string) BatchObjectResult {
+	if !exists {
+		item.Error = &ActionError{Code: http.StatusNotFound, Message: "lfs object not found"}
+		return item
+	}
+	item.Size = byteSize
+	item.Actions = map[string]ActionDetail{"download": {Href: endpoint}}
+	return item
+}
+
+func (s *Service) ListLocks(ctx context.Context, projectID int64, input LockListInput) (LockListResult, error) {
+	items, nextCursor, err := s.listLockEntities(ctx, projectID, input)
+	if err != nil {
+		return LockListResult{}, err
+	}
+	result, err := collectionlist.ReduceErrList(
+		collectionlist.NewList(items...),
+		LockListResult{Locks: make([]LockView, 0, len(items)), NextCursor: nextCursor},
+		func(result LockListResult, _ int, item lfsdomain.ProjectLFSLock) (LockListResult, error) {
+			view, viewErr := s.buildLockView(ctx, item)
+			if viewErr != nil {
+				return LockListResult{}, viewErr
+			}
+			result.Locks = append(result.Locks, view)
+			return result, nil
+		},
+	)
+	if err != nil {
+		return LockListResult{}, fmt.Errorf("build lfs lock list: %w", err)
+	}
+	return result, nil
+}
+
+func (s *Service) VerifyLocks(ctx context.Context, projectID, currentUserID int64, input LockListInput) (VerifyLocksResult, error) {
+	items, nextCursor, err := s.listLockEntities(ctx, projectID, input)
+	if err != nil {
+		return VerifyLocksResult{}, err
+	}
+	result, err := collectionlist.ReduceErrList(
+		collectionlist.NewList(items...),
+		VerifyLocksResult{Ours: make([]LockView, 0, len(items)), Theirs: make([]LockView, 0, len(items)), NextCursor: nextCursor},
+		func(result VerifyLocksResult, _ int, item lfsdomain.ProjectLFSLock) (VerifyLocksResult, error) {
+			view, viewErr := s.buildLockView(ctx, item)
+			if viewErr != nil {
+				return VerifyLocksResult{}, viewErr
+			}
+			if item.OwnerUserID == currentUserID {
+				result.Ours = append(result.Ours, view)
+			} else {
+				result.Theirs = append(result.Theirs, view)
+			}
+			return result, nil
+		},
+	)
+	if err != nil {
+		return VerifyLocksResult{}, fmt.Errorf("build lfs lock verification: %w", err)
+	}
+	return result, nil
 }
 
 func (s *Service) UploadObject(ctx context.Context, projectID int64, oid string, content []byte) (lfsdomain.ProjectLFSObject, error) {
@@ -230,42 +306,6 @@ func (s *Service) CreateLock(ctx context.Context, projectID int64, ownerUserID i
 		return LockEnvelope{}, err
 	}
 	return LockEnvelope{Lock: buildLockView(lock, owner)}, nil
-}
-
-func (s *Service) ListLocks(ctx context.Context, projectID int64, input LockListInput) (LockListResult, error) {
-	items, nextCursor, err := s.listLockEntities(ctx, projectID, input)
-	if err != nil {
-		return LockListResult{}, err
-	}
-	result := LockListResult{Locks: make([]LockView, 0, len(items)), NextCursor: nextCursor}
-	for _, item := range items {
-		view, err := s.buildLockView(ctx, item)
-		if err != nil {
-			return LockListResult{}, err
-		}
-		result.Locks = append(result.Locks, view)
-	}
-	return result, nil
-}
-
-func (s *Service) VerifyLocks(ctx context.Context, projectID int64, currentUserID int64, input LockListInput) (VerifyLocksResult, error) {
-	items, nextCursor, err := s.listLockEntities(ctx, projectID, input)
-	if err != nil {
-		return VerifyLocksResult{}, err
-	}
-	result := VerifyLocksResult{Ours: make([]LockView, 0, len(items)), Theirs: make([]LockView, 0, len(items)), NextCursor: nextCursor}
-	for _, item := range items {
-		view, err := s.buildLockView(ctx, item)
-		if err != nil {
-			return VerifyLocksResult{}, err
-		}
-		if item.OwnerUserID == currentUserID {
-			result.Ours = append(result.Ours, view)
-		} else {
-			result.Theirs = append(result.Theirs, view)
-		}
-	}
-	return result, nil
 }
 
 func (s *Service) Unlock(ctx context.Context, projectID int64, actorUserID int64, lockID string, input UnlockInput) (LockEnvelope, error) {

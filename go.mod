@@ -4,9 +4,9 @@ go 1.26.2
 
 require (
 	github.com/arcgolabs/authx v0.2.1
-	github.com/arcgolabs/collectionx/list v0.7.0
-	github.com/arcgolabs/collectionx/mapping v0.7.0
-	github.com/arcgolabs/collectionx/set v0.7.0
+	github.com/arcgolabs/collectionx/list v0.8.0
+	github.com/arcgolabs/collectionx/mapping v0.8.0
+	github.com/arcgolabs/collectionx/set v0.8.0
 	github.com/arcgolabs/configx v0.3.2
 	github.com/arcgolabs/dbx v0.1.5
 	github.com/arcgolabs/dix v0.7.2
@@ -38,7 +38,7 @@ require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
-	github.com/arcgolabs/collectionx/graph v0.7.0 // indirect
+	github.com/arcgolabs/collectionx/graph v0.8.0 // indirect
 	github.com/arcgolabs/httpx/adapter/echo v0.1.4 // indirect
 	github.com/arcgolabs/httpx/adapter/gin v0.1.4 // indirect
 	github.com/arcgolabs/httpx/adapter/std v0.1.4 // indirect

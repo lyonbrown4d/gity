@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	collectionlist "github.com/arcgolabs/collectionx/list"
+	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/bmatcuk/doublestar/v4"
 	"io/fs"
 	"net/http"
@@ -38,8 +40,8 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 		return nil, fmt.Errorf("script result does not include work_dir")
 	}
 	root := os.DirFS(workDir)
-	files := make([]ArtifactFile, 0)
-	seen := map[string]struct{}{}
+	files := collectionlist.NewList[ArtifactFile]()
+	seen := setx.NewSet[string]()
 	for _, pattern := range payload.Artifacts {
 		matches, err := doublestar.Glob(root, normalizeArtifactPattern(pattern), doublestar.WithFilesOnly())
 		if err != nil {
@@ -50,10 +52,10 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 			if relative == "" {
 				continue
 			}
-			if _, ok := seen[relative]; ok {
+			if seen.Contains(relative) {
 				continue
 			}
-			seen[relative] = struct{}{}
+			seen.Add(relative)
 			info, err := fs.Stat(root, relative)
 			if err != nil || info.IsDir() {
 				continue
@@ -62,7 +64,7 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 			if err != nil {
 				return nil, fmt.Errorf("read artifact %q: %w", relative, err)
 			}
-			files = append(files, ArtifactFile{
+			files.Add(ArtifactFile{
 				Name:        relative,
 				FileName:    path.Base(relative),
 				FilePath:    relative,
@@ -71,7 +73,7 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) ([]ArtifactFile, e
 			})
 		}
 	}
-	return files, nil
+	return files.Values(), nil
 }
 
 func normalizeArtifactPattern(value string) string {

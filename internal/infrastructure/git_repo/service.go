@@ -11,12 +11,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"unicode/utf8"
 
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/DaiYuANg/gity/internal/config"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -66,12 +66,12 @@ func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBran
 	}
 	defer iter.Close()
 
-	branches := make([]Branch, 0)
+	branches := collectionlist.NewList[Branch]()
 	err = iter.ForEach(func(ref *plumbing.Reference) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		branches = append(branches, Branch{
+		branches.Add(Branch{
 			Name:      ref.Name().Short(),
 			Hash:      ref.Hash().String(),
 			IsDefault: ref.Name().Short() == strings.TrimSpace(defaultBranch),
@@ -81,7 +81,7 @@ func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBran
 	if err != nil {
 		return nil, fmt.Errorf("iterate branches: %w", err)
 	}
-	slices.SortFunc(branches, func(a Branch, b Branch) int {
+	branches.Sort(func(a Branch, b Branch) int {
 		if a.IsDefault && !b.IsDefault {
 			return -1
 		}
@@ -90,7 +90,7 @@ func (s *Service) ListBranches(ctx context.Context, repoPath string, defaultBran
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return branches, nil
+	return branches.Values(), nil
 }
 
 func (s *Service) ListTree(ctx context.Context, repoPath string, refName string, defaultBranch string, treePath string) ([]TreeEntry, error) {
@@ -106,7 +106,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 		return nil, err
 	}
 
-	entries := make([]TreeEntry, 0, len(tree.Entries))
+	entries := collectionlist.NewListWithCapacity[TreeEntry](len(tree.Entries))
 	for _, entry := range tree.Entries {
 		size := int64(0)
 		entryType := "blob"
@@ -122,7 +122,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 		if strings.TrimSpace(treePath) != "" {
 			entryPath = path.Join(strings.Trim(strings.ReplaceAll(treePath, "\\", "/"), "/"), entry.Name)
 		}
-		entries = append(entries, TreeEntry{
+		entries.Add(TreeEntry{
 			Name: entry.Name,
 			Path: entryPath,
 			Type: entryType,
@@ -130,7 +130,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 			Size: size,
 		})
 	}
-	slices.SortFunc(entries, func(a TreeEntry, b TreeEntry) int {
+	entries.Sort(func(a TreeEntry, b TreeEntry) int {
 		if a.Type != b.Type {
 			if a.Type == "tree" {
 				return -1
@@ -139,7 +139,7 @@ func (s *Service) ListTree(ctx context.Context, repoPath string, refName string,
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return entries, nil
+	return entries.Values(), nil
 }
 
 func (s *Service) GetBlob(ctx context.Context, repoPath string, refName string, defaultBranch string, blobPath string) (Blob, error) {
@@ -213,7 +213,7 @@ func (s *Service) ListCommits(ctx context.Context, repoPath string, refName stri
 	}
 	defer iter.Close()
 
-	commits := make([]Commit, 0, limit)
+	commits := collectionlist.NewListWithCapacity[Commit](limit)
 	count := 0
 	err = iter.ForEach(func(item *object.Commit) error {
 		if ctx.Err() != nil {
@@ -227,7 +227,7 @@ func (s *Service) ListCommits(ctx context.Context, repoPath string, refName stri
 		if len(shortHash) > 8 {
 			shortHash = shortHash[:8]
 		}
-		commits = append(commits, Commit{
+		commits.Add(Commit{
 			Hash:        hash,
 			ShortHash:   shortHash,
 			AuthorName:  item.Author.Name,
@@ -241,7 +241,7 @@ func (s *Service) ListCommits(ctx context.Context, repoPath string, refName stri
 	if err != nil && !errors.Is(err, errStopIteration) {
 		return nil, fmt.Errorf("iterate commits: %w", err)
 	}
-	return commits, nil
+	return commits.Values(), nil
 }
 
 func (s *Service) Search(ctx context.Context, repoPath string, refName string, defaultBranch string, input SearchParams) ([]SearchResult, error) {
@@ -297,7 +297,7 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 	}
 
 	pathPrefix := normalizePathPrefix(input.Path)
-	results := make([]SearchResult, 0, limit)
+	results := collectionlist.NewListWithCapacity[SearchResult](limit)
 	fileCount := 0
 
 	err = tree.Files().ForEach(func(file *object.File) error {
@@ -328,14 +328,14 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 			if !matched {
 				continue
 			}
-			results = append(results, SearchResult{
+			results.Add(SearchResult{
 				Path:        file.Name,
 				LineNumber:  lineNumber + 1,
 				Column:      column,
 				MatchLength: matchLength,
 				LineContent: line,
 			})
-			if len(results) >= limit {
+			if results.Len() >= limit {
 				return errStopIteration
 			}
 		}
@@ -346,7 +346,7 @@ func (s *Service) Search(ctx context.Context, repoPath string, refName string, d
 	if err != nil && !errors.Is(err, errStopIteration) {
 		return nil, fmt.Errorf("search repository: %w", err)
 	}
-	return results, nil
+	return results.Values(), nil
 }
 
 func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName string, defaultBranch string) (LanguageAnalysis, error) {
@@ -382,15 +382,15 @@ func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName
 	if err != nil {
 		return LanguageAnalysis{}, fmt.Errorf("analyze repository languages: %w", err)
 	}
-	languages := make([]LanguageStat, 0, len(bytesByLanguage))
+	languages := collectionlist.NewListWithCapacity[LanguageStat](len(bytesByLanguage))
 	for language, bytes := range bytesByLanguage {
 		percentage := float64(0)
 		if total > 0 {
 			percentage = float64(bytes) * 100 / float64(total)
 		}
-		languages = append(languages, LanguageStat{Language: language, Bytes: bytes, Percentage: percentage})
+		languages.Add(LanguageStat{Language: language, Bytes: bytes, Percentage: percentage})
 	}
-	slices.SortFunc(languages, func(a LanguageStat, b LanguageStat) int {
+	languages.Sort(func(a LanguageStat, b LanguageStat) int {
 		if a.Bytes != b.Bytes {
 			if a.Bytes > b.Bytes {
 				return -1
@@ -402,7 +402,7 @@ func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath string, refName
 	return LanguageAnalysis{
 		Revision:   commit.Hash.String(),
 		TotalBytes: total,
-		Languages:  languages,
+		Languages:  languages.Values(),
 	}, nil
 }
 

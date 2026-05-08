@@ -11,6 +11,7 @@ import (
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"strings"
 	"time"
 )
@@ -91,11 +92,9 @@ func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]Ru
 	if err != nil {
 		return nil, err
 	}
-	views := make([]RunnerView, 0, items.Len())
-	for _, item := range items.Values() {
-		views = append(views, toRunnerView(item))
-	}
-	return views, nil
+	return collectionlist.MapList(items, func(_ int, item cidomain.ProjectRunner) RunnerView {
+		return toRunnerView(item)
+	}).Values(), nil
 }
 
 func (s *Service) RegisterProjectRunner(ctx context.Context, projectID int64, input RegisterInput) (RegistrationView, error) {

@@ -8,6 +8,7 @@ import (
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
@@ -102,18 +103,18 @@ func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
 
 func normalizeTags(value string) string {
 	parts := strings.Split(value, ",")
-	seen := map[string]struct{}{}
-	out := make([]string, 0, len(parts))
+	seen := setx.NewSetWithCapacity[string](len(parts))
+	out := collectionx.NewListWithCapacity[string](len(parts))
 	for _, part := range parts {
 		trimmed := strings.TrimSpace(strings.ToLower(part))
 		if trimmed == "" {
 			continue
 		}
-		if _, ok := seen[trimmed]; ok {
+		if seen.Contains(trimmed) {
 			continue
 		}
-		seen[trimmed] = struct{}{}
-		out = append(out, trimmed)
+		seen.Add(trimmed)
+		out.Add(trimmed)
 	}
-	return strings.Join(out, ",")
+	return strings.Join(out.Values(), ",")
 }

@@ -5,6 +5,8 @@ import (
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
+	collectionlist "github.com/arcgolabs/collectionx/list"
+	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
 	"strconv"
 	"strings"
@@ -100,14 +102,12 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			return nil, err
 		}
 		idFilter := parseIDFilter(in.IDs)
-		views := make([]organizationView, 0, items.Len())
-		items.Range(func(_ int, item namespacedomain.Namespace) bool {
-			if len(idFilter) > 0 && !idFilter[item.ID] {
-				return true
+		views := collectionlist.FilterMapList(items, func(_ int, item namespacedomain.Namespace) (organizationView, bool) {
+			if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
+				return organizationView{}, false
 			}
-			views = append(views, toOrganizationView(item))
-			return true
-		})
+			return toOrganizationView(item), true
+		}).Values()
 		return &namespaceOutput{Body: views}, nil
 	}
 
@@ -167,10 +167,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]organizationMemberView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toOrganizationMemberView(in.ID, item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item namespaceservice.MemberView) organizationMemberView {
+			return toOrganizationMemberView(in.ID, item)
+		}).Values()
 		return &namespaceOutput{Body: views}, nil
 	}
 
@@ -224,16 +223,16 @@ func toOrganizationMemberView(namespaceID int64, item namespaceservice.MemberVie
 	}
 }
 
-func parseIDFilter(raw string) map[int64]bool {
+func parseIDFilter(raw string) *setx.Set[int64] {
+	ids := setx.NewSet[int64]()
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil
+		return ids
 	}
-	ids := map[int64]bool{}
 	for _, part := range strings.Split(raw, ",") {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err == nil && id > 0 {
-			ids[id] = true
+			ids.Add(id)
 		}
 	}
 	return ids

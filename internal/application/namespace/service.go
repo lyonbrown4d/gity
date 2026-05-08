@@ -122,23 +122,20 @@ func (s *Service) ListMembers(ctx context.Context, namespaceID int64) ([]MemberV
 	if err != nil {
 		return nil, err
 	}
-	views := make([]MemberView, 0, members.Len())
-	members.Range(func(_ int, item namespacedomain.NamespaceMember) bool {
+	return collectionx.FilterMapList(members, func(_ int, item namespacedomain.NamespaceMember) (MemberView, bool) {
 		user, userErr := s.userRepo.GetByID(ctx, item.UserID)
 		if userErr != nil {
-			return true
+			return MemberView{}, false
 		}
-		views = append(views, MemberView{
+		return MemberView{
 			ID:          item.ID,
 			UserID:      item.UserID,
 			Username:    user.Username,
 			DisplayName: user.DisplayName,
 			Email:       user.Email,
 			Role:        item.Role,
-		})
-		return true
-	})
-	return views, nil
+		}, true
+	}).Values(), nil
 }
 
 func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMemberInput) (MemberView, error) {

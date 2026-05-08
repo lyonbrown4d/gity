@@ -3,6 +3,7 @@ package ports
 import (
 	"context"
 	"fmt"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"path"
 	"strings"
 )
@@ -76,14 +77,13 @@ func normalizeStorageKey(key string) string {
 
 func sanitizeNestedPath(value string) string {
 	parts := strings.Split(normalizeStorageKey(value), "/")
-	sanitized := make([]string, 0, len(parts))
-	for _, part := range parts {
+	sanitized := collectionlist.FilterMapList(collectionlist.NewList(parts...), func(_ int, part string) (string, bool) {
 		part = sanitizePathSegment(part)
 		if part == "" {
-			continue
+			return "", false
 		}
-		sanitized = append(sanitized, part)
-	}
+		return part, true
+	}).Values()
 	if len(sanitized) == 0 {
 		return "unknown"
 	}

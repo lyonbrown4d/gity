@@ -7,6 +7,7 @@ import (
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	packagedomain "github.com/DaiYuANg/gity/internal/domain/package_registry"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	"strings"
 )
@@ -68,11 +69,9 @@ func (s *Service) GetPackage(ctx context.Context, projectID int64, packageID int
 	if err != nil {
 		return PackageDetail{}, err
 	}
-	versionIDs := make([]int64, 0, versions.Len())
-	versions.Range(func(_ int, version packagedomain.ProjectPackageVersion) bool {
-		versionIDs = append(versionIDs, version.ID)
-		return true
-	})
+	versionIDs := collectionlist.MapList(versions, func(_ int, version packagedomain.ProjectPackageVersion) int64 {
+		return version.ID
+	}).Values()
 	files, err := s.fileRepo.ListByVersionIDs(ctx, versionIDs...)
 	if err != nil {
 		return PackageDetail{}, err
@@ -80,12 +79,12 @@ func (s *Service) GetPackage(ctx context.Context, projectID int64, packageID int
 	filesByVersion := mappingx.GroupByList(files, func(_ int, file packagedomain.ProjectPackageFile) int64 {
 		return file.ProjectPackageVersionID
 	})
-	detail := PackageDetail{Package: pkg, Versions: make([]PackageVersionDetail, 0, versions.Len())}
-	versions.Range(func(_ int, version packagedomain.ProjectPackageVersion) bool {
-		detail.Versions = append(detail.Versions, PackageVersionDetail{Version: version, Files: filesByVersion.GetCopy(version.ID)})
-		return true
-	})
-	return detail, nil
+	return PackageDetail{
+		Package: pkg,
+		Versions: collectionlist.MapList(versions, func(_ int, version packagedomain.ProjectPackageVersion) PackageVersionDetail {
+			return PackageVersionDetail{Version: version, Files: filesByVersion.GetCopy(version.ID)}
+		}).Values(),
+	}, nil
 }
 
 func (s *Service) UploadFile(ctx context.Context, projectID int64, input UploadFileInput) (packagedomain.ProjectPackageFile, error) {

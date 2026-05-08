@@ -3,6 +3,8 @@ package project
 import (
 	"context"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	collectionlist "github.com/arcgolabs/collectionx/list"
+	setx "github.com/arcgolabs/collectionx/set"
 	"strconv"
 	"strings"
 	"time"
@@ -188,14 +190,12 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			return nil, err
 		}
 		idFilter := parseIDFilter(in.IDs)
-		views := make([]repositoryView, 0, items.Len())
-		items.Range(func(_ int, item projectdomain.Project) bool {
-			if len(idFilter) > 0 && !idFilter[item.ID] {
-				return true
+		views := collectionlist.FilterMapList(items, func(_ int, item projectdomain.Project) (repositoryView, bool) {
+			if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
+				return repositoryView{}, false
 			}
-			views = append(views, toRepositoryView(item, settings))
-			return true
-		})
+			return toRepositoryView(item, settings), true
+		}).Values()
 		return &projectOutput{Body: views}, nil
 	}
 
@@ -242,10 +242,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]repositoryBranchView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toRepositoryBranchView(in.ID, item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item projectservice.Branch) repositoryBranchView {
+			return toRepositoryBranchView(in.ID, item)
+		}).Values()
 		return &projectOutput{Body: views}, nil
 	}
 
@@ -281,10 +280,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]repositoryCommitView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toRepositoryCommitView(in.ID, refName, item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item gitrepo.Commit) repositoryCommitView {
+			return toRepositoryCommitView(in.ID, refName, item)
+		}).Values()
 		return &projectOutput{Body: views}, nil
 	}
 
@@ -297,10 +295,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]repositoryTreeEntryView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toRepositoryTreeEntryView(item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item gitrepo.TreeEntry) repositoryTreeEntryView {
+			return toRepositoryTreeEntryView(item)
+		}).Values()
 		return &projectOutput{Body: views}, nil
 	}
 
@@ -558,16 +555,16 @@ func (in createFileCommitInput) ProjectIDValue() int64 {
 	return in.ID
 }
 
-func parseIDFilter(raw string) map[int64]bool {
+func parseIDFilter(raw string) *setx.Set[int64] {
+	ids := setx.NewSet[int64]()
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil
+		return ids
 	}
-	ids := map[int64]bool{}
 	for _, part := range strings.Split(raw, ",") {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err == nil && id > 0 {
-			ids[id] = true
+			ids.Add(id)
 		}
 	}
 	return ids

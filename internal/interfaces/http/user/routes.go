@@ -3,6 +3,8 @@ package user
 import (
 	"context"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
+	collectionlist "github.com/arcgolabs/collectionx/list"
+	setx "github.com/arcgolabs/collectionx/set"
 	"strconv"
 	"strings"
 
@@ -101,15 +103,13 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]userView, 0, items.Len())
 		idFilter := parseIDFilter(in.IDs)
-		items.Range(func(_ int, item identity.User) bool {
-			if len(idFilter) > 0 && !idFilter[item.ID] {
-				return true
+		views := collectionlist.FilterMapList(items, func(_ int, item identity.User) (userView, bool) {
+			if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
+				return userView{}, false
 			}
-			views = append(views, toUserView(item))
-			return true
-		})
+			return toUserView(item), true
+		}).Values()
 		return &userOutput{Body: views}, nil
 	}
 
@@ -235,16 +235,16 @@ func toUserView(item identity.User) userView {
 	}
 }
 
-func parseIDFilter(raw string) map[int64]bool {
+func parseIDFilter(raw string) *setx.Set[int64] {
+	ids := setx.NewSet[int64]()
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil
+		return ids
 	}
-	ids := map[int64]bool{}
 	for _, part := range strings.Split(raw, ",") {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err == nil && id > 0 {
-			ids[id] = true
+			ids.Add(id)
 		}
 	}
 	return ids

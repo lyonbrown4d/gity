@@ -14,6 +14,7 @@ import (
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 )
 
 type Service struct {
@@ -146,13 +147,15 @@ func (s *Service) CreatePipeline(ctx context.Context, projectID int64, input Cre
 	if err != nil {
 		return PipelineView{}, err
 	}
-	jobs := make([]PipelineJobView, 0, len(spec.Stages))
-	for index, stage := range spec.Stages {
+	jobs, err := collectionlist.ReduceErrList(collectionlist.NewList(spec.Stages...), make([]PipelineJobView, 0, len(spec.Stages)), func(acc []PipelineJobView, index int, stage plandsl.StageSpec) ([]PipelineJobView, error) {
 		view, err := s.enqueueStage(ctx, project, pipeline, stage, index, initialRunAfter(stage))
 		if err != nil {
-			return PipelineView{}, err
+			return acc, err
 		}
-		jobs = append(jobs, view)
+		return append(acc, view), nil
+	})
+	if err != nil {
+		return PipelineView{}, fmt.Errorf("enqueue pipeline stages: %w", err)
 	}
 	return PipelineView{Pipeline: pipeline, Spec: spec, Jobs: jobs}, nil
 }
@@ -288,13 +291,15 @@ func (s *Service) listPipelineJobs(ctx context.Context, projectID int64, pipelin
 	if err != nil {
 		return nil, err
 	}
-	views := make([]PipelineJobView, 0, items.Len())
-	for _, item := range items.Values() {
+	views, err := collectionlist.ReduceErrList(items, make([]PipelineJobView, 0, items.Len()), func(acc []PipelineJobView, _ int, item cidomain.ProjectPipelineJob) ([]PipelineJobView, error) {
 		view, err := s.toPipelineJobView(ctx, item)
 		if err != nil {
-			return nil, err
+			return acc, err
 		}
-		views = append(views, view)
+		return append(acc, view), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build pipeline job views: %w", err)
 	}
 	return views, nil
 }

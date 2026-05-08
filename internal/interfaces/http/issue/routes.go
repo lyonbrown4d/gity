@@ -8,6 +8,7 @@ import (
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
 	"github.com/gofiber/fiber/v2"
@@ -146,10 +147,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]issueView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toIssueView(item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item issuedomain.ProjectIssue) issueView {
+			return toIssueView(item)
+		}).Values()
 		return &issueOutput{Body: views}, nil
 	}
 
@@ -199,10 +199,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		if err != nil {
 			return nil, err
 		}
-		views := make([]issueCommentView, 0, len(items))
-		for _, item := range items {
-			views = append(views, toIssueCommentView(in.IssueIID, item))
-		}
+		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item issuedomain.ProjectIssueComment) issueCommentView {
+			return toIssueCommentView(in.IssueIID, item)
+		}).Values()
 		return &issueOutput{Body: views}, nil
 	}
 
