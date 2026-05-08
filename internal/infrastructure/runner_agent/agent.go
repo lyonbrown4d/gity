@@ -1,3 +1,4 @@
+// Package runneragent implements the standalone runner agent.
 package runneragent
 
 import (

@@ -1,3 +1,4 @@
+// Package lfs wires Git LFS HTTP endpoints.
 package lfs
 
 import "github.com/arcgolabs/dix"

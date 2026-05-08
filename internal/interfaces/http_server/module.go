@@ -1,3 +1,4 @@
+// Package httpserver wires the HTTP server runtime.
 package httpserver
 
 import (

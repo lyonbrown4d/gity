@@ -1,3 +1,4 @@
+// Package namespacemember wires namespace member persistence.
 package namespacemember
 
 import "github.com/arcgolabs/dix"

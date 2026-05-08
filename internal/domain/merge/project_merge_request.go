@@ -1,3 +1,4 @@
+// Package merge defines merge request domain models.
 package merge
 
 import "time"

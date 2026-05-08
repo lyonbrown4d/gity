@@ -1,3 +1,4 @@
+// Package projectmergerequest wires project merge request persistence.
 package projectmergerequest
 
 import "github.com/arcgolabs/dix"

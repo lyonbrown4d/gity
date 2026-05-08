@@ -1,3 +1,4 @@
+// Package namespace wires namespace application services.
 package namespace
 
 import "github.com/arcgolabs/dix"

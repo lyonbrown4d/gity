@@ -1,3 +1,4 @@
+// Package projectissueattachment wires project issue attachment persistence.
 package projectissueattachment
 
 import "github.com/arcgolabs/dix"

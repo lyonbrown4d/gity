@@ -1,3 +1,4 @@
+// Package eventbus implements application event dispatch.
 package eventbus
 
 import (

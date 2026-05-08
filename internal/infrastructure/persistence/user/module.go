@@ -1,3 +1,4 @@
+// Package user wires user persistence.
 package user
 
 import "github.com/arcgolabs/dix"

@@ -1,3 +1,4 @@
+// Package user wires user HTTP endpoints.
 package user
 
 import (

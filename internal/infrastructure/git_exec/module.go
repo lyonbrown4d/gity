@@ -1,3 +1,4 @@
+// Package gitexec wires native git execution.
 package gitexec
 
 import (

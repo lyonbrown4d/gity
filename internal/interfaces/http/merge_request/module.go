@@ -1,3 +1,4 @@
+// Package mergerequest wires merge request HTTP endpoints.
 package mergerequest
 
 import (

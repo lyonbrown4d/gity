@@ -149,27 +149,11 @@ func normalizeSlug(value, fallbackTitle string) (string, error) {
 	var builder strings.Builder
 	lastDash := false
 	for _, r := range source {
-		switch {
-		case unicode.IsLetter(r) || unicode.IsDigit(r):
-			if err := appendSlugRune(&builder, unicode.ToLower(r)); err != nil {
-				return "", err
-			}
-			lastDash = false
-		case r == '-' || r == '_' || unicode.IsSpace(r):
-			if !lastDash && builder.Len() > 0 {
-				if err := appendSlugRune(&builder, '-'); err != nil {
-					return "", err
-				}
-				lastDash = true
-			}
-		default:
-			if !lastDash && builder.Len() > 0 {
-				if err := appendSlugRune(&builder, '-'); err != nil {
-					return "", err
-				}
-				lastDash = true
-			}
+		nextLastDash, err := appendSlugToken(&builder, r, lastDash)
+		if err != nil {
+			return "", err
 		}
+		lastDash = nextLastDash
 	}
 	slug := strings.Trim(builder.String(), "-")
 	if slug == "" || slug == "." || slug == ".." {
@@ -179,6 +163,22 @@ func normalizeSlug(value, fallbackTitle string) (string, error) {
 		return "", oops.In("wiki").With("slug", slug, "length", len(slug)).New("wiki page slug is too long")
 	}
 	return slug, nil
+}
+
+func appendSlugToken(builder *strings.Builder, value rune, lastDash bool) (bool, error) {
+	if unicode.IsLetter(value) || unicode.IsDigit(value) {
+		if err := appendSlugRune(builder, unicode.ToLower(value)); err != nil {
+			return false, err
+		}
+		return false, nil
+	}
+	if lastDash || builder.Len() == 0 {
+		return lastDash, nil
+	}
+	if err := appendSlugRune(builder, '-'); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func appendSlugRune(builder *strings.Builder, value rune) error {

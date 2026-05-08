@@ -1,3 +1,4 @@
+// Package runner wires runner application services.
 package runner
 
 import "github.com/arcgolabs/dix"

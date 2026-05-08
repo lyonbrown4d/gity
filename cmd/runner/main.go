@@ -1,3 +1,4 @@
+// Package main contains the gity runner command.
 package main
 
 import (

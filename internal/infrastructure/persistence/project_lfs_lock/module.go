@@ -1,3 +1,4 @@
+// Package projectlfslock wires project LFS lock persistence.
 package projectlfslock
 
 import "github.com/arcgolabs/dix"

@@ -1,3 +1,4 @@
+// Package identity defines identity domain models.
 package identity
 
 import "time"

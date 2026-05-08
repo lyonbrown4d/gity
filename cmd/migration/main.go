@@ -1,3 +1,4 @@
+// Package main contains the gity migration command.
 package main
 
 import (

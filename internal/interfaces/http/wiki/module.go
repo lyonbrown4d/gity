@@ -1,3 +1,4 @@
+// Package wiki wires wiki HTTP endpoints.
 package wiki
 
 import (

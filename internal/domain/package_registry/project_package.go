@@ -1,3 +1,4 @@
+// Package packageregistry defines package registry domain models.
 package packageregistry
 
 import "time"

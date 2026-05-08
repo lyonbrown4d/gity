@@ -1,3 +1,4 @@
+// Package main contains the gity server command.
 package main
 
 import (

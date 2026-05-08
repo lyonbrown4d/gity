@@ -1,3 +1,4 @@
+// Package packageregistry wires package registry HTTP endpoints.
 package packageregistry
 
 import (

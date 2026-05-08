@@ -1,3 +1,4 @@
+// Package storage wires object storage services.
 package storage
 
 import (

@@ -1,3 +1,4 @@
+// Package projectrunner wires project runner persistence.
 package projectrunner
 
 import "github.com/arcgolabs/dix"

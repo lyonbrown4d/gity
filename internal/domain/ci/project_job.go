@@ -1,3 +1,4 @@
+// Package ci defines CI domain models.
 package ci
 
 import "time"

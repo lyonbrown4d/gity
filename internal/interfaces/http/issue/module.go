@@ -1,3 +1,4 @@
+// Package issue wires issue HTTP endpoints.
 package issue
 
 import (

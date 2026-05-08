@@ -1,3 +1,4 @@
+// Package httpapi contains shared HTTP API helpers.
 package httpapi
 
 import (

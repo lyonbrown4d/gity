@@ -1,3 +1,4 @@
+// Package wiki defines wiki domain models.
 package wiki
 
 import "time"

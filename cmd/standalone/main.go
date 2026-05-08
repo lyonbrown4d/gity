@@ -1,3 +1,4 @@
+// Package main contains the gity standalone command.
 package main
 
 import (

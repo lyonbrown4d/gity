@@ -1,3 +1,4 @@
+// Package auth wires auth HTTP endpoints.
 package auth
 
 import (

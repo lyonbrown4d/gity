@@ -1,3 +1,4 @@
+// Package projectpackage wires project package persistence.
 package projectpackage
 
 import "github.com/arcgolabs/dix"

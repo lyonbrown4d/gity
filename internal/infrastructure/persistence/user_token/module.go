@@ -1,3 +1,4 @@
+// Package usertoken wires user token persistence.
 package usertoken
 
 import "github.com/arcgolabs/dix"

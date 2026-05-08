@@ -1,3 +1,4 @@
+// Package bootstrap assembles application runtimes.
 package bootstrap
 
 import (

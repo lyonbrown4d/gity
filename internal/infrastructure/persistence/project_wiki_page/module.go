@@ -1,3 +1,4 @@
+// Package projectwikipage wires project wiki page persistence.
 package projectwikipage
 
 import "github.com/arcgolabs/dix"

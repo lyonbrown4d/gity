@@ -82,9 +82,9 @@ func TestRuntimeStartsEnsureSchema(t *testing.T) {
 			if err != nil {
 				t.Fatalf("resolve database runtime: %v", err)
 			}
-			assertTableExists(t, ctx, db, "project_jobs")
-			assertTableExists(t, ctx, db, "project_pipelines")
-			assertTableExists(t, ctx, db, "schema_migrations")
+			assertTableExists(ctx, t, db, "project_jobs")
+			assertTableExists(ctx, t, db, "project_pipelines")
+			assertTableExists(ctx, t, db, "schema_migrations")
 
 			stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer stopCancel()
@@ -107,7 +107,7 @@ func setRuntimeTestEnv(t *testing.T, tempDir string) {
 	t.Setenv("GITY_WORKER__POLL_INTERVAL_MILLIS", "10000")
 }
 
-func assertTableExists(t *testing.T, ctx context.Context, db *dbx.DB, tableName string) {
+func assertTableExists(ctx context.Context, t *testing.T, db *dbx.DB, tableName string) {
 	t.Helper()
 	var found string
 	row := db.QueryRowContext(ctx, `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, tableName)

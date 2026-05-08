@@ -1,3 +1,4 @@
+// Package apperror defines application error helpers.
 package apperror
 
 import "net/http"

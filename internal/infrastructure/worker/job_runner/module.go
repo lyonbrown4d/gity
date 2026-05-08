@@ -1,3 +1,4 @@
+// Package jobrunner wires background project job runners.
 package jobrunner
 
 import (

@@ -1,3 +1,4 @@
+// Package pipeline wires CI pipeline application services.
 package pipeline
 
 import "github.com/arcgolabs/dix"

@@ -1,3 +1,4 @@
+// Package lfs wires Git LFS application services.
 package lfs
 
 import "github.com/arcgolabs/dix"

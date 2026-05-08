@@ -1,3 +1,4 @@
+// Package database opens the configured dbx database.
 package database
 
 import (
@@ -11,9 +12,9 @@ import (
 	mysqlDialect "github.com/arcgolabs/dbx/dialect/mysql"
 	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // Register the MySQL database driver.
 	"github.com/samber/oops"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Register the SQLite database driver.
 )
 
 func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error) {

@@ -1,3 +1,4 @@
+// Package projectbranchprotection wires project branch protection persistence.
 package projectbranchprotection
 
 import "github.com/arcgolabs/dix"

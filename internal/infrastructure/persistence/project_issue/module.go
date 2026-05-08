@@ -1,3 +1,4 @@
+// Package projectissue wires project issue persistence.
 package projectissue
 
 import "github.com/arcgolabs/dix"

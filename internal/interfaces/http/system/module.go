@@ -1,3 +1,4 @@
+// Package system wires system HTTP endpoints.
 package system
 
 import (

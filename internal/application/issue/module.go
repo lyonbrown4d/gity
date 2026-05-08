@@ -1,3 +1,4 @@
+// Package issue wires issue application services.
 package issue
 
 import "github.com/arcgolabs/dix"

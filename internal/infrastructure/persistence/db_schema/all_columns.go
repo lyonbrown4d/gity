@@ -1,3 +1,4 @@
+// Package dbschema defines generated database schema metadata.
 package dbschema
 
 import (

@@ -1,3 +1,4 @@
+// Package project defines project domain models and events.
 package project
 
 import domainevent "github.com/DaiYuANg/gity/internal/domain/event"

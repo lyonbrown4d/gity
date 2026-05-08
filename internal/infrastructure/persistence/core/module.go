@@ -1,3 +1,4 @@
+// Package core wires persistence schema bootstrap.
 package core
 
 import "github.com/arcgolabs/dix"

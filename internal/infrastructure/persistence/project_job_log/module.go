@@ -1,3 +1,4 @@
+// Package projectjoblog wires project job log persistence.
 package projectjoblog
 
 import "github.com/arcgolabs/dix"

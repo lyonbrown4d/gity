@@ -2,11 +2,12 @@ package ports
 
 import (
 	"context"
+	"path"
 	"strconv"
+	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	"path"
-	"strings"
+	mappingx "github.com/arcgolabs/collectionx/mapping"
 )
 
 type ObjectStorage interface {
@@ -17,6 +18,21 @@ type ObjectStorage interface {
 	SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID, artifactID int64, fileName string, content []byte, contentType string) (string, error)
 	Load(ctx context.Context, key string) ([]byte, error)
 }
+
+var contentTypesByExtension = mappingx.NewMapFrom(map[string]string{
+	".md":   "text/markdown",
+	".txt":  "text/plain",
+	".json": "application/json",
+	".xml":  "application/xml",
+	".pom":  "application/xml",
+	".jar":  "application/java-archive",
+	".tgz":  "application/gzip",
+	".tar":  "application/x-tar",
+	".png":  "image/png",
+	".jpg":  "image/jpeg",
+	".jpeg": "image/jpeg",
+	".gif":  "image/gif",
+})
 
 func BuildIssueStorageKey(projectFullPath string, issueIID, attachmentID int64, fileName string) string {
 	return path.Join("issues", sanitizeNestedPath(projectFullPath), strconv.FormatInt(issueIID, 10), strconv.FormatInt(attachmentID, 10), sanitizeFileName(fileName))
@@ -43,33 +59,11 @@ func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID, artif
 }
 
 func DetectContentType(fileName string) string {
-	name := strings.ToLower(strings.TrimSpace(fileName))
-	switch {
-	case strings.HasSuffix(name, ".md"):
-		return "text/markdown"
-	case strings.HasSuffix(name, ".txt"):
-		return "text/plain"
-	case strings.HasSuffix(name, ".json"):
-		return "application/json"
-	case strings.HasSuffix(name, ".xml"):
-		return "application/xml"
-	case strings.HasSuffix(name, ".pom"):
-		return "application/xml"
-	case strings.HasSuffix(name, ".jar"):
-		return "application/java-archive"
-	case strings.HasSuffix(name, ".tgz"):
-		return "application/gzip"
-	case strings.HasSuffix(name, ".tar"):
-		return "application/x-tar"
-	case strings.HasSuffix(name, ".png"):
-		return "image/png"
-	case strings.HasSuffix(name, ".jpg") || strings.HasSuffix(name, ".jpeg"):
-		return "image/jpeg"
-	case strings.HasSuffix(name, ".gif"):
-		return "image/gif"
-	default:
-		return "application/octet-stream"
+	extension := strings.ToLower(path.Ext(strings.TrimSpace(fileName)))
+	if contentType, ok := contentTypesByExtension.Get(extension); ok {
+		return contentType
 	}
+	return "application/octet-stream"
 }
 
 func normalizeStorageKey(key string) string {

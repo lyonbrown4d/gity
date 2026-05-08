@@ -1,3 +1,4 @@
+// Package projectissuecomment wires project issue comment persistence.
 package projectissuecomment
 
 import "github.com/arcgolabs/dix"

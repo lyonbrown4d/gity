@@ -1,3 +1,4 @@
+// Package job wires project job application services.
 package job
 
 import "github.com/arcgolabs/dix"

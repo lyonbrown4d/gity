@@ -1,3 +1,4 @@
+// Package projectjob wires project job persistence.
 package projectjob
 
 import "github.com/arcgolabs/dix"

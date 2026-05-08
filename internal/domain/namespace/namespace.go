@@ -1,3 +1,4 @@
+// Package namespace defines namespace domain models.
 package namespace
 
 import "time"

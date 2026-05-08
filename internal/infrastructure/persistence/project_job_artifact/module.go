@@ -1,3 +1,4 @@
+// Package projectjobartifact wires project job artifact persistence.
 package projectjobartifact
 
 import "github.com/arcgolabs/dix"

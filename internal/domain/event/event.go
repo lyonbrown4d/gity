@@ -1,3 +1,4 @@
+// Package event defines domain event contracts.
 package event
 
 import "time"

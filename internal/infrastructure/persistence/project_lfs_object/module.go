@@ -1,3 +1,4 @@
+// Package projectlfsobject wires project LFS object persistence.
 package projectlfsobject
 
 import "github.com/arcgolabs/dix"

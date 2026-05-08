@@ -1,3 +1,4 @@
+// Package wiki wires wiki application services.
 package wiki
 
 import "github.com/arcgolabs/dix"

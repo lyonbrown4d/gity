@@ -1,3 +1,4 @@
+// Package pipeline wires CI pipeline HTTP endpoints.
 package pipeline
 
 import (

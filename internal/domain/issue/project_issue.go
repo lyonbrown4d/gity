@@ -1,3 +1,4 @@
+// Package issue defines issue domain models.
 package issue
 
 import "time"

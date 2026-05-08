@@ -1,3 +1,4 @@
+// Package projectpipeline wires project pipeline persistence.
 package projectpipeline
 
 import "github.com/arcgolabs/dix"

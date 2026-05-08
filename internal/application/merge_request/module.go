@@ -1,3 +1,4 @@
+// Package mergerequest wires merge request application services.
 package mergerequest
 
 import "github.com/arcgolabs/dix"

@@ -1,3 +1,4 @@
+// Package project wires project application services.
 package project
 
 import "github.com/arcgolabs/dix"

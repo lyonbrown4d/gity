@@ -1,3 +1,4 @@
+// Package namespace wires namespace HTTP endpoints.
 package namespace
 
 import (

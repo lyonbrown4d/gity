@@ -1,3 +1,4 @@
+// Package lfs defines Git LFS domain models.
 package lfs
 
 import "time"

@@ -1,3 +1,4 @@
+// Package packageregistry wires package registry application services.
 package packageregistry
 
 import "github.com/arcgolabs/dix"

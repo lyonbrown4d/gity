@@ -1,3 +1,4 @@
+// Package runner wires runner HTTP endpoints.
 package runner
 
 import (

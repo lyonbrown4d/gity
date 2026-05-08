@@ -1,3 +1,4 @@
+// Package gitrepo wires repository read services.
 package gitrepo
 
 import (

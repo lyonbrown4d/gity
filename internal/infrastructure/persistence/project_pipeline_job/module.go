@@ -1,3 +1,4 @@
+// Package projectpipelinejob wires project pipeline job persistence.
 package projectpipelinejob
 
 import "github.com/arcgolabs/dix"

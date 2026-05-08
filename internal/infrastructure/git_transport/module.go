@@ -1,3 +1,4 @@
+// Package gittransport wires Git smart HTTP transport.
 package gittransport
 
 import "github.com/arcgolabs/dix"

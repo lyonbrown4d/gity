@@ -1,3 +1,4 @@
+// Package job wires project job HTTP endpoints.
 package job
 
 import (

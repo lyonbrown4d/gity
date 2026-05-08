@@ -1,3 +1,4 @@
+// Package mapperx contains mapper helpers.
 package mapperx
 
 import (

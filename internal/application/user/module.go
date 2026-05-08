@@ -1,3 +1,4 @@
+// Package user wires user application services.
 package user
 
 import "github.com/arcgolabs/dix"

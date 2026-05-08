@@ -1,3 +1,4 @@
+// Package namespace wires namespace persistence.
 package namespace
 
 import "github.com/arcgolabs/dix"

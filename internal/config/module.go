@@ -1,3 +1,4 @@
+// Package config wires configuration loading.
 package config
 
 import "github.com/arcgolabs/dix"

@@ -1,3 +1,4 @@
+// Package main contains the gity worker command.
 package main
 
 import (

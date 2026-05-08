@@ -1,3 +1,4 @@
+// Package project wires project HTTP endpoints.
 package project
 
 import (

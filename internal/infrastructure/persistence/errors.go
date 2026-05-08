@@ -1,3 +1,4 @@
+// Package persistence contains shared persistence helpers.
 package persistence
 
 import (
