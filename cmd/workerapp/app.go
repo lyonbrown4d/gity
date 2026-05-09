@@ -2,6 +2,7 @@
 package workerapp
 
 import (
+	auditservice "github.com/DaiYuANg/gity/internal/application/audit"
 	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
@@ -26,6 +27,7 @@ import (
 	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
+	projectauditeventrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_attachment"
@@ -112,6 +114,7 @@ func repositoryRuntimeModule() dix.Module {
 			organizationrepo.Module(),
 			organizationmemberrepo.Module(),
 			projectrepo.Module(),
+			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
 			projectissuerepo.Module(),
 			projectissuecommentrepo.Module(),
@@ -155,6 +158,7 @@ func applicationRuntimeModule() dix.Module {
 		dix.Description("Worker application services"),
 		dix.Imports(
 			userservice.Module(),
+			auditservice.Module(),
 			organizationservice.Module(),
 			projectservice.Module(),
 			issueservice.Module(),

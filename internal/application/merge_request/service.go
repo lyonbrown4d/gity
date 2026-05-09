@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
@@ -23,11 +24,17 @@ type Service struct {
 	gitRunner    gitports.GitRunner
 	pipelineRepo gitports.ProjectPipelineRepository
 	pipelineSvc  *pipelineservice.Service
+	events       gitports.DomainEventPublisher
 }
 
 type PipelineDeps struct {
 	pipelineRepo gitports.ProjectPipelineRepository
 	pipelineSvc  *pipelineservice.Service
+}
+
+type GitDependencies struct {
+	gitRepo   gitports.GitRepository
+	gitRunner gitports.GitRunner
 }
 
 type CreateInput struct {
@@ -64,6 +71,7 @@ type MergeInput struct {
 	AuthorName  string `json:"author_name"`
 	AuthorEmail string `json:"author_email"`
 	Message     string `json:"message"`
+	ActorUserID int64  `json:"actor_user_id"`
 }
 
 const defaultCIConfigPath = ".gity-ci.plano"
@@ -72,8 +80,20 @@ func NewPipelineDeps(pipelineRepo gitports.ProjectPipelineRepository, pipelineSv
 	return &PipelineDeps{pipelineRepo: pipelineRepo, pipelineSvc: pipelineSvc}
 }
 
+func NewGitDependencies(gitRepo gitports.GitRepository, gitRunner gitports.GitRunner) GitDependencies {
+	return GitDependencies{gitRepo: gitRepo, gitRunner: gitRunner}
+}
+
 func NewService(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, gitRepo gitports.GitRepository, gitRunner gitports.GitRunner, pipelineDeps *PipelineDeps) *Service {
-	service := &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: gitRepo, gitRunner: gitRunner}
+	return NewServiceWithDependencies(projectRepo, mergeRepo, userRepo, NewGitDependencies(gitRepo, gitRunner), pipelineDeps, gitports.NoopDomainEventPublisher{})
+}
+
+func NewServiceWithDependencies(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, git GitDependencies, pipelineDeps *PipelineDeps, events gitports.DomainEventPublisher) *Service {
+	if events == nil {
+		events = gitports.NoopDomainEventPublisher{}
+	}
+	service := &Service{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, gitRepo: git.gitRepo, gitRunner: git.gitRunner}
+	service.events = events
 	if pipelineDeps != nil {
 		service.pipelineRepo = pipelineDeps.pipelineRepo
 		service.pipelineSvc = pipelineDeps.pipelineSvc
@@ -205,11 +225,23 @@ func (s *Service) Merge(ctx context.Context, projectID, mergeIID int64, input Me
 		return mergedomain.ProjectMergeRequest{}, mapGitExecError(err)
 	}
 	merged := "merged"
-	if err := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{State: &merged}); err != nil {
-		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_request_id", mr.ID, "merge_iid", mergeIID).Wrapf(err, "mark merge request merged")
+	if updateErr := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{State: &merged}); updateErr != nil {
+		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_request_id", mr.ID, "merge_iid", mergeIID).Wrapf(updateErr, "mark merge request merged")
 	}
 	s.triggerTargetBranchPipeline(ctx, project, mr)
-	return s.loadMergeRequest(ctx, projectID, mergeIID)
+	mergedMR, err := s.loadMergeRequest(ctx, projectID, mergeIID)
+	if err != nil {
+		return mergedomain.ProjectMergeRequest{}, err
+	}
+	s.publishEventAsync(ctx, mergedomain.NewProjectMergeRequestMergedEvent(mergedMR, input.ActorUserID))
+	return mergedMR, nil
+}
+
+func (s *Service) publishEventAsync(ctx context.Context, event mergedomain.ProjectMergeRequestMerged) {
+	if err := s.events.PublishAsync(ctx, event); err != nil {
+		wrapped := oops.In("merge_request").With("project_id", event.ProjectID, "merge_request_id", event.MergeRequestID, "merge_iid", event.MergeIID, "event", event.Name()).Wrapf(err, "publish merge request event")
+		slog.Default().Warn("publish merge request event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
+	}
 }
 
 func (s *Service) loadMergeRequest(ctx context.Context, projectID, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {

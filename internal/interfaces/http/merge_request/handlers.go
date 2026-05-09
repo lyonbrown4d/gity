@@ -62,6 +62,11 @@ func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestI
 	if err != nil {
 		return nil, err
 	}
+	actorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.ActorUserID)
+	if err != nil {
+		return nil, err
+	}
+	input.ActorUserID = actorUserID
 	item, err := e.service.Merge(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {
 		return nil, err

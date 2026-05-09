@@ -162,6 +162,13 @@ func fixMigrations() []Migration {
 			Name:    "add project branch protection rule fields",
 			Apply:   ensureProjectBranchProtectionRules,
 		},
+		{
+			Version: "0016_project_audit_events",
+			Name:    "add project audit events",
+			Apply: func(ctx context.Context, tx *dbx.Tx) error {
+				return autoMigrate(ctx, tx, "0016_project_audit_events", dbschema.ProjectAuditEventSchema)
+			},
+		},
 	}
 }
 

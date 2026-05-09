@@ -2,6 +2,7 @@
 package serverapp
 
 import (
+	auditservice "github.com/DaiYuANg/gity/internal/application/audit"
 	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
@@ -26,6 +27,7 @@ import (
 	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
+	projectauditeventrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_attachment"
@@ -46,6 +48,7 @@ import (
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
+	auditendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/audit"
 	authendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/auth"
 	gittransportendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/git_transport"
 	issueendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/issue"
@@ -126,6 +129,7 @@ func repositoryRuntimeModule() dix.Module {
 			organizationrepo.Module(),
 			organizationmemberrepo.Module(),
 			projectrepo.Module(),
+			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
 			projectissuerepo.Module(),
 			projectissuecommentrepo.Module(),
@@ -169,6 +173,7 @@ func applicationRuntimeModule() dix.Module {
 		dix.Description("Server application services"),
 		dix.Imports(
 			userservice.Module(),
+			auditservice.Module(),
 			organizationservice.Module(),
 			projectservice.Module(),
 			issueservice.Module(),
@@ -201,6 +206,7 @@ func endpointRuntimeModule() dix.Module {
 		dix.Imports(
 			systemendpoint.Module(),
 			authendpoint.Module(),
+			auditendpoint.Module(),
 			gittransportendpoint.Module(),
 			lfsendpoint.Module(),
 			userendpoint.Module(),

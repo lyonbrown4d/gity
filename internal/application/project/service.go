@@ -104,10 +104,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 	if err := s.provisionRepository(ctx, project); err != nil {
 		return projectdomain.Project{}, err
 	}
-	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectCreatedEvent(project)); err != nil {
-		wrapped := oops.In("project").With("project_id", project.ID).Wrapf(err, "publish project created event")
-		s.logger.Warn("publish project created event failed", slog.String("error", wrapped.Error()))
-	}
+	s.publishProjectEventAsync(ctx, project.ID, projectdomain.NewProjectCreatedEvent(project))
 	return project, nil
 }
 
@@ -167,10 +164,7 @@ func (s *Service) Delete(ctx context.Context, id int64, inputs ...DeleteInput) e
 	}
 	project.Status = projectdomain.ProjectStatusPendingDelete
 	project.DeletedAt = deletedAt
-	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(project)); err != nil {
-		wrapped := oops.In("project").With("project_id", id).Wrapf(err, "publish project deleted event")
-		s.logger.Warn("publish project deleted event failed", slog.String("error", wrapped.Error()))
-	}
+	s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectDeletedEvent(project))
 	return nil
 }
 

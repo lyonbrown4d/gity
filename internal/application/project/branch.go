@@ -65,11 +65,15 @@ func (s *Service) SetBranchProtection(ctx context.Context, id int64, branchName 
 		return Branch{}, err
 	}
 	if protected {
-		if _, err := s.branchRepo.Protect(ctx, id, branchName); err != nil {
+		protection, err := s.branchRepo.Protect(ctx, id, branchName)
+		if err != nil {
 			return Branch{}, oops.In("project").With("project_id", id, "branch", branchName).Wrapf(err, "protect branch")
 		}
+		s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectBranchProtectionChangedEvent(protection, true))
 	} else if err := s.branchRepo.Unprotect(ctx, id, branchName); err != nil {
 		return Branch{}, oops.In("project").With("project_id", id, "branch", branchName).Wrapf(err, "unprotect branch")
+	} else {
+		s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectBranchUnprotectedEvent(id, branchName))
 	}
 	return s.GetBranch(ctx, id, branchName)
 }
@@ -108,6 +112,7 @@ func (s *Service) UpsertBranchProtection(ctx context.Context, id int64, input Br
 	if err != nil {
 		return BranchProtection{}, oops.In("project").With("project_id", id, "branch", branchName).Wrapf(err, "upsert branch protection")
 	}
+	s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectBranchProtectionChangedEvent(item, true))
 	return toBranchProtection(item), nil
 }
 
@@ -133,6 +138,7 @@ func (s *Service) DeleteBranch(ctx context.Context, id int64, branchName string)
 	if err := s.gitRunner.DeleteBranch(ctx, repositoryPath(project), branchName); err != nil {
 		return mapGitExecError(err)
 	}
+	s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectBranchDeletedEvent(id, branchName))
 	return nil
 }
 

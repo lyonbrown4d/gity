@@ -4,8 +4,10 @@ package project
 import domainevent "github.com/DaiYuANg/gity/internal/domain/event"
 
 const (
-	EventProjectCreated = "project.created"
-	EventProjectDeleted = "project.deleted"
+	EventProjectCreated                 = "project.created"
+	EventProjectDeleted                 = "project.deleted"
+	EventProjectBranchProtectionChanged = "project.branch_protection.changed"
+	EventProjectBranchDeleted           = "project.branch.deleted"
 )
 
 type ProjectCreated struct {
@@ -65,5 +67,66 @@ func NewProjectDeletedEvent(project Project) ProjectDeleted {
 		FullPath:       project.FullPath,
 		Status:         project.Status,
 		DeletedAt:      deletedAt,
+	}
+}
+
+type ProjectBranchProtectionChanged struct {
+	domainevent.Metadata
+	ProjectID              int64  `json:"project_id"`
+	BranchName             string `json:"branch_name"`
+	Protected              bool   `json:"protected"`
+	RuleType               string `json:"rule_type,omitempty"`
+	PushAccessLevel        string `json:"push_access_level,omitempty"`
+	MergeAccessLevel       string `json:"merge_access_level,omitempty"`
+	RequireMergeRequest    bool   `json:"require_merge_request"`
+	RequirePipelineSuccess bool   `json:"require_pipeline_success"`
+	AllowForcePush         bool   `json:"allow_force_push"`
+	AllowDelete            bool   `json:"allow_delete"`
+}
+
+func (ProjectBranchProtectionChanged) Name() string {
+	return EventProjectBranchProtectionChanged
+}
+
+func NewProjectBranchProtectionChangedEvent(protection ProjectBranchProtection, protected bool) ProjectBranchProtectionChanged {
+	return ProjectBranchProtectionChanged{
+		Metadata:               domainevent.NewMetadata(),
+		ProjectID:              protection.ProjectID,
+		BranchName:             protection.BranchName,
+		Protected:              protected,
+		RuleType:               NormalizeProjectBranchProtectionRuleType(protection.RuleType, protection.BranchName),
+		PushAccessLevel:        NormalizeProjectBranchProtectionAccessLevel(protection.PushAccessLevel, ProjectBranchProtectionAccessNoOne),
+		MergeAccessLevel:       NormalizeProjectBranchProtectionAccessLevel(protection.MergeAccessLevel, ProjectBranchProtectionAccessMaintainer),
+		RequireMergeRequest:    protection.RequireMergeRequest != 0,
+		RequirePipelineSuccess: protection.RequirePipelineSuccess != 0,
+		AllowForcePush:         protection.AllowForcePush != 0,
+		AllowDelete:            protection.AllowDelete != 0,
+	}
+}
+
+func NewProjectBranchUnprotectedEvent(projectID int64, branchName string) ProjectBranchProtectionChanged {
+	return ProjectBranchProtectionChanged{
+		Metadata:   domainevent.NewMetadata(),
+		ProjectID:  projectID,
+		BranchName: branchName,
+		Protected:  false,
+	}
+}
+
+type ProjectBranchDeleted struct {
+	domainevent.Metadata
+	ProjectID  int64  `json:"project_id"`
+	BranchName string `json:"branch_name"`
+}
+
+func (ProjectBranchDeleted) Name() string {
+	return EventProjectBranchDeleted
+}
+
+func NewProjectBranchDeletedEvent(projectID int64, branchName string) ProjectBranchDeleted {
+	return ProjectBranchDeleted{
+		Metadata:   domainevent.NewMetadata(),
+		ProjectID:  projectID,
+		BranchName: branchName,
 	}
 }

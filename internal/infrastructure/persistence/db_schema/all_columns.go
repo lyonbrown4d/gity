@@ -18,6 +18,10 @@ func (s ProjectBranchProtectionSchemaDef) AllColumns() *collectionx.List[queryds
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectAuditEventSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectIssueAttachmentSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
