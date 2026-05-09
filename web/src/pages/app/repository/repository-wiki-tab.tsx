@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryWikiPageView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { isRecord, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 import { renderMarkdown } from "./repository-utils";
 
 interface RepositoryWikiTabProps {
@@ -17,7 +18,7 @@ interface RepositoryWikiTabProps {
   onError: (message: string | null) => void;
 }
 
-type RawWikiPage = Record<string, unknown>;
+type RawWikiPage = RawRecord;
 
 export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps): JSX.Element => {
   const identityQuery = useGetIdentity<{ id?: string | number }>();
@@ -438,16 +439,9 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
 
 const resolveWikiList = (payload: unknown): RawWikiPage[] => {
   if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
+    return resolveRecordArray(payload);
   }
-  if (!isRecord(payload)) {
-    return [];
-  }
-  const nested = payload.body ?? payload.Body;
-  if (Array.isArray(nested)) {
-    return nested.filter(isRecord);
-  }
-  return [];
+  return isRecord(payload) ? resolveRecordArray(payload.body ?? payload.Body) : [];
 };
 
 const resolveWikiPage = (payload: unknown): RawWikiPage => {
@@ -473,24 +467,6 @@ const normalizeWikiPage = (raw: RawWikiPage): RepositoryWikiPageView => ({
   created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
   updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
 });
-
-const isRecord = (value: unknown): value is RawWikiPage =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
 
 const parseRequiredUserID = (value: string): number | null => {
   const parsed = Number.parseInt(value.trim(), 10);

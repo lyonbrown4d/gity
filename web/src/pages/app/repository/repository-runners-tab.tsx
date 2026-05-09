@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import type { RepositoryRunnerView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { isRecord, normalizeBoolean, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryRunnersTabProps {
   repoId: string;
@@ -15,7 +16,7 @@ interface RepositoryRunnersTabProps {
   onError: (message: string | null) => void;
 }
 
-type RawRunner = Record<string, unknown>;
+type RawRunner = RawRecord;
 
 export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTabProps): JSX.Element => {
   const runnersQuery = useCustom<RawRunner[]>({
@@ -260,16 +261,9 @@ const RunnerStatusBadge = ({ runner, t }: { runner: RepositoryRunnerView; t: (te
 
 const resolveRunnerList = (payload: unknown): RawRunner[] => {
   if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
+    return resolveRecordArray(payload);
   }
-  if (!isRecord(payload)) {
-    return [];
-  }
-  const nested = payload.body ?? payload.Body;
-  if (Array.isArray(nested)) {
-    return nested.filter(isRecord);
-  }
-  return [];
+  return isRecord(payload) ? resolveRecordArray(payload.body ?? payload.Body) : [];
 };
 
 const resolveRegistration = (payload: unknown): { token: string } => {
@@ -294,27 +288,6 @@ const normalizeRunner = (raw: RawRunner): RepositoryRunnerView => ({
   created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
   updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
 });
-
-const isRecord = (value: unknown): value is RawRunner =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
-
-const normalizeBoolean = (value: unknown): boolean =>
-  value === true || value === 1 || normalizeString(value) === "1" || normalizeString(value).toLowerCase() === "true";
 
 const normalizeStatus = (value: unknown): "online" | "offline" =>
   normalizeString(value).toLowerCase() === "online" ? "online" : "offline";

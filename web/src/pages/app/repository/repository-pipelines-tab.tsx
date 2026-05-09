@@ -18,14 +18,22 @@ import type {
   RepositoryPipelineView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import {
+  isRecord,
+  normalizeBoolean,
+  normalizeNumber,
+  normalizeOptionalString,
+  normalizeString,
+  normalizeStringArray,
+  resolveRecordArray,
+  type RawRecord,
+} from "./repository-normalizers";
 
 interface RepositoryPipelinesTabProps {
   repoId: string;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
-
-type RawRecord = Record<string, unknown>;
 
 const terminalPipelineStatuses: RepositoryPipelineStatus[] = ["succeeded", "failed", "cancelled"];
 const terminalJobStatuses: RepositoryJobStatus[] = ["succeeded", "failed", "cancelled"];
@@ -777,58 +785,6 @@ const normalizeJob = (rawValue: unknown): RepositoryJobView => {
     started_at: normalizeOptionalString(raw.started_at ?? raw.StartedAt),
     finished_at: normalizeOptionalString(raw.finished_at ?? raw.FinishedAt),
   };
-};
-
-const resolveRecordArray = (value: unknown): RawRecord[] => (Array.isArray(value) ? value.filter(isRecord) : []);
-
-const normalizeStringArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeString(item)).filter(Boolean);
-  }
-  const raw = normalizeString(value).trim();
-  if (!raw) {
-    return [];
-  }
-  try {
-    const decoded: unknown = JSON.parse(raw);
-    return Array.isArray(decoded) ? decoded.map((item) => normalizeString(item)).filter(Boolean) : [raw];
-  } catch {
-    return [raw];
-  }
-};
-
-const isRecord = (value: unknown): value is RawRecord =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
-
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(normalizeString(value), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const normalizeBoolean = (value: unknown): boolean => {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  const normalized = normalizeString(value).trim().toLowerCase();
-  return normalized === "true" || normalized === "1";
 };
 
 const normalizePipelineStatus = (value: unknown): RepositoryPipelineStatus => {

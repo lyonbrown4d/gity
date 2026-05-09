@@ -12,6 +12,7 @@ type Settings struct {
 	Git      GitSettings      `json:"git"      koanf:"git"      mapstructure:"git"`
 	Storage  StorageSettings  `json:"storage"  koanf:"storage"  mapstructure:"storage"`
 	Worker   WorkerSettings   `json:"worker"   koanf:"worker"   mapstructure:"worker"`
+	Search   SearchSettings   `json:"search"   koanf:"search"   mapstructure:"search"`
 }
 
 type AppSettings struct {
@@ -55,6 +56,14 @@ type WorkerSettings struct {
 	MaxJobsPerTick     int    `json:"max_jobs_per_tick"    koanf:"max_jobs_per_tick"    mapstructure:"max_jobs_per_tick"`
 }
 
+type SearchSettings struct {
+	IndexEnabled           bool   `json:"index_enabled"            koanf:"index_enabled"            mapstructure:"index_enabled"`
+	IndexRoot              string `json:"index_root"               koanf:"index_root"               mapstructure:"index_root"`
+	RefreshIntervalSeconds int    `json:"refresh_interval_seconds" koanf:"refresh_interval_seconds" mapstructure:"refresh_interval_seconds"`
+	MaxFilesPerProject     int    `json:"max_files_per_project"    koanf:"max_files_per_project"    mapstructure:"max_files_per_project"`
+	MaxFileSizeBytes       int64  `json:"max_file_size_bytes"      koanf:"max_file_size_bytes"      mapstructure:"max_file_size_bytes"`
+}
+
 func DefaultSettings() Settings {
 	return Settings{
 		App: AppSettings{
@@ -86,6 +95,13 @@ func DefaultSettings() Settings {
 			PollIntervalMillis: 1000,
 			LeaseSeconds:       60,
 			MaxJobsPerTick:     1,
+		},
+		Search: SearchSettings{
+			IndexEnabled:           true,
+			IndexRoot:              "./data/search-index",
+			RefreshIntervalSeconds: 300,
+			MaxFilesPerProject:     5000,
+			MaxFileSizeBytes:       512 * 1024,
 		},
 	}
 }

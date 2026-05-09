@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/arcgolabs/collectionx/graph"
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/plano/compiler"
 	"github.com/arcgolabs/plano/schema"
@@ -106,80 +107,48 @@ func validateStringArgs(name string) func(args list.List[any]) error {
 }
 
 func validateStageGraph(stages []StageSpec) error {
-	names, err := validateStageNames(stages)
+	stageGraph, err := buildStageGraph(stages)
 	if err != nil {
 		return err
 	}
-	if err := validateStageNeeds(stages, names); err != nil {
-		return err
+	if _, err := stageGraph.TopologicalSort(); err != nil {
+		return oops.In("ci_plan_dsl").Wrapf(err, "stage dependency cycle")
 	}
-	return validateStageCycles(stages)
+	return nil
 }
 
-func validateStageNames(stages []StageSpec) (map[string]struct{}, error) {
-	names := make(map[string]struct{}, len(stages))
+func buildStageGraph(stages []StageSpec) (*graph.Graph[string, StageSpec], error) {
+	stageGraph := graph.NewDirectedGraph[string, StageSpec]()
+	if err := addStageGraphNodes(stageGraph, stages); err != nil {
+		return nil, err
+	}
+	if err := addStageGraphEdges(stageGraph, stages); err != nil {
+		return nil, err
+	}
+	return stageGraph, nil
+}
+
+func addStageGraphNodes(stageGraph *graph.Graph[string, StageSpec], stages []StageSpec) error {
 	for i := range stages {
 		stage := &stages[i]
-		if _, exists := names[stage.Name]; exists {
-			return nil, oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
+		if !stageGraph.AddNode(stage.Name, *stage) {
+			return oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
 		}
-		names[stage.Name] = struct{}{}
 	}
-	return names, nil
+	return nil
 }
 
-func validateStageNeeds(stages []StageSpec, names map[string]struct{}) error {
+func addStageGraphEdges(stageGraph *graph.Graph[string, StageSpec], stages []StageSpec) error {
 	for i := range stages {
 		stage := &stages[i]
 		for _, need := range stage.Needs {
-			if _, exists := names[need]; !exists {
+			if !stageGraph.HasNode(need) {
 				return oops.In("ci_plan_dsl").With("stage", stage.Name, "need", need).New("stage needs unknown stage")
+			}
+			if err := stageGraph.AddEdge(need, stage.Name); err != nil {
+				return oops.In("ci_plan_dsl").With("stage", stage.Name, "need", need).Wrapf(err, "add stage dependency")
 			}
 		}
 	}
-	return nil
-}
-
-func validateStageCycles(stages []StageSpec) error {
-	visitor := newStageCycleVisitor(stages)
-	for i := range stages {
-		stage := &stages[i]
-		if err := visitor.visit(stage.Name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type stageCycleVisitor struct {
-	byName   map[string]*StageSpec
-	visiting map[string]bool
-	visited  map[string]bool
-}
-
-func newStageCycleVisitor(stages []StageSpec) stageCycleVisitor {
-	byName := make(map[string]*StageSpec, len(stages))
-	for i := range stages {
-		stage := &stages[i]
-		byName[stage.Name] = stage
-	}
-	return stageCycleVisitor{byName: byName, visiting: map[string]bool{}, visited: map[string]bool{}}
-}
-
-func (v stageCycleVisitor) visit(name string) error {
-	if v.visited[name] {
-		return nil
-	}
-	if v.visiting[name] {
-		return oops.In("ci_plan_dsl").With("stage", name).New("stage dependency cycle")
-	}
-	v.visiting[name] = true
-	for _, need := range v.byName[name].Needs {
-		if err := v.visit(need); err != nil {
-			return err
-		}
-	}
-	v.visiting[name] = false
-	v.visited[name] = true
 	return nil
 }

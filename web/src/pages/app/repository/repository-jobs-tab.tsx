@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryJobStatus, RepositoryJobView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryJobsTabProps {
   repoId: string;
@@ -16,7 +17,7 @@ interface RepositoryJobsTabProps {
   onError: (message: string | null) => void;
 }
 
-type RawProjectJob = Record<string, unknown>;
+type RawProjectJob = RawRecord;
 
 const terminalStatuses: RepositoryJobStatus[] = ["succeeded", "failed", "cancelled"];
 
@@ -298,42 +299,9 @@ const normalizeJob = (raw: RawProjectJob): RepositoryJobView => ({
 
 const resolveJobList = (payload: unknown): RawProjectJob[] => {
   if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
+    return resolveRecordArray(payload);
   }
-  if (!isRecord(payload)) {
-    return [];
-  }
-  const nested = payload.body ?? payload.Body;
-  if (Array.isArray(nested)) {
-    return nested.filter(isRecord);
-  }
-  return [];
-};
-
-const isRecord = (value: unknown): value is RawProjectJob =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
-
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(normalizeString(value), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
+  return isRecord(payload) ? resolveRecordArray(payload.body ?? payload.Body) : [];
 };
 
 const normalizeStatus = (value: unknown): RepositoryJobStatus => {

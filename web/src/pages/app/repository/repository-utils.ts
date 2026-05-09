@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import dayjs from "dayjs";
 import { marked } from "marked";
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -22,11 +23,11 @@ export const shortSha = (value: string): string => {
 };
 
 export const formatTime = (value: string): string => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const date = dayjs(value);
+  if (!date.isValid()) {
     return value;
   }
-  return date.toLocaleString();
+  return date.format("YYYY-MM-DD HH:mm:ss");
 };
 
 export const extractErrorMessage = (error: unknown): string => {

@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { RepositoryLFSLockView, RepositoryLFSObjectView, RepositoryView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveBody, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryLFSTabProps {
   repoId: string;
@@ -18,8 +19,6 @@ interface RepositoryLFSTabProps {
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
-
-type RawRecord = Record<string, unknown>;
 
 export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryLFSTabProps): JSX.Element => {
   const objectsQuery = useCustom<RawRecord>({
@@ -287,12 +286,11 @@ const LFSStat = ({ label, value }: { label: string; value: number | string }) =>
 );
 
 const resolveObjectList = (payload: unknown): RawRecord[] => {
-  const raw = resolveBody(payload);
-  if (!isRecord(raw)) {
-    return [];
-  }
-  const objects = raw.objects ?? raw.Objects;
-  return Array.isArray(objects) ? objects.filter(isRecord) : [];
+	const raw = resolveBody(payload);
+	if (!isRecord(raw)) {
+		return [];
+	}
+	return resolveRecordArray(raw.objects ?? raw.Objects);
 };
 
 const resolveLockList = (payload: unknown): RawRecord[] => {
@@ -300,8 +298,7 @@ const resolveLockList = (payload: unknown): RawRecord[] => {
   if (!isRecord(raw)) {
     return [];
   }
-  const locks = raw.locks ?? raw.Locks;
-  return Array.isArray(locks) ? locks.filter(isRecord) : [];
+	return resolveRecordArray(raw.locks ?? raw.Locks);
 };
 
 const normalizeLFSObject = (raw: RawRecord): RepositoryLFSObjectView => ({
@@ -323,39 +320,6 @@ const normalizeLFSLock = (raw: RawRecord): RepositoryLFSLockView => {
       name: isRecord(owner) ? normalizeString(owner.name ?? owner.Name) : "",
     },
   };
-};
-
-const resolveBody = (payload: unknown): unknown => {
-  if (!isRecord(payload)) {
-    return payload;
-  }
-  return payload.body ?? payload.Body ?? payload;
-};
-
-const isRecord = (value: unknown): value is RawRecord =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
-
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(normalizeString(value), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const formatBytes = (value: number): string => {

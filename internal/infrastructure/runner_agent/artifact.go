@@ -2,16 +2,17 @@ package runneragent
 
 import (
 	"encoding/json"
+	"io/fs"
+	"os"
+	"path"
+	"strings"
+
+	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/samber/oops"
-	"io/fs"
-	"net/http"
-	"os"
-	"path"
-	"strings"
 )
 
 type ArtifactFile struct {
@@ -122,15 +123,5 @@ func normalizeArtifactPath(value string) string {
 }
 
 func detectArtifactContentType(fileName string, content []byte) string {
-	switch {
-	case strings.HasSuffix(strings.ToLower(fileName), ".txt"):
-		return "text/plain"
-	case strings.HasSuffix(strings.ToLower(fileName), ".json"):
-		return "application/json"
-	default:
-		if len(content) > 0 {
-			return http.DetectContentType(content)
-		}
-		return "application/octet-stream"
-	}
+	return storageports.DetectContentType(fileName, content)
 }

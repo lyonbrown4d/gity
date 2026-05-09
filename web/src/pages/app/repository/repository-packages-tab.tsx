@@ -18,6 +18,7 @@ import type {
   RepositoryPackageView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveBody, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryPackagesTabProps {
   repoId: string;
@@ -25,7 +26,7 @@ interface RepositoryPackagesTabProps {
   onError: (message: string | null) => void;
 }
 
-type RawPackage = Record<string, unknown>;
+type RawPackage = RawRecord;
 
 export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackagesTabProps): JSX.Element => {
   const dataProvider = useDataProvider();
@@ -447,7 +448,7 @@ const PackageStat = ({ label, value }: { label: string; value: number }) => (
 
 const resolvePackageList = (payload: unknown): RawPackage[] => {
   const raw = resolveBody(payload);
-  return Array.isArray(raw) ? raw.filter(isRecord) : [];
+  return resolveRecordArray(raw);
 };
 
 const normalizePackageDetail = (payload: unknown): RepositoryPackageDetailView | null => {
@@ -458,7 +459,7 @@ const normalizePackageDetail = (payload: unknown): RepositoryPackageDetailView |
   const versionsRaw = raw.versions ?? raw.Versions;
   return {
     package: normalizePackage(raw.package ?? raw.Package),
-    versions: Array.isArray(versionsRaw) ? versionsRaw.filter(isRecord).map(normalizePackageVersionDetail) : [],
+    versions: resolveRecordArray(versionsRaw).map(normalizePackageVersionDetail),
   };
 };
 
@@ -466,7 +467,7 @@ const normalizePackageVersionDetail = (raw: RawPackage): RepositoryPackageVersio
   const files = raw.files ?? raw.Files;
   return {
     version: normalizePackageVersion(raw.version ?? raw.Version),
-    files: Array.isArray(files) ? files.filter(isRecord).map(normalizePackageFile) : [],
+    files: resolveRecordArray(files).map(normalizePackageFile),
   };
 };
 
@@ -517,39 +518,6 @@ const normalizePackageFile = (value: unknown): RepositoryPackageFileView => {
     created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
     updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
   };
-};
-
-const resolveBody = (payload: unknown): unknown => {
-  if (!isRecord(payload)) {
-    return payload;
-  }
-  return payload.body ?? payload.Body ?? payload;
-};
-
-const isRecord = (value: unknown): value is RawPackage =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
-};
-
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
-
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(normalizeString(value), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const encodeBase64 = (value: string): string => {

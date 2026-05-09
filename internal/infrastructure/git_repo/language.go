@@ -4,67 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	mappingx "github.com/arcgolabs/collectionx/mapping"
+	enry "github.com/go-enry/go-enry/v2"
 	"github.com/go-git/go-git/v5/plumbing/object"
-)
-
-var (
-	fileNameLanguages = mappingx.NewMapFrom(map[string]string{
-		"dockerfile":        "Dockerfile",
-		"makefile":          "Makefile",
-		"go.mod":            "Go",
-		"go.sum":            "Go",
-		"cargo.toml":        "Rust",
-		"cargo.lock":        "Rust",
-		"package.json":      "JavaScript",
-		"pnpm-lock.yaml":    "JavaScript",
-		"package-lock.json": "JavaScript",
-		"yarn.lock":         "JavaScript",
-	})
-	fileExtensionLanguages = mappingx.NewMapFrom(map[string]string{
-		".go":       "Go",
-		".rs":       "Rust",
-		".java":     "Java",
-		".kt":       "Kotlin",
-		".kts":      "Kotlin",
-		".js":       "JavaScript",
-		".mjs":      "JavaScript",
-		".cjs":      "JavaScript",
-		".ts":       "TypeScript",
-		".jsx":      "JavaScript JSX",
-		".tsx":      "TypeScript JSX",
-		".css":      "CSS",
-		".scss":     "SCSS",
-		".sass":     "SCSS",
-		".html":     "HTML",
-		".htm":      "HTML",
-		".md":       "Markdown",
-		".markdown": "Markdown",
-		".json":     "JSON",
-		".yaml":     "YAML",
-		".yml":      "YAML",
-		".toml":     "TOML",
-		".xml":      "XML",
-		".pom":      "XML",
-		".sql":      "SQL",
-		".sh":       "Shell",
-		".bash":     "Shell",
-		".ps1":      "PowerShell",
-		".py":       "Python",
-		".rb":       "Ruby",
-		".php":      "PHP",
-		".c":        "C",
-		".h":        "C",
-		".cc":       "C++",
-		".cpp":      "C++",
-		".cxx":      "C++",
-		".hpp":      "C++",
-		".hh":       "C++",
-	})
 )
 
 func (s *Service) AnalyzeLanguages(ctx context.Context, repoPath, refName, defaultBranch string) (LanguageAnalysis, error) {
@@ -101,7 +45,11 @@ func analyzeLanguageBytes(ctx context.Context, tree *object.Tree) ([]LanguageSta
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		language := detectLanguage(file.Name)
+		content, err := readBlobContent(file)
+		if err != nil {
+			return err
+		}
+		language := detectLanguage(file.Name, content)
 		if language == "" {
 			return nil
 		}
@@ -143,11 +91,9 @@ func sortLanguageStats(languages *collectionlist.List[LanguageStat]) {
 	})
 }
 
-func detectLanguage(filePath string) string {
-	name := strings.ToLower(path.Base(filePath))
-	if language, ok := fileNameLanguages.Get(name); ok {
-		return language
+func detectLanguage(filePath string, content []byte) string {
+	if enry.IsVendor(filePath) || enry.IsBinary(content) || enry.IsGenerated(filePath, content) {
+		return ""
 	}
-	language, _ := fileExtensionLanguages.Get(strings.ToLower(path.Ext(filePath)))
-	return language
+	return enry.GetLanguage(filePath, content)
 }

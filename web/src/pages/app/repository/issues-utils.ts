@@ -35,11 +35,8 @@ export const extractErrorMessage = (error: unknown): string => {
 };
 
 export const toTimestamp = (value: string): number => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 0;
-  }
-  return date.getTime();
+  const date = dayjs(value);
+  return date.isValid() ? date.valueOf() : 0;
 };
 
 export const formatRelativeTime = (value: string): string => {
