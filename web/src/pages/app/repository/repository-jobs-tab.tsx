@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { RepositoryJobStatus, RepositoryJobView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 
@@ -227,9 +228,9 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
                 ) : null}
               </div>
               {job.last_error ? (
-                <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-                  {job.last_error}
-                </p>
+                <Alert variant="destructive" className="mt-2 px-2 py-1 text-xs">
+                  <AlertDescription className="text-xs leading-5">{job.last_error}</AlertDescription>
+                </Alert>
               ) : null}
               {job.result ? (
                 <pre className="mt-2 overflow-auto rounded-md bg-muted p-2 text-xs">{job.result}</pre>

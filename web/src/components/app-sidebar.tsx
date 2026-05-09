@@ -34,23 +34,31 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
   ] as const;
 
   return (
-    <Sidebar variant="inset" {...props}>
+    <Sidebar variant="inset" className="text-sidebar-foreground" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <NavLink to="/app/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <div className="relative flex aspect-square size-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_16px_36px_-22px_hsl(var(--sidebar-primary))]">
                   <ArrowRightLeft className="size-4" />
+                  <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-amber-400 ring-2 ring-sidebar" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{t("User Workspace")}</span>
-                  <span className="truncate text-xs">{t("User Portal")}</span>
+                  <span className="truncate text-base font-semibold tracking-[-0.03em]">Gity</span>
+                  <span className="truncate text-xs text-sidebar-foreground/65">{t("User Portal")}</span>
                 </div>
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <div className="mx-2 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/55 p-3 text-xs text-sidebar-foreground/75 shadow-inner group-data-[collapsible=icon]:hidden">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold text-sidebar-foreground">{t("Workspace")}</span>
+            <span className="gity-dot bg-sidebar-primary" />
+          </div>
+          <p className="leading-5">{t("Unified workspace for auth, organization management, and repository operations.")}</p>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

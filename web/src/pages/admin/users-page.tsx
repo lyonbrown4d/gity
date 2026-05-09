@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { useCreate, useDelete, useTable, useUpdate } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { UserView } from "@/pages/types";
@@ -196,9 +198,9 @@ export function AdminUsersPage(): JSX.Element {
         </CardHeader>
         <CardContent className="space-y-4">
           {errorMessage ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
           ) : null}
 
           {isLoading ? (
@@ -267,16 +269,16 @@ export function AdminUsersPage(): JSX.Element {
             </div>
             <div className="flex items-center gap-2">
               <Label htmlFor="users-page-size" className="text-xs">{t("Page size")}</Label>
-              <select
-                id="users-page-size"
-                className="h-9 rounded-md border bg-background px-2 text-sm"
-                value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value))}
-              >
-                {[10, 20, 50, 100].map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
+              <Select value={String(pageSize)} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger id="users-page-size" className="w-24">
+                  <SelectValue placeholder={t("Page size")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 50, 100].map((value) => (
+                    <SelectItem key={value} value={String(value)}>{value}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button type="button" variant="outline" size="sm" onClick={handlePrevPage} disabled={current <= 1}>
                 {t("Prev")}
               </Button>
@@ -325,15 +327,18 @@ export function AdminUsersPage(): JSX.Element {
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-user-status">{t("Status")}</Label>
-            <select
-              id="edit-user-status"
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            <Select
               value={editStatus}
-              onChange={(event) => setEditStatus(event.target.value === "disabled" ? "disabled" : "active")}
+              onValueChange={(value) => setEditStatus(value === "disabled" ? "disabled" : "active")}
             >
-              <option value="active">{t("active")}</option>
-              <option value="disabled">{t("disabled")}</option>
-            </select>
+              <SelectTrigger id="edit-user-status">
+                <SelectValue placeholder={t("Status")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">{t("active")}</SelectItem>
+                <SelectItem value="disabled">{t("disabled")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="outline" onClick={resetEditForm}>{t("Cancel")}</Button>

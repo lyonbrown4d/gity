@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryIssueView } from "@/pages/types";
 import { buildIssueDetailPath } from "./issue-markdown";
 import { IssueMarkdownEditor } from "./issue-markdown-editor";
@@ -149,25 +150,30 @@ export const RepositoryIssuesTab = ({
                 onChange={(event) => setIssueSearchQuery(event.target.value)}
               />
             </div>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            <Select
               value={issueStatusFilter}
-              onChange={(event) => setIssueStatusFilter(event.target.value as "open" | "closed" | "all")}
+              onValueChange={(value) => setIssueStatusFilter(value as "open" | "closed" | "all")}
             >
-              <option value="open">{t("Open issues")}</option>
-              <option value="closed">{t("Closed issues")}</option>
-              <option value="all">{t("All issues")}</option>
-            </select>
-            <select
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={issueSort}
-              onChange={(event) => setIssueSort(event.target.value as IssueSortMode)}
-            >
-              <option value="updated_desc">{t("Recently updated")}</option>
-              <option value="created_desc">{t("Recently created")}</option>
-              <option value="number_desc">{t("Newest number")}</option>
-              <option value="number_asc">{t("Oldest number")}</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder={t("Status")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">{t("Open issues")}</SelectItem>
+                <SelectItem value="closed">{t("Closed issues")}</SelectItem>
+                <SelectItem value="all">{t("All issues")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={issueSort} onValueChange={(value) => setIssueSort(value as IssueSortMode)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("Recently updated")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="updated_desc">{t("Recently updated")}</SelectItem>
+                <SelectItem value="created_desc">{t("Recently created")}</SelectItem>
+                <SelectItem value="number_desc">{t("Newest number")}</SelectItem>
+                <SelectItem value="number_asc">{t("Oldest number")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

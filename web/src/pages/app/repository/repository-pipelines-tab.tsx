@@ -4,6 +4,7 @@ import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type {
   RepositoryJobArtifactContentView,
   RepositoryJobArtifactView,
@@ -513,9 +514,9 @@ const PipelineJobCard = ({
       </p>
     ) : null}
     {item.project_job.last_error ? (
-      <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1 text-xs text-destructive">
-        {item.project_job.last_error}
-      </p>
+      <Alert variant="destructive" className="mt-2 px-2 py-1 text-xs">
+        <AlertDescription className="text-xs leading-5">{item.project_job.last_error}</AlertDescription>
+      </Alert>
     ) : null}
   </div>
 );

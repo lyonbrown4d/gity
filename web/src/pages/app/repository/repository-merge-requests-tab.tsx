@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type {
   RepositoryBranchView,
   RepositoryMergeRequestDiffView,
@@ -238,16 +240,20 @@ export const RepositoryMergeRequestsTab = ({
                     onChange={(event) => setSearchQuery(event.target.value)}
                   />
                 </div>
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                <Select
                   value={stateFilter}
-                  onChange={(event) => setStateFilter(event.target.value as RepositoryMergeRequestState | "all")}
+                  onValueChange={(value) => setStateFilter(value as RepositoryMergeRequestState | "all")}
                 >
-                  <option value="opened">{t("Open merge requests")}</option>
-                  <option value="merged">{t("Merged merge requests")}</option>
-                  <option value="closed">{t("Closed merge requests")}</option>
-                  <option value="all">{t("All merge requests")}</option>
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Status")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="opened">{t("Open merge requests")}</SelectItem>
+                    <SelectItem value="merged">{t("Merged merge requests")}</SelectItem>
+                    <SelectItem value="closed">{t("Closed merge requests")}</SelectItem>
+                    <SelectItem value="all">{t("All merge requests")}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -417,22 +423,21 @@ const BranchSelect = ({
   onChange: (value: string) => void;
 }) => (
   <div className="space-y-1">
-    <label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
+    <Label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
       {label}
-    </label>
-    <select
-      id={id}
-      className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      <option value="">{placeholder}</option>
-      {branches.map((branch) => (
-        <option key={branch.name} value={branch.name}>
-          {branch.name}
-        </option>
-      ))}
-    </select>
+    </Label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {branches.map((branch) => (
+          <SelectItem key={branch.name} value={branch.name}>
+            {branch.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   </div>
 );
 

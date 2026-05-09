@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryBranchView, RepositoryCommitView } from "@/pages/types";
 import { formatTime, shortSha } from "./repository-utils";
 
@@ -31,19 +32,19 @@ export const RepositoryCommitsTab = ({
           </div>
           <div className="space-y-2">
             <Label htmlFor="branch-filter">{t("Branch")}</Label>
-            <select
-              id="branch-filter"
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={branchFilter}
-              onChange={(event) => onChangeBranchFilter(event.target.value)}
-            >
-              <option value="all">{t("All branches")}</option>
-              {branches.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <Select value={branchFilter} onValueChange={onChangeBranchFilter}>
+              <SelectTrigger id="branch-filter">
+                <SelectValue placeholder={t("Branch")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("All branches")}</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.name} value={branch.name}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </CardHeader>

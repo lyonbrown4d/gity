@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type {
   RepositoryBlobView,
   RepositoryBranchView,
@@ -253,21 +254,21 @@ export const RepositoryCodeTab = ({
           </div>
           <div className="space-y-2">
             <Label htmlFor="code-branch-select">{t("Branch")}</Label>
-            <select
-              id="code-branch-select"
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={codeBranch}
-              onChange={(event) => onChangeCodeBranch(event.target.value)}
-            >
-              {branches.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}
-                </option>
-              ))}
-              {branches.length === 0 && repository.default_branch ? (
-                <option value={repository.default_branch}>{repository.default_branch}</option>
-              ) : null}
-            </select>
+            <Select value={codeBranch} onValueChange={onChangeCodeBranch}>
+              <SelectTrigger id="code-branch-select">
+                <SelectValue placeholder={t("Branch")} />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.name} value={branch.name}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+                {branches.length === 0 && repository.default_branch ? (
+                  <SelectItem value={repository.default_branch}>{repository.default_branch}</SelectItem>
+                ) : null}
+              </SelectContent>
+            </Select>
             <Button type="button" size="sm" variant="outline" onClick={onOpenCreateFile}>
               {t("Create file and commit")}
             </Button>

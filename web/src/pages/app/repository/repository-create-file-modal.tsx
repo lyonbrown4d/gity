@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryBranchView } from "@/pages/types";
 import { detectLanguage } from "./repository-utils";
 
@@ -47,19 +48,18 @@ export const RepositoryCreateFileModal = ({
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="new-file-branch">{t("Branch")}</Label>
-            <select
-              id="new-file-branch"
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={newFileBranch}
-              onChange={(event) => onChangeNewFileBranch(event.target.value)}
-              required
-            >
-              {branches.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <Select value={newFileBranch} onValueChange={onChangeNewFileBranch} required>
+              <SelectTrigger id="new-file-branch">
+                <SelectValue placeholder={t("Branch")} />
+              </SelectTrigger>
+              <SelectContent>
+                {branches.map((branch) => (
+                  <SelectItem key={branch.name} value={branch.name}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-file-path">{t("File path")}</Label>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDelete, useList } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { OrganizationView, RepositoryView } from "@/pages/types";
 
 export function AdminRepositoriesPage(): JSX.Element {
@@ -91,18 +93,18 @@ export function AdminRepositoriesPage(): JSX.Element {
           <div className="grid gap-3 md:grid-cols-[240px_1fr] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="admin-org-select">{t("Organization")}</Label>
-              <select
-                id="admin-org-select"
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                value={selectedOrg}
-                onChange={(event) => setSelectedOrg(event.target.value)}
-              >
-                {orgs.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                <SelectTrigger id="admin-org-select">
+                  <SelectValue placeholder={t("Organization")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgs.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{selectedOrgName}</Badge>
@@ -113,9 +115,9 @@ export function AdminRepositoriesPage(): JSX.Element {
           </div>
 
           {errorMessage ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
           ) : null}
         </CardContent>
       </Card>

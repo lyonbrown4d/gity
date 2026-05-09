@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { RepositoryBranchesTab } from "@/pages/app/repository/repository-branches-tab";
 import { RepositoryCodeTab } from "@/pages/app/repository/repository-code-tab";
@@ -85,9 +86,9 @@ export const RepositoryDetailPage = (): JSX.Element => {
       />
 
       {meta.errorMessage ? (
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {meta.errorMessage}
-        </p>
+        <Alert variant="destructive">
+          <AlertDescription>{meta.errorMessage}</AlertDescription>
+        </Alert>
       ) : null}
 
       {meta.isLoading ? <p className="text-sm text-muted-foreground">{t("Loading...")}</p> : null}

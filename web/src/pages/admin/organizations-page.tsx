@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCreate, useDelete, useList, useUpdate } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OrganizationMemberView, OrganizationView, RepositoryView } from "@/pages/types";
 
@@ -244,18 +246,18 @@ export function AdminOrganizationsPage(): JSX.Element {
           <div className="grid gap-3 md:grid-cols-[240px_1fr] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="selected-org">{t("Organization")}</Label>
-              <select
-                id="selected-org"
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                value={selectedOrg}
-                onChange={(event) => setSelectedOrg(event.target.value)}
-              >
-                {orgs.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedOrg} onValueChange={setSelectedOrg}>
+                <SelectTrigger id="selected-org">
+                  <SelectValue placeholder={t("Organization")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgs.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -287,9 +289,9 @@ export function AdminOrganizationsPage(): JSX.Element {
           </div>
 
           {errorMessage ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {errorMessage}
-            </p>
+            <Alert variant="destructive">
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Alert>
           ) : null}
         </CardContent>
       </Card>
@@ -440,15 +442,15 @@ export function AdminOrganizationsPage(): JSX.Element {
           </div>
           <div className="space-y-2">
             <Label htmlFor="member-role">{t("Role")}</Label>
-            <select
-              id="member-role"
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-              value={memberRole}
-              onChange={(event) => setMemberRole(event.target.value)}
-            >
-              <option value="member">{t("member")}</option>
-              <option value="owner">{t("owner")}</option>
-            </select>
+            <Select value={memberRole} onValueChange={setMemberRole}>
+              <SelectTrigger id="member-role">
+                <SelectValue placeholder={t("Role")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="member">{t("member")}</SelectItem>
+                <SelectItem value="owner">{t("owner")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={closeMemberModal}>

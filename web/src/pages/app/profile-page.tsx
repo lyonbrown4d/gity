@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useOne, useUpdate } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,19 +122,19 @@ export function AppProfilePage(): JSX.Element {
 
           <div className="mt-4 space-y-2">
             {message ? (
-              <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
-                {message}
-              </p>
+              <Alert className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700">
+                <AlertDescription>{message}</AlertDescription>
+              </Alert>
             ) : null}
             {error ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {error}
-              </p>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             ) : null}
             {loadError ? (
-              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                {loadError}
-              </p>
+              <Alert variant="destructive">
+                <AlertDescription>{loadError}</AlertDescription>
+              </Alert>
             ) : null}
           </div>
         </CardContent>
