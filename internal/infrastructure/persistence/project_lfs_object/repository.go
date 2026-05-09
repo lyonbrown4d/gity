@@ -3,15 +3,17 @@ package projectlfsobject
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	lfsports "github.com/DaiYuANg/gity/internal/application/ports"
 	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
+	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
-	"strings"
-	"time"
 )
 
 type Repository struct {
@@ -29,6 +31,19 @@ func NewProjectLFSObjectRepository(repo *Repository) lfsports.ProjectLFSObjectRe
 func (r *Repository) GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (lfsdomain.ProjectLFSObject, error) {
 	query := querydsl.Select(dbschema.ProjectLFSObjectSchema.AllColumns().Values()...).From(dbschema.ProjectLFSObjectSchema).Where(querydsl.And(dbschema.ProjectLFSObjectSchema.ProjectID.Eq(projectID), dbschema.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid)))).Limit(1)
 	return persistence.One(r.base.First(ctx, query))
+}
+
+func (r *Repository) ListByProjectID(ctx context.Context, input lfsports.ListProjectLFSObjectsInput) (*collectionlist.List[lfsdomain.ProjectLFSObject], error) {
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+	predicates := []querydsl.Predicate{dbschema.ProjectLFSObjectSchema.ProjectID.Eq(input.ProjectID)}
+	if input.AfterID > 0 {
+		predicates = append(predicates, dbschema.ProjectLFSObjectSchema.ID.Gt(input.AfterID))
+	}
+	query := querydsl.Select(dbschema.ProjectLFSObjectSchema.AllColumns().Values()...).From(dbschema.ProjectLFSObjectSchema).Where(querydsl.And(predicates...)).OrderBy(dbschema.ProjectLFSObjectSchema.ID.Asc()).Limit(limit)
+	return persistence.Many(r.base.List(ctx, query))
 }
 
 func (r *Repository) Create(ctx context.Context, projectID int64, oid string, byteSize int64, storageKey string) (lfsdomain.ProjectLFSObject, error) {

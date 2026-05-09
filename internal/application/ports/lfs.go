@@ -9,6 +9,7 @@ import (
 
 type ProjectLFSObjectRepository interface {
 	GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (lfsdomain.ProjectLFSObject, error)
+	ListByProjectID(ctx context.Context, input ListProjectLFSObjectsInput) (*collectionx.List[lfsdomain.ProjectLFSObject], error)
 	Create(ctx context.Context, projectID int64, oid string, byteSize int64, storageKey string) (lfsdomain.ProjectLFSObject, error)
 	UpdateStored(ctx context.Context, id, byteSize int64, storageKey string) error
 }
@@ -25,6 +26,12 @@ type CreateProjectLFSLockInput struct {
 	ProjectID   int64
 	OwnerUserID int64
 	Path        string
+}
+
+type ListProjectLFSObjectsInput struct {
+	ProjectID int64
+	AfterID   int64
+	Limit     int
 }
 
 type ListProjectLFSLocksInput struct {

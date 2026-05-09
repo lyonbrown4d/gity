@@ -9,8 +9,10 @@ import { RepositoryCommitsTab } from "@/pages/app/repository/repository-commits-
 import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-create-file-modal";
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
 import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-tab";
+import { RepositoryLFSTab } from "@/pages/app/repository/repository-lfs-tab";
 import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
 import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
+import { RepositoryPackagesTab } from "@/pages/app/repository/repository-packages-tab";
 import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
 import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
@@ -186,6 +188,23 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
+      {meta.repository && activeTab === "packages" ? (
+        <RepositoryPackagesTab
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
+      {meta.repository && activeTab === "lfs" ? (
+        <RepositoryLFSTab
+          repoId={repoId}
+          repository={meta.repository}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
       {meta.repository && activeTab === "runners" ? (
         <RepositoryRunnersTab
           repoId={repoId}
@@ -254,6 +273,8 @@ const isRepoTab = (value: string | null): value is RepoTab =>
   || value === "issues"
   || value === "merge-requests"
   || value === "wiki"
+  || value === "packages"
+  || value === "lfs"
   || value === "pipelines"
   || value === "jobs"
   || value === "runners"

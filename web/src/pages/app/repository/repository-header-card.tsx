@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import {
   BookOpen,
   Code2,
+  Database,
   GitBranch,
   GitCommit,
   GitPullRequest,
   ListTodo,
+  Package,
   PlayCircle,
   Rocket,
   Settings,
@@ -37,6 +39,7 @@ const TAB_GROUPS: Array<{
     items: [
       { value: "code", label: "Code", icon: Code2 },
       { value: "wiki", label: "Wiki", icon: BookOpen },
+      { value: "packages", label: "Packages", icon: Package },
     ],
   },
   {
@@ -51,6 +54,7 @@ const TAB_GROUPS: Array<{
     items: [
       { value: "commits", label: "Commits", icon: GitCommit },
       { value: "branches", label: "Branches", icon: GitBranch },
+      { value: "lfs", label: "LFS", icon: Database },
     ],
   },
   {

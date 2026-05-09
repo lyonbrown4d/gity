@@ -239,6 +239,70 @@ export interface RepositoryRunnerView {
   updated_at?: string | null;
 }
 
+export interface RepositoryPackageView {
+  id: string;
+  project_id: string;
+  type: string;
+  name: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryPackageVersionView {
+  id: string;
+  project_package_id: string;
+  version: string;
+  status: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryPackageFileView {
+  id: string;
+  project_package_version_id: string;
+  file_name: string;
+  file_path?: string | null;
+  content_type?: string | null;
+  byte_size: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryPackageVersionDetailView {
+  version: RepositoryPackageVersionView;
+  files: RepositoryPackageFileView[];
+}
+
+export interface RepositoryPackageDetailView {
+  package: RepositoryPackageView;
+  versions: RepositoryPackageVersionDetailView[];
+}
+
+export interface RepositoryPackageFileContentView {
+  file: RepositoryPackageFileView;
+  content_base64: string;
+}
+
+export interface RepositoryLFSObjectView {
+  id: string;
+  project_id: string;
+  oid: string;
+  byte_size: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryLFSLockOwnerView {
+  name: string;
+}
+
+export interface RepositoryLFSLockView {
+  id: string;
+  path: string;
+  locked_at?: string | null;
+  owner: RepositoryLFSLockOwnerView;
+}
+
 export interface IssueAttachmentUploadView {
   url: string;
   object_key: string;
