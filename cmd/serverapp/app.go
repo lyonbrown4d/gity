@@ -30,14 +30,18 @@ import (
 	projectauditeventrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
+	projectissueassigneerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_assignee"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_attachment"
 	projectissuecommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_comment"
+	projectissuelabelrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_label"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_artifact"
 	projectjoblogrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_log"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_lock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_object"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request"
+	projectmergerequestapprovalrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_approval"
+	projectmergerequestcommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_comment"
 	projectmergerequestparticipantrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_participant"
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package"
 	projectpackagefilerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package_file"
@@ -136,14 +140,18 @@ func repositoryRuntimeModule() dix.Module {
 			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
 			projectissuerepo.Module(),
+			projectissueassigneerepo.Module(),
 			projectissuecommentrepo.Module(),
 			projectissueattachmentrepo.Module(),
+			projectissuelabelrepo.Module(),
 			projectjobartifactrepo.Module(),
 			projectjoblogrepo.Module(),
 			projectjobrepo.Module(),
 			projectlfslockrepo.Module(),
 			projectlfsobjectrepo.Module(),
 			projectmergerequestrepo.Module(),
+			projectmergerequestcommentrepo.Module(),
+			projectmergerequestapprovalrepo.Module(),
 			projectmergerequestparticipantrepo.Module(),
 			projectpackagerepo.Module(),
 			projectpackageversionrepo.Module(),

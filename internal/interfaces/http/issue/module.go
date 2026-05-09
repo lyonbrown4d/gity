@@ -11,7 +11,7 @@ func Module() dix.Module {
 		"endpoint.issue",
 		dix.Description("Issue routes"),
 		dix.Providers(
-			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(60))),
+			dix.Provider4(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(60))),
 		),
 		dix.Invokes(
 			dix.Invoke3(RegisterMultipartRoutes),

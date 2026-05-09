@@ -93,6 +93,50 @@ func (e *Endpoint) createComment(ctx context.Context, in *createCommentInput) (*
 	return &issueOutput{Body: toIssueCommentView(in.IssueIID, item)}, nil
 }
 
+func (e *Endpoint) listAssignees(ctx context.Context, in *projectIssueInput) (*issueOutput, error) {
+	item, err := e.service.ListAssignees(ctx, in.ProjectID, in.IssueIID)
+	if err != nil {
+		return nil, err
+	}
+	views := collectionlist.MapList(collectionlist.NewList(item.Assignees...), func(_ int, assignee issuedomain.ProjectIssueAssignee) issueAssigneeView {
+		return toIssueAssigneeView(in.IssueIID, assignee)
+	}).Values()
+	return &issueOutput{Body: views}, nil
+}
+
+func (e *Endpoint) setAssignees(ctx context.Context, in *setIssueAssigneesInput) (*issueOutput, error) {
+	item, err := e.service.SetAssignees(ctx, in.ProjectID, in.IssueIID, issueservice.AssigneesInput{UserIDs: in.Body.UserIDs})
+	if err != nil {
+		return nil, err
+	}
+	views := collectionlist.MapList(collectionlist.NewList(item.Assignees...), func(_ int, assignee issuedomain.ProjectIssueAssignee) issueAssigneeView {
+		return toIssueAssigneeView(in.IssueIID, assignee)
+	}).Values()
+	return &issueOutput{Body: views}, nil
+}
+
+func (e *Endpoint) listLabels(ctx context.Context, in *projectIssueInput) (*issueOutput, error) {
+	item, err := e.service.ListLabels(ctx, in.ProjectID, in.IssueIID)
+	if err != nil {
+		return nil, err
+	}
+	views := collectionlist.MapList(collectionlist.NewList(item.Labels...), func(_ int, label issuedomain.ProjectIssueLabel) issueLabelView {
+		return toIssueLabelView(in.IssueIID, label)
+	}).Values()
+	return &issueOutput{Body: views}, nil
+}
+
+func (e *Endpoint) setLabels(ctx context.Context, in *setIssueLabelsInput) (*issueOutput, error) {
+	item, err := e.service.SetLabels(ctx, in.ProjectID, in.IssueIID, issueservice.LabelsInput{Labels: issueLabelsInputFromBody(in.Body)})
+	if err != nil {
+		return nil, err
+	}
+	views := collectionlist.MapList(collectionlist.NewList(item.Labels...), func(_ int, label issuedomain.ProjectIssueLabel) issueLabelView {
+		return toIssueLabelView(in.IssueIID, label)
+	}).Values()
+	return &issueOutput{Body: views}, nil
+}
+
 func (e *Endpoint) listAttachments(ctx context.Context, in *projectIssueInput) (*issueOutput, error) {
 	items, err := e.service.ListAttachments(ctx, in.ProjectID, in.IssueIID)
 	if err != nil {

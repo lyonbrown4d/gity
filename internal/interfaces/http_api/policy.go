@@ -21,6 +21,15 @@ type ProjectInput interface {
 type ProjectScopeResolver func(context.Context, int64) (infraauth.ProjectScope, error)
 
 func ActorUserID(ctx context.Context, authRuntime *infraauth.Runtime, authorization string, fallback int64) (int64, error) {
+	if strings.TrimSpace(authorization) != "" {
+		principal, ok, err := authenticateHeader(ctx, authRuntime, authorization)
+		if err != nil {
+			return 0, err
+		}
+		if ok {
+			return principal.UserID, nil
+		}
+	}
 	if fallback > 0 {
 		return fallback, nil
 	}
@@ -55,14 +64,18 @@ func RequireUser[I AuthorizationInput, O any](authRuntime *infraauth.Runtime) ht
 }
 
 func RequireProjectRead[I ProjectInput, O any](authRuntime *infraauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
-	return projectPolicy[I, O]("require_project_read", authRuntime, resolver, true)
+	return projectPolicy[I, O]("require_project_read", authRuntime, resolver, infraauth.ProjectActionRead, true)
 }
 
 func RequireProjectWrite[I ProjectInput, O any](authRuntime *infraauth.Runtime, resolver ProjectScopeResolver) httpx.RoutePolicy[I, O] {
-	return projectPolicy[I, O]("require_project_write", authRuntime, resolver, false)
+	return RequireProjectAction[I, O]("require_project_write", authRuntime, resolver, infraauth.ProjectActionWrite)
 }
 
-func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, read bool) httpx.RoutePolicy[I, O] {
+func RequireProjectAction[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, action string) httpx.RoutePolicy[I, O] {
+	return projectPolicy[I, O](name, authRuntime, resolver, action, false)
+}
+
+func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, action string, allowAnonymousPublicRead bool) httpx.RoutePolicy[I, O] {
 	return httpx.RoutePolicy[I, O]{
 		Name:      name,
 		Operation: markBearerProtected,
@@ -71,26 +84,26 @@ func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Ru
 				return nil
 			}
 			return func(ctx context.Context, input *I) (*O, error) {
-				return authorizeProjectRequest(ctx, input, next, authRuntime, resolver, read)
+				return authorizeProjectRequest(ctx, input, next, authRuntime, resolver, action, allowAnonymousPublicRead)
 			}
 		},
 	}
 }
 
-func authorizeProjectRequest[I ProjectInput, O any](ctx context.Context, input *I, next httpx.TypedHandler[I, O], authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, read bool) (*O, error) {
+func authorizeProjectRequest[I ProjectInput, O any](ctx context.Context, input *I, next httpx.TypedHandler[I, O], authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, action string, allowAnonymousPublicRead bool) (*O, error) {
 	scope, err := resolveProjectScope(ctx, input, resolver)
 	if err != nil {
 		return nil, err
 	}
 	authorization := authorizationHeader(input)
-	if canReadPublicProjectAnonymously(read, scope, authorization) {
+	if canReadPublicProjectAnonymously(allowAnonymousPublicRead, scope, authorization) {
 		return next(ctx, input)
 	}
 	principal, err := requirePrincipal(ctx, authRuntime, authorization)
 	if err != nil {
 		return nil, err
 	}
-	if err := authorizeProjectAccess(ctx, authRuntime, principal, scope, read); err != nil {
+	if err := authorizeProjectAccess(ctx, authRuntime, principal, scope, action); err != nil {
 		return nil, err
 	}
 	return next(ctx, input)
@@ -118,8 +131,8 @@ func requirePrincipal(ctx context.Context, authRuntime *infraauth.Runtime, autho
 	return principal, nil
 }
 
-func authorizeProjectAccess(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, scope infraauth.ProjectScope, read bool) error {
-	allowed, err := projectAccessAllowed(ctx, authRuntime, principal, scope, read)
+func authorizeProjectAccess(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, scope infraauth.ProjectScope, action string) error {
+	allowed, err := authRuntime.CanProjectAction(ctx, principal, scope, action)
 	if err != nil {
 		return httpx.NewError(http.StatusForbidden, "authorization failed", err)
 	}
@@ -127,13 +140,6 @@ func authorizeProjectAccess(ctx context.Context, authRuntime *infraauth.Runtime,
 		return httpx.NewError(http.StatusForbidden, "forbidden")
 	}
 	return nil
-}
-
-func projectAccessAllowed(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, scope infraauth.ProjectScope, read bool) (bool, error) {
-	if read {
-		return authRuntime.CanReadProject(ctx, principal, scope)
-	}
-	return authRuntime.CanWriteProject(ctx, principal, scope)
 }
 
 func authenticateHeader(ctx context.Context, authRuntime *infraauth.Runtime, authorization string) (infraauth.Principal, bool, error) {

@@ -16,14 +16,13 @@ type Publisher struct {
 }
 
 func NewBus(logger *slog.Logger) eventx.BusRuntime {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return eventx.New(
 		eventx.WithParallelDispatch(false),
 		eventx.WithMiddleware(eventx.RecoverMiddleware()),
 		eventx.WithAsyncErrorHandler(func(_ context.Context, event eventx.Event, err error) {
-			logger.Error("domain event handler failed", slog.String("event", event.Name()), slog.String("error", err.Error()))
+			if logger != nil {
+				logger.Error("domain event handler failed", slog.String("event", event.Name()), slog.String("error", err.Error()))
+			}
 		}),
 	)
 }

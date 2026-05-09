@@ -24,8 +24,10 @@ import (
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
+	projectissueassigneerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_assignee"
 	projectissueattachmentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_attachment"
 	projectissuecommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_comment"
+	projectissuelabelrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue_label"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
@@ -44,6 +46,7 @@ func TestIssueFlow(t *testing.T) {
 
 	issueIID := createIssueRecord(t, fixture)
 	assertIssueUpdate(t, fixture, issueIID)
+	assertIssueCollaboration(t, fixture, issueIID)
 	createIssueComment(t, fixture, issueIID)
 	attachmentID := createIssueAttachment(t, fixture, issueIID)
 	assertIssueCollections(t, fixture, issueIID)
@@ -56,6 +59,7 @@ type issueFixture struct {
 	projectID       int64
 	projectFullPath string
 	ownerID         int64
+	reviewerID      int64
 	service         *issueservice.Service
 }
 
@@ -82,6 +86,8 @@ func newIssueFixture(t *testing.T) issueFixture {
 	issueRepository := testutil.Must(projectissuerepo.NewRepository(db))
 	commentRepository := testutil.Must(projectissuecommentrepo.NewRepository(db))
 	attachmentRepository := testutil.Must(projectissueattachmentrepo.NewRepository(db))
+	assigneeRepository := testutil.Must(projectissueassigneerepo.NewRepository(db))
+	labelRepository := testutil.Must(projectissuelabelrepo.NewRepository(db))
 
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	storageRoot := filepath.Join(t.TempDir(), "storage")
@@ -92,12 +98,16 @@ func newIssueFixture(t *testing.T) issueFixture {
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	organizationSvc := organizationservice.NewService(logger, organizationRepository, organizationMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, organizationRepository, projectBranchProtectionRepository)
-	issueSvc := issueservice.NewService(projectRepository, issueRepository, commentRepository, attachmentRepository, userRepository, storage)
+	issueSvc := issueservice.NewServiceWithDependencies(
+		issueservice.NewRepositories(projectRepository, issueRepository, commentRepository, attachmentRepository, assigneeRepository, labelRepository),
+		issueservice.NewRuntimeDependencies(logger, userRepository, storage),
+	)
 
 	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	reviewer := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "bob", DisplayName: "Bob", Email: "bob@gity.dev"}))
 	space := testutil.Must(organizationSvc.Create(ctx, organizationservice.CreateInput{Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
 	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{OrganizationID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
-	return issueFixture{ctx: ctx, repoRoot: repoRoot, projectID: project.ID, projectFullPath: project.FullPath, ownerID: owner.ID, service: issueSvc}
+	return issueFixture{ctx: ctx, repoRoot: repoRoot, projectID: project.ID, projectFullPath: project.FullPath, ownerID: owner.ID, reviewerID: reviewer.ID, service: issueSvc}
 }
 
 func createIssueRecord(t *testing.T, fixture issueFixture) int64 {
@@ -122,6 +132,31 @@ func createIssueComment(t *testing.T, fixture issueFixture, issueIID int64) {
 	comment := testutil.Must(fixture.service.CreateComment(fixture.ctx, fixture.projectID, issueIID, issueservice.CreateCommentInput{AuthorUserID: fixture.ownerID, Body: "looks good"}))
 	if comment.ID == 0 {
 		t.Fatalf("expected comment id")
+	}
+}
+
+func assertIssueCollaboration(t *testing.T, fixture issueFixture, issueIID int64) {
+	t.Helper()
+
+	assignees := testutil.Must(fixture.service.SetAssignees(fixture.ctx, fixture.projectID, issueIID, issueservice.AssigneesInput{UserIDs: []int64{fixture.reviewerID, fixture.ownerID, fixture.reviewerID}}))
+	if len(assignees.Assignees) != 2 {
+		t.Fatalf("unexpected issue assignees: %+v", assignees.Assignees)
+	}
+	listedAssignees := testutil.Must(fixture.service.ListAssignees(fixture.ctx, fixture.projectID, issueIID))
+	if len(listedAssignees.Assignees) != 2 {
+		t.Fatalf("unexpected listed issue assignees: %+v", listedAssignees.Assignees)
+	}
+	labels := testutil.Must(fixture.service.SetLabels(fixture.ctx, fixture.projectID, issueIID, issueservice.LabelsInput{Labels: []issueservice.LabelInput{
+		{Name: "bug", Color: "#dc2626"},
+		{Name: "backend", Color: "#2563eb"},
+		{Name: "bug", Color: "#dc2626"},
+	}}))
+	if len(labels.Labels) != 2 {
+		t.Fatalf("unexpected issue labels: %+v", labels.Labels)
+	}
+	listedLabels := testutil.Must(fixture.service.ListLabels(fixture.ctx, fixture.projectID, issueIID))
+	if len(listedLabels.Labels) != 2 || listedLabels.Labels[0].Name != "backend" || listedLabels.Labels[1].Name != "bug" {
+		t.Fatalf("unexpected listed issue labels: %+v", listedLabels.Labels)
 	}
 }
 

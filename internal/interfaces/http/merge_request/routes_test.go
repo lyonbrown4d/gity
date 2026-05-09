@@ -1,6 +1,7 @@
 package mergerequest_test
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -8,34 +9,39 @@ import (
 	"github.com/arcgolabs/httpx"
 )
 
-func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
+func TestEndpointRegistersMergeRequestRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(mergerequest.NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(mergerequest.NewEndpoint(nil, nil, nil, nil))
 
-	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests")
-	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests")
-	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests/{merge_iid}/diff")
-	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests/{merge_iid}/checks")
-	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests/{merge_iid}/participants")
-	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests/{merge_iid}/merge")
-	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/merge-requests/{merge_iid}/reviewers")
-	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/merge-requests/{merge_iid}/assignees")
+	assertMergeRequestRoutes(t, server, "projects")
+	assertMergeRequestRoutes(t, server, "repos")
 }
 
-func TestEndpointRegistersDeprecatedRepoMergeRequestAliases(t *testing.T) {
-	server := httpx.New(httpx.WithBasePath("/api"))
+func assertMergeRequestRoutes(t *testing.T, server httpx.ServerRuntime, scope string) {
+	t.Helper()
 
-	server.RegisterOnly(mergerequest.NewEndpoint(nil, nil, nil))
-
-	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests")
-	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests")
-	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests/{merge_iid}/diff")
-	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests/{merge_iid}/checks")
-	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests/{merge_iid}/participants")
-	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests/{merge_iid}/merge")
-	assertRoute(t, server, http.MethodPatch, "/api/v1/repos/{id}/merge-requests/{merge_iid}/reviewers")
-	assertRoute(t, server, http.MethodPatch, "/api/v1/repos/{id}/merge-requests/{merge_iid}/assignees")
+	routes := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests"},
+		{http.MethodPost, "/api/v1/%s/{id}/merge-requests"},
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests/{merge_iid}/diff"},
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests/{merge_iid}/checks"},
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests/{merge_iid}/participants"},
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests/{merge_iid}/comments"},
+		{http.MethodPost, "/api/v1/%s/{id}/merge-requests/{merge_iid}/comments"},
+		{http.MethodGet, "/api/v1/%s/{id}/merge-requests/{merge_iid}/approvals"},
+		{http.MethodPost, "/api/v1/%s/{id}/merge-requests/{merge_iid}/approve"},
+		{http.MethodPost, "/api/v1/%s/{id}/merge-requests/{merge_iid}/unapprove"},
+		{http.MethodPost, "/api/v1/%s/{id}/merge-requests/{merge_iid}/merge"},
+		{http.MethodPatch, "/api/v1/%s/{id}/merge-requests/{merge_iid}/reviewers"},
+		{http.MethodPatch, "/api/v1/%s/{id}/merge-requests/{merge_iid}/assignees"},
+	}
+	for _, route := range routes {
+		assertRoute(t, server, route.method, fmt.Sprintf(route.path, scope))
+	}
 }
 
 func assertRoute(t *testing.T, server httpx.ServerRuntime, method, path string) {

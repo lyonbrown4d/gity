@@ -23,9 +23,6 @@ type Agent struct {
 }
 
 func New(cfg Config, logger *slog.Logger) *Agent {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &Agent{
 		cfg:    cfg,
 		client: NewClient(cfg.ServerURL, cfg.Token),

@@ -176,6 +176,20 @@ func fixMigrations() []Migration {
 				return autoMigrate(ctx, tx, "0017_project_merge_request_participants", dbschema.ProjectMergeRequestParticipantSchema)
 			},
 		},
+		{
+			Version: "0018_project_merge_request_collaboration",
+			Name:    "add project merge request comments and approvals",
+			Apply: func(ctx context.Context, tx *dbx.Tx) error {
+				return autoMigrate(ctx, tx, "0018_project_merge_request_collaboration", dbschema.ProjectMergeRequestCommentSchema, dbschema.ProjectMergeRequestApprovalSchema)
+			},
+		},
+		{
+			Version: "0019_project_issue_assignees_labels",
+			Name:    "add project issue assignees and labels",
+			Apply: func(ctx context.Context, tx *dbx.Tx) error {
+				return autoMigrate(ctx, tx, "0019_project_issue_assignees_labels", dbschema.ProjectIssueAssigneeSchema, dbschema.ProjectIssueLabelSchema)
+			},
+		},
 	}
 }
 

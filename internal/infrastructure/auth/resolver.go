@@ -20,7 +20,21 @@ var (
 		"public":   "project_public_read",
 		"internal": "project_internal_read",
 	})
-	projectWriteRoles = setx.NewSet("developer", "maintainer", "owner")
+	projectWriteRoles  = setx.NewSet("developer", "maintainer", "owner")
+	projectMergeRoles  = setx.NewSet("maintainer", "owner")
+	projectReportRoles = setx.NewSet("guest", "reporter", "developer", "maintainer", "owner")
+)
+
+const (
+	ProjectActionRead                = "project.read"
+	ProjectActionWrite               = "project.write"
+	ProjectActionIssueCreate         = "project.issues.create"
+	ProjectActionIssueWrite          = "project.issues.write"
+	ProjectActionIssueComment        = "project.issues.comment"
+	ProjectActionMergeRequestCreate  = "project.merge_requests.create"
+	ProjectActionMergeRequestWrite   = "project.merge_requests.write"
+	ProjectActionMergeRequestComment = "project.merge_requests.comment"
+	ProjectActionMergeRequestMerge   = "project.merge_requests.merge"
 )
 
 type ProjectScope struct {
@@ -74,10 +88,14 @@ func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64
 
 func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, action string, principal Principal, organizationID int64, visibility string) authx.Decision {
 	switch action {
-	case "project.read":
+	case ProjectActionRead:
 		return authorizeProjectRead(ctx, memberRepository, principal, organizationID, visibility)
-	case "project.write":
-		return authorizeProjectWrite(ctx, memberRepository, principal, organizationID)
+	case ProjectActionWrite, ProjectActionIssueWrite, ProjectActionMergeRequestCreate, ProjectActionMergeRequestWrite:
+		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectWriteRoles)
+	case ProjectActionIssueCreate, ProjectActionIssueComment, ProjectActionMergeRequestComment:
+		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectReportRoles)
+	case ProjectActionMergeRequestMerge:
+		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectMergeRoles)
 	default:
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}
@@ -93,13 +111,14 @@ func authorizeProjectRead(ctx context.Context, memberRepository *organizationmem
 	return authx.Decision{Allowed: false, Reason: "deny"}
 }
 
-func authorizeProjectWrite(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64) authx.Decision {
+func authorizeProjectRole(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64, action string, allowedRoles *setx.Set[string]) authx.Decision {
 	member, err := memberRepository.FindByOrganizationAndUser(ctx, organizationID, principal.UserID)
 	if err != nil {
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}
-	if projectWriteRoles.Contains(strings.TrimSpace(member.Role)) {
-		return authx.Decision{Allowed: true, PolicyID: "project_write"}
+	role := strings.TrimSpace(member.Role)
+	if allowedRoles.Contains(role) {
+		return authx.Decision{Allowed: true, PolicyID: action}
 	}
 	return authx.Decision{Allowed: false, Reason: "deny"}
 }
@@ -150,25 +169,17 @@ func (r *Runtime) AuthenticateHeader(ctx context.Context, authorization string) 
 }
 
 func (r *Runtime) CanReadProject(ctx context.Context, principal Principal, project ProjectScope) (bool, error) {
-	decision, err := r.Engine.Can(ctx, authx.AuthorizationModel{
-		Principal: principal,
-		Action:    "project.read",
-		Resource:  fmt.Sprintf("project:%d", project.ID),
-		Context: mappingx.NewMapFrom(map[string]any{
-			"organization_id": project.OrganizationID,
-			"visibility":      strings.TrimSpace(project.Visibility),
-		}),
-	})
-	if err != nil {
-		return false, oops.In("auth").With("project_id", project.ID, "organization_id", project.OrganizationID, "user_id", principal.UserID).Wrapf(err, "authorize project read")
-	}
-	return decision.Allowed, nil
+	return r.CanProjectAction(ctx, principal, project, ProjectActionRead)
 }
 
 func (r *Runtime) CanWriteProject(ctx context.Context, principal Principal, project ProjectScope) (bool, error) {
+	return r.CanProjectAction(ctx, principal, project, ProjectActionWrite)
+}
+
+func (r *Runtime) CanProjectAction(ctx context.Context, principal Principal, project ProjectScope, action string) (bool, error) {
 	decision, err := r.Engine.Can(ctx, authx.AuthorizationModel{
 		Principal: principal,
-		Action:    "project.write",
+		Action:    action,
 		Resource:  fmt.Sprintf("project:%d", project.ID),
 		Context: mappingx.NewMapFrom(map[string]any{
 			"organization_id": project.OrganizationID,
@@ -176,7 +187,9 @@ func (r *Runtime) CanWriteProject(ctx context.Context, principal Principal, proj
 		}),
 	})
 	if err != nil {
-		return false, oops.In("auth").With("project_id", project.ID, "organization_id", project.OrganizationID, "user_id", principal.UserID).Wrapf(err, "authorize project write")
+		return false, oops.In("auth").
+			With("project_id", project.ID, "organization_id", project.OrganizationID, "user_id", principal.UserID, "action", action).
+			Wrapf(err, "authorize project action")
 	}
 	return decision.Allowed, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
@@ -15,9 +16,12 @@ import (
 )
 
 type Service struct {
+	logger          *slog.Logger
 	projectRepo     gitports.ProjectRepository
 	mergeRepo       gitports.ProjectMergeRequestRepository
 	participantRepo gitports.ProjectMergeRequestParticipantRepository
+	commentRepo     gitports.ProjectMergeRequestCommentRepository
+	approvalRepo    gitports.ProjectMergeRequestApprovalRepository
 	userRepo        gitports.UserRepository
 	branchRepo      gitports.ProjectBranchProtectionRepository
 	gitRepo         gitports.GitRepository
@@ -38,11 +42,16 @@ type GitDependencies struct {
 }
 
 type Repositories struct {
-	projectRepo     gitports.ProjectRepository
-	mergeRepo       gitports.ProjectMergeRequestRepository
+	projectRepo gitports.ProjectRepository
+	mergeRepo   gitports.ProjectMergeRequestRepository
+	userRepo    gitports.UserRepository
+	branchRepo  gitports.ProjectBranchProtectionRepository
+}
+
+type CollaborationRepositories struct {
 	participantRepo gitports.ProjectMergeRequestParticipantRepository
-	userRepo        gitports.UserRepository
-	branchRepo      gitports.ProjectBranchProtectionRepository
+	commentRepo     gitports.ProjectMergeRequestCommentRepository
+	approvalRepo    gitports.ProjectMergeRequestApprovalRepository
 }
 
 type CreateInput struct {
@@ -97,27 +106,36 @@ func NewGitDependencies(gitRepo gitports.GitRepository, gitRunner gitports.GitRu
 	return GitDependencies{gitRepo: gitRepo, gitRunner: gitRunner}
 }
 
-func NewRepositories(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, participantRepo gitports.ProjectMergeRequestParticipantRepository, userRepo gitports.UserRepository, branchRepo gitports.ProjectBranchProtectionRepository) Repositories {
-	return Repositories{projectRepo: projectRepo, mergeRepo: mergeRepo, participantRepo: participantRepo, userRepo: userRepo, branchRepo: branchRepo}
+func NewRepositories(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, branchRepo gitports.ProjectBranchProtectionRepository) Repositories {
+	return Repositories{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, branchRepo: branchRepo}
 }
 
-func NewService(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, gitRepo gitports.GitRepository, gitRunner gitports.GitRunner, pipelineDeps *PipelineDeps) *Service {
+func NewCollaborationRepositories(participantRepo gitports.ProjectMergeRequestParticipantRepository, commentRepo gitports.ProjectMergeRequestCommentRepository, approvalRepo gitports.ProjectMergeRequestApprovalRepository) CollaborationRepositories {
+	return CollaborationRepositories{participantRepo: participantRepo, commentRepo: commentRepo, approvalRepo: approvalRepo}
+}
+
+func NewService(logger *slog.Logger, projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, gitRepo gitports.GitRepository, gitRunner gitports.GitRunner, pipelineDeps *PipelineDeps) *Service {
 	return NewServiceWithDependencies(
-		NewRepositories(projectRepo, mergeRepo, nil, userRepo, nil),
+		logger,
+		NewRepositories(projectRepo, mergeRepo, userRepo, nil),
+		CollaborationRepositories{},
 		NewGitDependencies(gitRepo, gitRunner),
 		pipelineDeps,
 		gitports.NoopDomainEventPublisher{},
 	)
 }
 
-func NewServiceWithDependencies(repos Repositories, git GitDependencies, pipelineDeps *PipelineDeps, events gitports.DomainEventPublisher) *Service {
+func NewServiceWithDependencies(logger *slog.Logger, repos Repositories, collaboration CollaborationRepositories, git GitDependencies, pipelineDeps *PipelineDeps, events gitports.DomainEventPublisher) *Service {
 	if events == nil {
 		events = gitports.NoopDomainEventPublisher{}
 	}
 	service := &Service{
+		logger:          logger,
 		projectRepo:     repos.projectRepo,
 		mergeRepo:       repos.mergeRepo,
-		participantRepo: repos.participantRepo,
+		participantRepo: collaboration.participantRepo,
+		commentRepo:     collaboration.commentRepo,
+		approvalRepo:    collaboration.approvalRepo,
 		userRepo:        repos.userRepo,
 		branchRepo:      repos.branchRepo,
 		gitRepo:         git.gitRepo,
@@ -129,6 +147,13 @@ func NewServiceWithDependencies(repos Repositories, git GitDependencies, pipelin
 		service.pipelineSvc = pipelineDeps.pipelineSvc
 	}
 	return service
+}
+
+func (s *Service) warn(message string, attrs ...any) {
+	if s.logger == nil {
+		return
+	}
+	s.logger.Warn(message, attrs...)
 }
 
 func (s *Service) List(ctx context.Context, projectID int64) ([]mergedomain.ProjectMergeRequest, error) {

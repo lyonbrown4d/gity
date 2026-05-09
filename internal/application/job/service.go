@@ -46,9 +46,6 @@ func NewService(
 	artifactRepo storageports.ProjectJobArtifactRepository,
 	storage storageports.ObjectStorage,
 ) *Service {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &Service{logger: logger, projectRepo: projectRepo, jobRepo: jobRepo, logRepo: logRepo, artifactRepo: artifactRepo, storage: storage}
 }
 

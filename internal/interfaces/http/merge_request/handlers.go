@@ -48,6 +48,22 @@ func (e *Endpoint) listParticipants(ctx context.Context, in *mergeRequestInput) 
 	return &mergeRequestOutput{Body: item}, nil
 }
 
+func (e *Endpoint) listComments(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
+	item, err := e.service.ListComments(ctx, in.ProjectID, in.MergeIID)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) listApprovals(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
+	item, err := e.service.ListApprovals(ctx, in.ProjectID, in.MergeIID)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
 func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
 	input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
 	if err != nil {
@@ -59,6 +75,60 @@ func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeReques
 	}
 	input.AuthorUserID = authorUserID
 	item, err := e.service.Create(ctx, in.ProjectID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) createComment(ctx context.Context, in *createMergeRequestCommentInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.CommentInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
+	if err != nil {
+		return nil, err
+	}
+	input.AuthorUserID = authorUserID
+	if input.Body == "" {
+		input.Body = in.Body.Content
+	}
+	item, err := e.service.CreateComment(ctx, in.ProjectID, in.MergeIID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) approve(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.ApprovalInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+	input.UserID = userID
+	item, err := e.service.Approve(ctx, in.ProjectID, in.MergeIID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) unapprove(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.ApprovalInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+	input.UserID = userID
+	item, err := e.service.Unapprove(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {
 		return nil, err
 	}

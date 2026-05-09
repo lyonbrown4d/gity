@@ -81,8 +81,16 @@ func RequireUserRoute[I AuthorizationInput, O any](authRuntime *auth.Runtime) Ro
 	return Policy(RequireUser[I, O](authRuntime))
 }
 
+func RequireProjectReadRoute[I ProjectInput, O any](authRuntime *auth.Runtime, resolver ProjectScopeResolver) RouteOption[I, O] {
+	return Policy(RequireProjectRead[I, O](authRuntime, resolver))
+}
+
 func RequireProjectWriteRoute[I ProjectInput, O any](authRuntime *auth.Runtime, resolver ProjectScopeResolver) RouteOption[I, O] {
 	return Policy(RequireProjectWrite[I, O](authRuntime, resolver))
+}
+
+func RequireProjectActionRoute[I ProjectInput, O any](name string, authRuntime *auth.Runtime, resolver ProjectScopeResolver, action string) RouteOption[I, O] {
+	return Policy(RequireProjectAction[I, O](name, authRuntime, resolver, action))
 }
 
 func MustRegisterRoutes(registrar httpx.Registrar, routes ...EndpointRoute) {

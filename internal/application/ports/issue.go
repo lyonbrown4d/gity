@@ -19,6 +19,16 @@ type ProjectIssueCommentRepository interface {
 	Create(ctx context.Context, input CreateProjectIssueCommentInput) (issuedomain.ProjectIssueComment, error)
 }
 
+type ProjectIssueAssigneeRepository interface {
+	ListByIssueID(ctx context.Context, issueID int64) (*collectionx.List[issuedomain.ProjectIssueAssignee], error)
+	ReplaceByIssueID(ctx context.Context, issueID int64, userIDs []int64) (*collectionx.List[issuedomain.ProjectIssueAssignee], error)
+}
+
+type ProjectIssueLabelRepository interface {
+	ListByIssueID(ctx context.Context, issueID int64) (*collectionx.List[issuedomain.ProjectIssueLabel], error)
+	ReplaceByIssueID(ctx context.Context, issueID int64, labels []ProjectIssueLabelInput) (*collectionx.List[issuedomain.ProjectIssueLabel], error)
+}
+
 type ProjectIssueAttachmentRepository interface {
 	ListByIssueID(ctx context.Context, issueID int64) (*collectionx.List[issuedomain.ProjectIssueAttachment], error)
 	GetByIssueAndID(ctx context.Context, issueID, attachmentID int64) (issuedomain.ProjectIssueAttachment, error)
@@ -45,6 +55,11 @@ type CreateProjectIssueCommentInput struct {
 	ProjectIssueID int64
 	AuthorUserID   int64
 	Body           string
+}
+
+type ProjectIssueLabelInput struct {
+	Name  string
+	Color string
 }
 
 type CreateProjectIssueAttachmentInput struct {

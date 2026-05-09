@@ -15,7 +15,7 @@ import (
 func (s *Service) publishEventAsync(ctx context.Context, event mergedomain.ProjectMergeRequestMerged) {
 	if err := s.events.PublishAsync(ctx, event); err != nil {
 		wrapped := oops.In("merge_request").With("project_id", event.ProjectID, "merge_request_id", event.MergeRequestID, "merge_iid", event.MergeIID, "event", event.Name()).Wrapf(err, "publish merge request event")
-		slog.Default().Warn("publish merge request event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
+		s.warn("publish merge request event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
 	}
 }
 
@@ -23,7 +23,7 @@ func (s *Service) publishRepositoryChanged(ctx context.Context, project projectd
 	event := projectdomain.NewProjectRepositoryChangedEvent(project, branchName, "", false, "merge_request")
 	if err := s.events.PublishAsync(ctx, event); err != nil {
 		wrapped := oops.In("merge_request").With("project_id", project.ID, "branch", branchName, "event", event.Name()).Wrapf(err, "publish repository changed event")
-		slog.Default().Warn("publish repository changed event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
+		s.warn("publish repository changed event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
 	}
 }
 

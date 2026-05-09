@@ -18,8 +18,25 @@ type Service struct {
 	issueRepo      storageports.ProjectIssueRepository
 	commentRepo    storageports.ProjectIssueCommentRepository
 	attachmentRepo storageports.ProjectIssueAttachmentRepository
+	assigneeRepo   storageports.ProjectIssueAssigneeRepository
+	labelRepo      storageports.ProjectIssueLabelRepository
 	userRepo       storageports.UserRepository
 	storage        storageports.ObjectStorage
+}
+
+type Repositories struct {
+	projectRepo    storageports.ProjectRepository
+	issueRepo      storageports.ProjectIssueRepository
+	commentRepo    storageports.ProjectIssueCommentRepository
+	attachmentRepo storageports.ProjectIssueAttachmentRepository
+	assigneeRepo   storageports.ProjectIssueAssigneeRepository
+	labelRepo      storageports.ProjectIssueLabelRepository
+}
+
+type RuntimeDependencies struct {
+	logger   *slog.Logger
+	userRepo storageports.UserRepository
+	storage  storageports.ObjectStorage
 }
 
 type CreateIssueInput struct {
@@ -39,15 +56,39 @@ type CreateCommentInput struct {
 	Body         string `json:"body"`
 }
 
-func NewService(projectRepo storageports.ProjectRepository, issueRepo storageports.ProjectIssueRepository, commentRepo storageports.ProjectIssueCommentRepository, attachmentRepo storageports.ProjectIssueAttachmentRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
-	return &Service{
-		logger:         slog.Default(),
+func NewRepositories(projectRepo storageports.ProjectRepository, issueRepo storageports.ProjectIssueRepository, commentRepo storageports.ProjectIssueCommentRepository, attachmentRepo storageports.ProjectIssueAttachmentRepository, assigneeRepo storageports.ProjectIssueAssigneeRepository, labelRepo storageports.ProjectIssueLabelRepository) Repositories {
+	return Repositories{
 		projectRepo:    projectRepo,
 		issueRepo:      issueRepo,
 		commentRepo:    commentRepo,
 		attachmentRepo: attachmentRepo,
-		userRepo:       userRepo,
-		storage:        storage,
+		assigneeRepo:   assigneeRepo,
+		labelRepo:      labelRepo,
+	}
+}
+
+func NewRuntimeDependencies(logger *slog.Logger, userRepo storageports.UserRepository, storage storageports.ObjectStorage) RuntimeDependencies {
+	return RuntimeDependencies{logger: logger, userRepo: userRepo, storage: storage}
+}
+
+func NewService(logger *slog.Logger, projectRepo storageports.ProjectRepository, issueRepo storageports.ProjectIssueRepository, commentRepo storageports.ProjectIssueCommentRepository, attachmentRepo storageports.ProjectIssueAttachmentRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
+	return NewServiceWithDependencies(
+		NewRepositories(projectRepo, issueRepo, commentRepo, attachmentRepo, nil, nil),
+		NewRuntimeDependencies(logger, userRepo, storage),
+	)
+}
+
+func NewServiceWithDependencies(repos Repositories, runtime RuntimeDependencies) *Service {
+	return &Service{
+		logger:         runtime.logger,
+		projectRepo:    repos.projectRepo,
+		issueRepo:      repos.issueRepo,
+		commentRepo:    repos.commentRepo,
+		attachmentRepo: repos.attachmentRepo,
+		assigneeRepo:   repos.assigneeRepo,
+		labelRepo:      repos.labelRepo,
+		userRepo:       runtime.userRepo,
+		storage:        runtime.storage,
 	}
 }
 

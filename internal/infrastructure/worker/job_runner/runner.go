@@ -25,9 +25,6 @@ type Runner struct {
 }
 
 func NewRunner(logger *slog.Logger, service *jobservice.Service, settings config.Settings) *Runner {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &Runner{logger: logger, service: service, settings: settings}
 }
 

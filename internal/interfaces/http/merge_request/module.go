@@ -11,7 +11,7 @@ func Module() dix.Module {
 		"endpoint.mergerequest",
 		dix.Description("Merge request routes"),
 		dix.Providers(
-			dix.Provider3(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(70))),
+			dix.Provider4(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(70))),
 		),
 	)
 }

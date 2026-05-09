@@ -5,12 +5,12 @@ import (
 	"context"
 	"errors"
 	"log"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/DaiYuANg/gity/internal/infrastructure/runner_agent"
+	"github.com/arcgolabs/logx"
 	"github.com/samber/oops"
 )
 
@@ -29,7 +29,11 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	agent := runneragent.New(cfg, slog.Default())
+	logger, err := logx.NewDevelopment()
+	if err != nil {
+		return oops.In("runner").Wrapf(err, "initialize runner logger")
+	}
+	agent := runneragent.New(cfg, logger)
 	if cfg.Once {
 		if _, err := agent.RunOnce(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			return oops.In("runner").Wrapf(err, "run runner once")

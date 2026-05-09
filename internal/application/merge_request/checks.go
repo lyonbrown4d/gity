@@ -23,7 +23,7 @@ func (s *Service) triggerTargetBranchPipeline(ctx context.Context, project proje
 	}
 	if _, _, err := s.pipelineSvc.CreatePushPipeline(ctx, project.ID, branch.Name, branch.Hash); err != nil {
 		wrapped := oops.In("merge_request").With("project_id", project.ID, "merge_request_id", mr.ID, "target_branch", branch.Name, "commit_sha", branch.Hash).Wrapf(err, "trigger target branch pipeline")
-		slog.Default().Warn("trigger target branch pipeline failed", slog.String("error", wrapped.Error()))
+		s.warn("trigger target branch pipeline failed", slog.String("error", wrapped.Error()))
 	}
 }
 

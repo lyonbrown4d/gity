@@ -24,6 +24,8 @@ import (
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request"
+	projectmergerequestapprovalrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_approval"
+	projectmergerequestcommentrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_comment"
 	projectmergerequestparticipantrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_participant"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
 	projectpipelinejobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline_job"
@@ -42,6 +44,7 @@ func TestMergeRequestFlow(t *testing.T) {
 	fixture := newMergeRequestFixture(t, false)
 	mrIID := assertCreateMergeRequest(t, fixture, "merge feature")
 	assertMergeRequestDiff(t, fixture, mrIID)
+	assertMergeRequestCollaboration(t, fixture, mrIID)
 	assertMergeRequestMerge(t, fixture, mrIID)
 	assertCloseSecondMergeRequest(t, fixture)
 	assertListMergeRequests(t, fixture)
@@ -85,6 +88,8 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
 	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
 	mergeRequestParticipantRepository := testutil.Must(projectmergerequestparticipantrepo.NewRepository(db))
+	mergeRequestCommentRepository := testutil.Must(projectmergerequestcommentrepo.NewRepository(db))
+	mergeRequestApprovalRepository := testutil.Must(projectmergerequestapprovalrepo.NewRepository(db))
 	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
 	pipelineJobRepository := createMRPipelineJobRepository(db, withPipelineService)
 	jobRepository := createMRJobRepository(db, withPipelineService)
@@ -100,7 +105,9 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, organizationRepository, projectBranchProtectionRepository)
 	pipelineSvc := createMRPipelineService(logger, projectRepository, pipelineRepository, pipelineJobRepository, jobRepository, gitRepository)
 	mergeRequestSvc := mergerequestservice.NewServiceWithDependencies(
-		mergerequestservice.NewRepositories(projectRepository, mergeRequestRepository, mergeRequestParticipantRepository, userRepository, projectBranchProtectionRepository),
+		logger,
+		mergerequestservice.NewRepositories(projectRepository, mergeRequestRepository, userRepository, projectBranchProtectionRepository),
+		mergerequestservice.NewCollaborationRepositories(mergeRequestParticipantRepository, mergeRequestCommentRepository, mergeRequestApprovalRepository),
 		mergerequestservice.NewGitDependencies(gitRepository, runner),
 		mergerequestservice.NewPipelineDeps(pipelineRepository, pipelineSvc),
 		nil,
@@ -167,6 +174,27 @@ func assertMergeRequestDiff(t *testing.T, fixture mergeRequestFixture, mrIID int
 	diff := testutil.Must(fixture.mergeRequestService.GetDiff(fixture.ctx, fixture.projectID, mrIID))
 	if !strings.Contains(diff.Diff, "feature.txt") {
 		t.Fatalf("expected diff to include feature file, got %s", diff.Diff)
+	}
+}
+
+func assertMergeRequestCollaboration(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	commented := testutil.Must(fixture.mergeRequestService.CreateComment(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.CommentInput{AuthorUserID: fixture.reviewerID, Body: "Looks good"}))
+	if len(commented.Comments) != 1 || commented.Comments[0].Body != "Looks good" {
+		t.Fatalf("unexpected merge request comments: %+v", commented.Comments)
+	}
+	comments := testutil.Must(fixture.mergeRequestService.ListComments(fixture.ctx, fixture.projectID, mrIID))
+	if len(comments.Comments) != 1 || comments.Comments[0].AuthorUserID != fixture.reviewerID {
+		t.Fatalf("unexpected listed merge request comments: %+v", comments.Comments)
+	}
+	approved := testutil.Must(fixture.mergeRequestService.Approve(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.ApprovalInput{UserID: fixture.reviewerID}))
+	if len(approved.Approvals) != 1 || approved.Approvals[0].UserID != fixture.reviewerID {
+		t.Fatalf("unexpected merge request approvals: %+v", approved.Approvals)
+	}
+	unapproved := testutil.Must(fixture.mergeRequestService.Unapprove(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.ApprovalInput{UserID: fixture.reviewerID}))
+	if len(unapproved.Approvals) != 0 {
+		t.Fatalf("unexpected merge request approvals after unapprove: %+v", unapproved.Approvals)
 	}
 }
 

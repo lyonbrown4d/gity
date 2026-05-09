@@ -19,6 +19,17 @@ type ProjectMergeRequestParticipantRepository interface {
 	ReplaceByMergeRequestAndRole(ctx context.Context, mergeRequestID int64, role string, userIDs []int64) (*collectionx.List[mergedomain.ProjectMergeRequestParticipant], error)
 }
 
+type ProjectMergeRequestCommentRepository interface {
+	ListByMergeRequestID(ctx context.Context, mergeRequestID int64) (*collectionx.List[mergedomain.ProjectMergeRequestComment], error)
+	Create(ctx context.Context, input CreateProjectMergeRequestCommentInput) (mergedomain.ProjectMergeRequestComment, error)
+}
+
+type ProjectMergeRequestApprovalRepository interface {
+	ListByMergeRequestID(ctx context.Context, mergeRequestID int64) (*collectionx.List[mergedomain.ProjectMergeRequestApproval], error)
+	Upsert(ctx context.Context, input UpsertProjectMergeRequestApprovalInput) (mergedomain.ProjectMergeRequestApproval, error)
+	DeleteByMergeRequestAndUser(ctx context.Context, mergeRequestID, userID int64) error
+}
+
 type CreateProjectMergeRequestInput struct {
 	ProjectID    int64
 	AuthorUserID int64
@@ -32,4 +43,15 @@ type UpdateProjectMergeRequestInput struct {
 	Title       *string
 	Description *string
 	State       *string
+}
+
+type CreateProjectMergeRequestCommentInput struct {
+	MergeRequestID int64
+	AuthorUserID   int64
+	Body           string
+}
+
+type UpsertProjectMergeRequestApprovalInput struct {
+	MergeRequestID int64
+	UserID         int64
 }

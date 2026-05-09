@@ -26,7 +26,15 @@ func (s ProjectIssueAttachmentSchemaDef) AllColumns() *collectionx.List[querydsl
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectIssueAssigneeSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectIssueCommentSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
+func (s ProjectIssueLabelSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 
@@ -55,6 +63,14 @@ func (s ProjectLFSObjectSchemaDef) AllColumns() *collectionx.List[querydsl.Selec
 }
 
 func (s ProjectMergeRequestSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
+func (s ProjectMergeRequestApprovalSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
+func (s ProjectMergeRequestCommentSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 
