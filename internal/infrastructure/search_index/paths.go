@@ -14,7 +14,10 @@ import (
 	"github.com/samber/oops"
 )
 
-const revisionFileName = ".gity_revision"
+const (
+	revisionFileName   = ".gity_revision"
+	searchIndexVersion = "v2"
+)
 
 func (s *Service) openRepository(project projectdomain.Project) (*git.Repository, error) {
 	repoPath, err := s.projectRepoPath(project)
@@ -76,7 +79,11 @@ func currentRevision(projectIndexPath string) string {
 	if readErr != nil || closeErr != nil {
 		return ""
 	}
-	return strings.TrimSpace(string(raw))
+	revision, ok := strings.CutPrefix(strings.TrimSpace(string(raw)), searchIndexVersion+":")
+	if !ok {
+		return ""
+	}
+	return revision
 }
 
 func (s *Service) projectIndexPath(projectID int64) (string, error) {

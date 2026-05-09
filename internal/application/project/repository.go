@@ -2,9 +2,12 @@ package project
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
+	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 )
 
 func (s *Service) ListTree(ctx context.Context, id int64, refName, treePath string) ([]gitports.TreeEntry, error) {
@@ -24,7 +27,7 @@ func (s *Service) Search(ctx context.Context, id int64, refName, query, path str
 	if err != nil {
 		return nil, apperror.NotFound("project not found", err)
 	}
-	results, err := s.gitRepository.Search(ctx, repositoryPath(project), refName, project.DefaultBranch, gitports.SearchParams{
+	params := gitports.SearchParams{
 		Query:       query,
 		Path:        path,
 		Limit:       limit,
@@ -32,11 +35,37 @@ func (s *Service) Search(ctx context.Context, id int64, refName, query, path str
 		MaxFileSize: maxFileSize,
 		MatchCase:   matchCase,
 		UseRegex:    useRegex,
-	})
+	}
+	indexed, indexErr := s.searchProjectIndex(ctx, project, refName, params)
+	if indexErr != nil || indexed.Hit {
+		if indexErr != nil {
+			return nil, indexErr
+		}
+		return indexed.Results, nil
+	}
+	results, err := s.gitRepository.Search(ctx, repositoryPath(project), refName, project.DefaultBranch, params)
 	if err != nil {
 		return nil, mapGitError(err)
 	}
 	return results, nil
+}
+
+func (s *Service) searchProjectIndex(ctx context.Context, project projectdomain.Project, refName string, params gitports.SearchParams) (gitports.CodeSearchIndexResult, error) {
+	if s.searchIndex == nil {
+		return gitports.CodeSearchIndexResult{}, nil
+	}
+	result, err := s.searchIndex.SearchProject(ctx, project, refName, params)
+	if err == nil || isSearchValidationError(err) {
+		return result, mapGitError(err)
+	}
+	if s.logger != nil {
+		s.logger.Warn("project search index failed; falling back to repository scan", slog.Int64("project_id", project.ID), slog.String("error", err.Error()))
+	}
+	return gitports.CodeSearchIndexResult{}, nil
+}
+
+func isSearchValidationError(err error) bool {
+	return errors.Is(err, gitports.ErrInvalidSearchQuery) || errors.Is(err, gitports.ErrInvalidSearchRegexp)
 }
 
 func (s *Service) GetBlob(ctx context.Context, id int64, refName, blobPath string) (gitports.Blob, error) {

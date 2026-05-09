@@ -263,6 +263,7 @@ func (s *Service) Merge(ctx context.Context, projectID, mergeIID int64, input Me
 	if err != nil {
 		return mergedomain.ProjectMergeRequest{}, err
 	}
+	s.publishRepositoryChanged(ctx, project, mr.TargetBranch)
 	s.publishEventAsync(ctx, mergedomain.NewProjectMergeRequestMergedEvent(mergedMR, input.ActorUserID))
 	return mergedMR, nil
 }

@@ -11,20 +11,11 @@ import (
 
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	"github.com/blevesearch/bleve/v2"
+	"github.com/blevesearch/bleve/v2/mapping"
 	enry "github.com/go-enry/go-enry/v2"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/samber/oops"
 )
-
-type document struct {
-	ProjectID int64  `json:"project_id"`
-	FullPath  string `json:"full_path"`
-	Revision  string `json:"revision"`
-	Path      string `json:"path"`
-	Content   string `json:"content"`
-	Language  string `json:"language"`
-	Size      int64  `json:"size"`
-}
 
 type indexState struct {
 	maxFiles     int
@@ -80,11 +71,37 @@ func prepareTemporaryIndex(projectID int64, projectIndexPath, tempPath string) e
 }
 
 func createProjectIndex(projectID int64, tempPath string) (bleve.Index, error) {
-	index, err := bleve.New(tempPath, bleve.NewIndexMapping())
+	index, err := bleve.New(tempPath, newIndexMapping())
 	if err != nil {
 		return nil, oops.In("search_index").With("project_id", projectID, "index_path", tempPath).Wrapf(err, "create project search index")
 	}
 	return index, nil
+}
+
+func newIndexMapping() *mapping.IndexMappingImpl {
+	indexMapping := bleve.NewIndexMapping()
+	documentMapping := bleve.NewDocumentMapping()
+	documentMapping.AddFieldMappingsAt("project_id", bleve.NewNumericFieldMapping())
+	documentMapping.AddFieldMappingsAt("full_path", storedKeywordFieldMapping())
+	documentMapping.AddFieldMappingsAt("revision", storedKeywordFieldMapping())
+	documentMapping.AddFieldMappingsAt("path", storedKeywordFieldMapping())
+	documentMapping.AddFieldMappingsAt("content", storedTextFieldMapping())
+	documentMapping.AddFieldMappingsAt("language", storedKeywordFieldMapping())
+	documentMapping.AddFieldMappingsAt("size", bleve.NewNumericFieldMapping())
+	indexMapping.DefaultMapping = documentMapping
+	return indexMapping
+}
+
+func storedKeywordFieldMapping() *mapping.FieldMapping {
+	fieldMapping := bleve.NewKeywordFieldMapping()
+	fieldMapping.Store = true
+	return fieldMapping
+}
+
+func storedTextFieldMapping() *mapping.FieldMapping {
+	fieldMapping := bleve.NewTextFieldMapping()
+	fieldMapping.Store = true
+	return fieldMapping
 }
 
 func (s *Service) closeIndexWithLog(index bleve.Index, projectID int64, indexPath string) {
@@ -101,7 +118,7 @@ func closeProjectIndex(index bleve.Index, projectID int64, indexPath string) err
 }
 
 func writeRevisionFile(projectID int64, tempPath, revision string) error {
-	if err := os.WriteFile(filepath.Join(tempPath, revisionFileName), []byte(revision), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(tempPath, revisionFileName), []byte(searchIndexVersion+":"+revision), 0o600); err != nil {
 		return oops.In("search_index").With("project_id", projectID, "index_path", tempPath).Wrapf(err, "write project search index revision")
 	}
 	return nil
@@ -166,15 +183,15 @@ func (s *Service) indexFile(ctx context.Context, index bleve.Index, project proj
 	return nil
 }
 
-func newDocument(project projectdomain.Project, revision string, file *object.File, content []byte) document {
-	return document{
-		ProjectID: project.ID,
-		FullPath:  project.FullPath,
-		Revision:  revision,
-		Path:      file.Name,
-		Content:   string(content),
-		Language:  enry.GetLanguage(file.Name, content),
-		Size:      file.Size,
+func newDocument(project projectdomain.Project, revision string, file *object.File, content []byte) map[string]any {
+	return map[string]any{
+		"project_id": project.ID,
+		"full_path":  project.FullPath,
+		"revision":   revision,
+		"path":       file.Name,
+		"content":    string(content),
+		"language":   enry.GetLanguage(file.Name, content),
+		"size":       file.Size,
 	}
 }
 

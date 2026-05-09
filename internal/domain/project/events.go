@@ -6,6 +6,7 @@ import domainevent "github.com/DaiYuANg/gity/internal/domain/event"
 const (
 	EventProjectCreated                 = "project.created"
 	EventProjectDeleted                 = "project.deleted"
+	EventProjectRepositoryChanged       = "project.repository.changed"
 	EventProjectBranchProtectionChanged = "project.branch_protection.changed"
 	EventProjectBranchDeleted           = "project.branch.deleted"
 )
@@ -68,6 +69,43 @@ func NewProjectDeletedEvent(project Project) ProjectDeleted {
 		Status:         project.Status,
 		DeletedAt:      deletedAt,
 	}
+}
+
+type ProjectRepositoryChanged struct {
+	domainevent.Metadata
+	ProjectID      int64  `json:"project_id"`
+	OrganizationID int64  `json:"organization_id"`
+	FullPath       string `json:"full_path"`
+	DefaultBranch  string `json:"default_branch"`
+	BranchName     string `json:"branch_name"`
+	CommitSHA      string `json:"commit_sha,omitempty"`
+	Deleted        bool   `json:"deleted"`
+	Source         string `json:"source,omitempty"`
+}
+
+func (ProjectRepositoryChanged) Name() string {
+	return EventProjectRepositoryChanged
+}
+
+func NewProjectRepositoryChangedEvent(project Project, branchName, commitSHA string, deleted bool, source string) ProjectRepositoryChanged {
+	return ProjectRepositoryChanged{
+		Metadata:       domainevent.NewMetadata(),
+		ProjectID:      project.ID,
+		OrganizationID: project.OrganizationID,
+		FullPath:       project.FullPath,
+		DefaultBranch:  project.DefaultBranch,
+		BranchName:     branchName,
+		CommitSHA:      commitSHA,
+		Deleted:        deleted,
+		Source:         source,
+	}
+}
+
+func (e ProjectRepositoryChanged) AffectsDefaultBranch() bool {
+	if e.Deleted {
+		return false
+	}
+	return e.BranchName == "" || e.BranchName == e.DefaultBranch || e.BranchName == "refs/heads/"+e.DefaultBranch
 }
 
 type ProjectBranchProtectionChanged struct {

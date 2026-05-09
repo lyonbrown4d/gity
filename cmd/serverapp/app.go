@@ -48,6 +48,7 @@ import (
 	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
+	searchindex "github.com/DaiYuANg/gity/internal/infrastructure/search_index"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
 	auditendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/audit"
 	authendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/auth"
@@ -165,6 +166,7 @@ func infrastructureRuntimeModule() dix.Module {
 			inframapper.Module(),
 			infrastorage.Module(),
 			infraeventbus.Module(),
+			searchindex.QueryModule(),
 		),
 	)
 }

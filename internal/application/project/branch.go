@@ -182,6 +182,7 @@ func (s *Service) CreateFileCommit(ctx context.Context, id int64, input CreateFi
 	if err != nil {
 		return mapGitExecError(err)
 	}
+	s.publishProjectEventAsync(ctx, id, projectdomain.NewProjectRepositoryChangedEvent(project, branchName, "", false, "file_commit"))
 	return nil
 }
 

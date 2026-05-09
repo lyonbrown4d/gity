@@ -5,6 +5,8 @@ import (
 	"log/slog"
 
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
+	gitports "github.com/DaiYuANg/gity/internal/application/ports"
+	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 )
 
 func triggerPushPipelines(ctx context.Context, logger *slog.Logger, service *pipelineservice.Service, project projectView, updates []receivePackUpdate) {
@@ -47,6 +49,31 @@ func logPushPipeline(logger *slog.Logger, project projectView, update receivePac
 		return
 	}
 	logger.Debug("push pipeline already exists", attrsToArgs(attrs)...)
+}
+
+func publishRepositoryChanges(ctx context.Context, logger *slog.Logger, publisher gitports.DomainEventPublisher, project projectView, updates []receivePackUpdate) {
+	if publisher == nil {
+		return
+	}
+	for _, update := range updates {
+		if update.BranchName == "" || isZeroOID(update.NewSHA) {
+			continue
+		}
+		event := projectdomain.NewProjectRepositoryChangedEvent(toDomainProject(project), update.BranchName, update.NewSHA, update.Delete, "git_push")
+		if err := publisher.PublishAsync(ctx, event); err != nil {
+			logger.Warn("publish repository changed event failed", slog.String("project", project.FullPath), slog.String("branch", update.BranchName), slog.String("error", err.Error()))
+		}
+	}
+}
+
+func toDomainProject(project projectView) projectdomain.Project {
+	return projectdomain.Project{
+		ID:             project.ID,
+		OrganizationID: project.OrganizationID,
+		FullPath:       project.FullPath,
+		Visibility:     project.Visibility,
+		DefaultBranch:  project.DefaultBranch,
+	}
 }
 
 func attrsToArgs(attrs []slog.Attr) []any {

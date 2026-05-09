@@ -19,6 +19,14 @@ func (s *Service) publishEventAsync(ctx context.Context, event mergedomain.Proje
 	}
 }
 
+func (s *Service) publishRepositoryChanged(ctx context.Context, project projectdomain.Project, branchName string) {
+	event := projectdomain.NewProjectRepositoryChangedEvent(project, branchName, "", false, "merge_request")
+	if err := s.events.PublishAsync(ctx, event); err != nil {
+		wrapped := oops.In("merge_request").With("project_id", project.ID, "branch", branchName, "event", event.Name()).Wrapf(err, "publish repository changed event")
+		slog.Default().Warn("publish repository changed event failed", slog.String("event", event.Name()), slog.String("error", wrapped.Error()))
+	}
+}
+
 func (s *Service) loadMergeRequest(ctx context.Context, projectID, mergeIID int64) (mergedomain.ProjectMergeRequest, error) {
 	_, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
 	return mr, err

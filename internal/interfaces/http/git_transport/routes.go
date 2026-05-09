@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
+	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	infragittransport "github.com/DaiYuANg/gity/internal/infrastructure/git_transport"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
@@ -37,10 +38,14 @@ var (
 type RouteServices struct {
 	branchProtectionRepo *projectbranchprotectionrepo.Repository
 	pipelineService      *pipelineservice.Service
+	events               gitports.DomainEventPublisher
 }
 
-func NewRouteServices(branchProtectionRepo *projectbranchprotectionrepo.Repository, pipelineService *pipelineservice.Service) *RouteServices {
-	return &RouteServices{branchProtectionRepo: branchProtectionRepo, pipelineService: pipelineService}
+func NewRouteServices(branchProtectionRepo *projectbranchprotectionrepo.Repository, pipelineService *pipelineservice.Service, events gitports.DomainEventPublisher) *RouteServices {
+	if events == nil {
+		events = gitports.NoopDomainEventPublisher{}
+	}
+	return &RouteServices{branchProtectionRepo: branchProtectionRepo, pipelineService: pipelineService, events: events}
 }
 
 func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service, services *RouteServices) {
@@ -123,6 +128,7 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime
 	c.Set(fiber.HeaderCacheControl, "no-cache")
 	if rpc.service == serviceReceivePack {
 		triggerPushPipelines(c.UserContext(), logger, services.pipelineService, project, updates)
+		publishRepositoryChanges(c.UserContext(), logger, services.events, project, updates)
 	}
 	return c.Send(stdout.Bytes())
 }

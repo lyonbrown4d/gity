@@ -9,6 +9,7 @@ func Module() dix.Module {
 		dix.Description("Project application services"),
 		dix.Providers(
 			dix.Provider2(NewGitDependencies),
+			dix.Provider2(NewRuntimeDependencies),
 			dix.Provider6(NewDependencies),
 			dix.Provider1(NewServiceWithDependencies),
 		),

@@ -15,7 +15,12 @@ type Dependencies struct {
 	Git              GitDependencies
 	OrganizationRepo gitports.OrganizationRepository
 	BranchRepo       gitports.ProjectBranchProtectionRepository
-	Events           gitports.DomainEventPublisher
+	Runtime          RuntimeDependencies
+}
+
+type RuntimeDependencies struct {
+	Events      gitports.DomainEventPublisher
+	SearchIndex gitports.CodeSearchIndex
 }
 
 type CreateInput struct {

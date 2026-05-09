@@ -24,14 +24,22 @@ type Service struct {
 	organizationRepo gitports.OrganizationRepository
 	branchRepo       gitports.ProjectBranchProtectionRepository
 	events           gitports.DomainEventPublisher
+	searchIndex      gitports.CodeSearchIndex
 }
 
 func NewGitDependencies(runner gitports.GitRunner, repository gitports.GitRepository) GitDependencies {
 	return GitDependencies{Runner: runner, Repository: repository}
 }
 
-func NewDependencies(logger *slog.Logger, repo gitports.ProjectRepository, git GitDependencies, organizationRepo gitports.OrganizationRepository, branchRepo gitports.ProjectBranchProtectionRepository, events gitports.DomainEventPublisher) Dependencies {
-	return Dependencies{Logger: logger, Repo: repo, Git: git, OrganizationRepo: organizationRepo, BranchRepo: branchRepo, Events: events}
+func NewRuntimeDependencies(events gitports.DomainEventPublisher, searchIndex gitports.CodeSearchIndex) RuntimeDependencies {
+	if events == nil {
+		events = gitports.NoopDomainEventPublisher{}
+	}
+	return RuntimeDependencies{Events: events, SearchIndex: searchIndex}
+}
+
+func NewDependencies(logger *slog.Logger, repo gitports.ProjectRepository, git GitDependencies, organizationRepo gitports.OrganizationRepository, branchRepo gitports.ProjectBranchProtectionRepository, runtime RuntimeDependencies) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, Git: git, OrganizationRepo: organizationRepo, BranchRepo: branchRepo, Runtime: runtime}
 }
 
 func NewServiceWithDependencies(deps Dependencies) *Service {
@@ -45,12 +53,12 @@ func NewService(logger *slog.Logger, repo gitports.ProjectRepository, gitRunner 
 		Git:              NewGitDependencies(gitRunner, gitRepository),
 		OrganizationRepo: organizationRepo,
 		BranchRepo:       branchRepo,
-		Events:           gitports.NoopDomainEventPublisher{},
+		Runtime:          RuntimeDependencies{Events: gitports.NoopDomainEventPublisher{}},
 	})
 }
 
 func newService(deps Dependencies) *Service {
-	events := deps.Events
+	events := deps.Runtime.Events
 	if events == nil {
 		events = gitports.NoopDomainEventPublisher{}
 	}
@@ -62,6 +70,7 @@ func newService(deps Dependencies) *Service {
 		organizationRepo: deps.OrganizationRepo,
 		branchRepo:       deps.BranchRepo,
 		events:           events,
+		searchIndex:      deps.Runtime.SearchIndex,
 	}
 }
 
