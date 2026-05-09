@@ -137,7 +137,7 @@ func normalizeUploadFileInput(projectID int64, input UploadFileInput) (normalize
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = storageports.DetectContentType(fileName)
+		contentType = storageports.DetectContentType(fileName, content)
 	}
 	if filePath == "" {
 		filePath = fileName

@@ -1,4 +1,8 @@
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import type { RepositoryIssueCommentView, RepositoryIssueView } from "@/pages/types";
+
+dayjs.extend(relativeTime);
 
 export type IssueSortMode = "updated_desc" | "created_desc" | "number_desc" | "number_asc";
 
@@ -39,30 +43,11 @@ export const toTimestamp = (value: string): number => {
 };
 
 export const formatRelativeTime = (value: string): string => {
-  const target = toTimestamp(value);
-  if (!target) {
+  const target = dayjs(value);
+  if (!target.isValid()) {
     return value;
   }
-  const now = Date.now();
-  const diff = target - now;
-  const abs = Math.abs(diff);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-
-  if (abs < minute) {
-    return "just now";
-  }
-  if (abs < hour) {
-    const amount = Math.round(abs / minute);
-    return diff < 0 ? `${amount}m ago` : `in ${amount}m`;
-  }
-  if (abs < day) {
-    const amount = Math.round(abs / hour);
-    return diff < 0 ? `${amount}h ago` : `in ${amount}h`;
-  }
-  const amount = Math.round(abs / day);
-  return diff < 0 ? `${amount}d ago` : `in ${amount}d`;
+  return target.fromNow();
 };
 
 export const issueUserInitials = (userId: string): string => {

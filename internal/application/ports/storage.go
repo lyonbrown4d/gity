@@ -2,12 +2,13 @@ package ports
 
 import (
 	"context"
+	"mime"
 	"path"
 	"strconv"
 	"strings"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
-	mappingx "github.com/arcgolabs/collectionx/mapping"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 type ObjectStorage interface {
@@ -18,21 +19,6 @@ type ObjectStorage interface {
 	SavePipelineArtifact(ctx context.Context, projectFullPath string, projectJobID, artifactID int64, fileName string, content []byte, contentType string) (string, error)
 	Load(ctx context.Context, key string) ([]byte, error)
 }
-
-var contentTypesByExtension = mappingx.NewMapFrom(map[string]string{
-	".md":   "text/markdown",
-	".txt":  "text/plain",
-	".json": "application/json",
-	".xml":  "application/xml",
-	".pom":  "application/xml",
-	".jar":  "application/java-archive",
-	".tgz":  "application/gzip",
-	".tar":  "application/x-tar",
-	".png":  "image/png",
-	".jpg":  "image/jpeg",
-	".jpeg": "image/jpeg",
-	".gif":  "image/gif",
-})
 
 func BuildIssueStorageKey(projectFullPath string, issueIID, attachmentID int64, fileName string) string {
 	return path.Join("issues", sanitizeNestedPath(projectFullPath), strconv.FormatInt(issueIID, 10), strconv.FormatInt(attachmentID, 10), sanitizeFileName(fileName))
@@ -58,10 +44,16 @@ func BuildPipelineArtifactStorageKey(projectFullPath string, projectJobID, artif
 	return path.Join("pipelines", sanitizeNestedPath(projectFullPath), "jobs", strconv.FormatInt(projectJobID, 10), "artifacts", strconv.FormatInt(artifactID, 10), sanitizeFileName(fileName))
 }
 
-func DetectContentType(fileName string) string {
+func DetectContentType(fileName string, contents ...[]byte) string {
 	extension := strings.ToLower(path.Ext(strings.TrimSpace(fileName)))
-	if contentType, ok := contentTypesByExtension.Get(extension); ok {
+	if contentType := mime.TypeByExtension(extension); contentType != "" {
 		return contentType
+	}
+	for _, content := range contents {
+		if len(content) == 0 {
+			continue
+		}
+		return mimetype.Detect(content).String()
 	}
 	return "application/octet-stream"
 }

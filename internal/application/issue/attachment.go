@@ -113,7 +113,7 @@ func (s *Service) validateAttachmentUpload(ctx context.Context, projectID int64,
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = storageports.DetectContentType(input.FileName)
+		contentType = storageports.DetectContentType(input.FileName, input.Content)
 	}
 	return project, contentType, nil
 }
@@ -197,7 +197,7 @@ func (s *Service) GetDraftAttachmentRaw(ctx context.Context, projectID int64, ob
 	}
 	return AttachmentRawContent{
 		FileName:    storageKeyFileName(normalizedKey),
-		ContentType: storageports.DetectContentType(normalizedKey),
+		ContentType: storageports.DetectContentType(normalizedKey, content),
 		Content:     content,
 	}, nil
 }

@@ -1,9 +1,10 @@
 package project
 
 import (
-	"regexp"
 	"strings"
 	"time"
+
+	"github.com/bmatcuk/doublestar/v4"
 )
 
 const (
@@ -15,6 +16,8 @@ const (
 	ProjectBranchProtectionAccessMaintainer = "maintainer"
 	ProjectBranchProtectionAccessOwner      = "owner"
 )
+
+const branchPatternPathSeparator = "\x1F"
 
 type ProjectBranchProtection struct {
 	ID                     int64     `dbx:"id"`
@@ -117,25 +120,14 @@ func (p ProjectBranchProtection) RequiresPipelineSuccess() bool {
 }
 
 func wildcardMatch(pattern, value string) bool {
-	var builder strings.Builder
-	writePatternPart(&builder, "^")
-	for _, char := range pattern {
-		switch char {
-		case '*':
-			writePatternPart(&builder, ".*")
-		case '?':
-			writePatternPart(&builder, ".")
-		default:
-			writePatternPart(&builder, regexp.QuoteMeta(string(char)))
-		}
-	}
-	writePatternPart(&builder, "$")
-	matched, err := regexp.MatchString(builder.String(), value)
+	matched, err := doublestar.Match(normalizeBranchPattern(pattern), normalizeBranchPattern(value))
 	return err == nil && matched
 }
 
-func writePatternPart(builder *strings.Builder, value string) {
-	if _, err := builder.WriteString(value); err != nil {
-		panic(err)
+func normalizeBranchPattern(value string) string {
+	normalized := strings.ReplaceAll(value, "/", branchPatternPathSeparator)
+	for strings.Contains(normalized, "**") {
+		normalized = strings.ReplaceAll(normalized, "**", "*")
 	}
+	return normalized
 }

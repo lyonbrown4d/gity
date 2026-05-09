@@ -1,11 +1,10 @@
 package plandsl
 
 import (
-	"regexp"
 	"strings"
-)
 
-var safeShellArgPattern = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
+	"mvdan.cc/sh/v3/syntax"
+)
 
 func shellJoin(args []string) string {
 	quoted := make([]string, 0, len(args))
@@ -16,8 +15,9 @@ func shellJoin(args []string) string {
 }
 
 func shellQuote(value string) string {
-	if value != "" && safeShellArgPattern.MatchString(value) {
-		return value
+	quoted, err := syntax.Quote(value, syntax.LangBash)
+	if err != nil {
+		return "''"
 	}
-	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	return quoted
 }

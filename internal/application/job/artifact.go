@@ -98,7 +98,7 @@ func prepareArtifactUpload(projectID, jobID int64, input UploadArtifactInput) (p
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
-		contentType = storageports.DetectContentType(fileName)
+		contentType = storageports.DetectContentType(fileName, content)
 	}
 	return preparedArtifactUpload{FileName: fileName, ContentType: contentType, Content: content}, nil
 }

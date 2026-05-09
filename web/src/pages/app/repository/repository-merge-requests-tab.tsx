@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, GitMerge, GitPullRequest, RefreshCw, Search, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
+import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,28 @@ interface RepositoryMergeRequestsTabProps {
 }
 
 type RawRecord = Record<string, unknown>;
+
+const rawRecordSchema = z.record(z.string(), z.unknown());
+const rawRecordArraySchema = z.array(rawRecordSchema);
+const stringValueSchema = z.preprocess((value) => (value === undefined || value === null ? "" : String(value)), z.string());
+const optionalStringValueSchema = stringValueSchema.transform((value) => {
+  const normalized = value.trim();
+  return !normalized || normalized === "0001-01-01T00:00:00Z" ? null : normalized;
+});
+const numberValueSchema = z.preprocess((value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const parsed = Number.parseInt(value === undefined || value === null ? "" : String(value), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}, z.number());
+const boolValueSchema = z.preprocess((value) => {
+  if (value === true || value === 1) {
+    return true;
+  }
+  const normalized = value === undefined || value === null ? "" : String(value).trim().toLowerCase();
+  return normalized === "1" || normalized === "true";
+}, z.boolean());
 
 export const RepositoryMergeRequestsTab = ({
   repoId,
@@ -978,34 +1001,20 @@ const normalizeUser = (raw: RawRecord): UserView => ({
 });
 
 const isRecord = (value: unknown): value is RawRecord =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+  rawRecordSchema.safeParse(value).success;
 
-const resolveRecordArray = (value: unknown): RawRecord[] => (Array.isArray(value) ? value.filter(isRecord) : []);
-
-const normalizeString = (value: unknown): string => {
-  if (value === undefined || value === null) {
-    return "";
-  }
-  return String(value);
+const resolveRecordArray = (value: unknown): RawRecord[] => {
+  const result = rawRecordArraySchema.safeParse(value);
+  return result.success ? result.data : [];
 };
 
-const normalizeOptionalString = (value: unknown): string | null => {
-  const normalized = normalizeString(value).trim();
-  if (!normalized || normalized === "0001-01-01T00:00:00Z") {
-    return null;
-  }
-  return normalized;
-};
+const normalizeString = (value: unknown): string => stringValueSchema.parse(value);
 
-const normalizeNumber = (value: unknown): number => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  const parsed = Number.parseInt(normalizeString(value), 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+const normalizeOptionalString = (value: unknown): string | null => optionalStringValueSchema.parse(value);
 
-const normalizeBool = (value: unknown): boolean => value === true || value === 1 || value === "1" || value === "true";
+const normalizeNumber = (value: unknown): number => numberValueSchema.parse(value);
+
+const normalizeBool = (value: unknown): boolean => boolValueSchema.parse(value);
 
 const normalizeState = (value: unknown): RepositoryMergeRequestState => {
   const normalized = normalizeString(value);

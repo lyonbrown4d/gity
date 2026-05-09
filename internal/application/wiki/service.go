@@ -3,12 +3,13 @@ package wiki
 import (
 	"context"
 	"errors"
+	"strings"
+
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	appports "github.com/DaiYuANg/gity/internal/application/ports"
 	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
+	slugx "github.com/gosimple/slug"
 	"github.com/samber/oops"
-	"strings"
-	"unicode"
 )
 
 type Service struct {
@@ -144,46 +145,12 @@ func normalizeSlug(value, fallbackTitle string) (string, error) {
 	if source == "" {
 		source = strings.TrimSpace(fallbackTitle)
 	}
-	source = strings.ReplaceAll(source, "\\", "-")
-	source = strings.ReplaceAll(source, "/", "-")
-	var builder strings.Builder
-	lastDash := false
-	for _, r := range source {
-		nextLastDash, err := appendSlugToken(&builder, r, lastDash)
-		if err != nil {
-			return "", err
-		}
-		lastDash = nextLastDash
-	}
-	slug := strings.Trim(builder.String(), "-")
-	if slug == "" || slug == "." || slug == ".." {
+	normalizedSlug := strings.Trim(slugx.Make(source), "-")
+	if normalizedSlug == "" || normalizedSlug == "." || normalizedSlug == ".." {
 		return "", oops.In("wiki").With("value", value, "fallback_title", fallbackTitle).New("wiki page slug is required")
 	}
-	if len(slug) > 160 {
-		return "", oops.In("wiki").With("slug", slug, "length", len(slug)).New("wiki page slug is too long")
+	if len(normalizedSlug) > 160 {
+		return "", oops.In("wiki").With("slug", normalizedSlug, "length", len(normalizedSlug)).New("wiki page slug is too long")
 	}
-	return slug, nil
-}
-
-func appendSlugToken(builder *strings.Builder, value rune, lastDash bool) (bool, error) {
-	if unicode.IsLetter(value) || unicode.IsDigit(value) {
-		if err := appendSlugRune(builder, unicode.ToLower(value)); err != nil {
-			return false, err
-		}
-		return false, nil
-	}
-	if lastDash || builder.Len() == 0 {
-		return lastDash, nil
-	}
-	if err := appendSlugRune(builder, '-'); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func appendSlugRune(builder *strings.Builder, value rune) error {
-	if _, err := builder.WriteRune(value); err != nil {
-		return oops.In("wiki").With("rune", string(value)).Wrapf(err, "append wiki slug rune")
-	}
-	return nil
+	return normalizedSlug, nil
 }
