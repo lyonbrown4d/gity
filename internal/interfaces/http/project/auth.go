@@ -12,7 +12,7 @@ func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (infraauth
 	if err != nil {
 		return infraauth.ProjectScope{}, err
 	}
-	return infraauth.ProjectScope{ID: item.ID, NamespaceID: item.NamespaceID, Visibility: item.Visibility}, nil
+	return infraauth.ProjectScope{ID: item.ID, OrganizationID: item.OrganizationID, Visibility: item.Visibility}, nil
 }
 
 func (e *Endpoint) attachPipelineTrigger(ctx context.Context, body map[string]any, projectID int64, branchName string) {

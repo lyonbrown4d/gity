@@ -10,7 +10,7 @@ import (
 
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
+	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
@@ -18,8 +18,8 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
+	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
@@ -89,8 +89,8 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
-	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
+	organizationMemberRepository := testutil.Must(organizationmemberrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
 	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
@@ -105,14 +105,14 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
-	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
+	organizationSvc := organizationservice.NewService(logger, organizationRepository, organizationMemberRepository, userRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, organizationRepository, projectBranchProtectionRepository)
 	pipelineSvc := createMRPipelineService(logger, projectRepository, pipelineRepository, pipelineJobRepository, jobRepository, gitRepository)
 	mergeRequestSvc := mergerequestservice.NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, mergerequestservice.NewPipelineDeps(pipelineRepository, pipelineSvc))
 
 	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
-	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
-	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+	space := testutil.Must(organizationSvc.Create(ctx, organizationservice.CreateInput{Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{OrganizationID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
 	testutil.RequireNoError(t, pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"), "push fixture branches")
 
 	return mergeRequestFixture{

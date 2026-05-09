@@ -11,13 +11,14 @@ This repository now uses a single Go module for the backend runtime and keeps th
 - Authentication foundation through `arcgolabs/authx`
 - Configuration loading through `arcgolabs/configx`
 - Logging through `arcgolabs/logx`
+- Application metadata/version through `internal/debug` and injected `dix.AppMeta`
 - Database foundation through `arcgolabs/dbx` repository mode
 - Snowflake `int64` IDs generated through `dbx`
-- Versioned schema bootstrap through a `schema_migrations` table plus `dbx` migration execution
+- Dedicated migration runtime with versioned schema tracking in `schema_migrations`
 - Git process boundary through native `git` subprocesses
 - Git read model through `go-git`
 - Current business chains online:
-  - `namespace -> project`
+  - `organization -> project`
   - `project -> issue -> comment -> attachment`
 
 The old Rust backend has been removed so the repository can move forward on one backend stack.
@@ -27,15 +28,19 @@ The old Rust backend has been removed so the repository can move forward on one 
 | Path | Responsibility |
 | --- | --- |
 | `cmd/server` | API server entrypoint |
+| `cmd/migration` | database migration entrypoint |
 | `cmd/worker` | background worker entrypoint |
-| `internal/app` | thin `dix` composition root |
+| `cmd/serverapp` | reusable server `dix` application composition |
+| `cmd/migrationapp` | reusable migration `dix` application composition |
+| `cmd/workerapp` | reusable worker `dix` application composition |
+| `cmd/standalone` | single-process migration + server + worker entrypoint using `dix` subapps |
 | `internal/config` | runtime settings and config loading |
-| `internal/entity` | typed dbx entities and schema definitions |
-| `internal/repository` | package-local `dbx` repository mode persistence |
-| `internal/service` | application services |
-| `internal/http` | `httpx` + Fiber server bootstrap and lifecycle |
-| `internal/endpoint` | HTTP route registration |
-| `internal/platform` | auth, db, logging, storage, and git infrastructure |
+| `internal/debug` | build metadata and dix app meta provider |
+| `internal/domain` | domain models and events |
+| `internal/application` | application services and ports |
+| `internal/infrastructure` | auth, db, persistence, storage, logging, worker, and git adapters |
+| `internal/interfaces/http_server` | `httpx` + Fiber server bootstrap and lifecycle |
+| `internal/interfaces/http` | HTTP endpoint modules |
 | `web` | frontend app |
 
 ## Quick Start
@@ -57,7 +62,21 @@ The current backend defaults to sqlite for the rewrite bootstrap, so Docker is o
 `GITY_DATABASE__NODE_ID` controls the Snowflake node id used by `dbx`.
 `GITY_STORAGE__ROOT` controls where issue attachments are stored on local disk.
 
-### 3. Run the backend
+### 3. Run database migrations
+
+Separate server and worker processes do not manage schema. Run migrations explicitly before starting them:
+
+```bash
+go run ./cmd/migration
+```
+
+For local single-process usage, `cmd/standalone` runs migration first and then starts server and worker:
+
+```bash
+go run ./cmd/standalone
+```
+
+### 4. Run the backend
 
 ```bash
 go run ./cmd/server
@@ -71,7 +90,7 @@ Current backend defaults:
 - OpenAPI: `http://localhost:8080/openapi.json`
 - Database: local sqlite file from `GITY_DATABASE__DSN`
 
-### 4. Run the frontend
+### 5. Run the frontend
 
 ```bash
 cp web/.env.example web/.env
@@ -94,12 +113,12 @@ Users:
 - `GET /v1/users/{id}/tokens`
 - `POST /v1/users/{id}/tokens`
 
-Namespaces:
-- `GET /v1/namespaces`
-- `GET /v1/namespaces/{id}`
-- `POST /v1/namespaces`
-- `GET /v1/namespaces/{id}/members`
-- `POST /v1/namespaces/{id}/members`
+Organizations:
+- `GET /v1/orgs`
+- `GET /v1/orgs/{id}`
+- `POST /v1/orgs`
+- `GET /v1/orgs/{id}/members`
+- `POST /v1/orgs/{id}/members`
 
 Projects:
 - `GET /v1/projects`
@@ -123,10 +142,10 @@ Issues:
 - `GET /v1/projects/{id}/issues/{issue_iid}/attachments/{attachment_id}`
 
 Git Smart HTTP:
-- `/<namespace>/<project>.git/info/refs?service=git-upload-pack`
-- `/<namespace>/<project>.git/git-upload-pack`
-- `/<namespace>/<project>.git/info/refs?service=git-receive-pack`
-- `/<namespace>/<project>.git/git-receive-pack`
+- `/<organization>/<project>.git/info/refs?service=git-upload-pack`
+- `/<organization>/<project>.git/git-upload-pack`
+- `/<organization>/<project>.git/info/refs?service=git-receive-pack`
+- `/<organization>/<project>.git/git-receive-pack`
 
 ## Development Notes
 
@@ -137,6 +156,7 @@ go test ./...
 ```
 
 Architecture notes for the Go rewrite live in [docs/GO_REWRITE_ARCHITECTURE.md](docs/GO_REWRITE_ARCHITECTURE.md).
+The product domain target lives in [docs/gitlab-like-domain-model.md](docs/gitlab-like-domain-model.md).
 
 ## Roadmap
 

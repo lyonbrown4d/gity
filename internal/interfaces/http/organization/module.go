@@ -1,5 +1,5 @@
-// Package namespace wires namespace HTTP endpoints.
-package namespace
+// Package organization wires organization HTTP endpoints.
+package organization
 
 import (
 	"github.com/arcgolabs/dix"
@@ -8,8 +8,8 @@ import (
 
 func Module() dix.Module {
 	return dix.NewModule(
-		"endpoint.namespace",
-		dix.Description("Namespace routes"),
+		"endpoint.organization",
+		dix.Description("Organization routes"),
 		dix.Providers(
 			dix.Provider1(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(40))),
 		),

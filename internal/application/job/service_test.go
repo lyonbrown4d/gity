@@ -12,7 +12,7 @@ import (
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectjobartifactrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job_artifact"
@@ -49,7 +49,7 @@ func newJobFixture(t *testing.T, withArtifacts bool) jobFixture {
 	testutil.CleanupClose(t, "db", db)
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
 	logRepository := createJobLogRepository(t, db, withArtifacts)
@@ -57,8 +57,8 @@ func newJobFixture(t *testing.T, withArtifacts bool) jobFixture {
 	storageSvc := createJobStorage(t, withArtifacts)
 	service := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, artifactRepository, storageSvc)
 
-	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
-	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace))
+	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
+	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, organization))
 
 	return jobFixture{ctx: ctx, projectID: project.ID, service: service}
 }

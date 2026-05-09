@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_lock"
@@ -55,7 +55,7 @@ func newBoundaryFixture(t *testing.T) boundaryFixture {
 	testutil.CleanupClose(t, "db", db)
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaces := testutil.Must(namespacerepo.NewRepository(db))
+	organizations := testutil.Must(organizationrepo.NewRepository(db))
 	projects := testutil.Must(projectrepo.NewRepository(db))
 	users := testutil.Must(userrepo.NewRepository(db))
 	issues := testutil.Must(projectissuerepo.NewRepository(db))
@@ -66,9 +66,9 @@ func newBoundaryFixture(t *testing.T) boundaryFixture {
 	lfsLocks := testutil.Must(projectlfslockrepo.NewRepository(db))
 
 	owner := testutil.Must(users.Create(ctx, userrepo.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
-	namespace := testutil.Must(namespaces.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
-	firstProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "First", PathKey: "first", Visibility: "private"}, namespace))
-	secondProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Second", PathKey: "second", Visibility: "private"}, namespace))
+	organization := testutil.Must(organizations.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
+	firstProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{OrganizationID: organization.ID, Name: "First", PathKey: "first", Visibility: "private"}, organization))
+	secondProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Second", PathKey: "second", Visibility: "private"}, organization))
 
 	return boundaryFixture{
 		ctx:             ctx,

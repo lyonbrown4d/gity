@@ -10,13 +10,13 @@ const (
 
 type ProjectCreated struct {
 	domainevent.Metadata
-	ProjectID     int64  `json:"project_id"`
-	NamespaceID   int64  `json:"namespace_id"`
-	ProjectName   string `json:"name"`
-	PathKey       string `json:"path_key"`
-	FullPath      string `json:"full_path"`
-	Visibility    string `json:"visibility"`
-	DefaultBranch string `json:"default_branch"`
+	ProjectID      int64  `json:"project_id"`
+	OrganizationID int64  `json:"organization_id"`
+	ProjectName    string `json:"name"`
+	PathKey        string `json:"path_key"`
+	FullPath       string `json:"full_path"`
+	Visibility     string `json:"visibility"`
+	DefaultBranch  string `json:"default_branch"`
 }
 
 func (ProjectCreated) Name() string {
@@ -25,14 +25,14 @@ func (ProjectCreated) Name() string {
 
 func NewProjectCreatedEvent(project Project) ProjectCreated {
 	return ProjectCreated{
-		Metadata:      domainevent.NewMetadata(),
-		ProjectID:     project.ID,
-		NamespaceID:   project.NamespaceID,
-		ProjectName:   project.Name,
-		PathKey:       project.PathKey,
-		FullPath:      project.FullPath,
-		Visibility:    project.Visibility,
-		DefaultBranch: project.DefaultBranch,
+		Metadata:       domainevent.NewMetadata(),
+		ProjectID:      project.ID,
+		OrganizationID: project.OrganizationID,
+		ProjectName:    project.Name,
+		PathKey:        project.PathKey,
+		FullPath:       project.FullPath,
+		Visibility:     project.Visibility,
+		DefaultBranch:  project.DefaultBranch,
 	}
 }
 

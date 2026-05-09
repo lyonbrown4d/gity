@@ -4,11 +4,11 @@ package main
 import (
 	"log"
 
-	"github.com/DaiYuANg/gity/internal/bootstrap"
+	serverapp "github.com/DaiYuANg/gity/cmd/serverapp"
 )
 
 func main() {
-	if err := bootstrap.NewServerApp().Run(); err != nil {
+	if err := serverapp.NewApp().Run(); err != nil {
 		log.Fatal(err)
 	}
 }

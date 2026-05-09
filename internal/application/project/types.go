@@ -10,21 +10,21 @@ type GitDependencies struct {
 }
 
 type Dependencies struct {
-	Logger        *slog.Logger
-	Repo          gitports.ProjectRepository
-	Git           GitDependencies
-	NamespaceRepo gitports.NamespaceRepository
-	BranchRepo    gitports.ProjectBranchProtectionRepository
-	Events        gitports.DomainEventPublisher
+	Logger           *slog.Logger
+	Repo             gitports.ProjectRepository
+	Git              GitDependencies
+	OrganizationRepo gitports.OrganizationRepository
+	BranchRepo       gitports.ProjectBranchProtectionRepository
+	Events           gitports.DomainEventPublisher
 }
 
 type CreateInput struct {
-	NamespaceID   int64  `json:"namespace_id"`
-	Name          string `json:"name"`
-	PathKey       string `json:"path_key"`
-	Visibility    string `json:"visibility"`
-	Description   string `json:"description"`
-	DefaultBranch string `json:"default_branch"`
+	OrganizationID int64  `json:"organization_id"`
+	Name           string `json:"name"`
+	PathKey        string `json:"path_key"`
+	Visibility     string `json:"visibility"`
+	Description    string `json:"description"`
+	DefaultBranch  string `json:"default_branch"`
 }
 
 type Branch struct {

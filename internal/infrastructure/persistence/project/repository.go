@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	projectports "github.com/DaiYuANg/gity/internal/application/ports"
-	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
+	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
@@ -32,12 +32,12 @@ func NewProjectRepository(repo *Repository) projectports.ProjectRepository {
 	return repo
 }
 
-func (r *Repository) List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error) {
+func (r *Repository) List(ctx context.Context, organizationID *int64) (*collectionx.List[projectdomain.Project], error) {
 	query := querydsl.Select(dbschema.ProjectSchema.AllColumns().Values()...).
 		From(dbschema.ProjectSchema).
 		OrderBy(dbschema.ProjectSchema.ID.Desc())
-	if namespaceID != nil {
-		query = query.Where(dbschema.ProjectSchema.NamespaceID.Eq(*namespaceID))
+	if organizationID != nil {
+		query = query.Where(dbschema.ProjectSchema.OrganizationID.Eq(*organizationID))
 	}
 	return persistence.Many(r.base.List(ctx, query))
 }
@@ -52,7 +52,7 @@ func (r *Repository) GetByFullPath(ctx context.Context, fullPath string) (projec
 	}))
 }
 
-func (r *Repository) Create(ctx context.Context, input CreateInput, namespace namespacedomain.Namespace) (projectdomain.Project, error) {
+func (r *Repository) Create(ctx context.Context, input CreateInput, organization organizationdomain.Organization) (projectdomain.Project, error) {
 	trimmedPath := strings.TrimSpace(input.PathKey)
 	trimmedName := strings.TrimSpace(input.Name)
 	defaultBranch := strings.TrimSpace(input.DefaultBranch)
@@ -63,19 +63,19 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, namespace na
 	if visibility == "" {
 		visibility = "private"
 	}
-	fullPath := namespace.FullPath + "/" + trimmedPath
+	fullPath := organization.FullPath + "/" + trimmedPath
 	now := time.Now().UTC()
 
 	item := projectdomain.Project{
-		NamespaceID:   input.NamespaceID,
-		Name:          trimmedName,
-		PathKey:       trimmedPath,
-		FullPath:      fullPath,
-		Visibility:    visibility,
-		Description:   strings.TrimSpace(input.Description),
-		DefaultBranch: defaultBranch,
-		CreatedAt:     now,
-		UpdatedAt:     now,
+		OrganizationID: input.OrganizationID,
+		Name:           trimmedName,
+		PathKey:        trimmedPath,
+		FullPath:       fullPath,
+		Visibility:     visibility,
+		Description:    strings.TrimSpace(input.Description),
+		DefaultBranch:  defaultBranch,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	if err := r.base.Create(ctx, &item); err != nil {
 		return projectdomain.Project{}, fmt.Errorf("insert project: %w", err)

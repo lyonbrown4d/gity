@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
+	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	"github.com/arcgolabs/authx"
@@ -24,12 +24,12 @@ var (
 )
 
 type ProjectScope struct {
-	ID          int64
-	NamespaceID int64
-	Visibility  string
+	ID             int64
+	OrganizationID int64
+	Visibility     string
 }
 
-func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *namespacememberrepo.Repository) *authx.Engine {
+func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *organizationmemberrepo.Repository) *authx.Engine {
 	return authx.NewEngine(
 		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository))),
 		authx.WithAuthorizer(newProjectAuthorizer(memberRepository)),
@@ -50,13 +50,13 @@ func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *user
 	})
 }
 
-func newProjectAuthorizer(memberRepository *namespacememberrepo.Repository) authx.Authorizer {
+func newProjectAuthorizer(memberRepository *organizationmemberrepo.Repository) authx.Authorizer {
 	return authx.AuthorizerFunc(func(ctx context.Context, input authx.AuthorizationModel) (authx.Decision, error) {
-		principal, namespaceID, visibility, ok := authorizationProjectScope(input)
+		principal, organizationID, visibility, ok := authorizationProjectScope(input)
 		if !ok {
 			return authx.Decision{Allowed: false, Reason: "invalid_project_scope"}, nil
 		}
-		return authorizeProject(ctx, memberRepository, input.Action, principal, namespaceID, visibility), nil
+		return authorizeProject(ctx, memberRepository, input.Action, principal, organizationID, visibility), nil
 	})
 }
 
@@ -65,36 +65,36 @@ func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64
 	if !ok {
 		return Principal{}, 0, "", false
 	}
-	namespaceID, namespaceIDFound := input.Context.Get("namespace_id")
+	organizationID, organizationIDFound := input.Context.Get("organization_id")
 	visibility, visibilityFound := input.Context.Get("visibility")
-	namespaceIDValue, namespaceIDOK := namespaceID.(int64)
+	organizationIDValue, organizationIDOK := organizationID.(int64)
 	visibilityValue, visibilityOK := visibility.(string)
-	return principal, namespaceIDValue, visibilityValue, namespaceIDFound && namespaceIDOK && visibilityFound && visibilityOK
+	return principal, organizationIDValue, visibilityValue, organizationIDFound && organizationIDOK && visibilityFound && visibilityOK
 }
 
-func authorizeProject(ctx context.Context, memberRepository *namespacememberrepo.Repository, action string, principal Principal, namespaceID int64, visibility string) authx.Decision {
+func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, action string, principal Principal, organizationID int64, visibility string) authx.Decision {
 	switch action {
 	case "project.read":
-		return authorizeProjectRead(ctx, memberRepository, principal, namespaceID, visibility)
+		return authorizeProjectRead(ctx, memberRepository, principal, organizationID, visibility)
 	case "project.write":
-		return authorizeProjectWrite(ctx, memberRepository, principal, namespaceID)
+		return authorizeProjectWrite(ctx, memberRepository, principal, organizationID)
 	default:
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}
 }
 
-func authorizeProjectRead(ctx context.Context, memberRepository *namespacememberrepo.Repository, principal Principal, namespaceID int64, visibility string) authx.Decision {
+func authorizeProjectRead(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64, visibility string) authx.Decision {
 	if policyID, ok := projectReadVisibilityPolicies.Get(visibility); ok {
 		return authx.Decision{Allowed: true, PolicyID: policyID}
 	}
-	if _, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceID, principal.UserID); err == nil {
+	if _, err := memberRepository.FindByOrganizationAndUser(ctx, organizationID, principal.UserID); err == nil {
 		return authx.Decision{Allowed: true, PolicyID: "project_private_read"}
 	}
 	return authx.Decision{Allowed: false, Reason: "deny"}
 }
 
-func authorizeProjectWrite(ctx context.Context, memberRepository *namespacememberrepo.Repository, principal Principal, namespaceID int64) authx.Decision {
-	member, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceID, principal.UserID)
+func authorizeProjectWrite(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64) authx.Decision {
+	member, err := memberRepository.FindByOrganizationAndUser(ctx, organizationID, principal.UserID)
 	if err != nil {
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}
@@ -155,12 +155,12 @@ func (r *Runtime) CanReadProject(ctx context.Context, principal Principal, proje
 		Action:    "project.read",
 		Resource:  fmt.Sprintf("project:%d", project.ID),
 		Context: mappingx.NewMapFrom(map[string]any{
-			"namespace_id": project.NamespaceID,
-			"visibility":   strings.TrimSpace(project.Visibility),
+			"organization_id": project.OrganizationID,
+			"visibility":      strings.TrimSpace(project.Visibility),
 		}),
 	})
 	if err != nil {
-		return false, oops.In("auth").With("project_id", project.ID, "namespace_id", project.NamespaceID, "user_id", principal.UserID).Wrapf(err, "authorize project read")
+		return false, oops.In("auth").With("project_id", project.ID, "organization_id", project.OrganizationID, "user_id", principal.UserID).Wrapf(err, "authorize project read")
 	}
 	return decision.Allowed, nil
 }
@@ -171,12 +171,12 @@ func (r *Runtime) CanWriteProject(ctx context.Context, principal Principal, proj
 		Action:    "project.write",
 		Resource:  fmt.Sprintf("project:%d", project.ID),
 		Context: mappingx.NewMapFrom(map[string]any{
-			"namespace_id": project.NamespaceID,
-			"visibility":   strings.TrimSpace(project.Visibility),
+			"organization_id": project.OrganizationID,
+			"visibility":      strings.TrimSpace(project.Visibility),
 		}),
 	})
 	if err != nil {
-		return false, oops.In("auth").With("project_id", project.ID, "namespace_id", project.NamespaceID, "user_id", principal.UserID).Wrapf(err, "authorize project write")
+		return false, oops.In("auth").With("project_id", project.ID, "organization_id", project.OrganizationID, "user_id", principal.UserID).Wrapf(err, "authorize project write")
 	}
 	return decision.Allowed, nil
 }

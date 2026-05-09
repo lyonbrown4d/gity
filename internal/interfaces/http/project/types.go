@@ -14,7 +14,6 @@ type projectByIDInput struct {
 
 type projectsInput struct {
 	OrganizationID int64  `query:"organization_id"`
-	NamespaceID    int64  `query:"namespace_id"`
 	IDs            string `query:"ids"`
 }
 
@@ -63,7 +62,6 @@ type projectOutput struct {
 
 type createProjectBody struct {
 	OrganizationID int64  `json:"organization_id"`
-	NamespaceID    int64  `json:"namespace_id"`
 	Key            string `json:"key"`
 	Name           string `json:"name"`
 	PathKey        string `json:"path_key"`

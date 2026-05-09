@@ -16,7 +16,7 @@ func toRepositoryView(item projectdomain.Project, settings config.Settings) repo
 	return repositoryView{
 		ID:             strconv.FormatInt(item.ID, 10),
 		UUID:           strconv.FormatInt(item.ID, 10),
-		OrganizationID: strconv.FormatInt(item.NamespaceID, 10),
+		OrganizationID: strconv.FormatInt(item.OrganizationID, 10),
 		Key:            item.PathKey,
 		Name:           item.Name,
 		Description:    item.Description,

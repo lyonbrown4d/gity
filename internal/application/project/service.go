@@ -15,35 +15,35 @@ import (
 var projectVisibilities = setx.NewSet("private", "internal", "public")
 
 type Service struct {
-	logger        *slog.Logger
-	repo          gitports.ProjectRepository
-	gitRunner     gitports.GitRunner
-	gitRepository gitports.GitRepository
-	namespaceRepo gitports.NamespaceRepository
-	branchRepo    gitports.ProjectBranchProtectionRepository
-	events        gitports.DomainEventPublisher
+	logger           *slog.Logger
+	repo             gitports.ProjectRepository
+	gitRunner        gitports.GitRunner
+	gitRepository    gitports.GitRepository
+	organizationRepo gitports.OrganizationRepository
+	branchRepo       gitports.ProjectBranchProtectionRepository
+	events           gitports.DomainEventPublisher
 }
 
 func NewGitDependencies(runner gitports.GitRunner, repository gitports.GitRepository) GitDependencies {
 	return GitDependencies{Runner: runner, Repository: repository}
 }
 
-func NewDependencies(logger *slog.Logger, repo gitports.ProjectRepository, git GitDependencies, namespaceRepo gitports.NamespaceRepository, branchRepo gitports.ProjectBranchProtectionRepository, events gitports.DomainEventPublisher) Dependencies {
-	return Dependencies{Logger: logger, Repo: repo, Git: git, NamespaceRepo: namespaceRepo, BranchRepo: branchRepo, Events: events}
+func NewDependencies(logger *slog.Logger, repo gitports.ProjectRepository, git GitDependencies, organizationRepo gitports.OrganizationRepository, branchRepo gitports.ProjectBranchProtectionRepository, events gitports.DomainEventPublisher) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, Git: git, OrganizationRepo: organizationRepo, BranchRepo: branchRepo, Events: events}
 }
 
 func NewServiceWithDependencies(deps Dependencies) *Service {
 	return newService(deps)
 }
 
-func NewService(logger *slog.Logger, repo gitports.ProjectRepository, gitRunner gitports.GitRunner, gitRepository gitports.GitRepository, namespaceRepo gitports.NamespaceRepository, branchRepo gitports.ProjectBranchProtectionRepository) *Service {
+func NewService(logger *slog.Logger, repo gitports.ProjectRepository, gitRunner gitports.GitRunner, gitRepository gitports.GitRepository, organizationRepo gitports.OrganizationRepository, branchRepo gitports.ProjectBranchProtectionRepository) *Service {
 	return newService(Dependencies{
-		Logger:        logger,
-		Repo:          repo,
-		Git:           NewGitDependencies(gitRunner, gitRepository),
-		NamespaceRepo: namespaceRepo,
-		BranchRepo:    branchRepo,
-		Events:        gitports.NoopDomainEventPublisher{},
+		Logger:           logger,
+		Repo:             repo,
+		Git:              NewGitDependencies(gitRunner, gitRepository),
+		OrganizationRepo: organizationRepo,
+		BranchRepo:       branchRepo,
+		Events:           gitports.NoopDomainEventPublisher{},
 	})
 }
 
@@ -53,20 +53,20 @@ func newService(deps Dependencies) *Service {
 		events = gitports.NoopDomainEventPublisher{}
 	}
 	return &Service{
-		logger:        deps.Logger,
-		repo:          deps.Repo,
-		gitRunner:     deps.Git.Runner,
-		gitRepository: deps.Git.Repository,
-		namespaceRepo: deps.NamespaceRepo,
-		branchRepo:    deps.BranchRepo,
-		events:        events,
+		logger:           deps.Logger,
+		repo:             deps.Repo,
+		gitRunner:        deps.Git.Runner,
+		gitRepository:    deps.Git.Repository,
+		organizationRepo: deps.OrganizationRepo,
+		branchRepo:       deps.BranchRepo,
+		events:           events,
 	}
 }
 
-func (s *Service) List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error) {
-	items, err := s.repo.List(ctx, namespaceID)
+func (s *Service) List(ctx context.Context, organizationID *int64) (*collectionx.List[projectdomain.Project], error) {
+	items, err := s.repo.List(ctx, organizationID)
 	if err != nil {
-		return nil, oops.In("project").With("namespace_id", namespaceID).Wrapf(err, "list projects")
+		return nil, oops.In("project").With("organization_id", organizationID).Wrapf(err, "list projects")
 	}
 	return items, nil
 }
@@ -84,20 +84,20 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 	if err != nil {
 		return projectdomain.Project{}, err
 	}
-	namespace, err := s.namespaceRepo.GetByID(ctx, input.NamespaceID)
+	organization, err := s.organizationRepo.GetByID(ctx, input.OrganizationID)
 	if err != nil {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).Wrapf(err, "load project namespace")
+		return projectdomain.Project{}, oops.In("project").With("organization_id", input.OrganizationID).Wrapf(err, "load project organization")
 	}
 	project, err := s.repo.Create(ctx, gitports.CreateProjectInput{
-		NamespaceID:   input.NamespaceID,
-		Name:          input.Name,
-		PathKey:       input.PathKey,
-		Visibility:    visibility,
-		Description:   input.Description,
-		DefaultBranch: input.DefaultBranch,
-	}, namespace)
+		OrganizationID: input.OrganizationID,
+		Name:           input.Name,
+		PathKey:        input.PathKey,
+		Visibility:     visibility,
+		Description:    input.Description,
+		DefaultBranch:  input.DefaultBranch,
+	}, organization)
 	if err != nil {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name, "path_key", input.PathKey).Wrapf(err, "create project")
+		return projectdomain.Project{}, oops.In("project").With("organization_id", input.OrganizationID, "name", input.Name, "path_key", input.PathKey).Wrapf(err, "create project")
 	}
 	if err := s.provisionRepository(ctx, project); err != nil {
 		return projectdomain.Project{}, err
@@ -110,25 +110,25 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 }
 
 func validateCreateInput(input CreateInput) (string, error) {
-	if input.NamespaceID <= 0 {
-		return "", oops.In("project").With("namespace_id", input.NamespaceID).New("project namespace_id is required")
+	if input.OrganizationID <= 0 {
+		return "", oops.In("project").With("organization_id", input.OrganizationID).New("project organization_id is required")
 	}
 	if strings.TrimSpace(input.Name) == "" {
-		return "", oops.In("project").With("namespace_id", input.NamespaceID).New("project name is required")
+		return "", oops.In("project").With("organization_id", input.OrganizationID).New("project name is required")
 	}
 	if strings.TrimSpace(input.PathKey) == "" {
-		return "", oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name).New("project path_key is required")
+		return "", oops.In("project").With("organization_id", input.OrganizationID, "name", input.Name).New("project path_key is required")
 	}
-	return normalizeVisibility(input.NamespaceID, input.Visibility)
+	return normalizeVisibility(input.OrganizationID, input.Visibility)
 }
 
-func normalizeVisibility(namespaceID int64, value string) (string, error) {
+func normalizeVisibility(organizationID int64, value string) (string, error) {
 	visibility := strings.TrimSpace(strings.ToLower(value))
 	if visibility == "" {
 		visibility = "private"
 	}
 	if !projectVisibilities.Contains(visibility) {
-		return "", oops.In("project").With("namespace_id", namespaceID, "visibility", visibility).New("unsupported project visibility")
+		return "", oops.In("project").With("organization_id", organizationID, "visibility", visibility).New("unsupported project visibility")
 	}
 	return visibility, nil
 }

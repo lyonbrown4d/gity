@@ -9,7 +9,7 @@ import (
 
 	wikiservice "github.com/DaiYuANg/gity/internal/application/wiki"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectwikipagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
@@ -47,7 +47,7 @@ func newWikiFixture(t *testing.T) wikiFixture {
 	testutil.CleanupClose(t, "db", db)
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	userRepository := testutil.Must(userrepo.NewRepository(db))
 	pageRepository := testutil.Must(projectwikipagerepo.NewRepository(db))
@@ -58,17 +58,16 @@ func newWikiFixture(t *testing.T) wikiFixture {
 		DisplayName: "Alice",
 		Email:       "alice@gity.dev",
 	}))
-	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{
-		Kind:    "group",
+	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{
 		Name:    "Core Team",
 		PathKey: "core-team",
 	}))
 	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{
-		NamespaceID: namespace.ID,
-		Name:        "Gity",
-		PathKey:     "gity",
-		Visibility:  "private",
-	}, namespace))
+		OrganizationID: organization.ID,
+		Name:           "Gity",
+		PathKey:        "gity",
+		Visibility:     "private",
+	}, organization))
 
 	return wikiFixture{
 		ctx:       ctx,

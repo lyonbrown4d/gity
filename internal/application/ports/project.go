@@ -3,16 +3,16 @@ package ports
 import (
 	"context"
 
-	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
+	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionx "github.com/arcgolabs/collectionx/list"
 )
 
 type ProjectRepository interface {
-	List(ctx context.Context, namespaceID *int64) (*collectionx.List[projectdomain.Project], error)
+	List(ctx context.Context, organizationID *int64) (*collectionx.List[projectdomain.Project], error)
 	GetByID(ctx context.Context, id int64) (projectdomain.Project, error)
 	GetByFullPath(ctx context.Context, fullPath string) (projectdomain.Project, error)
-	Create(ctx context.Context, input CreateProjectInput, namespace namespacedomain.Namespace) (projectdomain.Project, error)
+	Create(ctx context.Context, input CreateProjectInput, organization organizationdomain.Organization) (projectdomain.Project, error)
 	DeleteByID(ctx context.Context, id int64) error
 }
 
@@ -24,10 +24,10 @@ type ProjectBranchProtectionRepository interface {
 }
 
 type CreateProjectInput struct {
-	NamespaceID   int64
-	Name          string
-	PathKey       string
-	Visibility    string
-	Description   string
-	DefaultBranch string
+	OrganizationID int64
+	Name           string
+	PathKey        string
+	Visibility     string
+	Description    string
+	DefaultBranch  string
 }

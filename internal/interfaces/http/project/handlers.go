@@ -13,8 +13,8 @@ import (
 )
 
 func (e *Endpoint) listProjects(ctx context.Context, in *projectsInput) (*projectOutput, error) {
-	namespaceFilter := projectNamespaceFilter(in)
-	items, err := e.service.List(ctx, namespaceFilter)
+	organizationFilter := projectOrganizationFilter(in)
+	items, err := e.service.List(ctx, organizationFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -156,29 +156,23 @@ func (e *Endpoint) languages(ctx context.Context, in *projectRepositoryInput) (*
 	}}, nil
 }
 
-func projectNamespaceFilter(in *projectsInput) *int64 {
-	namespaceID := in.NamespaceID
-	if namespaceID == 0 {
-		namespaceID = in.OrganizationID
-	}
-	if namespaceID <= 0 {
+func projectOrganizationFilter(in *projectsInput) *int64 {
+	organizationID := in.OrganizationID
+	if organizationID <= 0 {
 		return nil
 	}
-	return &namespaceID
+	return &organizationID
 }
 
 func buildCreateProjectInput(in *createProjectInput) projectservice.CreateInput {
-	namespaceID := in.Body.NamespaceID
-	if namespaceID == 0 {
-		namespaceID = in.Body.OrganizationID
-	}
+	organizationID := in.Body.OrganizationID
 	return projectservice.CreateInput{
-		NamespaceID:   namespaceID,
-		Name:          in.Body.Name,
-		PathKey:       firstNonEmpty(in.Body.PathKey, in.Body.Key),
-		Visibility:    in.Body.Visibility,
-		Description:   in.Body.Description,
-		DefaultBranch: in.Body.DefaultBranch,
+		OrganizationID: organizationID,
+		Name:           in.Body.Name,
+		PathKey:        firstNonEmpty(in.Body.PathKey, in.Body.Key),
+		Visibility:     in.Body.Visibility,
+		Description:    in.Body.Description,
+		DefaultBranch:  in.Body.DefaultBranch,
 	}
 }
 

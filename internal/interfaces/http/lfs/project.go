@@ -62,7 +62,7 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project
 		return fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 
-	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	var allowed bool
 	if readOperation {
 		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
@@ -86,7 +86,7 @@ func requireProjectWritePrincipal(c *fiber.Ctx, authRuntime *infraauth.Runtime, 
 	if !ok {
 		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
-	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	allowed, err := authRuntime.CanWriteProject(c.UserContext(), principal, scope)
 	if err != nil {
 		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
@@ -106,14 +106,14 @@ func loadProject(ctx context.Context, repo *projectrepo.Repository, rawRepoPath 
 	if err != nil {
 		return projectView{}, fiber.ErrNotFound
 	}
-	return projectView{ID: project.ID, NamespaceID: project.NamespaceID, FullPath: project.FullPath, Visibility: project.Visibility}, nil
+	return projectView{ID: project.ID, OrganizationID: project.OrganizationID, FullPath: project.FullPath, Visibility: project.Visibility}, nil
 }
 
 type projectView struct {
-	ID          int64
-	NamespaceID int64
-	FullPath    string
-	Visibility  string
+	ID             int64
+	OrganizationID int64
+	FullPath       string
+	Visibility     string
 }
 
 func normalizeRepoFullPath(value string) (string, error) {

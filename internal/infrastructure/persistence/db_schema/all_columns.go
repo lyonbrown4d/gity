@@ -6,11 +6,11 @@ import (
 	"github.com/arcgolabs/dbx/querydsl"
 )
 
-func (s NamespaceMemberSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+func (s OrganizationMemberSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 
-func (s NamespaceSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+func (s OrganizationSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 

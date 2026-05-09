@@ -5,11 +5,11 @@ import (
 	"context"
 	"log"
 
-	"github.com/DaiYuANg/gity/internal/bootstrap"
+	migrationapp "github.com/DaiYuANg/gity/cmd/migrationapp"
 )
 
 func main() {
-	if err := bootstrap.RunMigration(context.Background()); err != nil {
+	if err := migrationapp.Run(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 }

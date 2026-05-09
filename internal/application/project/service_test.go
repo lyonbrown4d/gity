@@ -9,15 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
+	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
+	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
@@ -29,28 +29,28 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestNamespaceProjectFlow(t *testing.T) {
+func TestOrganizationProjectFlow(t *testing.T) {
 	t.Parallel()
 
 	fixture := newProjectFixture(t)
-	assertCreateNamespace(t, fixture)
+	assertCreateOrganization(t, fixture)
 	assertCreateProject(t, fixture)
 	seedProjectRepository(t, fixture)
-	assertNamespaceProjectLists(t, fixture)
-	assertNamespaceMembers(t, fixture)
+	assertOrganizationProjectLists(t, fixture)
+	assertOrganizationMembers(t, fixture)
 	assertProjectBranchWorkflow(t, fixture)
 	assertProjectRepositoryContent(t, fixture)
 }
 
 type projectFixture struct {
-	ctx              context.Context
-	repoRoot         string
-	ownerID          int64
-	namespaceID      int64
-	projectID        int64
-	projectFullPath  string
-	namespaceService *namespaceservice.Service
-	projectService   *projectservice.Service
+	ctx                 context.Context
+	repoRoot            string
+	ownerID             int64
+	organizationID      int64
+	projectID           int64
+	projectFullPath     string
+	organizationService *organizationservice.Service
+	projectService      *projectservice.Service
 }
 
 func newProjectFixture(t *testing.T) *projectFixture {
@@ -69,8 +69,8 @@ func newProjectFixture(t *testing.T) *projectFixture {
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
-	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
+	organizationMemberRepository := testutil.Must(organizationmemberrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
 	userRepository := testutil.Must(userrepo.NewRepository(db))
@@ -81,8 +81,8 @@ func newProjectFixture(t *testing.T) *projectFixture {
 	gitRepository := gitrepo.NewService(settings)
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
-	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
+	organizationSvc := organizationservice.NewService(logger, organizationRepository, organizationMemberRepository, userRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, organizationRepository, projectBranchProtectionRepository)
 
 	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{
 		Username:    "alice",
@@ -91,43 +91,43 @@ func newProjectFixture(t *testing.T) *projectFixture {
 	}))
 
 	return &projectFixture{
-		ctx:              ctx,
-		repoRoot:         repoRoot,
-		ownerID:          owner.ID,
-		namespaceService: namespaceSvc,
-		projectService:   projectSvc,
+		ctx:                 ctx,
+		repoRoot:            repoRoot,
+		ownerID:             owner.ID,
+		organizationService: organizationSvc,
+		projectService:      projectSvc,
 	}
 }
 
-func assertCreateNamespace(t *testing.T, fixture *projectFixture) {
+func assertCreateOrganization(t *testing.T, fixture *projectFixture) {
 	t.Helper()
 
-	namespace := testutil.Must(fixture.namespaceService.Create(fixture.ctx, namespaceservice.CreateInput{
-		Kind:        "group",
+	organization := testutil.Must(fixture.organizationService.Create(fixture.ctx, organizationservice.CreateInput{
+
 		Name:        "Core Team",
 		PathKey:     "core-team",
 		OwnerUserID: fixture.ownerID,
-		Description: "Core platform namespace",
+		Description: "Core platform organization",
 	}))
-	if namespace.ID == 0 {
-		t.Fatalf("expected namespace id to be assigned")
+	if organization.ID == 0 {
+		t.Fatalf("expected organization id to be assigned")
 	}
-	if namespace.FullPath != "core-team" {
-		t.Fatalf("unexpected namespace full path: %s", namespace.FullPath)
+	if organization.FullPath != "core-team" {
+		t.Fatalf("unexpected organization full path: %s", organization.FullPath)
 	}
-	fixture.namespaceID = namespace.ID
+	fixture.organizationID = organization.ID
 }
 
 func assertCreateProject(t *testing.T, fixture *projectFixture) {
 	t.Helper()
 
 	project := testutil.Must(fixture.projectService.Create(fixture.ctx, projectservice.CreateInput{
-		NamespaceID:   fixture.namespaceID,
-		Name:          "Gity",
-		PathKey:       "gity",
-		Visibility:    "private",
-		Description:   "Git hosting platform",
-		DefaultBranch: "main",
+		OrganizationID: fixture.organizationID,
+		Name:           "Gity",
+		PathKey:        "gity",
+		Visibility:     "private",
+		Description:    "Git hosting platform",
+		DefaultBranch:  "main",
 	}))
 	if project.ID == 0 {
 		t.Fatalf("expected project id to be assigned")
@@ -150,26 +150,26 @@ func seedProjectRepository(t *testing.T, fixture *projectFixture) {
 	testutil.RequireNoError(t, pushFixtureCommit(fixture.ctx, fixture.repoRoot, fixture.projectFullPath+".git"), "push fixture commit")
 }
 
-func assertNamespaceProjectLists(t *testing.T, fixture *projectFixture) {
+func assertOrganizationProjectLists(t *testing.T, fixture *projectFixture) {
 	t.Helper()
 
-	namespaces := testutil.Must(fixture.namespaceService.List(fixture.ctx))
-	if namespaces.Len() != 1 {
-		t.Fatalf("expected one namespace, got %d", namespaces.Len())
+	organizations := testutil.Must(fixture.organizationService.List(fixture.ctx))
+	if organizations.Len() != 1 {
+		t.Fatalf("expected one organization, got %d", organizations.Len())
 	}
 
-	projects := testutil.Must(fixture.projectService.List(fixture.ctx, &fixture.namespaceID))
+	projects := testutil.Must(fixture.projectService.List(fixture.ctx, &fixture.organizationID))
 	if projects.Len() != 1 {
 		t.Fatalf("expected one project, got %d", projects.Len())
 	}
 }
 
-func assertNamespaceMembers(t *testing.T, fixture *projectFixture) {
+func assertOrganizationMembers(t *testing.T, fixture *projectFixture) {
 	t.Helper()
 
-	members := testutil.Must(fixture.namespaceService.ListMembers(fixture.ctx, fixture.namespaceID))
+	members := testutil.Must(fixture.organizationService.ListMembers(fixture.ctx, fixture.organizationID))
 	if len(members) != 1 || members[0].Role != "owner" || members[0].UserID != fixture.ownerID {
-		t.Fatalf("unexpected namespace members: %+v", members)
+		t.Fatalf("unexpected organization members: %+v", members)
 	}
 }
 

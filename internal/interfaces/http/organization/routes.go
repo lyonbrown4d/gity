@@ -1,8 +1,8 @@
-package namespace
+package organization
 
 import (
-	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
-	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
+	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
+	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
@@ -10,54 +10,54 @@ import (
 	"strings"
 )
 
-type createNamespaceInput struct {
-	Body createNamespaceBody `json:"body"`
+type createOrganizationInput struct {
+	Body createOrganizationBody `json:"body"`
 }
 
-type namespaceByIDInput struct {
+type organizationByIDInput struct {
 	ID int64 `path:"id"`
 }
 
-type namespacesInput struct {
+type organizationsInput struct {
 	IDs string `query:"ids"`
 }
 
-type namespaceMemberInput struct {
+type organizationMemberInput struct {
 	ID int64 `path:"id"`
 }
 
-type addNamespaceMemberInput struct {
+type addOrganizationMemberInput struct {
+	ID   int64                     `path:"id"`
+	Body addOrganizationMemberBody `json:"body"`
+}
+
+type updateOrganizationInput struct {
 	ID   int64                  `path:"id"`
-	Body addNamespaceMemberBody `json:"body"`
+	Body updateOrganizationBody `json:"body"`
 }
 
-type updateNamespaceInput struct {
-	ID   int64               `path:"id"`
-	Body updateNamespaceBody `json:"body"`
-}
-
-type namespaceOutput struct {
+type organizationOutput struct {
 	Body any `json:"body"`
 }
 
-type createNamespaceBody struct {
-	Kind        string `json:"kind"`
+type createOrganizationBody struct {
 	Key         string `json:"key"`
 	Name        string `json:"name"`
 	PathKey     string `json:"path_key"`
 	OwnerUserID int64  `json:"owner_user_id"`
 	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
 }
 
-type updateNamespaceBody struct {
-	Kind        *string `json:"kind"`
+type updateOrganizationBody struct {
 	Key         *string `json:"key"`
 	Name        *string `json:"name"`
 	PathKey     *string `json:"path_key"`
 	Description *string `json:"description"`
+	Visibility  *string `json:"visibility"`
 }
 
-type addNamespaceMemberBody struct {
+type addOrganizationMemberBody struct {
 	UserID int64  `json:"user_id"`
 	Role   string `json:"role"`
 }
@@ -68,6 +68,7 @@ type organizationView struct {
 	Name        string `json:"name"`
 	Role        string `json:"role"`
 	Description string `json:"description"`
+	Visibility  string `json:"visibility"`
 }
 
 type organizationMemberView struct {
@@ -80,50 +81,44 @@ type organizationMemberView struct {
 }
 
 type Endpoint struct {
-	service *namespaceservice.Service
+	service *organizationservice.Service
 }
 
-func NewEndpoint(service *namespaceservice.Service) *Endpoint {
+func NewEndpoint(service *organizationservice.Service) *Endpoint {
 	return &Endpoint{service: service}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
-	return httpapi.EndpointSpec("/v1", "Organizations", "Organizations", "Organization and namespace APIs.")
+	return httpapi.EndpointSpec("/v1", "Organizations", "Organizations", "Organization APIs.")
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/namespaces", e.listNamespaces),
-		httpapi.Get("/orgs", e.listNamespaces),
-		httpapi.Get("/namespaces/{id}", e.getNamespace),
-		httpapi.Get("/orgs/{id}", e.getNamespace),
-		httpapi.Post("/namespaces", e.createNamespace),
-		httpapi.Post("/orgs", e.createNamespace),
-		httpapi.Patch("/namespaces/{id}", e.updateNamespace),
-		httpapi.Patch("/orgs/{id}", e.updateNamespace),
-		httpapi.Delete("/namespaces/{id}", e.deleteNamespace),
-		httpapi.Delete("/orgs/{id}", e.deleteNamespace),
-		httpapi.Get("/namespaces/{id}/members", e.listMembers),
+		httpapi.Get("/orgs", e.listOrganizations),
+		httpapi.Get("/orgs/{id}", e.getOrganization),
+		httpapi.Post("/orgs", e.createOrganization),
+		httpapi.Patch("/orgs/{id}", e.updateOrganization),
+		httpapi.Delete("/orgs/{id}", e.deleteOrganization),
 		httpapi.Get("/orgs/{id}/members", e.listMembers),
-		httpapi.Post("/namespaces/{id}/members", e.addMember),
 		httpapi.Post("/orgs/{id}/members", e.addMember),
 	)
 }
 
-func toOrganizationView(item namespacedomain.Namespace) organizationView {
+func toOrganizationView(item organizationdomain.Organization) organizationView {
 	return organizationView{
 		ID:          strconv.FormatInt(item.ID, 10),
 		Key:         item.PathKey,
 		Name:        item.Name,
 		Role:        "owner",
 		Description: item.Description,
+		Visibility:  item.Visibility,
 	}
 }
 
-func toOrganizationMemberView(namespaceID int64, item namespaceservice.MemberView) organizationMemberView {
+func toOrganizationMemberView(organizationID int64, item organizationservice.MemberView) organizationMemberView {
 	return organizationMemberView{
 		ID:             strconv.FormatInt(item.ID, 10),
-		OrganizationID: strconv.FormatInt(namespaceID, 10),
+		OrganizationID: strconv.FormatInt(organizationID, 10),
 		UserID:         strconv.FormatInt(item.UserID, 10),
 		Username:       item.Username,
 		Email:          item.Email,

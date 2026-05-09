@@ -21,6 +21,6 @@ func ProjectScopeResolverFrom(lookup ProjectLookup) ProjectScopeResolver {
 		if err != nil {
 			return infraauth.ProjectScope{}, err
 		}
-		return infraauth.ProjectScope{ID: item.ID, NamespaceID: item.NamespaceID, Visibility: item.Visibility}, nil
+		return infraauth.ProjectScope{ID: item.ID, OrganizationID: item.OrganizationID, Visibility: item.Visibility}, nil
 	}
 }

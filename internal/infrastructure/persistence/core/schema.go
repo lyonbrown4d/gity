@@ -49,9 +49,9 @@ func coreMigrations() []Migration {
 	return []Migration{
 		{
 			Version: "0001_core",
-			Name:    "bootstrap core namespace project auth schema",
+			Name:    "bootstrap core organization project auth schema",
 			Apply: func(ctx context.Context, tx *dbx.Tx) error {
-				return autoMigrate(ctx, tx, "0001_core", dbschema.UserSchema, dbschema.NamespaceSchema, dbschema.ProjectSchema, dbschema.NamespaceMemberSchema, dbschema.UserAccessTokenSchema)
+				return autoMigrate(ctx, tx, "0001_core", dbschema.UserSchema, dbschema.OrganizationSchema, dbschema.ProjectSchema, dbschema.OrganizationMemberSchema, dbschema.UserAccessTokenSchema)
 			},
 		},
 		{

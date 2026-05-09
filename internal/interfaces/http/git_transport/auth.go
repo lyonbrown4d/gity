@@ -23,7 +23,7 @@ func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project proj
 		return fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 	allowed := false
-	scope := infraauth.ProjectScope{ID: project.ID, NamespaceID: project.NamespaceID, Visibility: project.Visibility}
+	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	switch service {
 	case serviceUploadPack:
 		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
@@ -48,14 +48,14 @@ func loadProject(ctx context.Context, repo *projectrepo.Repository, rawRepoPath 
 	if err != nil {
 		return projectView{}, fiber.ErrNotFound
 	}
-	return projectView{ID: project.ID, NamespaceID: project.NamespaceID, FullPath: project.FullPath, Visibility: project.Visibility}, nil
+	return projectView{ID: project.ID, OrganizationID: project.OrganizationID, FullPath: project.FullPath, Visibility: project.Visibility}, nil
 }
 
 type projectView struct {
-	ID          int64
-	NamespaceID int64
-	FullPath    string
-	Visibility  string
+	ID             int64
+	OrganizationID int64
+	FullPath       string
+	Visibility     string
 }
 
 func normalizeRepoFullPath(value string) (string, error) {

@@ -12,15 +12,15 @@ import (
 	"testing"
 
 	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
-	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
+	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
+	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
@@ -73,8 +73,8 @@ func newIssueFixture(t *testing.T) issueFixture {
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
-	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
+	organizationMemberRepository := testutil.Must(organizationmemberrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
 	userRepository := testutil.Must(userrepo.NewRepository(db))
@@ -90,13 +90,13 @@ func newIssueFixture(t *testing.T) issueFixture {
 	storage := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
-	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
+	organizationSvc := organizationservice.NewService(logger, organizationRepository, organizationMemberRepository, userRepository)
+	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, organizationRepository, projectBranchProtectionRepository)
 	issueSvc := issueservice.NewService(projectRepository, issueRepository, commentRepository, attachmentRepository, userRepository, storage)
 
 	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
-	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
-	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+	space := testutil.Must(organizationSvc.Create(ctx, organizationservice.CreateInput{Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{OrganizationID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
 	return issueFixture{ctx: ctx, repoRoot: repoRoot, projectID: project.ID, projectFullPath: project.FullPath, ownerID: owner.ID, service: issueSvc}
 }
 

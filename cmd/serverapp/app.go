@@ -1,11 +1,12 @@
-package bootstrap
+// Package serverapp assembles the server dix application.
+package serverapp
 
 import (
 	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
 	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
+	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
 	packageregistryservice "github.com/DaiYuANg/gity/internal/application/package_registry"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
@@ -13,6 +14,7 @@ import (
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	wikiservice "github.com/DaiYuANg/gity/internal/application/wiki"
 	"github.com/DaiYuANg/gity/internal/config"
+	gitydebug "github.com/DaiYuANg/gity/internal/debug"
 	"github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/DaiYuANg/gity/internal/infrastructure/database"
 	infraeventbus "github.com/DaiYuANg/gity/internal/infrastructure/event_bus"
@@ -21,9 +23,8 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_transport"
 	infralogger "github.com/DaiYuANg/gity/internal/infrastructure/logger"
 	inframapper "github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	coredb "github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
-	namespacememberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace_member"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
+	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectissuerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_issue"
@@ -45,14 +46,13 @@ import (
 	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	infrastorage "github.com/DaiYuANg/gity/internal/infrastructure/storage"
-	jobrunner "github.com/DaiYuANg/gity/internal/infrastructure/worker/job_runner"
 	authendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/auth"
 	gittransportendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/git_transport"
 	issueendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/issue"
 	jobendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/job"
 	lfsendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/lfs"
 	mergerequestendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/merge_request"
-	namespaceendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/namespace"
+	organizationendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/organization"
 	packageregistryendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/package_registry"
 	pipelineendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/pipeline"
 	projectendpoint "github.com/DaiYuANg/gity/internal/interfaces/http/project"
@@ -64,128 +64,155 @@ import (
 	"github.com/arcgolabs/dix"
 )
 
-func NewMigrationApp() *dix.App {
-	return newApp(
-		"gity-migration",
-		"Gity database migration runtime",
-		migrationModules(),
-	)
-}
-
-func NewServerApp() *dix.App {
-	return newApp(
-		"gity-server",
-		"Gity HTTP server runtime",
-		append(sharedModules(), serverAugmentModules()...),
-	)
-}
-
-func NewWorkerApp() *dix.App {
-	return newApp(
-		"gity-worker",
-		"Gity background worker runtime",
-		append(sharedModules(), workerAugmentModules()...),
-	)
-}
-
-func NewStandaloneApp() *dix.App {
-	modules := append(sharedModules(), serverAugmentModules()...)
-	modules = append(modules, workerAugmentModules()...)
-	return newApp(
-		"gity-standalone",
-		"Gity standalone runtime with server and worker components",
-		modules,
-	)
-}
-
-func newApp(name, description string, modules []dix.Module) *dix.App {
+// NewApp builds the standalone HTTP server application.
+func NewApp() *dix.App {
 	return dix.New(
-		name,
-		dix.WithVersion("0.1.0"),
-		dix.WithAppDescription(description),
-		dix.UseLoggerErr1(infralogger.NewLogger),
-		dix.WithModules(modules...),
+		"gity-server",
+		appOptions(
+			"cmd.server.meta",
+			"gity-server",
+			"Gity HTTP server runtime",
+			sharedRuntimeModule(),
+			serverRuntimeModule(),
+		)...,
 	)
 }
 
-func migrationModules() []dix.Module {
-	return []dix.Module{
-		config.Module(),
-		database.Module(),
-		coredb.Module(),
+// NewSubApp builds the server sub-application used by standalone.
+func NewSubApp() *dix.App {
+	return dix.NewSubApp(
+		"server",
+		appOptions(
+			"cmd.server.meta",
+			"server",
+			"Gity HTTP server subapp runtime",
+			sharedRuntimeModule(),
+			serverRuntimeModule(),
+		)...,
+	)
+}
+
+func appOptions(metaModuleName, appName, description string, modules ...dix.Module) []dix.AppOption {
+	runtimeModules := make([]dix.Module, 0, len(modules)+1)
+	runtimeModules = append(runtimeModules, gitydebug.Module(metaModuleName, appName, description))
+	runtimeModules = append(runtimeModules, modules...)
+	return []dix.AppOption{
+		dix.UseLoggerErr1(infralogger.NewLogger),
+		dix.Modules(runtimeModules...),
 	}
 }
 
-func sharedModules() []dix.Module {
-	return []dix.Module{
-		config.Module(),
-		database.Module(),
-		coredb.Module(),
-		userrepo.Module(),
-		usertokenrepo.Module(),
-		namespacerepo.Module(),
-		namespacememberrepo.Module(),
-		projectrepo.Module(),
-		projectbranchprotectionrepo.Module(),
-		projectissuerepo.Module(),
-		projectissuecommentrepo.Module(),
-		projectissueattachmentrepo.Module(),
-		projectjobartifactrepo.Module(),
-		projectjoblogrepo.Module(),
-		projectjobrepo.Module(),
-		projectlfslockrepo.Module(),
-		projectlfsobjectrepo.Module(),
-		projectmergerequestrepo.Module(),
-		projectpackagerepo.Module(),
-		projectpackageversionrepo.Module(),
-		projectpackagefilerepo.Module(),
-		projectpipelinerepo.Module(),
-		projectpipelinejobrepo.Module(),
-		projectrunnerrepo.Module(),
-		projectwikipagerepo.Module(),
-		auth.Module(),
-		gitexec.Module(),
-		gitrepo.Module(),
-		gittransport.Module(),
-		inframapper.Module(),
-		infrastorage.Module(),
-		infraeventbus.Module(),
-		userservice.Module(),
-		namespaceservice.Module(),
-		projectservice.Module(),
-		issueservice.Module(),
-		jobservice.Module(),
-		lfsservice.Module(),
-		mergerequestservice.Module(),
-		packageregistryservice.Module(),
-		pipelineservice.Module(),
-		runnerservice.Module(),
-		wikiservice.Module(),
-	}
+func sharedRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.shared",
+		dix.Description("Server shared runtime composition"),
+		dix.Imports(
+			config.Module(),
+			database.Module(),
+			repositoryRuntimeModule(),
+			infrastructureRuntimeModule(),
+			applicationRuntimeModule(),
+		),
+	)
 }
 
-func serverAugmentModules() []dix.Module {
-	return []dix.Module{
-		httpapp.Module(),
-		systemendpoint.Module(),
-		authendpoint.Module(),
-		gittransportendpoint.Module(),
-		lfsendpoint.Module(),
-		userendpoint.Module(),
-		namespaceendpoint.Module(),
-		projectendpoint.Module(),
-		issueendpoint.Module(),
-		jobendpoint.Module(),
-		mergerequestendpoint.Module(),
-		packageregistryendpoint.Module(),
-		pipelineendpoint.Module(),
-		runnerendpoint.Module(),
-		wikiendpoint.Module(),
-	}
+func repositoryRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.repositories",
+		dix.Description("Server repository adapters"),
+		dix.Imports(
+			userrepo.Module(),
+			usertokenrepo.Module(),
+			organizationrepo.Module(),
+			organizationmemberrepo.Module(),
+			projectrepo.Module(),
+			projectbranchprotectionrepo.Module(),
+			projectissuerepo.Module(),
+			projectissuecommentrepo.Module(),
+			projectissueattachmentrepo.Module(),
+			projectjobartifactrepo.Module(),
+			projectjoblogrepo.Module(),
+			projectjobrepo.Module(),
+			projectlfslockrepo.Module(),
+			projectlfsobjectrepo.Module(),
+			projectmergerequestrepo.Module(),
+			projectpackagerepo.Module(),
+			projectpackageversionrepo.Module(),
+			projectpackagefilerepo.Module(),
+			projectpipelinerepo.Module(),
+			projectpipelinejobrepo.Module(),
+			projectrunnerrepo.Module(),
+			projectwikipagerepo.Module(),
+		),
+	)
 }
 
-func workerAugmentModules() []dix.Module {
-	return []dix.Module{
-		jobrunner.Module(),
-	}
+func infrastructureRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.infrastructure",
+		dix.Description("Server infrastructure adapters"),
+		dix.Imports(
+			auth.Module(),
+			gitexec.Module(),
+			gitrepo.Module(),
+			gittransport.Module(),
+			inframapper.Module(),
+			infrastorage.Module(),
+			infraeventbus.Module(),
+		),
+	)
+}
+
+func applicationRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.application",
+		dix.Description("Server application services"),
+		dix.Imports(
+			userservice.Module(),
+			organizationservice.Module(),
+			projectservice.Module(),
+			issueservice.Module(),
+			jobservice.Module(),
+			lfsservice.Module(),
+			mergerequestservice.Module(),
+			packageregistryservice.Module(),
+			pipelineservice.Module(),
+			runnerservice.Module(),
+			wikiservice.Module(),
+		),
+	)
+}
+
+func serverRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.http",
+		dix.Description("HTTP server command composition"),
+		dix.Imports(
+			httpapp.Module(),
+			endpointRuntimeModule(),
+		),
+	)
+}
+
+func endpointRuntimeModule() dix.Module {
+	return dix.NewModule(
+		"cmd.server.http.endpoints",
+		dix.Description("HTTP endpoints"),
+		dix.Imports(
+			systemendpoint.Module(),
+			authendpoint.Module(),
+			gittransportendpoint.Module(),
+			lfsendpoint.Module(),
+			userendpoint.Module(),
+			organizationendpoint.Module(),
+			projectendpoint.Module(),
+			issueendpoint.Module(),
+			jobendpoint.Module(),
+			mergerequestendpoint.Module(),
+			packageregistryendpoint.Module(),
+			pipelineendpoint.Module(),
+			runnerendpoint.Module(),
+			wikiendpoint.Module(),
+		),
+	)
 }

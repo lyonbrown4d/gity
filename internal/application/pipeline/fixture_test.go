@@ -13,7 +13,7 @@ import (
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
-	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
+	organizationrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
 	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
@@ -94,7 +94,7 @@ func setupPipelineEnv(ctx context.Context, t *testing.T, withGit bool) pipelineT
 	testutil.CleanupClose(t, "db", db)
 	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	organizationRepository := testutil.Must(organizationrepo.NewRepository(db))
 	projectRepository := testutil.Must(projectrepo.NewRepository(db))
 	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
 	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
@@ -102,12 +102,12 @@ func setupPipelineEnv(ctx context.Context, t *testing.T, withGit bool) pipelineT
 	gitRunner, gitRepository := pipelineGitServices(t, withGit)
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
 	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
-	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
-	projectInput := projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}
+	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
+	projectInput := projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}
 	if withGit {
 		projectInput.DefaultBranch = "main"
 	}
-	project := testutil.Must(projectRepository.Create(ctx, projectInput, namespace))
+	project := testutil.Must(projectRepository.Create(ctx, projectInput, organization))
 
 	return pipelineTestEnv{
 		ProjectID:       project.ID,
