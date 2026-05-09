@@ -237,6 +237,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
           onChangeNewBranchName={meta.setNewBranchName}
           onSubmitCreateBranch={(event) => void meta.submitCreateBranch(event)}
           onToggleBranchProtection={(branch, protect) => void meta.toggleBranchProtection(branch, protect)}
+          onUpdateBranchProtection={(branch, patch) => void meta.updateBranchProtection(branch, patch)}
           onDeleteBranch={(branch) => void meta.removeBranch(branch)}
         />
       ) : null}

@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { useCustom, useCustomMutation, useDelete, useList } from "@refinedev/core";
-import type { OrganizationView, RepositoryBranchView, RepositoryCommitView, RepositoryView } from "@/pages/types";
+import type {
+  OrganizationView,
+  RepositoryBranchProtectionPatch,
+  RepositoryBranchProtectionRuleType,
+  RepositoryBranchView,
+  RepositoryCommitView,
+  RepositoryView,
+} from "@/pages/types";
 import { extractErrorMessage } from "./repository-utils";
 
 interface UseRepositoryMetaControllerArgs {
@@ -118,6 +125,29 @@ export const useRepositoryMetaController = ({
     }
   };
 
+  const updateBranchProtection = async (branch: RepositoryBranchView, patch: RepositoryBranchProtectionPatch) => {
+    setActionError(null);
+    try {
+      const current = branch.protection;
+      await patchBranchProtection({
+        url: `/projects/${repoId}/repository/branch-protections/${encodeURIComponent(branch.name)}`,
+        method: "patch",
+        values: {
+          rule_type: patch.rule_type ?? current?.rule_type ?? defaultProtectionRuleType(branch.name),
+          push_access_level: patch.push_access_level ?? current?.push_access_level ?? "no_one",
+          merge_access_level: patch.merge_access_level ?? current?.merge_access_level ?? "maintainer",
+          require_merge_request: patch.require_merge_request ?? current?.require_merge_request ?? true,
+          require_pipeline_success: patch.require_pipeline_success ?? current?.require_pipeline_success ?? false,
+          allow_force_push: patch.allow_force_push ?? current?.allow_force_push ?? false,
+          allow_delete: patch.allow_delete ?? current?.allow_delete ?? false,
+        },
+      });
+      await loadBranches();
+    } catch (error) {
+      setActionError(extractErrorMessage(error));
+    }
+  };
+
   const removeBranch = async (branch: RepositoryBranchView) => {
     setActionError(null);
     try {
@@ -183,8 +213,12 @@ export const useRepositoryMetaController = ({
     loadCommits,
     submitCreateBranch,
     toggleBranchProtection,
+    updateBranchProtection,
     removeBranch,
     copyCloneUrl,
     submitDelete,
   };
 };
+
+const defaultProtectionRuleType = (branchName: string): RepositoryBranchProtectionRuleType =>
+  branchName.includes("*") || branchName.includes("?") ? "pattern" : "exact";

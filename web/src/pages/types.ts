@@ -28,18 +28,34 @@ export interface RepositoryBranchView {
   protection?: RepositoryBranchProtectionView | null;
 }
 
+export type RepositoryBranchProtectionRuleType = "exact" | "pattern";
+export type RepositoryBranchAccessLevel = "no_one" | "developer" | "maintainer" | "owner";
+
 export interface RepositoryBranchProtectionView {
   id: string;
   repository_id: string;
   branch_name: string;
-  rule_type: "exact" | "pattern";
-  push_access_level: "no_one" | "developer" | "maintainer" | "owner";
-  merge_access_level: "no_one" | "developer" | "maintainer" | "owner";
+  rule_type: RepositoryBranchProtectionRuleType;
+  push_access_level: RepositoryBranchAccessLevel;
+  merge_access_level: RepositoryBranchAccessLevel;
   require_merge_request: boolean;
   require_pipeline_success: boolean;
   allow_force_push: boolean;
   allow_delete: boolean;
 }
+
+export type RepositoryBranchProtectionPatch = Partial<
+  Pick<
+    RepositoryBranchProtectionView,
+    | "rule_type"
+    | "push_access_level"
+    | "merge_access_level"
+    | "require_merge_request"
+    | "require_pipeline_success"
+    | "allow_force_push"
+    | "allow_delete"
+  >
+>;
 
 export interface RepositoryCommitView {
   repository_id: string;
@@ -132,6 +148,38 @@ export interface RepositoryMergeRequestView {
 export interface RepositoryMergeRequestDiffView {
   merge_request: RepositoryMergeRequestView;
   diff: string;
+}
+
+export interface RepositoryMergeRequestCheckStatusView {
+  merge_request: RepositoryMergeRequestView;
+  source_branch: string;
+  source_commit_sha: string;
+  target_branch: string;
+  target_branch_protected: boolean;
+  require_merge_request: boolean;
+  require_pipeline_success: boolean;
+  pipeline_required: boolean;
+  required: boolean;
+  mergeable: boolean;
+  status: string;
+  blocking_reason?: string | null;
+  pipeline?: RepositoryPipelineView | null;
+}
+
+export type RepositoryMergeRequestParticipantRole = "reviewer" | "assignee";
+
+export interface RepositoryMergeRequestParticipantView {
+  id: string;
+  merge_request_id: string;
+  user_id: string;
+  role: RepositoryMergeRequestParticipantRole;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryMergeRequestParticipantsView {
+  merge_request: RepositoryMergeRequestView;
+  participants: RepositoryMergeRequestParticipantView[];
 }
 
 export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
@@ -332,6 +380,7 @@ export interface IssueAttachmentUploadView {
 export interface UserView {
   id: string;
   username: string;
+  display_name?: string | null;
   email: string;
   status: string;
   is_super_admin: boolean;

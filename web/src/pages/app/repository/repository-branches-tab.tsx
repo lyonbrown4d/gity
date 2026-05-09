@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmAction } from "@/components/common/confirm-action";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { RepositoryBranchView } from "@/pages/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { RepositoryBranchAccessLevel, RepositoryBranchProtectionPatch, RepositoryBranchView } from "@/pages/types";
 import { shortSha } from "./repository-utils";
 
 interface RepositoryBranchesTabProps {
@@ -18,6 +19,7 @@ interface RepositoryBranchesTabProps {
   onChangeNewBranchName: (value: string) => void;
   onSubmitCreateBranch: (event: React.FormEvent<HTMLFormElement>) => void;
   onToggleBranchProtection: (branch: RepositoryBranchView, protect: boolean) => void;
+  onUpdateBranchProtection: (branch: RepositoryBranchView, patch: RepositoryBranchProtectionPatch) => void;
   onDeleteBranch: (branch: RepositoryBranchView) => void;
 }
 
@@ -33,6 +35,7 @@ export const RepositoryBranchesTab = ({
   onChangeNewBranchName,
   onSubmitCreateBranch,
   onToggleBranchProtection,
+  onUpdateBranchProtection,
   onDeleteBranch,
 }: RepositoryBranchesTabProps): JSX.Element => {
   return (
@@ -78,6 +81,50 @@ export const RepositoryBranchesTab = ({
                       {protection.allow_delete ? ` / ${t("Deletion allowed")}` : ` / ${t("Deletion blocked")}`}
                     </p>
                   ) : null}
+                  {protection ? (
+                    <div className="mt-3 grid gap-3 rounded-md border bg-muted/10 p-3 lg:grid-cols-2">
+                      <BranchAccessSelect
+                        label={t("Push access")}
+                        value={protection.push_access_level}
+                        disabled={isUpdatingBranch}
+                        t={t}
+                        onChange={(value) => onUpdateBranchProtection(branch, { push_access_level: value })}
+                      />
+                      <BranchAccessSelect
+                        label={t("Merge access")}
+                        value={protection.merge_access_level}
+                        disabled={isUpdatingBranch}
+                        t={t}
+                        onChange={(value) => onUpdateBranchProtection(branch, { merge_access_level: value })}
+                      />
+                      <div className="flex flex-wrap gap-2 lg:col-span-2">
+                        <ProtectionToggle
+                          label={t("Require merge request")}
+                          enabled={protection.require_merge_request}
+                          disabled={isUpdatingBranch}
+                          onClick={() => onUpdateBranchProtection(branch, { require_merge_request: !protection.require_merge_request })}
+                        />
+                        <ProtectionToggle
+                          label={t("Require successful pipeline")}
+                          enabled={protection.require_pipeline_success}
+                          disabled={isUpdatingBranch}
+                          onClick={() => onUpdateBranchProtection(branch, { require_pipeline_success: !protection.require_pipeline_success })}
+                        />
+                        <ProtectionToggle
+                          label={t("Allow force push")}
+                          enabled={protection.allow_force_push}
+                          disabled={isUpdatingBranch}
+                          onClick={() => onUpdateBranchProtection(branch, { allow_force_push: !protection.allow_force_push })}
+                        />
+                        <ProtectionToggle
+                          label={t("Allow delete")}
+                          enabled={protection.allow_delete}
+                          disabled={isUpdatingBranch}
+                          onClick={() => onUpdateBranchProtection(branch, { allow_delete: !protection.allow_delete })}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -113,4 +160,76 @@ export const RepositoryBranchesTab = ({
       </CardContent>
     </Card>
   );
+};
+
+const ACCESS_LEVELS: RepositoryBranchAccessLevel[] = ["no_one", "developer", "maintainer", "owner"];
+
+const BranchAccessSelect = ({
+  label,
+  value,
+  disabled,
+  t,
+  onChange,
+}: {
+  label: string;
+  value: RepositoryBranchAccessLevel;
+  disabled: boolean;
+  t: (text: string) => string;
+  onChange: (value: RepositoryBranchAccessLevel) => void;
+}) => (
+  <div className="space-y-1">
+    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+    <Select
+      value={value}
+      disabled={disabled}
+      onValueChange={(nextValue) => {
+        if (isAccessLevel(nextValue)) {
+          onChange(nextValue);
+        }
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ACCESS_LEVELS.map((level) => (
+          <SelectItem key={level} value={level}>
+            {t(accessLevelLabel(level))}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+const ProtectionToggle = ({
+  label,
+  enabled,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  enabled: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) => (
+  <Button type="button" size="sm" variant={enabled ? "default" : "outline"} disabled={disabled} onClick={onClick}>
+    {label}
+  </Button>
+);
+
+const isAccessLevel = (value: string): value is RepositoryBranchAccessLevel =>
+  ACCESS_LEVELS.includes(value as RepositoryBranchAccessLevel);
+
+const accessLevelLabel = (level: RepositoryBranchAccessLevel): string => {
+  switch (level) {
+    case "no_one":
+      return "No one";
+    case "developer":
+      return "Developer";
+    case "maintainer":
+      return "Maintainer";
+    case "owner":
+      return "Owner";
+  }
 };
