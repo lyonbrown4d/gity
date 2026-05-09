@@ -114,12 +114,13 @@ export function AppRepositoriesPage(): JSX.Element {
     );
   };
 
-  const submitDelete = (repo: RepositoryView) => {
+  const submitDelete = (repo: RepositoryView, confirmation: string) => {
     setActionError(null);
     deleteRepository(
       {
         resource: "my-projects",
         id: repo.id,
+        meta: { confirmation },
       },
       {
         onSuccess: async () => {
@@ -272,7 +273,10 @@ export function AppRepositoriesPage(): JSX.Element {
                   description={t("This action cannot be undone.")}
                   confirmLabel={t("Delete")}
                   cancelLabel={t("Cancel")}
-                  onConfirm={() => submitDelete(repo)}
+                  verificationLabel={t("Type {path} to confirm deletion.").replace("{path}", repo.full_path)}
+                  verificationValue={repo.full_path}
+                  verificationPlaceholder={repo.full_path}
+                  onConfirm={(verification) => submitDelete(repo, verification ?? "")}
                 >
                   <Button
                     type="button"

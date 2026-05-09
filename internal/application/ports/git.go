@@ -35,6 +35,7 @@ type GitRunner interface {
 	Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout, stderr io.Writer) error
 	InitBare(ctx context.Context, repoPath, initialBranch string) error
 	CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error
+	DeleteBranch(ctx context.Context, repoPath, branchName string) error
 	CreateFileCommit(ctx context.Context, repoPath string, input CreateFileCommitInput) error
 	DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error)
 	Archive(ctx context.Context, repoPath, revision string) ([]byte, error)

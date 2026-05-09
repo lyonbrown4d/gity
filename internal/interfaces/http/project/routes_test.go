@@ -16,6 +16,9 @@ func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branches")
+	assertRoute(t, server, http.MethodDelete, "/api/v1/projects/{id}/repository/branches/{branch_name}")
+	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branch-protections")
+	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/repository/branch-protections/{branch_name}")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/repository/files")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/repository/branches/{branch_name}/protect")
 }
@@ -27,6 +30,7 @@ func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/branches")
+	assertRoute(t, server, http.MethodDelete, "/api/v1/repos/{id}/branches/{branch_name}")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/file-commits")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/branches/{branch_name}/protect")
 }

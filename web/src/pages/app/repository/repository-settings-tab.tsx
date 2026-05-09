@@ -7,7 +7,7 @@ interface RepositorySettingsTabProps {
   repository: RepositoryView;
   t: (text: string) => string;
   isDeleting: boolean;
-  onDelete: () => void;
+  onDelete: (confirmation: string) => void;
 }
 
 export const RepositorySettingsTab = ({
@@ -49,7 +49,10 @@ export const RepositorySettingsTab = ({
             description={t("This action cannot be undone.")}
             confirmLabel={t("Delete")}
             cancelLabel={t("Cancel")}
-            onConfirm={onDelete}
+            verificationLabel={t("Type {path} to confirm deletion.").replace("{path}", repository.full_path)}
+            verificationValue={repository.full_path}
+            verificationPlaceholder={repository.full_path}
+            onConfirm={(verification) => onDelete(verification ?? "")}
           >
             <Button type="button" variant="destructive" size="sm" className="mt-3" disabled={isDeleting}>
               {t("Delete")}

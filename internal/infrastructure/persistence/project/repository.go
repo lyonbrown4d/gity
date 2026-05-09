@@ -35,21 +35,31 @@ func NewProjectRepository(repo *Repository) projectports.ProjectRepository {
 func (r *Repository) List(ctx context.Context, organizationID *int64) (*collectionx.List[projectdomain.Project], error) {
 	query := querydsl.Select(dbschema.ProjectSchema.AllColumns().Values()...).
 		From(dbschema.ProjectSchema).
+		Where(activeProjectPredicate()).
 		OrderBy(dbschema.ProjectSchema.ID.Desc())
 	if organizationID != nil {
-		query = query.Where(dbschema.ProjectSchema.OrganizationID.Eq(*organizationID))
+		query = query.Where(querydsl.And(activeProjectPredicate(), dbschema.ProjectSchema.OrganizationID.Eq(*organizationID)))
 	}
 	return persistence.Many(r.base.List(ctx, query))
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (projectdomain.Project, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectSchema.ID).Get(ctx, id))
+	return r.getByID(ctx, id, false)
+}
+
+func (r *Repository) GetIncludingDeletedByID(ctx context.Context, id int64) (projectdomain.Project, error) {
+	return r.getByID(ctx, id, true)
 }
 
 func (r *Repository) GetByFullPath(ctx context.Context, fullPath string) (projectdomain.Project, error) {
-	return persistence.One(r.base.GetByKey(ctx, dbxrepo.Key{
-		"full_path": strings.TrimSpace(fullPath),
-	}))
+	query := querydsl.Select(dbschema.ProjectSchema.AllColumns().Values()...).
+		From(dbschema.ProjectSchema).
+		Where(querydsl.And(
+			dbschema.ProjectSchema.FullPath.Eq(strings.TrimSpace(fullPath)),
+			activeProjectPredicate(),
+		)).
+		Limit(1)
+	return persistence.One(r.base.First(ctx, query))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput, organization organizationdomain.Organization) (projectdomain.Project, error) {
@@ -74,6 +84,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, organization
 		Visibility:     visibility,
 		Description:    strings.TrimSpace(input.Description),
 		DefaultBranch:  defaultBranch,
+		Status:         projectdomain.ProjectStatusActive,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -83,9 +94,40 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, organization
 	return item, nil
 }
 
+func (r *Repository) MarkPendingDeleteByID(ctx context.Context, id int64, deletedAt time.Time) error {
+	if deletedAt.IsZero() {
+		deletedAt = time.Now().UTC()
+	} else {
+		deletedAt = deletedAt.UTC()
+	}
+	if _, err := dbxrepo.By(r.base, dbschema.ProjectSchema.ID).Update(ctx, id,
+		dbschema.ProjectSchema.Status.Set(projectdomain.ProjectStatusPendingDelete),
+		dbschema.ProjectSchema.DeletedAt.Set(deletedAt),
+		dbschema.ProjectSchema.UpdatedAt.Set(deletedAt),
+	); err != nil {
+		return fmt.Errorf("mark project pending delete: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
 	if _, err := dbxrepo.By(r.base, dbschema.ProjectSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) getByID(ctx context.Context, id int64, includeDeleted bool) (projectdomain.Project, error) {
+	query := querydsl.Select(dbschema.ProjectSchema.AllColumns().Values()...).
+		From(dbschema.ProjectSchema).
+		Where(dbschema.ProjectSchema.ID.Eq(id)).
+		Limit(1)
+	if !includeDeleted {
+		query = query.Where(querydsl.And(dbschema.ProjectSchema.ID.Eq(id), activeProjectPredicate()))
+	}
+	return persistence.One(r.base.First(ctx, query))
+}
+
+func activeProjectPredicate() querydsl.Predicate {
+	return dbschema.ProjectSchema.Status.Eq(projectdomain.ProjectStatusActive)
 }

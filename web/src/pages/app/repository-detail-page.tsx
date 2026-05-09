@@ -228,13 +228,16 @@ export const RepositoryDetailPage = (): JSX.Element => {
         <RepositoryBranchesTab
           t={t}
           branches={meta.branches}
+          defaultBranch={meta.repository.default_branch}
           newBranchName={meta.newBranchName}
           isLoadingBranches={meta.isLoadingBranches}
           isCreatingBranch={meta.isCreatingBranch}
           isUpdatingBranch={meta.isUpdatingBranch}
+          isDeletingBranch={meta.isDeletingBranch}
           onChangeNewBranchName={meta.setNewBranchName}
           onSubmitCreateBranch={(event) => void meta.submitCreateBranch(event)}
           onToggleBranchProtection={(branch, protect) => void meta.toggleBranchProtection(branch, protect)}
+          onDeleteBranch={(branch) => void meta.removeBranch(branch)}
         />
       ) : null}
 

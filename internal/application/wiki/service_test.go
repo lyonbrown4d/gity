@@ -128,7 +128,8 @@ func assertListWikiPages(t *testing.T, fixture wikiFixture, pageID, otherPageID 
 		t.Fatalf("unexpected wiki page list: %+v", pages)
 	}
 	seen := map[int64]bool{}
-	for _, page := range pages {
+	for index := range pages {
+		page := &pages[index]
 		seen[page.ID] = true
 	}
 	if !seen[pageID] || !seen[otherPageID] {

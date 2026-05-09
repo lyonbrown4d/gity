@@ -3,6 +3,7 @@ package project
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	"github.com/DaiYuANg/gity/internal/config"
@@ -18,12 +19,22 @@ func toRepositoryView(item projectdomain.Project, settings config.Settings) repo
 		UUID:           strconv.FormatInt(item.ID, 10),
 		OrganizationID: strconv.FormatInt(item.OrganizationID, 10),
 		Key:            item.PathKey,
+		FullPath:       item.FullPath,
 		Name:           item.Name,
 		Description:    item.Description,
 		Visibility:     item.Visibility,
 		DefaultBranch:  item.DefaultBranch,
+		Status:         item.Status,
+		DeletedAt:      formatProjectTime(item.DeletedAt),
 		CloneHTTPURL:   baseURL + "/" + strings.Trim(item.FullPath, "/") + ".git",
 	}
+}
+
+func formatProjectTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format("2006-01-02T15:04:05Z")
 }
 
 func toRepositoryBranchView(projectID int64, item projectservice.Branch) repositoryBranchView {
@@ -32,6 +43,25 @@ func toRepositoryBranchView(projectID int64, item projectservice.Branch) reposit
 		Name:          item.Name,
 		IsProtected:   item.IsProtected,
 		LastCommitSHA: item.LastCommitSHA,
+		Protection:    toBranchProtectionView(item.Protection),
+	}
+}
+
+func toBranchProtectionView(item *projectservice.BranchProtection) *branchProtectionView {
+	if item == nil {
+		return nil
+	}
+	return &branchProtectionView{
+		ID:                     strconv.FormatInt(item.ID, 10),
+		RepositoryID:           strconv.FormatInt(item.ProjectID, 10),
+		BranchName:             item.BranchName,
+		RuleType:               item.RuleType,
+		PushAccessLevel:        item.PushAccessLevel,
+		MergeAccessLevel:       item.MergeAccessLevel,
+		RequireMergeRequest:    item.RequireMergeRequest,
+		RequirePipelineSuccess: item.RequirePipelineSuccess,
+		AllowForcePush:         item.AllowForcePush,
+		AllowDelete:            item.AllowDelete,
 	}
 }
 
@@ -78,6 +108,14 @@ func (in projectByIDInput) ProjectIDValue() int64 {
 	return in.ID
 }
 
+func (in deleteProjectInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in deleteProjectInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
 func (in createBranchInput) AuthorizationHeader() string {
 	return in.Authorization
 }
@@ -91,6 +129,14 @@ func (in branchProtectionInput) AuthorizationHeader() string {
 }
 
 func (in branchProtectionInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
+func (in upsertBranchProtectionInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in upsertBranchProtectionInput) ProjectIDValue() int64 {
 	return in.ID
 }
 

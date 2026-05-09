@@ -23,6 +23,7 @@ export const useRepositoryMetaController = ({
   const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
   const { mutateAsync: createBranch, isLoading: isCreatingBranch } = useCustomMutation();
   const { mutateAsync: patchBranchProtection, isLoading: isUpdatingBranch } = useCustomMutation();
+  const { mutateAsync: deleteBranch, isLoading: isDeletingBranch } = useCustomMutation();
 
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const repoQuery = useList<RepositoryView>({
@@ -117,6 +118,23 @@ export const useRepositoryMetaController = ({
     }
   };
 
+  const removeBranch = async (branch: RepositoryBranchView) => {
+    setActionError(null);
+    try {
+      await deleteBranch({
+        url: `/projects/${repoId}/repository/branches/${encodeURIComponent(branch.name)}`,
+        method: "delete",
+        values: {},
+      });
+      if (branchFilter === branch.name) {
+        setBranchFilter("all");
+      }
+      await Promise.all([loadBranches(), loadCommits()]);
+    } catch (error) {
+      setActionError(extractErrorMessage(error));
+    }
+  };
+
   const copyCloneUrl = async () => {
     if (!repository) {
       return;
@@ -128,13 +146,13 @@ export const useRepositoryMetaController = ({
     }
   };
 
-  const submitDelete = () => {
+  const submitDelete = (confirmation: string) => {
     if (!repository) {
       return;
     }
     setActionError(null);
     deleteRepository(
-      { resource: "my-projects", id: repository.id },
+      { resource: "my-projects", id: repository.id, meta: { confirmation } },
       { onSuccess: onDeleted, onError: (error) => setActionError(extractErrorMessage(error)) },
     );
   };
@@ -157,6 +175,7 @@ export const useRepositoryMetaController = ({
     isLoadingCommits: commitsQuery.isFetching,
     isUpdatingBranch,
     isCreatingBranch,
+    isDeletingBranch,
     isDeleting,
     setBranchFilter,
     setNewBranchName,
@@ -164,6 +183,7 @@ export const useRepositoryMetaController = ({
     loadCommits,
     submitCreateBranch,
     toggleBranchProtection,
+    removeBranch,
     copyCloneUrl,
     submitDelete,
   };

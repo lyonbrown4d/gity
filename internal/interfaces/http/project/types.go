@@ -12,6 +12,12 @@ type projectByIDInput struct {
 	Authorization string `header:"Authorization"`
 }
 
+type deleteProjectInput struct {
+	ID            int64             `path:"id"`
+	Authorization string            `header:"Authorization"`
+	Body          deleteProjectBody `json:"body"`
+}
+
 type projectsInput struct {
 	OrganizationID int64  `query:"organization_id"`
 	IDs            string `query:"ids"`
@@ -35,6 +41,13 @@ type branchProtectionInput struct {
 	ID            int64  `path:"id"`
 	BranchName    string `path:"branch_name"`
 	Authorization string `header:"Authorization"`
+}
+
+type upsertBranchProtectionInput struct {
+	ID            int64                `path:"id"`
+	BranchName    string               `path:"branch_name"`
+	Authorization string               `header:"Authorization"`
+	Body          branchProtectionBody `json:"body"`
 }
 
 type createFileCommitInput struct {
@@ -70,9 +83,23 @@ type createProjectBody struct {
 	DefaultBranch  string `json:"default_branch"`
 }
 
+type deleteProjectBody struct {
+	Confirmation string `json:"confirmation"`
+}
+
 type createBranchBody struct {
 	Name      string `json:"name"`
 	SourceRef string `json:"source_ref"`
+}
+
+type branchProtectionBody struct {
+	RuleType               string `json:"rule_type"`
+	PushAccessLevel        string `json:"push_access_level"`
+	MergeAccessLevel       string `json:"merge_access_level"`
+	RequireMergeRequest    bool   `json:"require_merge_request"`
+	RequirePipelineSuccess bool   `json:"require_pipeline_success"`
+	AllowForcePush         bool   `json:"allow_force_push"`
+	AllowDelete            bool   `json:"allow_delete"`
 }
 
 type createFileCommitBody struct {
@@ -89,18 +116,35 @@ type repositoryView struct {
 	UUID           string `json:"uuid"`
 	OrganizationID string `json:"organization_id"`
 	Key            string `json:"key"`
+	FullPath       string `json:"full_path"`
 	Name           string `json:"name"`
 	Description    string `json:"description"`
 	Visibility     string `json:"visibility"`
 	DefaultBranch  string `json:"default_branch"`
+	Status         string `json:"status"`
+	DeletedAt      string `json:"deleted_at,omitempty"`
 	CloneHTTPURL   string `json:"clone_http_url"`
 }
 
 type repositoryBranchView struct {
-	RepositoryID  string `json:"repository_id"`
-	Name          string `json:"name"`
-	IsProtected   bool   `json:"is_protected"`
-	LastCommitSHA string `json:"last_commit_sha,omitempty"`
+	RepositoryID  string                `json:"repository_id"`
+	Name          string                `json:"name"`
+	IsProtected   bool                  `json:"is_protected"`
+	LastCommitSHA string                `json:"last_commit_sha,omitempty"`
+	Protection    *branchProtectionView `json:"protection,omitempty"`
+}
+
+type branchProtectionView struct {
+	ID                     string `json:"id"`
+	RepositoryID           string `json:"repository_id"`
+	BranchName             string `json:"branch_name"`
+	RuleType               string `json:"rule_type"`
+	PushAccessLevel        string `json:"push_access_level"`
+	MergeAccessLevel       string `json:"merge_access_level"`
+	RequireMergeRequest    bool   `json:"require_merge_request"`
+	RequirePipelineSuccess bool   `json:"require_pipeline_success"`
+	AllowForcePush         bool   `json:"allow_force_push"`
+	AllowDelete            bool   `json:"allow_delete"`
 }
 
 type repositoryCommitView struct {

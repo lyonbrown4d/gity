@@ -48,7 +48,7 @@ func loadProject(ctx context.Context, repo *projectrepo.Repository, rawRepoPath 
 	if err != nil {
 		return projectView{}, fiber.ErrNotFound
 	}
-	return projectView{ID: project.ID, OrganizationID: project.OrganizationID, FullPath: project.FullPath, Visibility: project.Visibility}, nil
+	return projectView{ID: project.ID, OrganizationID: project.OrganizationID, FullPath: project.FullPath, Visibility: project.Visibility, DefaultBranch: project.DefaultBranch}, nil
 }
 
 type projectView struct {
@@ -56,6 +56,7 @@ type projectView struct {
 	OrganizationID int64
 	FullPath       string
 	Visibility     string
+	DefaultBranch  string
 }
 
 func normalizeRepoFullPath(value string) (string, error) {

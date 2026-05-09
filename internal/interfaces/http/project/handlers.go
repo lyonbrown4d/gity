@@ -44,14 +44,16 @@ func (e *Endpoint) createProject(ctx context.Context, in *createProjectInput) (*
 	return &projectOutput{Body: toRepositoryView(item, e.settings)}, nil
 }
 
-func (e *Endpoint) deleteProject(ctx context.Context, in *projectByIDInput) (*projectOutput, error) {
+func (e *Endpoint) deleteProject(ctx context.Context, in *deleteProjectInput) (*projectOutput, error) {
 	item, err := e.service.GetByID(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.service.Delete(ctx, in.ID); err != nil {
+	if err := e.service.Delete(ctx, in.ID, projectservice.DeleteInput{Confirmation: in.Body.Confirmation}); err != nil {
 		return nil, err
 	}
+	item.Status = projectdomain.ProjectStatusPendingDelete
+	item.DeletedAt = time.Now().UTC()
 	return &projectOutput{Body: toRepositoryView(item, e.settings)}, nil
 }
 
@@ -74,12 +76,47 @@ func (e *Endpoint) createBranch(ctx context.Context, in *createBranchInput) (*pr
 	return &projectOutput{Body: toRepositoryBranchView(in.ID, item)}, nil
 }
 
+func (e *Endpoint) deleteBranch(ctx context.Context, in *branchProtectionInput) (*projectOutput, error) {
+	if err := e.service.DeleteBranch(ctx, in.ID, in.BranchName); err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: map[string]any{"status": "deleted"}}, nil
+}
+
 func (e *Endpoint) protectBranch(ctx context.Context, in *branchProtectionInput) (*projectOutput, error) {
 	return e.setBranchProtection(ctx, in, true)
 }
 
 func (e *Endpoint) unprotectBranch(ctx context.Context, in *branchProtectionInput) (*projectOutput, error) {
 	return e.setBranchProtection(ctx, in, false)
+}
+
+func (e *Endpoint) listBranchProtections(ctx context.Context, in *projectByIDInput) (*projectOutput, error) {
+	items, err := e.service.ListBranchProtections(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item projectservice.BranchProtection) branchProtectionView {
+		return *toBranchProtectionView(&item)
+	}).Values()
+	return &projectOutput{Body: views}, nil
+}
+
+func (e *Endpoint) upsertBranchProtection(ctx context.Context, in *upsertBranchProtectionInput) (*projectOutput, error) {
+	item, err := e.service.UpsertBranchProtection(ctx, in.ID, projectservice.BranchProtectionInput{
+		BranchName:             in.BranchName,
+		RuleType:               in.Body.RuleType,
+		PushAccessLevel:        in.Body.PushAccessLevel,
+		MergeAccessLevel:       in.Body.MergeAccessLevel,
+		RequireMergeRequest:    in.Body.RequireMergeRequest,
+		RequirePipelineSuccess: in.Body.RequirePipelineSuccess,
+		AllowForcePush:         in.Body.AllowForcePush,
+		AllowDelete:            in.Body.AllowDelete,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: toBranchProtectionView(&item)}, nil
 }
 
 func (e *Endpoint) listCommits(ctx context.Context, in *projectRepositoryInput) (*projectOutput, error) {

@@ -98,6 +98,25 @@ func (r *Runner) CreateBranch(ctx context.Context, repoPath, branchName, sourceR
 	return nil
 }
 
+func (r *Runner) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return err
+	}
+	branchName = strings.TrimSpace(branchName)
+	if err := r.validateBranchName(ctx, absRepo, branchName); err != nil {
+		return err
+	}
+	refName := "refs/heads/" + branchName
+	if err := r.runGit(ctx, absRepo, "show-ref", "--verify", "--quiet", refName); err != nil {
+		return gitports.ErrReferenceNotFound
+	}
+	if err := r.runGit(ctx, absRepo, "update-ref", "-d", refName); err != nil {
+		return fmt.Errorf("delete branch %s: %w", branchName, err)
+	}
+	return nil
+}
+
 func (r *Runner) DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {

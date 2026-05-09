@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"strings"
+	"time"
 
+	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionx "github.com/arcgolabs/collectionx/list"
@@ -144,16 +146,48 @@ func (s *Service) provisionRepository(ctx context.Context, project projectdomain
 	return nil
 }
 
-func (s *Service) Delete(ctx context.Context, id int64) error {
+func (s *Service) Delete(ctx context.Context, id int64, inputs ...DeleteInput) error {
 	if id <= 0 {
 		return oops.In("project").With("project_id", id).New("project id is required")
 	}
-	if err := s.repo.DeleteByID(ctx, id); err != nil {
-		return oops.In("project").With("project_id", id).Wrapf(err, "delete project")
+	project, err := s.repo.GetIncludingDeletedByID(ctx, id)
+	if err != nil {
+		return oops.In("project").With("project_id", id).Wrapf(err, "load project for delete")
 	}
-	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(id)); err != nil {
+	input := normalizeDeleteInput(inputs)
+	if err := validateDeleteConfirmation(project, input); err != nil {
+		return err
+	}
+	if project.IsPendingDelete() {
+		return nil
+	}
+	deletedAt := time.Now().UTC()
+	if err := s.repo.MarkPendingDeleteByID(ctx, id, deletedAt); err != nil {
+		return oops.In("project").With("project_id", id, "full_path", project.FullPath).Wrapf(err, "mark project pending delete")
+	}
+	project.Status = projectdomain.ProjectStatusPendingDelete
+	project.DeletedAt = deletedAt
+	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectDeletedEvent(project)); err != nil {
 		wrapped := oops.In("project").With("project_id", id).Wrapf(err, "publish project deleted event")
 		s.logger.Warn("publish project deleted event failed", slog.String("error", wrapped.Error()))
+	}
+	return nil
+}
+
+func normalizeDeleteInput(inputs []DeleteInput) DeleteInput {
+	if len(inputs) == 0 {
+		return DeleteInput{}
+	}
+	return inputs[0]
+}
+
+func validateDeleteConfirmation(project projectdomain.Project, input DeleteInput) error {
+	confirmation := strings.TrimSpace(input.Confirmation)
+	if confirmation == "" {
+		return apperror.BadRequest("project delete confirmation is required", oops.In("project").With("project_id", project.ID, "full_path", project.FullPath).New("project delete confirmation is required"))
+	}
+	if confirmation != project.FullPath {
+		return apperror.BadRequest("project delete confirmation does not match full path", oops.In("project").With("project_id", project.ID, "full_path", project.FullPath, "confirmation", confirmation).New("project delete confirmation does not match full path"))
 	}
 	return nil
 }

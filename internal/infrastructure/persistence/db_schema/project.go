@@ -19,6 +19,8 @@ type ProjectSchemaDef struct {
 	Visibility     column.Column[projectdomain.Project, string]                     `dbx:"visibility,index"`
 	Description    column.Column[projectdomain.Project, string]                     `dbx:"description,null"`
 	DefaultBranch  column.Column[projectdomain.Project, string]                     `dbx:"default_branch"`
+	Status         column.Column[projectdomain.Project, string]                     `dbx:"status,index"`
+	DeletedAt      column.Column[projectdomain.Project, time.Time]                  `dbx:"deleted_at,type=TIMESTAMP,null"`
 	CreatedAt      column.Column[projectdomain.Project, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
 	UpdatedAt      column.Column[projectdomain.Project, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
 }

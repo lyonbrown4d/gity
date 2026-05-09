@@ -10,10 +10,13 @@ export interface RepositoryView {
   uuid: string;
   organization_id: string;
   key: string;
+  full_path: string;
   name: string;
   description?: string;
   visibility: string;
   default_branch: string;
+  status: "active" | "pending_delete";
+  deleted_at?: string | null;
   clone_http_url: string;
 }
 
@@ -22,6 +25,20 @@ export interface RepositoryBranchView {
   name: string;
   is_protected: boolean;
   last_commit_sha?: string | null;
+  protection?: RepositoryBranchProtectionView | null;
+}
+
+export interface RepositoryBranchProtectionView {
+  id: string;
+  repository_id: string;
+  branch_name: string;
+  rule_type: "exact" | "pattern";
+  push_access_level: "no_one" | "developer" | "maintainer" | "owner";
+  merge_access_level: "no_one" | "developer" | "maintainer" | "owner";
+  require_merge_request: boolean;
+  require_pipeline_success: boolean;
+  allow_force_push: boolean;
+  allow_delete: boolean;
 }
 
 export interface RepositoryCommitView {

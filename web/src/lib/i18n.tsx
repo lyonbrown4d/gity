@@ -12,6 +12,7 @@ interface I18nContextValue {
 const STORAGE_KEY = "gity.locale";
 
 const zhDict: Record<string, string> = {
+  "Type {path} to confirm deletion.": "\u8f93\u5165 {path} \u4ee5\u786e\u8ba4\u5220\u9664\u3002",
   "Welcome back": "欢迎回来",
   "Sign in to manage repositories and organizations.": "登录后可管理仓库与组织。",
   "Sign in to manage projects and organizations.": "登录后可管理项目与组织。",
@@ -304,6 +305,16 @@ const zhDict: Record<string, string> = {
   Unprotected: "未保护",
   Unprotect: "取消保护",
   Protect: "保护",
+  Default: "\u9ed8\u8ba4",
+  Push: "\u63a8\u9001",
+  no_one: "\u7981\u6b62",
+  developer: "\u5f00\u53d1\u8005",
+  maintainer: "\u7ef4\u62a4\u8005",
+  "Deletion allowed": "\u5141\u8bb8\u5220\u9664",
+  "Deletion blocked": "\u7981\u6b62\u5220\u9664",
+  "Delete branch \"{name}\"?": "\u786e\u8ba4\u5220\u9664\u5206\u652f\u201c{name}\u201d\uff1f",
+  "Default branch cannot be deleted.": "\u9ed8\u8ba4\u5206\u652f\u4e0d\u80fd\u5220\u9664\u3002",
+  "Type {name} to confirm branch deletion.": "\u8f93\u5165 {name} \u4ee5\u786e\u8ba4\u5220\u9664\u5206\u652f\u3002",
   "No branches found.": "暂无分支。",
   "Repository metadata and danger zone.": "仓库元数据与危险操作。",
   "Project metadata and danger zone.": "项目元数据与危险操作。",

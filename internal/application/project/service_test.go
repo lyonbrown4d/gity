@@ -40,6 +40,7 @@ func TestOrganizationProjectFlow(t *testing.T) {
 	assertOrganizationMembers(t, fixture)
 	assertProjectBranchWorkflow(t, fixture)
 	assertProjectRepositoryContent(t, fixture)
+	assertProjectDeletionGovernance(t, fixture)
 }
 
 type projectFixture struct {
@@ -200,6 +201,10 @@ func assertProjectBranchWorkflow(t *testing.T, fixture *projectFixture) {
 func assertProjectBranchProtection(t *testing.T, fixture *projectFixture) {
 	t.Helper()
 
+	releaseBranch := testutil.Must(fixture.projectService.CreateBranch(fixture.ctx, fixture.projectID, "release/1.0", "main"))
+	if releaseBranch.Name != "release/1.0" {
+		t.Fatalf("unexpected release branch: %+v", releaseBranch)
+	}
 	protectedBranch := testutil.Must(fixture.projectService.SetBranchProtection(fixture.ctx, fixture.projectID, "feature/editor", true))
 	if !protectedBranch.IsProtected {
 		t.Fatalf("expected branch to be protected: %+v", protectedBranch)
@@ -211,6 +216,38 @@ func assertProjectBranchProtection(t *testing.T, fixture *projectFixture) {
 		Message:    "Try protected branch",
 	}); createCommitErr == nil {
 		t.Fatalf("expected protected branch file commit to fail")
+	}
+	pattern := testutil.Must(fixture.projectService.UpsertBranchProtection(fixture.ctx, fixture.projectID, projectservice.BranchProtectionInput{
+		BranchName:          "release/*",
+		RuleType:            "pattern",
+		PushAccessLevel:     "no_one",
+		MergeAccessLevel:    "maintainer",
+		RequireMergeRequest: true,
+	}))
+	if pattern.RuleType != "pattern" || pattern.BranchName != "release/*" {
+		t.Fatalf("unexpected pattern protection: %+v", pattern)
+	}
+	branches := testutil.Must(fixture.projectService.ListBranches(fixture.ctx, fixture.projectID))
+	if !branchProtected(branches, "release/1.0") {
+		t.Fatalf("expected release branch to match pattern protection: %+v", branches)
+	}
+	if _, err := fixture.projectService.CreateBranch(fixture.ctx, fixture.projectID, "release/2.0", "main"); err == nil {
+		t.Fatalf("expected protected pattern branch creation to fail")
+	}
+	if deleteErr := fixture.projectService.DeleteBranch(fixture.ctx, fixture.projectID, "release/1.0"); deleteErr == nil {
+		t.Fatalf("expected protected branch delete to fail")
+	}
+	testutil.Must(fixture.projectService.UpsertBranchProtection(fixture.ctx, fixture.projectID, projectservice.BranchProtectionInput{
+		BranchName:          "release/*",
+		RuleType:            "pattern",
+		PushAccessLevel:     "no_one",
+		MergeAccessLevel:    "maintainer",
+		RequireMergeRequest: true,
+		AllowDelete:         true,
+	}))
+	testutil.RequireNoError(t, fixture.projectService.DeleteBranch(fixture.ctx, fixture.projectID, "release/1.0"), "delete protected branch with allow_delete")
+	if deleteErr := fixture.projectService.DeleteBranch(fixture.ctx, fixture.projectID, "main"); deleteErr == nil {
+		t.Fatalf("expected default branch delete to fail")
 	}
 }
 

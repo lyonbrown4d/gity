@@ -38,16 +38,32 @@ func NewProjectCreatedEvent(project Project) ProjectCreated {
 
 type ProjectDeleted struct {
 	domainevent.Metadata
-	ProjectID int64 `json:"project_id"`
+	ProjectID      int64  `json:"project_id"`
+	OrganizationID int64  `json:"organization_id"`
+	ProjectName    string `json:"name"`
+	PathKey        string `json:"path_key"`
+	FullPath       string `json:"full_path"`
+	Status         string `json:"status"`
+	DeletedAt      string `json:"deleted_at,omitempty"`
 }
 
 func (ProjectDeleted) Name() string {
 	return EventProjectDeleted
 }
 
-func NewProjectDeletedEvent(projectID int64) ProjectDeleted {
+func NewProjectDeletedEvent(project Project) ProjectDeleted {
+	deletedAt := ""
+	if !project.DeletedAt.IsZero() {
+		deletedAt = project.DeletedAt.UTC().Format("2006-01-02T15:04:05Z")
+	}
 	return ProjectDeleted{
-		Metadata:  domainevent.NewMetadata(),
-		ProjectID: projectID,
+		Metadata:       domainevent.NewMetadata(),
+		ProjectID:      project.ID,
+		OrganizationID: project.OrganizationID,
+		ProjectName:    project.Name,
+		PathKey:        project.PathKey,
+		FullPath:       project.FullPath,
+		Status:         project.Status,
+		DeletedAt:      deletedAt,
 	}
 }

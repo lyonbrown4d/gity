@@ -140,7 +140,12 @@ const projectsAdapter: ResourceAdapter = {
   deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: DeleteOneParams<TVariables>,
   ) => {
-    const data = await apiRequest<TData>(`/projects/${params.id}`, { method: "DELETE" });
+    const meta = asRecord(params.meta as unknown);
+    const confirmation = asString(meta?.confirmation);
+    const data = await apiRequest<TData>(`/projects/${params.id}`, {
+      method: "DELETE",
+      body: JSON.stringify(confirmation ? { confirmation } : {}),
+    });
     return { data };
   },
 };
