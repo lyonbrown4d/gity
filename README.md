@@ -158,6 +158,29 @@ go test ./...
 Architecture notes for the Go rewrite live in [docs/GO_REWRITE_ARCHITECTURE.md](docs/GO_REWRITE_ARCHITECTURE.md).
 The product domain target lives in [docs/gitlab-like-domain-model.md](docs/gitlab-like-domain-model.md).
 
+## Beta Release
+
+GitHub Actions runs CI on `main` and pull requests. A release is created only when a SemVer tag is pushed:
+
+```bash
+git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
+git push origin v0.1.0-beta.1
+```
+
+The release workflow uses GoReleaser to publish GitHub Release artifacts, Linux packages, checksums, and Docker images.
+
+Published binaries:
+
+- `gity-server`
+- `gity-migration`
+- `gity-worker`
+- `gity-standalone`
+- `gity-runner`
+
+GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and Linux `deb`/`rpm`/`apk` packages. Docker images are published to GHCR as `ghcr.io/daiyuang/gity-server`, `ghcr.io/daiyuang/gity-migration`, `ghcr.io/daiyuang/gity-worker`, `ghcr.io/daiyuang/gity-standalone`, and `ghcr.io/daiyuang/gity-runner`.
+
+UPX compression is enabled for Linux and Windows release binaries. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
+
 ## Roadmap
 
 Detailed planning lives in [ROADMAP.md](ROADMAP.md).

@@ -1,0 +1,223 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: gity
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - &gity_build
+    id: gity-server
+    main: ./cmd/server
+    binary: gity-server
+    targets:
+      - linux_amd64_v1
+      - linux_arm64
+      - darwin_amd64_v1
+      - darwin_arm64
+      - windows_amd64_v1
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/DaiYuANg/gity/internal/debug.VersionOverride={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+  - <<: *gity_build
+    id: gity-migration
+    main: ./cmd/migration
+    binary: gity-migration
+  - <<: *gity_build
+    id: gity-worker
+    main: ./cmd/worker
+    binary: gity-worker
+  - <<: *gity_build
+    id: gity-standalone
+    main: ./cmd/standalone
+    binary: gity-standalone
+  - <<: *gity_build
+    id: gity-runner
+    main: ./cmd/runner
+    binary: gity-runner
+
+upx:
+  - enabled: true
+    ids:
+      - gity-server
+      - gity-migration
+      - gity-worker
+      - gity-standalone
+      - gity-runner
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    compress: best
+    lzma: true
+  - enabled: true
+    ids:
+      - gity-server
+      - gity-migration
+      - gity-worker
+      - gity-standalone
+      - gity-runner
+    goos:
+      - windows
+    goarch:
+      - amd64
+    compress: best
+    lzma: true
+
+archives:
+  - id: gity
+    ids:
+      - gity-server
+      - gity-migration
+      - gity-worker
+      - gity-standalone
+      - gity-runner
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+      {{- with .Arm }}v{{ . }}{{ end -}}
+      {{- if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end -}}
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - README.md
+
+nfpms:
+  - id: gity-linux
+    package_name: gity
+    ids:
+      - gity-server
+      - gity-migration
+      - gity-worker
+      - gity-standalone
+      - gity-runner
+    vendor: Gity
+    homepage: https://github.com/DaiYuANg/gity
+    maintainer: DaiYuANg
+    description: Lightweight Git hosting platform.
+    bindir: /usr/bin
+    dependencies:
+      - git
+    formats:
+      - deb
+      - rpm
+      - apk
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity/README.md
+
+dockers_v2:
+  - &gity_docker
+    id: gity-server
+    ids:
+      - gity-server
+    images:
+      - ghcr.io/daiyuang/gity-server
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Tag }}"
+    dockerfile: build/package/Dockerfile
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    build_args:
+      BINARY: gity-server
+    labels:
+      org.opencontainers.image.title: gity-server
+      org.opencontainers.image.description: Gity API server
+      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+    sbom: false
+    disable: "{{ .IsSnapshot }}"
+  - <<: *gity_docker
+    id: gity-migration
+    ids:
+      - gity-migration
+    images:
+      - ghcr.io/daiyuang/gity-migration
+    build_args:
+      BINARY: gity-migration
+    labels:
+      org.opencontainers.image.title: gity-migration
+      org.opencontainers.image.description: Gity database migration command
+      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+  - <<: *gity_docker
+    id: gity-worker
+    ids:
+      - gity-worker
+    images:
+      - ghcr.io/daiyuang/gity-worker
+    build_args:
+      BINARY: gity-worker
+    labels:
+      org.opencontainers.image.title: gity-worker
+      org.opencontainers.image.description: Gity background worker
+      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+  - <<: *gity_docker
+    id: gity-standalone
+    ids:
+      - gity-standalone
+    images:
+      - ghcr.io/daiyuang/gity-standalone
+    build_args:
+      BINARY: gity-standalone
+    labels:
+      org.opencontainers.image.title: gity-standalone
+      org.opencontainers.image.description: Gity single-process runtime
+      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+  - <<: *gity_docker
+    id: gity-runner
+    ids:
+      - gity-runner
+    images:
+      - ghcr.io/daiyuang/gity-runner
+    build_args:
+      BINARY: gity-runner
+    labels:
+      org.opencontainers.image.title: gity-runner
+      org.opencontainers.image.description: Gity CI runner agent
+      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "^style:"
+
+release:
+  github:
+    owner: DaiYuANg
+    name: gity
+  draft: false
+  prerelease: auto
+  replace_existing_artifacts: true
+  include_meta: true

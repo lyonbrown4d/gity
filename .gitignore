@@ -84,6 +84,7 @@ data
 bin/
 coverage.out
 /gity.db
+/dist/
 
 node_modules/
 packages/
