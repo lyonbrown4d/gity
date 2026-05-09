@@ -1,17 +1,18 @@
-package project
+package project_test
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/DaiYuANg/gity/internal/config"
+	project "github.com/DaiYuANg/gity/internal/interfaces/http/project"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil, nil))
+	server.RegisterOnly(project.NewEndpoint(nil, config.Settings{}, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branches")
@@ -22,7 +23,7 @@ func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, config.Settings{}, nil, nil))
+	server.RegisterOnly(project.NewEndpoint(nil, config.Settings{}, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/branches")

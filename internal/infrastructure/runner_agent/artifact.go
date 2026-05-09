@@ -23,21 +23,33 @@ type ArtifactFile struct {
 }
 
 func CollectArtifacts(job cidomain.ProjectJob, result string) (artifacts []ArtifactFile, err error) {
-	var payload ScriptPayload
-	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); decodeErr != nil {
-		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script job payload")
+	payload, scriptResult, err := decodeArtifactInputs(job, result)
+	if err != nil {
+		return nil, err
 	}
 	if len(payload.Artifacts) == 0 {
 		return nil, nil
-	}
-	var scriptResult ScriptResult
-	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); decodeErr != nil {
-		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script result")
 	}
 	workDir := strings.TrimSpace(scriptResult.WorkDir)
 	if workDir == "" {
 		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).New("script result does not include work_dir")
 	}
+	return collectArtifactsFromWorkDir(job, payload, workDir)
+}
+
+func decodeArtifactInputs(job cidomain.ProjectJob, result string) (ScriptPayload, ScriptResult, error) {
+	var payload ScriptPayload
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); decodeErr != nil {
+		return ScriptPayload{}, ScriptResult{}, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script job payload")
+	}
+	var scriptResult ScriptResult
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); decodeErr != nil {
+		return ScriptPayload{}, ScriptResult{}, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script result")
+	}
+	return payload, scriptResult, nil
+}
+
+func collectArtifactsFromWorkDir(job cidomain.ProjectJob, payload ScriptPayload, workDir string) (artifacts []ArtifactFile, err error) {
 	rootHandle, err := os.OpenRoot(workDir)
 	if err != nil {
 		return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "work_dir", workDir).Wrapf(err, "open artifact work dir")
@@ -47,41 +59,50 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) (artifacts []Artif
 			err = oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "work_dir", workDir).Wrapf(closeErr, "close artifact work dir")
 		}
 	}()
-	root := rootHandle.FS()
 	files := collectionlist.NewList[ArtifactFile]()
 	seen := setx.NewSet[string]()
 	for _, pattern := range payload.Artifacts {
-		matches, err := doublestar.Glob(root, normalizeArtifactPattern(pattern), doublestar.WithFilesOnly())
-		if err != nil {
-			return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "pattern", pattern).Wrapf(err, "match artifact pattern")
-		}
-		for _, match := range matches {
-			relative := normalizeArtifactPath(match)
-			if relative == "" {
-				continue
-			}
-			if seen.Contains(relative) {
-				continue
-			}
-			seen.Add(relative)
-			info, err := fs.Stat(root, relative)
-			if err != nil || info.IsDir() {
-				continue
-			}
-			content, err := rootHandle.ReadFile(relative)
-			if err != nil {
-				return nil, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", relative).Wrapf(err, "read artifact")
-			}
-			files.Add(ArtifactFile{
-				Name:        relative,
-				FileName:    path.Base(relative),
-				FilePath:    relative,
-				ContentType: detectArtifactContentType(relative, content),
-				Content:     content,
-			})
+		if err := collectArtifactPattern(job, rootHandle, pattern, seen, files); err != nil {
+			return nil, err
 		}
 	}
 	return files.Values(), nil
+}
+
+func collectArtifactPattern(job cidomain.ProjectJob, rootHandle *os.Root, pattern string, seen *setx.Set[string], files *collectionlist.List[ArtifactFile]) error {
+	root := rootHandle.FS()
+	matches, err := doublestar.Glob(root, normalizeArtifactPattern(pattern), doublestar.WithFilesOnly())
+	if err != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "pattern", pattern).Wrapf(err, "match artifact pattern")
+	}
+	for _, match := range matches {
+		if err := addArtifactMatch(job, rootHandle, match, seen, files); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addArtifactMatch(job cidomain.ProjectJob, rootHandle *os.Root, match string, seen *setx.Set[string], files *collectionlist.List[ArtifactFile]) error {
+	relative := normalizeArtifactPath(match)
+	if relative == "" || seen.Contains(relative) {
+		return nil
+	}
+	seen.Add(relative)
+	root := rootHandle.FS()
+	info, err := fs.Stat(root, relative)
+	if err != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", relative).Wrapf(err, "stat artifact")
+	}
+	if info.IsDir() {
+		return nil
+	}
+	content, err := rootHandle.ReadFile(relative)
+	if err != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "artifact_path", relative).Wrapf(err, "read artifact")
+	}
+	files.Add(ArtifactFile{Name: relative, FileName: path.Base(relative), FilePath: relative, ContentType: detectArtifactContentType(relative, content), Content: content})
+	return nil
 }
 
 func normalizeArtifactPattern(value string) string {

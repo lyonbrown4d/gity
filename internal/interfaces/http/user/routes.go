@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	identity "github.com/DaiYuANg/gity/internal/domain/identity"
-	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"strconv"
 	"strings"
@@ -95,121 +94,16 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
-	authRuntime := e.authRuntime
-
-	listUsers := func(ctx context.Context, in *usersInput) (*userOutput, error) {
-		items, err := service.List(ctx)
-		if err != nil {
-			return nil, err
-		}
-		idFilter := parseIDFilter(in.IDs)
-		views := collectionlist.FilterMapList(items, func(_ int, item identity.User) (userView, bool) {
-			if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
-				return userView{}, false
-			}
-			return toUserView(item), true
-		}).Values()
-		return &userOutput{Body: views}, nil
-	}
-
-	getCurrentUser := func(ctx context.Context, in *currentUserInput) (*userOutput, error) {
-		user, err := currentUser(ctx, service, authRuntime, in.Authorization)
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(user)}, nil
-	}
-
-	getUser := func(ctx context.Context, in *userByIDInput) (*userOutput, error) {
-		item, err := service.GetByID(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(item)}, nil
-	}
-
-	createUser := func(ctx context.Context, in *createUserInput) (*userOutput, error) {
-		item, err := service.Create(ctx, userservice.CreateInput{
-			Username:    in.Body.Username,
-			DisplayName: in.Body.DisplayName,
-			Email:       in.Body.Email,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(item)}, nil
-	}
-
-	updateCurrentUser := func(ctx context.Context, in *updateCurrentUserInput) (*userOutput, error) {
-		user, err := currentUser(ctx, service, authRuntime, in.Authorization)
-		if err != nil {
-			return nil, err
-		}
-		item, err := service.Update(ctx, user.ID, userservice.UpdateInput{
-			Username:    in.Body.Username,
-			DisplayName: in.Body.DisplayName,
-			Email:       in.Body.Email,
-			Status:      in.Body.Status,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(item)}, nil
-	}
-
-	updateUser := func(ctx context.Context, in *updateUserInput) (*userOutput, error) {
-		item, err := service.Update(ctx, in.ID, userservice.UpdateInput{
-			Username:    in.Body.Username,
-			DisplayName: in.Body.DisplayName,
-			Email:       in.Body.Email,
-			Status:      in.Body.Status,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(item)}, nil
-	}
-
-	deleteUser := func(ctx context.Context, in *userByIDInput) (*userOutput, error) {
-		item, err := service.GetByID(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := service.Delete(ctx, in.ID); err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: toUserView(item)}, nil
-	}
-
-	listTokens := func(ctx context.Context, in *userTokenInput) (*userOutput, error) {
-		items, err := service.ListTokens(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: items}, nil
-	}
-
-	createToken := func(ctx context.Context, in *createUserTokenInput) (*userOutput, error) {
-		item, err := service.CreateToken(ctx, in.ID, userservice.CreateTokenInput{
-			Name: in.Body.Name,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &userOutput{Body: item}, nil
-	}
-
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/users", listUsers),
-		httpapi.Get("/users/me", getCurrentUser),
-		httpapi.Get("/users/{id}", getUser),
-		httpapi.Post("/users", createUser),
-		httpapi.Patch("/users/me", updateCurrentUser),
-		httpapi.Patch("/users/{id}", updateUser),
-		httpapi.Delete("/users/{id}", deleteUser),
-		httpapi.Get("/users/{id}/tokens", listTokens),
-		httpapi.Post("/users/{id}/tokens", createToken),
+		httpapi.Get("/users", e.listUsers),
+		httpapi.Get("/users/me", e.getCurrentUser),
+		httpapi.Get("/users/{id}", e.getUser),
+		httpapi.Post("/users", e.createUser),
+		httpapi.Patch("/users/me", e.updateCurrentUser),
+		httpapi.Patch("/users/{id}", e.updateUser),
+		httpapi.Delete("/users/{id}", e.deleteUser),
+		httpapi.Get("/users/{id}/tokens", e.listTokens),
+		httpapi.Post("/users/{id}/tokens", e.createToken),
 	)
 }
 

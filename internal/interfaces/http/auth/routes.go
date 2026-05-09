@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"context"
 	"strconv"
 
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 )
@@ -66,42 +64,10 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
-
-	login := func(ctx context.Context, in *loginInput) (*authOutput, error) {
-		session, err := service.Login(ctx, in.Body.Username)
-		if err != nil {
-			return nil, err
-		}
-		return &authOutput{Body: toAuthView(session)}, nil
-	}
-
-	refresh := func(ctx context.Context, in *refreshInput) (*authOutput, error) {
-		session, err := service.Refresh(ctx, in.Body.RefreshToken)
-		if err != nil {
-			return nil, err
-		}
-		return &authOutput{Body: toAuthView(session)}, nil
-	}
-
-	logout := func(ctx context.Context, in *logoutInput) (*logoutOutput, error) {
-		if token, ok := infraauth.TokenFromAuthorizationHeader(in.Authorization); ok {
-			if err := service.RevokeToken(ctx, token); err != nil {
-				return nil, err
-			}
-		}
-		if err := service.RevokeToken(ctx, in.Body.RefreshToken); err != nil {
-			return nil, err
-		}
-		out := &logoutOutput{}
-		out.Body.OK = true
-		return out, nil
-	}
-
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Post("/auth/login", login),
-		httpapi.Post("/auth/refresh", refresh),
-		httpapi.Post("/auth/logout", logout),
+		httpapi.Post("/auth/login", e.login),
+		httpapi.Post("/auth/refresh", e.refresh),
+		httpapi.Post("/auth/logout", e.logout),
 	)
 }
 

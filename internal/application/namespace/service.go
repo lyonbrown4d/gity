@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	namespaceports "github.com/DaiYuANg/gity/internal/application/ports"
+	identitydomain "github.com/DaiYuANg/gity/internal/domain/identity"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
@@ -160,13 +161,7 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 	if input.UserID <= 0 {
 		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).New("user_id is required")
 	}
-	role := strings.TrimSpace(input.Role)
-	if role == "" {
-		role = "developer"
-	}
-	if role == "member" {
-		role = "developer"
-	}
+	role := normalizeMemberRole(input.Role)
 	if !namespaceMemberRoles.Contains(role) {
 		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID, "role", role).New("unsupported namespace member role")
 	}
@@ -177,10 +172,8 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 	if err != nil {
 		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).Wrapf(err, "load namespace member user")
 	}
-	if _, existingErr := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, input.UserID); existingErr == nil {
-		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).New("namespace member already exists")
-	} else if !errors.Is(existingErr, namespaceports.ErrNotFound) {
-		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID).Wrapf(existingErr, "check namespace member")
+	if memberErr := s.ensureMemberDoesNotExist(ctx, namespaceID, input.UserID); memberErr != nil {
+		return MemberView{}, memberErr
 	}
 	member, err := s.memberRepo.Create(ctx, namespaceports.CreateNamespaceMemberInput{
 		NamespaceID: namespaceID,
@@ -190,6 +183,27 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 	if err != nil {
 		return MemberView{}, oops.In("namespace").With("namespace_id", namespaceID, "user_id", input.UserID, "role", role).Wrapf(err, "create namespace member")
 	}
+	return buildMemberView(member, user), nil
+}
+
+func normalizeMemberRole(value string) string {
+	role := strings.TrimSpace(value)
+	if role == "" || role == "member" {
+		return "developer"
+	}
+	return role
+}
+
+func (s *Service) ensureMemberDoesNotExist(ctx context.Context, namespaceID, userID int64) error {
+	if _, existingErr := s.memberRepo.FindByNamespaceAndUser(ctx, namespaceID, userID); existingErr == nil {
+		return oops.In("namespace").With("namespace_id", namespaceID, "user_id", userID).New("namespace member already exists")
+	} else if !errors.Is(existingErr, namespaceports.ErrNotFound) {
+		return oops.In("namespace").With("namespace_id", namespaceID, "user_id", userID).Wrapf(existingErr, "check namespace member")
+	}
+	return nil
+}
+
+func buildMemberView(member namespacedomain.NamespaceMember, user identitydomain.User) MemberView {
 	return MemberView{
 		ID:          member.ID,
 		UserID:      user.ID,
@@ -197,5 +211,5 @@ func (s *Service) AddMember(ctx context.Context, namespaceID int64, input AddMem
 		DisplayName: user.DisplayName,
 		Email:       user.Email,
 		Role:        member.Role,
-	}, nil
+	}
 }

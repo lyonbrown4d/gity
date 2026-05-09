@@ -22,49 +22,69 @@ type receivePackUpdate struct {
 	Delete     bool
 }
 
-func parseReceivePackUpdates(body []byte) []receivePackUpdate {
+// ParseReceivePackUpdates extracts branch updates from a git-receive-pack request body.
+func ParseReceivePackUpdates(body []byte) []receivePackUpdate {
 	updates := collectionlist.NewList[receivePackUpdate]()
 	offset := 0
-	for offset+4 <= len(body) {
-		rawLength := string(body[offset : offset+4])
-		offset += 4
-		if rawLength == "0000" {
+	for {
+		payload, nextOffset, ok := nextPacketPayload(body, offset)
+		if !ok {
 			break
 		}
-		lengthBytes, err := hex.DecodeString(rawLength)
-		if err != nil || len(lengthBytes) != 2 {
-			break
-		}
-		length := int(lengthBytes[0])<<8 + int(lengthBytes[1])
-		if length < 4 {
-			break
-		}
-		payloadLength := length - 4
-		if offset+payloadLength > len(body) {
-			break
-		}
-		payload := string(body[offset : offset+payloadLength])
-		offset += payloadLength
-		if index := strings.IndexByte(payload, 0); index >= 0 {
-			payload = payload[:index]
-		}
-		fields := strings.Fields(payload)
-		if len(fields) < 3 {
+		offset = nextOffset
+		update, ok := receivePackUpdateFromPayload(payload)
+		if !ok {
 			continue
 		}
-		refName := fields[2]
-		if strings.HasPrefix(refName, "refs/heads/") {
-			newSHA := fields[1]
-			updates.Add(receivePackUpdate{
-				OldSHA:     fields[0],
-				NewSHA:     newSHA,
-				RefName:    refName,
-				BranchName: strings.TrimPrefix(refName, "refs/heads/"),
-				Delete:     isZeroOID(newSHA),
-			})
-		}
+		updates.Add(update)
 	}
 	return updates.Values()
+}
+
+func nextPacketPayload(body []byte, offset int) (string, int, bool) {
+	if offset+4 > len(body) {
+		return "", offset, false
+	}
+	rawLength := string(body[offset : offset+4])
+	offset += 4
+	if rawLength == "0000" {
+		return "", offset, false
+	}
+	lengthBytes, err := hex.DecodeString(rawLength)
+	if err != nil || len(lengthBytes) != 2 {
+		return "", offset, false
+	}
+	length := int(lengthBytes[0])<<8 + int(lengthBytes[1])
+	if length < 4 {
+		return "", offset, false
+	}
+	payloadLength := length - 4
+	if offset+payloadLength > len(body) {
+		return "", offset, false
+	}
+	return string(body[offset : offset+payloadLength]), offset + payloadLength, true
+}
+
+func receivePackUpdateFromPayload(payload string) (receivePackUpdate, bool) {
+	if index := strings.IndexByte(payload, 0); index >= 0 {
+		payload = payload[:index]
+	}
+	fields := strings.Fields(payload)
+	if len(fields) < 3 {
+		return receivePackUpdate{}, false
+	}
+	refName := fields[2]
+	if !strings.HasPrefix(refName, "refs/heads/") {
+		return receivePackUpdate{}, false
+	}
+	newSHA := fields[1]
+	return receivePackUpdate{
+		OldSHA:     fields[0],
+		NewSHA:     newSHA,
+		RefName:    refName,
+		BranchName: strings.TrimPrefix(refName, "refs/heads/"),
+		Delete:     isZeroOID(newSHA),
+	}, true
 }
 
 func isZeroOID(value string) bool {

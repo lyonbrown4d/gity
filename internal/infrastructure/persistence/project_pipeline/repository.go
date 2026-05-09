@@ -89,44 +89,11 @@ func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectPipeline, error) {
 	var created cidomain.ProjectPipeline
 	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef]) error {
-		nextIID := int64(1)
-		query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-			From(dbschema.ProjectPipelineSchema).
-			Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(input.ProjectID)).
-			OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
-			Limit(1)
-		last, err := repo.First(ctx, query)
-		if err == nil {
-			nextIID = last.IID + 1
-		} else if !persistence.IsNotFound(err) {
-			return oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "load last pipeline")
+		nextIID, err := nextPipelineIID(ctx, repo, input.ProjectID)
+		if err != nil {
+			return err
 		}
-		status := strings.TrimSpace(input.Status)
-		if status == "" {
-			status = StatusPending
-		}
-		source := strings.TrimSpace(input.Source)
-		if source == "" {
-			source = "api"
-		}
-		configSource := strings.TrimSpace(input.ConfigSource)
-		if configSource == "" {
-			configSource = ".gity-ci.plano"
-		}
-		now := time.Now().UTC()
-		item := cidomain.ProjectPipeline{
-			ProjectID:     input.ProjectID,
-			IID:           nextIID,
-			Name:          strings.TrimSpace(input.Name),
-			Source:        source,
-			RefName:       strings.TrimSpace(input.RefName),
-			CommitSHA:     strings.TrimSpace(input.CommitSHA),
-			Status:        status,
-			ConfigSource:  configSource,
-			ConfigContent: strings.TrimSpace(input.ConfigContent),
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		}
+		item := newProjectPipeline(input, nextIID)
 		if err := repo.Create(ctx, &item); err != nil {
 			return fmt.Errorf("insert project pipeline: %w", err)
 		}
@@ -137,6 +104,63 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 		return cidomain.ProjectPipeline{}, oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "create pipeline")
 	}
 	return created, nil
+}
+
+func nextPipelineIID(ctx context.Context, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef], projectID int64) (int64, error) {
+	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
+		From(dbschema.ProjectPipelineSchema).
+		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
+		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
+		Limit(1)
+	last, err := repo.First(ctx, query)
+	if err == nil {
+		return last.IID + 1, nil
+	}
+	if persistence.IsNotFound(err) {
+		return 1, nil
+	}
+	return 0, oops.In("persistence.pipeline").With("project_id", projectID).Wrapf(err, "load last pipeline")
+}
+
+func newProjectPipeline(input CreateInput, iid int64) cidomain.ProjectPipeline {
+	now := time.Now().UTC()
+	return cidomain.ProjectPipeline{
+		ProjectID:     input.ProjectID,
+		IID:           iid,
+		Name:          strings.TrimSpace(input.Name),
+		Source:        defaultPipelineSource(input.Source),
+		RefName:       strings.TrimSpace(input.RefName),
+		CommitSHA:     strings.TrimSpace(input.CommitSHA),
+		Status:        defaultPipelineStatus(input.Status),
+		ConfigSource:  defaultPipelineConfigSource(input.ConfigSource),
+		ConfigContent: strings.TrimSpace(input.ConfigContent),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+}
+
+func defaultPipelineStatus(value string) string {
+	status := strings.TrimSpace(value)
+	if status == "" {
+		return StatusPending
+	}
+	return status
+}
+
+func defaultPipelineSource(value string) string {
+	source := strings.TrimSpace(value)
+	if source == "" {
+		return "api"
+	}
+	return source
+}
+
+func defaultPipelineConfigSource(value string) string {
+	configSource := strings.TrimSpace(value)
+	if configSource == "" {
+		return ".gity-ci.plano"
+	}
+	return configSource
 }
 
 func (r *Repository) UpdateStatus(ctx context.Context, item cidomain.ProjectPipeline, status string) error {

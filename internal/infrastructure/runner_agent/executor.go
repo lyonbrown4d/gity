@@ -29,66 +29,119 @@ func ExecuteScriptJobWithTrace(ctx context.Context, cfg Config, job cidomain.Pro
 }
 
 func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.ProjectJob, checker ScriptCancellationChecker, traceStreamer ScriptTraceStreamer, sourceFetcher ScriptSourceFetcher) (string, error) {
-	var payload ScriptPayload
-	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
-		return "", fmt.Errorf("decode script job payload: %w", err)
+	payload, err := decodeScriptPayload(job)
+	if err != nil {
+		return "", err
 	}
-	if len(payload.Script) == 0 {
-		return "", errors.New("script job payload requires at least one script line")
-	}
-
-	timeout := time.Duration(payload.TimeoutSeconds) * time.Second
-	if timeout <= 0 {
-		timeout = time.Duration(cfg.LeaseSeconds) * time.Second
-	}
-	if timeout <= 0 {
-		timeout = 10 * time.Minute
-	}
+	timeout := scriptTimeout(cfg, payload)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cancelRequested := make(chan struct{}, 1)
-	done := make(chan struct{})
-	defer close(done)
+	cancelRequested, stopWatcher := startScriptCancellationWatcher(ctx, cancel, checker)
+	defer stopWatcher()
 
-	if checker != nil {
-		go func() {
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-done:
-					return
-				case <-ticker.C:
-					shouldCancel, err := checker(ctx)
-					if err != nil || !shouldCancel {
-						continue
-					}
-					select {
-					case cancelRequested <- struct{}{}:
-					default:
-					}
-					cancel()
-					return
-				}
-			}
-		}()
+	workDir, err := createScriptWorkspace(cfg, job)
+	if err != nil {
+		return "", err
+	}
+	if checkoutErr := checkoutProjectSource(ctx, cfg, job, payload, workDir, sourceFetcher); checkoutErr != nil {
+		return "", checkoutErr
 	}
 
+	started := time.Now()
+	command, output := prepareScriptCommand(ctx, cfg, job, payload, workDir, started, traceStreamer)
+	err = command.Run()
+	return encodeScriptResult(started, workDir, output, resolveScriptError(ctx, err, timeout, cancelRequested))
+}
+
+func decodeScriptPayload(job cidomain.ProjectJob) (ScriptPayload, error) {
+	var payload ScriptPayload
+	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
+		return ScriptPayload{}, fmt.Errorf("decode script job payload: %w", err)
+	}
+	if len(payload.Script) == 0 {
+		return ScriptPayload{}, errors.New("script job payload requires at least one script line")
+	}
+	return payload, nil
+}
+
+func scriptTimeout(cfg Config, payload ScriptPayload) time.Duration {
+	timeout := time.Duration(payload.TimeoutSeconds) * time.Second
+	if timeout > 0 {
+		return timeout
+	}
+	timeout = time.Duration(cfg.LeaseSeconds) * time.Second
+	if timeout > 0 {
+		return timeout
+	}
+	return 10 * time.Minute
+}
+
+func startScriptCancellationWatcher(ctx context.Context, cancel context.CancelFunc, checker ScriptCancellationChecker) (chan struct{}, func()) {
+	cancelRequested := make(chan struct{}, 1)
+	done := make(chan struct{})
+	if checker != nil {
+		go watchScriptCancellation(ctx, cancel, checker, cancelRequested, done)
+	}
+	return cancelRequested, func() { close(done) }
+}
+
+func watchScriptCancellation(ctx context.Context, cancel context.CancelFunc, checker ScriptCancellationChecker, cancelRequested chan<- struct{}, done <-chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-done:
+			return
+		case <-ticker.C:
+			if shouldCancelScript(ctx, checker) {
+				requestScriptCancellation(cancelRequested, cancel)
+				return
+			}
+		}
+	}
+}
+
+func shouldCancelScript(ctx context.Context, checker ScriptCancellationChecker) bool {
+	shouldCancel, err := checker(ctx)
+	return err == nil && shouldCancel
+}
+
+func requestScriptCancellation(cancelRequested chan<- struct{}, cancel context.CancelFunc) {
+	select {
+	case cancelRequested <- struct{}{}:
+	default:
+	}
+	cancel()
+}
+
+func createScriptWorkspace(cfg Config, job cidomain.ProjectJob) (string, error) {
 	workDir := filepath.Join(cfg.WorkDir, fmt.Sprintf("job-%d-attempt-%d", job.ID, job.Attempts))
 	if err := os.MkdirAll(workDir, 0o750); err != nil {
 		return "", fmt.Errorf("create job workspace: %w", err)
 	}
-	if err := checkoutProjectSource(ctx, cfg, job, payload, workDir, sourceFetcher); err != nil {
-		return "", err
-	}
+	return workDir, nil
+}
 
-	started := time.Now()
+func prepareScriptCommand(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, started time.Time, traceStreamer ScriptTraceStreamer) (*exec.Cmd, *cappedBuffer) {
 	command := scriptCommand(ctx, payload.Shell, strings.Join(payload.Script, "\n"))
 	command.Dir = workDir
-	command.Env = append(os.Environ(),
+	command.Env = scriptEnvironment(job, payload)
+	output := &cappedBuffer{
+		limit:         cfg.MaxOutputBytes,
+		ctx:           ctx,
+		started:       started,
+		traceStreamer: traceStreamer,
+	}
+	command.Stdout = output
+	command.Stderr = output
+	return command, output
+}
+
+func scriptEnvironment(job cidomain.ProjectJob, payload ScriptPayload) []string {
+	env := append(os.Environ(),
 		fmt.Sprintf("GITY_JOB_ID=%d", job.ID),
 		fmt.Sprintf("GITY_PROJECT_ID=%d", job.ProjectID),
 		fmt.Sprintf("GITY_JOB_ATTEMPT=%d", job.Attempts),
@@ -98,37 +151,30 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	)
 	for key, value := range payload.Env {
 		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
+		if key != "" {
+			env = append(env, fmt.Sprintf("%s=%s", key, value))
 		}
-		command.Env = append(command.Env, fmt.Sprintf("%s=%s", key, value))
 	}
+	return env
+}
 
-	output := &cappedBuffer{
-		limit:         cfg.MaxOutputBytes,
-		ctx:           ctx,
-		started:       started,
-		traceStreamer: traceStreamer,
-	}
-	command.Stdout = output
-	command.Stderr = output
-	err := command.Run()
-	exitCode := exitCodeFromError(err)
-
-	canceledByChecker := false
+func resolveScriptError(ctx context.Context, err error, timeout time.Duration, cancelRequested <-chan struct{}) error {
 	select {
 	case <-cancelRequested:
-		canceledByChecker = true
+		return errors.New("script job canceled")
 	default:
 	}
-	if canceledByChecker {
-		err = errors.New("script job canceled")
-		exitCode = -1
-	} else if ctx.Err() == context.DeadlineExceeded {
-		err = fmt.Errorf("script job timed out after %s", timeout)
+	if ctx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("script job timed out after %s", timeout)
+	}
+	return err
+}
+
+func encodeScriptResult(started time.Time, workDir string, output *cappedBuffer, err error) (string, error) {
+	exitCode := exitCodeFromError(err)
+	if isForcedScriptExit(err) {
 		exitCode = -1
 	}
-
 	result := ScriptResult{
 		ExitCode:        exitCode,
 		Output:          output.String(),
@@ -144,6 +190,14 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 		return string(encoded), fmt.Errorf("script job failed: exit_code=%d: %w", exitCode, err)
 	}
 	return string(encoded), nil
+}
+
+func isForcedScriptExit(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := err.Error()
+	return strings.Contains(message, "script job timed out") || strings.Contains(message, "script job canceled")
 }
 
 func scriptCommand(ctx context.Context, shell, script string) *exec.Cmd {

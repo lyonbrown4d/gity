@@ -9,6 +9,7 @@ import (
 	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
 	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 
@@ -23,6 +24,12 @@ type UploadArtifactInput struct {
 type ProjectJobArtifactContent struct {
 	Artifact      cidomain.ProjectJobArtifact `json:"artifact"`
 	ContentBase64 string                      `json:"content_base64"`
+}
+
+type preparedArtifactUpload struct {
+	FileName    string
+	ContentType string
+	Content     []byte
 }
 
 func (s *Service) ListProjectJobArtifacts(ctx context.Context, projectID, jobID int64) ([]cidomain.ProjectJobArtifact, error) {
@@ -62,40 +69,68 @@ func (s *Service) UploadProjectJobArtifact(ctx context.Context, projectID, jobID
 	if _, jobErr := s.GetProjectJob(ctx, projectID, jobID); jobErr != nil {
 		return cidomain.ProjectJobArtifact{}, jobErr
 	}
+	payload, err := prepareArtifactUpload(projectID, jobID, input)
+	if err != nil {
+		return cidomain.ProjectJobArtifact{}, err
+	}
+	artifact, err := s.createProjectJobArtifact(ctx, projectID, jobID, input, payload)
+	if err != nil {
+		return cidomain.ProjectJobArtifact{}, err
+	}
+	storageKey, err := s.storeProjectJobArtifact(ctx, project, jobID, artifact, payload)
+	if err != nil {
+		return cidomain.ProjectJobArtifact{}, err
+	}
+	return s.markProjectJobArtifactStored(ctx, projectID, jobID, artifact, payload, storageKey)
+}
+
+func prepareArtifactUpload(projectID, jobID int64, input UploadArtifactInput) (preparedArtifactUpload, error) {
 	fileName := strings.TrimSpace(input.FileName)
 	if fileName == "" {
-		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact file_name is required", oops.In("job").With("project_id", projectID, "job_id", jobID).New("artifact file_name is required"))
+		return preparedArtifactUpload{}, apperror.BadRequest("artifact file_name is required", oops.In("job").With("project_id", projectID, "job_id", jobID).New("artifact file_name is required"))
 	}
 	if strings.TrimSpace(input.ContentBase64) == "" {
-		return cidomain.ProjectJobArtifact{}, apperror.BadRequest("artifact content_base64 is required", oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).New("artifact content_base64 is required"))
+		return preparedArtifactUpload{}, apperror.BadRequest("artifact content_base64 is required", oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).New("artifact content_base64 is required"))
 	}
 	content, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.ContentBase64))
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).Wrapf(err, "decode artifact content")
+		return preparedArtifactUpload{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).Wrapf(err, "decode artifact content")
 	}
 	contentType := strings.TrimSpace(input.ContentType)
 	if contentType == "" {
 		contentType = storageports.DetectContentType(fileName)
 	}
+	return preparedArtifactUpload{FileName: fileName, ContentType: contentType, Content: content}, nil
+}
+
+func (s *Service) createProjectJobArtifact(ctx context.Context, projectID, jobID int64, input UploadArtifactInput, payload preparedArtifactUpload) (cidomain.ProjectJobArtifact, error) {
 	artifact, err := s.artifactRepo.Create(ctx, storageports.CreateProjectJobArtifactInput{
 		ProjectID:    projectID,
 		ProjectJobID: jobID,
 		Name:         input.Name,
-		FileName:     fileName,
+		FileName:     payload.FileName,
 		FilePath:     input.FilePath,
-		ContentType:  contentType,
+		ContentType:  payload.ContentType,
 	})
 	if err != nil {
-		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", fileName).Wrapf(err, "create project job artifact")
+		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "file_name", payload.FileName).Wrapf(err, "create project job artifact")
 	}
-	storageKey, err := s.storage.SavePipelineArtifact(ctx, project.FullPath, jobID, artifact.ID, fileName, content, contentType)
+	return artifact, nil
+}
+
+func (s *Service) storeProjectJobArtifact(ctx context.Context, project projectdomain.Project, jobID int64, artifact cidomain.ProjectJobArtifact, payload preparedArtifactUpload) (string, error) {
+	storageKey, err := s.storage.SavePipelineArtifact(ctx, project.FullPath, jobID, artifact.ID, payload.FileName, payload.Content, payload.ContentType)
 	if err != nil {
 		if cleanupErr := s.artifactRepo.DeleteByID(ctx, artifact.ID); cleanupErr != nil {
-			return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(oops.Join(err, cleanupErr), "save project job artifact and cleanup record")
+			return "", oops.In("job").With("project_id", project.ID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(oops.Join(err, cleanupErr), "save project job artifact and cleanup record")
 		}
-		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(err, "save project job artifact")
+		return "", oops.In("job").With("project_id", project.ID, "job_id", jobID, "artifact_id", artifact.ID).Wrapf(err, "save project job artifact")
 	}
-	if storeErr := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: contentType, ByteSize: int64(len(content)), StorageKey: storageKey}); storeErr != nil {
+	return storageKey, nil
+}
+
+func (s *Service) markProjectJobArtifactStored(ctx context.Context, projectID, jobID int64, artifact cidomain.ProjectJobArtifact, payload preparedArtifactUpload, storageKey string) (cidomain.ProjectJobArtifact, error) {
+	if storeErr := s.artifactRepo.MarkStored(ctx, artifact.ID, storageports.StoreProjectJobArtifactInput{ContentType: payload.ContentType, ByteSize: int64(len(payload.Content)), StorageKey: storageKey}); storeErr != nil {
 		return cidomain.ProjectJobArtifact{}, oops.In("job").With("project_id", projectID, "job_id", jobID, "artifact_id", artifact.ID, "storage_key", storageKey).Wrapf(storeErr, "mark project job artifact stored")
 	}
 	stored, err := s.artifactRepo.GetByID(ctx, artifact.ID)

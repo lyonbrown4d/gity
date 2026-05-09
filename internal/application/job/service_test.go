@@ -28,71 +28,103 @@ import (
 func TestProjectJobFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newJobFixture(t, false)
+	createdID := assertEnqueueNoopJob(t, fixture)
+	assertListProjectJobs(t, fixture, createdID)
+	assertRunNextCompletesNoopJob(t, fixture, createdID)
+	assertRunNextWithoutWork(t, fixture)
+}
+
+type jobFixture struct {
+	ctx       context.Context
+	projectID int64
+	service   *jobservice.Service
+}
+
+func newJobFixture(t *testing.T, withArtifacts bool) jobFixture {
+	t.Helper()
+
 	ctx := context.Background()
 	db := openTestDB(t)
 	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	jobRepository, err := projectjobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job repo: %v", err)
-	}
-	service := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
+	logRepository := createJobLogRepository(t, db, withArtifacts)
+	artifactRepository := createJobArtifactRepository(t, db, withArtifacts)
+	storageSvc := createJobStorage(t, withArtifacts)
+	service := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, artifactRepository, storageSvc)
 
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
+	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
+	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace))
 
-	created, err := service.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{Payload: `{"reason":"test"}`})
-	if err != nil {
-		t.Fatalf("enqueue job: %v", err)
+	return jobFixture{ctx: ctx, projectID: project.ID, service: service}
+}
+
+func createJobLogRepository(t *testing.T, db *dbx.DB, enabled bool) *projectjoblogrepo.Repository {
+	t.Helper()
+	if !enabled {
+		return nil
 	}
+	return testutil.Must(projectjoblogrepo.NewRepository(db))
+}
+
+func createJobArtifactRepository(t *testing.T, db *dbx.DB, enabled bool) *projectjobartifactrepo.Repository {
+	t.Helper()
+	if !enabled {
+		return nil
+	}
+	return testutil.Must(projectjobartifactrepo.NewRepository(db))
+}
+
+func createJobStorage(t *testing.T, enabled bool) *infrastorage.Service {
+	t.Helper()
+	if !enabled {
+		return nil
+	}
+	return testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: filepath.Join(t.TempDir(), "storage")}}))
+}
+
+func assertEnqueueNoopJob(t *testing.T, fixture jobFixture) int64 {
+	t.Helper()
+
+	created := testutil.Must(fixture.service.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Payload: `{"reason":"test"}`}))
 	if created.Status != projectjobrepo.StatusPending || created.Kind != jobservice.KindNoop || created.MaxAttempts != 3 {
 		t.Fatalf("unexpected created job: %+v", created)
 	}
+	return created.ID
+}
 
-	items, err := service.ListProjectJobs(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list jobs: %v", err)
-	}
-	if len(items) != 1 || items[0].ID != created.ID {
+func assertListProjectJobs(t *testing.T, fixture jobFixture, jobID int64) {
+	t.Helper()
+
+	items := testutil.Must(fixture.service.ListProjectJobs(fixture.ctx, fixture.projectID))
+	if len(items) != 1 || items[0].ID != jobID {
 		t.Fatalf("unexpected jobs: %+v", items)
 	}
+}
 
-	claimed, err := service.RunNext(ctx, "worker-a", time.Minute)
-	if err != nil {
-		t.Fatalf("run next: %v", err)
-	}
+func assertRunNextCompletesNoopJob(t *testing.T, fixture jobFixture, jobID int64) {
+	t.Helper()
+
+	claimed, err := fixture.service.RunNext(fixture.ctx, "worker-a", time.Minute)
+	testutil.RequireNoError(t, err, "run next")
 	if !claimed {
 		t.Fatalf("expected a job to be claimed")
 	}
-	completed, err := service.GetProjectJob(ctx, project.ID, created.ID)
-	if err != nil {
-		t.Fatalf("get completed job: %v", err)
-	}
+	completed := testutil.Must(fixture.service.GetProjectJob(fixture.ctx, fixture.projectID, jobID))
 	if completed.Status != projectjobrepo.StatusSucceeded || completed.Attempts != 1 || completed.Result == "" {
 		t.Fatalf("unexpected completed job: %+v", completed)
 	}
+}
 
-	claimed, err = service.RunNext(ctx, "worker-a", time.Minute)
-	if err != nil {
-		t.Fatalf("run next without work: %v", err)
-	}
+func assertRunNextWithoutWork(t *testing.T, fixture jobFixture) {
+	t.Helper()
+
+	claimed, err := fixture.service.RunNext(fixture.ctx, "worker-a", time.Minute)
+	testutil.RequireNoError(t, err, "run next without work")
 	if claimed {
 		t.Fatalf("expected no job to be claimed")
 	}
@@ -101,101 +133,76 @@ func TestProjectJobFlow(t *testing.T) {
 func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	db := openTestDB(t)
-	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	fixture := newJobFixture(t, true)
+	claimedID := assertClaimScriptJob(t, fixture)
+	assertAppendProjectJobTrace(t, fixture, claimedID)
+	assertCompleteScriptJob(t, fixture, claimedID)
+	artifactID := assertUploadProjectJobArtifact(t, fixture, claimedID)
+	assertListProjectJobArtifacts(t, fixture, claimedID, artifactID)
+	assertProjectJobArtifactContent(t, fixture, claimedID, artifactID)
+}
 
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	jobRepository, err := projectjobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job repo: %v", err)
-	}
-	logRepository, err := projectjoblogrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job log repo: %v", err)
-	}
-	artifactRepository, err := projectjobartifactrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new artifact repo: %v", err)
-	}
-	storageSvc, err := infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: filepath.Join(t.TempDir(), "storage")}})
-	if err != nil {
-		t.Fatalf("new storage service: %v", err)
-	}
-	service := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, artifactRepository, storageSvc)
+func assertClaimScriptJob(t *testing.T, fixture jobFixture) int64 {
+	t.Helper()
 
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	created, err := service.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{
+	created := testutil.Must(fixture.service.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
 		Kind:    jobservice.KindScript,
 		Payload: `{"script":["go test ./..."]}`,
-	})
-	if err != nil {
-		t.Fatalf("enqueue script job: %v", err)
-	}
-	claimed, ok, err := service.ClaimProjectJob(ctx, project.ID, "runner-a", time.Minute)
-	if err != nil {
-		t.Fatalf("claim script job: %v", err)
-	}
+	}))
+	claimed, ok, err := fixture.service.ClaimProjectJob(fixture.ctx, fixture.projectID, "runner-a", time.Minute)
+	testutil.RequireNoError(t, err, "claim script job")
 	if !ok || claimed.ID != created.ID {
 		t.Fatalf("unexpected claimed job: ok=%v job=%+v", ok, claimed)
 	}
-	streamed, err := service.AppendProjectJobTrace(ctx, project.ID, claimed.ID, jobservice.AppendTraceInput{Output: "streaming\n", DurationMillis: 12})
-	if err != nil {
-		t.Fatalf("append trace: %v", err)
-	}
+	return claimed.ID
+}
+
+func assertAppendProjectJobTrace(t *testing.T, fixture jobFixture, jobID int64) {
+	t.Helper()
+
+	streamed := testutil.Must(fixture.service.AppendProjectJobTrace(fixture.ctx, fixture.projectID, jobID, jobservice.AppendTraceInput{Output: "streaming\n", DurationMillis: 12}))
 	if streamed.Trace != "streaming" || streamed.DurationMillis != 12 {
 		t.Fatalf("unexpected streamed trace: %+v", streamed)
 	}
-	if _, completeErr := service.CompleteProjectJob(ctx, project.ID, claimed.ID, `{"exit_code":0,"output":"ok\n","output_truncated":false,"duration_millis":42,"work_dir":"."}`); completeErr != nil {
-		t.Fatalf("complete script job: %v", completeErr)
-	}
-	trace, err := service.GetProjectJobTrace(ctx, project.ID, claimed.ID)
-	if err != nil {
-		t.Fatalf("get trace: %v", err)
-	}
+}
+
+func assertCompleteScriptJob(t *testing.T, fixture jobFixture, jobID int64) {
+	t.Helper()
+
+	_, completeErr := fixture.service.CompleteProjectJob(fixture.ctx, fixture.projectID, jobID, `{"exit_code":0,"output":"ok\n","output_truncated":false,"duration_millis":42,"work_dir":"."}`)
+	testutil.RequireNoError(t, completeErr, "complete script job")
+	trace := testutil.Must(fixture.service.GetProjectJobTrace(fixture.ctx, fixture.projectID, jobID))
 	if trace.Trace != "ok" || trace.ExitCode != 0 || trace.DurationMillis != 42 {
 		t.Fatalf("unexpected trace: %+v", trace)
 	}
-	artifact, err := service.UploadProjectJobArtifact(ctx, project.ID, claimed.ID, jobservice.UploadArtifactInput{
+}
+
+func assertUploadProjectJobArtifact(t *testing.T, fixture jobFixture, jobID int64) int64 {
+	t.Helper()
+
+	artifact := testutil.Must(fixture.service.UploadProjectJobArtifact(fixture.ctx, fixture.projectID, jobID, jobservice.UploadArtifactInput{
 		FileName:      "report.txt",
 		FilePath:      "dist/report.txt",
 		ContentBase64: base64.StdEncoding.EncodeToString([]byte("artifact")),
-	})
-	if err != nil {
-		t.Fatalf("upload artifact: %v", err)
-	}
-	items, err := service.ListProjectJobArtifacts(ctx, project.ID, claimed.ID)
-	if err != nil {
-		t.Fatalf("list artifacts: %v", err)
-	}
-	if len(items) != 1 || items[0].ID != artifact.ID {
+	}))
+	return artifact.ID
+}
+
+func assertListProjectJobArtifacts(t *testing.T, fixture jobFixture, jobID, artifactID int64) {
+	t.Helper()
+
+	items := testutil.Must(fixture.service.ListProjectJobArtifacts(fixture.ctx, fixture.projectID, jobID))
+	if len(items) != 1 || items[0].ID != artifactID {
 		t.Fatalf("unexpected artifacts: %+v", items)
 	}
-	content, err := service.GetProjectJobArtifactContent(ctx, project.ID, claimed.ID, artifact.ID)
-	if err != nil {
-		t.Fatalf("get artifact content: %v", err)
-	}
+}
+
+func assertProjectJobArtifactContent(t *testing.T, fixture jobFixture, jobID, artifactID int64) {
+	t.Helper()
+
+	content := testutil.Must(fixture.service.GetProjectJobArtifactContent(fixture.ctx, fixture.projectID, jobID, artifactID))
 	decoded, err := base64.StdEncoding.DecodeString(content.ContentBase64)
-	if err != nil {
-		t.Fatalf("decode artifact content: %v", err)
-	}
+	testutil.RequireNoError(t, err, "decode artifact content")
 	if string(decoded) != "artifact" {
 		t.Fatalf("artifact content = %q", decoded)
 	}
@@ -204,58 +211,33 @@ func TestProjectScriptJobTraceAndArtifacts(t *testing.T) {
 func TestProjectJobRetry(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	db := openTestDB(t)
-	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	fixture := newJobFixture(t, true)
+	claimedID := assertClaimRetryableJob(t, fixture)
+	assertRetryProjectJob(t, fixture, claimedID)
+}
 
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	jobRepository, err := projectjobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job repo: %v", err)
-	}
-	service := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
+func assertClaimRetryableJob(t *testing.T, fixture jobFixture) int64 {
+	t.Helper()
 
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-
-	created, err := service.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{
+	created := testutil.Must(fixture.service.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
 		Kind:        jobservice.KindScript,
 		Payload:     `{"script":["echo"]}`,
 		MaxAttempts: 2,
-	})
-	if err != nil {
-		t.Fatalf("enqueue job: %v", err)
-	}
-	claimed, ok, err := service.ClaimProjectJob(ctx, project.ID, "runner-a", time.Minute)
-	if err != nil {
-		t.Fatalf("claim job: %v", err)
-	}
+	}))
+	claimed, ok, err := fixture.service.ClaimProjectJob(fixture.ctx, fixture.projectID, "runner-a", time.Minute)
+	testutil.RequireNoError(t, err, "claim job")
 	if !ok || claimed.ID != created.ID {
 		t.Fatalf("unexpected claim result: ok=%v job=%+v", ok, claimed)
 	}
-	if _, failErr := service.FailProjectJob(ctx, project.ID, claimed.ID, "failed", time.Second); failErr != nil {
-		t.Fatalf("fail job: %v", failErr)
-	}
-	retried, err := service.RetryProjectJob(ctx, project.ID, claimed.ID)
-	if err != nil {
-		t.Fatalf("retry job: %v", err)
-	}
+	_, failErr := fixture.service.FailProjectJob(fixture.ctx, fixture.projectID, claimed.ID, "failed", time.Second)
+	testutil.RequireNoError(t, failErr, "fail job")
+	return claimed.ID
+}
+
+func assertRetryProjectJob(t *testing.T, fixture jobFixture, jobID int64) {
+	t.Helper()
+
+	retried := testutil.Must(fixture.service.RetryProjectJob(fixture.ctx, fixture.projectID, jobID))
 	if retried.Status != projectjobrepo.StatusPending {
 		t.Fatalf("unexpected job status: %s", retried.Status)
 	}

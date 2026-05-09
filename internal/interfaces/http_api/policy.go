@@ -71,40 +71,69 @@ func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Ru
 				return nil
 			}
 			return func(ctx context.Context, input *I) (*O, error) {
-				if resolver == nil {
-					return nil, httpx.NewError(http.StatusInternalServerError, "project scope resolver is not configured")
-				}
-				scope, err := resolver(ctx, projectID(input))
-				if err != nil {
-					return nil, err
-				}
-				authorization := authorizationHeader(input)
-				if read && strings.EqualFold(strings.TrimSpace(scope.Visibility), "public") && strings.TrimSpace(authorization) == "" {
-					return next(ctx, input)
-				}
-				principal, ok, err := authenticateHeader(ctx, authRuntime, authorization)
-				if err != nil {
-					return nil, err
-				}
-				if !ok {
-					return nil, httpx.NewError(http.StatusUnauthorized, "authentication required")
-				}
-				var allowed bool
-				if read {
-					allowed, err = authRuntime.CanReadProject(ctx, principal, scope)
-				} else {
-					allowed, err = authRuntime.CanWriteProject(ctx, principal, scope)
-				}
-				if err != nil {
-					return nil, httpx.NewError(http.StatusForbidden, "authorization failed", err)
-				}
-				if !allowed {
-					return nil, httpx.NewError(http.StatusForbidden, "forbidden")
-				}
-				return next(ctx, input)
+				return authorizeProjectRequest(ctx, input, next, authRuntime, resolver, read)
 			}
 		},
 	}
+}
+
+func authorizeProjectRequest[I ProjectInput, O any](ctx context.Context, input *I, next httpx.TypedHandler[I, O], authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, read bool) (*O, error) {
+	scope, err := resolveProjectScope(ctx, input, resolver)
+	if err != nil {
+		return nil, err
+	}
+	authorization := authorizationHeader(input)
+	if canReadPublicProjectAnonymously(read, scope, authorization) {
+		return next(ctx, input)
+	}
+	principal, err := requirePrincipal(ctx, authRuntime, authorization)
+	if err != nil {
+		return nil, err
+	}
+	if err := authorizeProjectAccess(ctx, authRuntime, principal, scope, read); err != nil {
+		return nil, err
+	}
+	return next(ctx, input)
+}
+
+func resolveProjectScope[I ProjectInput](ctx context.Context, input *I, resolver ProjectScopeResolver) (infraauth.ProjectScope, error) {
+	if resolver == nil {
+		return infraauth.ProjectScope{}, httpx.NewError(http.StatusInternalServerError, "project scope resolver is not configured")
+	}
+	return resolver(ctx, projectID(input))
+}
+
+func canReadPublicProjectAnonymously(read bool, scope infraauth.ProjectScope, authorization string) bool {
+	return read && strings.EqualFold(strings.TrimSpace(scope.Visibility), "public") && strings.TrimSpace(authorization) == ""
+}
+
+func requirePrincipal(ctx context.Context, authRuntime *infraauth.Runtime, authorization string) (infraauth.Principal, error) {
+	principal, ok, err := authenticateHeader(ctx, authRuntime, authorization)
+	if err != nil {
+		return infraauth.Principal{}, err
+	}
+	if !ok {
+		return infraauth.Principal{}, httpx.NewError(http.StatusUnauthorized, "authentication required")
+	}
+	return principal, nil
+}
+
+func authorizeProjectAccess(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, scope infraauth.ProjectScope, read bool) error {
+	allowed, err := projectAccessAllowed(ctx, authRuntime, principal, scope, read)
+	if err != nil {
+		return httpx.NewError(http.StatusForbidden, "authorization failed", err)
+	}
+	if !allowed {
+		return httpx.NewError(http.StatusForbidden, "forbidden")
+	}
+	return nil
+}
+
+func projectAccessAllowed(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, scope infraauth.ProjectScope, read bool) (bool, error) {
+	if read {
+		return authRuntime.CanReadProject(ctx, principal, scope)
+	}
+	return authRuntime.CanWriteProject(ctx, principal, scope)
 }
 
 func authenticateHeader(ctx context.Context, authRuntime *infraauth.Runtime, authorization string) (infraauth.Principal, bool, error) {

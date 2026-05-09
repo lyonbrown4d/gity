@@ -1,16 +1,17 @@
-package packageregistry
+package packageregistry_test
 
 import (
 	"net/http"
 	"testing"
 
+	packageregistry "github.com/DaiYuANg/gity/internal/interfaces/http/package_registry"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
+	server.RegisterOnly(packageregistry.NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages/{package_id}")
@@ -21,7 +22,7 @@ func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoPackageRegistryAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
+	server.RegisterOnly(packageregistry.NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/packages")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/packages/{package_id}")

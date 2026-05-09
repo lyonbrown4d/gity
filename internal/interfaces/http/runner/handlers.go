@@ -1,0 +1,105 @@
+package runner
+
+import (
+	"context"
+	"time"
+
+	runnerservice "github.com/DaiYuANg/gity/internal/application/runner"
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+)
+
+func (e *Endpoint) listProjectRunners(ctx context.Context, in *projectRunnersInput) (*runnerOutput, error) {
+	items, err := e.service.ListProjectRunners(ctx, in.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: items}, nil
+}
+
+func (e *Endpoint) registerProjectRunner(ctx context.Context, in *registerRunnerInput) (*runnerOutput, error) {
+	input, err := mapperx.MapStrict[runnerservice.RegisterInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.RegisterProjectRunner(ctx, in.ProjectID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) deleteProjectRunner(ctx context.Context, in *projectRunnerInput) (*runnerOutput, error) {
+	item, err := e.service.DeleteProjectRunner(ctx, in.ProjectID, in.RunnerID)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) heartbeat(ctx context.Context, in *runnerTokenInput) (*runnerOutput, error) {
+	item, err := e.service.Heartbeat(ctx, in.Body.Token)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) claimJob(ctx context.Context, in *claimJobInput) (*runnerOutput, error) {
+	item, err := e.service.ClaimJob(ctx, in.Body.Token, time.Duration(in.Body.LeaseSeconds)*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) completeJob(ctx context.Context, in *runnerJobInput) (*runnerOutput, error) {
+	item, err := e.service.CompleteJob(ctx, in.Body.Token, in.JobID, in.Body.Result)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) failJob(ctx context.Context, in *runnerJobInput) (*runnerOutput, error) {
+	item, err := e.service.FailJob(ctx, in.Body.Token, in.JobID, in.Body.Error, in.Body.Result, runnerRetryDelay(in.Body.RetryAfterSeconds))
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) appendTrace(ctx context.Context, in *runnerTraceInput) (*runnerOutput, error) {
+	input, err := mapperx.MapStrict[runnerservice.AppendTraceInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.AppendTrace(ctx, in.Body.Token, in.JobID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) downloadSourceArchive(ctx context.Context, in *runnerSourceArchiveInput) (*runnerOutput, error) {
+	item, err := e.service.DownloadSourceArchive(ctx, in.Body.Token, in.JobID)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) uploadArtifact(ctx context.Context, in *runnerArtifactInput) (*runnerOutput, error) {
+	input, err := mapperx.MapStrict[runnerservice.UploadArtifactInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.UploadArtifact(ctx, in.Body.Token, in.JobID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func runnerRetryDelay(seconds int) time.Duration {
+	return time.Duration(seconds) * time.Second
+}

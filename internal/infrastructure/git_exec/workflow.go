@@ -37,6 +37,10 @@ func (r *Runner) CreateFileCommit(ctx context.Context, repoPath string, input Cr
 	if err := writeNewWorktreeFile(worktree, filePath, input.Content); err != nil {
 		return err
 	}
+	return r.pushFileCommit(ctx, worktree, branchName, filePath, message)
+}
+
+func (r *Runner) pushFileCommit(ctx context.Context, worktree, branchName, filePath, message string) error {
 	if err := r.runGit(ctx, worktree, "add", "--", filePath); err != nil {
 		return err
 	}

@@ -14,16 +14,9 @@ import (
 )
 
 func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID int64) (SourceArchiveView, error) {
-	runner, err := s.authenticateRunner(ctx, token)
+	runner, job, err := s.loadSourceArchiveJob(ctx, token, jobID)
 	if err != nil {
 		return SourceArchiveView{}, err
-	}
-	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
-	if err != nil {
-		return SourceArchiveView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
-	}
-	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
-		return SourceArchiveView{}, ownershipErr
 	}
 	if s.gitRunner == nil {
 		return SourceArchiveView{}, apperror.Internal("git runner is not configured")
@@ -36,12 +29,9 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 	if err != nil {
 		return SourceArchiveView{}, err
 	}
-	if payload.ProjectFullPath != "" && payload.ProjectFullPath != project.FullPath {
-		return SourceArchiveView{}, apperror.BadRequest("job project path does not match runner project", fmt.Errorf("payload project=%q expected=%q", payload.ProjectFullPath, project.FullPath))
-	}
-	revision := firstNonEmpty(payload.CommitSHA, payload.RefName)
-	if revision == "" {
-		return SourceArchiveView{}, apperror.BadRequest("job source revision is required", oops.In("runner").With("project_id", runner.ProjectID, "job_id", jobID).New("job source revision is required"))
+	revision, err := resolveSourceArchiveRevision(runner.ProjectID, jobID, project.FullPath, payload)
+	if err != nil {
+		return SourceArchiveView{}, err
 	}
 	if heartbeatErr := s.runnerRepo.MarkHeartbeat(ctx, runner.ID); heartbeatErr != nil {
 		return SourceArchiveView{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID).Wrapf(heartbeatErr, "mark runner heartbeat")
@@ -55,6 +45,32 @@ func (s *Service) DownloadSourceArchive(ctx context.Context, token string, jobID
 		Encoding:      "base64",
 		ContentBase64: base64.StdEncoding.EncodeToString(content),
 	}, nil
+}
+
+func (s *Service) loadSourceArchiveJob(ctx context.Context, token string, jobID int64) (cidomain.ProjectRunner, cidomain.ProjectJob, error) {
+	runner, err := s.authenticateRunner(ctx, token)
+	if err != nil {
+		return cidomain.ProjectRunner{}, cidomain.ProjectJob{}, err
+	}
+	job, err := s.jobService.GetProjectJob(ctx, runner.ProjectID, jobID)
+	if err != nil {
+		return cidomain.ProjectRunner{}, cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
+	}
+	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
+		return cidomain.ProjectRunner{}, cidomain.ProjectJob{}, ownershipErr
+	}
+	return runner, job, nil
+}
+
+func resolveSourceArchiveRevision(projectID, jobID int64, projectFullPath string, payload scriptSourcePayload) (string, error) {
+	if payload.ProjectFullPath != "" && payload.ProjectFullPath != projectFullPath {
+		return "", apperror.BadRequest("job project path does not match runner project", fmt.Errorf("payload project=%q expected=%q", payload.ProjectFullPath, projectFullPath))
+	}
+	revision := firstNonEmpty(payload.CommitSHA, payload.RefName)
+	if revision == "" {
+		return "", apperror.BadRequest("job source revision is required", oops.In("runner").With("project_id", projectID, "job_id", jobID).New("job source revision is required"))
+	}
+	return revision, nil
 }
 
 func decodeScriptSourcePayload(job cidomain.ProjectJob) (scriptSourcePayload, error) {

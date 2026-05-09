@@ -68,69 +68,103 @@ func (a *Agent) RunOnce(ctx context.Context) (bool, error) {
 }
 
 func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) error {
+	if job.Kind == "script" {
+		return a.executeScriptJob(ctx, job)
+	}
+	return a.failUnsupportedJob(ctx, job)
+}
+
+func (a *Agent) executeScriptJob(ctx context.Context, job cidomain.ProjectJob) error {
+	callbacks := a.scriptCallbacks(job)
+	result, err := ExecuteScriptJobWithSource(ctx, a.cfg, job, callbacks.checker, callbacks.trace, callbacks.source)
+	artifactErr := a.uploadArtifacts(ctx, job, result)
+	if err != nil {
+		return a.reportScriptFailure(ctx, job, result, err, artifactErr)
+	}
+	if artifactErr != nil {
+		return a.reportArtifactFailure(ctx, job, result, artifactErr)
+	}
+	if err := a.client.CompleteJob(ctx, job.ID, result); err != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "complete runner job")
+	}
+	a.logger.Info("runner job completed", slog.Int64("job_id", job.ID))
+	return nil
+}
+
+type scriptCallbacks struct {
+	checker ScriptCancellationChecker
+	trace   ScriptTraceStreamer
+	source  ScriptSourceFetcher
+}
+
+func (a *Agent) scriptCallbacks(job cidomain.ProjectJob) scriptCallbacks {
+	var traceWarned atomic.Bool
+	return scriptCallbacks{
+		checker: a.scriptCancellationChecker(job),
+		trace:   a.scriptTraceStreamer(job, &traceWarned),
+		source:  a.scriptSourceFetcher(),
+	}
+}
+
+func (a *Agent) scriptCancellationChecker(job cidomain.ProjectJob) ScriptCancellationChecker {
 	expectedLocker := job.LockedBy
-	switch job.Kind {
-	case "script":
-		var traceWarned atomic.Bool
-		result, err := ExecuteScriptJobWithSource(ctx, a.cfg, job, func(checkCtx context.Context) (bool, error) {
-			current, err := a.client.GetProjectJob(checkCtx, job.ProjectID, job.ID)
-			if err != nil {
-				return false, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "check claimed job status")
-			}
-			if strings.TrimSpace(current.LockedBy) != expectedLocker {
-				return true, nil
-			}
-			if strings.TrimSpace(current.Status) != runningJobStatus {
-				return true, nil
-			}
-			return false, nil
-		}, func(traceCtx context.Context, output string, outputTruncated bool, durationMillis int64) error {
-			if err := a.client.AppendTrace(traceCtx, job.ID, output, outputTruncated, durationMillis); err != nil {
-				if traceWarned.CompareAndSwap(false, true) {
-					a.logger.Warn("runner trace upload failed", slog.Int64("job_id", job.ID), slog.String("error", err.Error()))
-				}
-				return nil
-			}
-			return nil
-		}, func(sourceCtx context.Context, job cidomain.ProjectJob, _ ScriptPayload, workDir string) error {
-			content, err := a.client.DownloadSourceArchive(sourceCtx, job.ID)
-			if err != nil {
-				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "download source archive")
-			}
-			return ExtractSourceArchive(content, workDir)
-		})
-		artifactErr := a.uploadArtifacts(ctx, job, result)
+	return func(checkCtx context.Context) (bool, error) {
+		current, err := a.client.GetProjectJob(checkCtx, job.ProjectID, job.ID)
 		if err != nil {
-			reportErr := a.client.FailJob(ctx, job.ID, err.Error(), result, 0)
-			if reportErr != nil {
-				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, err), "report script job failure")
-			}
-			if artifactErr != nil {
-				a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
-			}
-			a.logger.Warn("runner job failed", slog.Int64("job_id", job.ID), slog.String("error", err.Error()))
-			return nil
+			return false, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "check claimed job status")
 		}
-		if artifactErr != nil {
-			reportErr := a.client.FailJob(ctx, job.ID, "artifact upload failed: "+artifactErr.Error(), result, 0)
-			if reportErr != nil {
-				return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, artifactErr), "report artifact upload failure")
+		return strings.TrimSpace(current.LockedBy) != expectedLocker || strings.TrimSpace(current.Status) != runningJobStatus, nil
+	}
+}
+
+func (a *Agent) scriptTraceStreamer(job cidomain.ProjectJob, warned *atomic.Bool) ScriptTraceStreamer {
+	return func(traceCtx context.Context, output string, outputTruncated bool, durationMillis int64) error {
+		if err := a.client.AppendTrace(traceCtx, job.ID, output, outputTruncated, durationMillis); err != nil {
+			if warned.CompareAndSwap(false, true) {
+				a.logger.Warn("runner trace upload failed", slog.Int64("job_id", job.ID), slog.String("error", err.Error()))
 			}
-			a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
-			return nil
-		}
-		if err := a.client.CompleteJob(ctx, job.ID, result); err != nil {
-			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "complete runner job")
-		}
-		a.logger.Info("runner job completed", slog.Int64("job_id", job.ID))
-		return nil
-	default:
-		message := "runner does not support job kind: " + job.Kind
-		if err := a.client.FailJob(ctx, job.ID, message, "", 0); err != nil {
-			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "kind", job.Kind).Wrapf(err, "report unsupported runner job kind")
 		}
 		return nil
 	}
+}
+
+func (a *Agent) scriptSourceFetcher() ScriptSourceFetcher {
+	return func(sourceCtx context.Context, job cidomain.ProjectJob, _ ScriptPayload, workDir string) error {
+		content, err := a.client.DownloadSourceArchive(sourceCtx, job.ID)
+		if err != nil {
+			return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(err, "download source archive")
+		}
+		return ExtractSourceArchive(content, workDir)
+	}
+}
+
+func (a *Agent) reportScriptFailure(ctx context.Context, job cidomain.ProjectJob, result string, err, artifactErr error) error {
+	reportErr := a.client.FailJob(ctx, job.ID, err.Error(), result, 0)
+	if reportErr != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, err), "report script job failure")
+	}
+	if artifactErr != nil {
+		a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
+	}
+	a.logger.Warn("runner job failed", slog.Int64("job_id", job.ID), slog.String("error", err.Error()))
+	return nil
+}
+
+func (a *Agent) reportArtifactFailure(ctx context.Context, job cidomain.ProjectJob, result string, artifactErr error) error {
+	reportErr := a.client.FailJob(ctx, job.ID, "artifact upload failed: "+artifactErr.Error(), result, 0)
+	if reportErr != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(oops.Join(reportErr, artifactErr), "report artifact upload failure")
+	}
+	a.logger.Warn("runner artifact upload failed", slog.Int64("job_id", job.ID), slog.String("error", artifactErr.Error()))
+	return nil
+}
+
+func (a *Agent) failUnsupportedJob(ctx context.Context, job cidomain.ProjectJob) error {
+	message := "runner does not support job kind: " + job.Kind
+	if err := a.client.FailJob(ctx, job.ID, message, "", 0); err != nil {
+		return oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID, "kind", job.Kind).Wrapf(err, "report unsupported runner job kind")
+	}
+	return nil
 }
 
 func (a *Agent) uploadArtifacts(ctx context.Context, job cidomain.ProjectJob, result string) error {

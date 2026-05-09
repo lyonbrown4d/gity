@@ -67,12 +67,7 @@ func (s *Service) resolveCommit(ctx context.Context, repository *git.Repository,
 	candidates := resolveRevisionCandidates(refName, defaultBranch)
 	var lastErr error
 	for _, candidate := range candidates {
-		hash, err := repository.ResolveRevision(plumbing.Revision(candidate))
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		commit, err := repository.CommitObject(*hash)
+		commit, err := resolveCandidateCommit(repository, candidate)
 		if err != nil {
 			lastErr = err
 			continue
@@ -89,6 +84,18 @@ func (s *Service) resolveCommit(ctx context.Context, repository *git.Repository,
 		return nil, fmt.Errorf("resolve commit: %w", lastErr)
 	}
 	return nil, ErrReferenceNotFound
+}
+
+func resolveCandidateCommit(repository *git.Repository, candidate string) (*object.Commit, error) {
+	hash, err := repository.ResolveRevision(plumbing.Revision(candidate))
+	if err != nil {
+		return nil, fmt.Errorf("resolve revision %s: %w", candidate, err)
+	}
+	commit, err := repository.CommitObject(*hash)
+	if err != nil {
+		return nil, fmt.Errorf("load commit %s: %w", candidate, err)
+	}
+	return commit, nil
 }
 
 func (s *Service) resolveRepoPath(repoPath string) (string, error) {

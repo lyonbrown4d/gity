@@ -106,14 +106,29 @@ func validateStringArgs(name string) func(args list.List[any]) error {
 }
 
 func validateStageGraph(stages []StageSpec) error {
+	names, err := validateStageNames(stages)
+	if err != nil {
+		return err
+	}
+	if err := validateStageNeeds(stages, names); err != nil {
+		return err
+	}
+	return validateStageCycles(stages)
+}
+
+func validateStageNames(stages []StageSpec) (map[string]struct{}, error) {
 	names := make(map[string]struct{}, len(stages))
 	for i := range stages {
 		stage := &stages[i]
 		if _, exists := names[stage.Name]; exists {
-			return oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
+			return nil, oops.In("ci_plan_dsl").With("stage", stage.Name).New("duplicate stage")
 		}
 		names[stage.Name] = struct{}{}
 	}
+	return names, nil
+}
+
+func validateStageNeeds(stages []StageSpec, names map[string]struct{}) error {
 	for i := range stages {
 		stage := &stages[i]
 		for _, need := range stage.Needs {
@@ -122,36 +137,49 @@ func validateStageGraph(stages []StageSpec) error {
 			}
 		}
 	}
-	visiting := map[string]bool{}
-	visited := map[string]bool{}
+	return nil
+}
+
+func validateStageCycles(stages []StageSpec) error {
+	visitor := newStageCycleVisitor(stages)
+	for i := range stages {
+		stage := &stages[i]
+		if err := visitor.visit(stage.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type stageCycleVisitor struct {
+	byName   map[string]*StageSpec
+	visiting map[string]bool
+	visited  map[string]bool
+}
+
+func newStageCycleVisitor(stages []StageSpec) stageCycleVisitor {
 	byName := make(map[string]*StageSpec, len(stages))
 	for i := range stages {
 		stage := &stages[i]
 		byName[stage.Name] = stage
 	}
-	var visit func(string) error
-	visit = func(name string) error {
-		if visited[name] {
-			return nil
-		}
-		if visiting[name] {
-			return oops.In("ci_plan_dsl").With("stage", name).New("stage dependency cycle")
-		}
-		visiting[name] = true
-		for _, need := range byName[name].Needs {
-			if err := visit(need); err != nil {
-				return err
-			}
-		}
-		visiting[name] = false
-		visited[name] = true
+	return stageCycleVisitor{byName: byName, visiting: map[string]bool{}, visited: map[string]bool{}}
+}
+
+func (v stageCycleVisitor) visit(name string) error {
+	if v.visited[name] {
 		return nil
 	}
-	for i := range stages {
-		stage := &stages[i]
-		if err := visit(stage.Name); err != nil {
+	if v.visiting[name] {
+		return oops.In("ci_plan_dsl").With("stage", name).New("stage dependency cycle")
+	}
+	v.visiting[name] = true
+	for _, need := range v.byName[name].Needs {
+		if err := v.visit(need); err != nil {
 			return err
 		}
 	}
+	v.visiting[name] = false
+	v.visited[name] = true
 	return nil
 }

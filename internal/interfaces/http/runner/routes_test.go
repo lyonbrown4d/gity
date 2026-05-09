@@ -1,16 +1,17 @@
-package runner
+package runner_test
 
 import (
 	"net/http"
 	"testing"
 
+	runner "github.com/DaiYuANg/gity/internal/interfaces/http/runner"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersCanonicalRunnerRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
+	server.RegisterOnly(runner.NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/runners")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/runners")
@@ -23,7 +24,7 @@ func TestEndpointRegistersCanonicalRunnerRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoRunnerAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil, nil))
+	server.RegisterOnly(runner.NewEndpoint(nil, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/runners")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/runners")

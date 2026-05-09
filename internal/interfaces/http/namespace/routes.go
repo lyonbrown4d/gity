@@ -1,11 +1,9 @@
 package namespace
 
 import (
-	"context"
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	namespacedomain "github.com/DaiYuANg/gity/internal/domain/namespace"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
-	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
 	"strconv"
@@ -94,111 +92,21 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
-
-	listNamespaces := func(ctx context.Context, in *namespacesInput) (*namespaceOutput, error) {
-		items, err := service.List(ctx)
-		if err != nil {
-			return nil, err
-		}
-		idFilter := parseIDFilter(in.IDs)
-		views := collectionlist.FilterMapList(items, func(_ int, item namespacedomain.Namespace) (organizationView, bool) {
-			if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
-				return organizationView{}, false
-			}
-			return toOrganizationView(item), true
-		}).Values()
-		return &namespaceOutput{Body: views}, nil
-	}
-
-	getNamespace := func(ctx context.Context, in *namespaceByIDInput) (*namespaceOutput, error) {
-		item, err := service.GetByID(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		return &namespaceOutput{Body: toOrganizationView(item)}, nil
-	}
-
-	createNamespace := func(ctx context.Context, in *createNamespaceInput) (*namespaceOutput, error) {
-		pathKey := firstNonEmpty(in.Body.PathKey, in.Body.Key)
-		item, err := service.Create(ctx, namespaceservice.CreateInput{
-			Kind:        in.Body.Kind,
-			Name:        in.Body.Name,
-			PathKey:     pathKey,
-			OwnerUserID: in.Body.OwnerUserID,
-			Description: in.Body.Description,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &namespaceOutput{Body: toOrganizationView(item)}, nil
-	}
-
-	updateNamespace := func(ctx context.Context, in *updateNamespaceInput) (*namespaceOutput, error) {
-		pathKey := in.Body.PathKey
-		if pathKey == nil {
-			pathKey = in.Body.Key
-		}
-		item, err := service.Update(ctx, in.ID, namespaceservice.UpdateInput{
-			Kind:        in.Body.Kind,
-			Name:        in.Body.Name,
-			PathKey:     pathKey,
-			Description: in.Body.Description,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &namespaceOutput{Body: toOrganizationView(item)}, nil
-	}
-
-	deleteNamespace := func(ctx context.Context, in *namespaceByIDInput) (*namespaceOutput, error) {
-		item, err := service.GetByID(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		if err := service.Delete(ctx, in.ID); err != nil {
-			return nil, err
-		}
-		return &namespaceOutput{Body: toOrganizationView(item)}, nil
-	}
-
-	listMembers := func(ctx context.Context, in *namespaceMemberInput) (*namespaceOutput, error) {
-		items, err := service.ListMembers(ctx, in.ID)
-		if err != nil {
-			return nil, err
-		}
-		views := collectionlist.MapList(collectionlist.NewList(items...), func(_ int, item namespaceservice.MemberView) organizationMemberView {
-			return toOrganizationMemberView(in.ID, item)
-		}).Values()
-		return &namespaceOutput{Body: views}, nil
-	}
-
-	addMember := func(ctx context.Context, in *addNamespaceMemberInput) (*namespaceOutput, error) {
-		item, err := service.AddMember(ctx, in.ID, namespaceservice.AddMemberInput{
-			UserID: in.Body.UserID,
-			Role:   in.Body.Role,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &namespaceOutput{Body: toOrganizationMemberView(in.ID, item)}, nil
-	}
-
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/namespaces", listNamespaces),
-		httpapi.Get("/orgs", listNamespaces),
-		httpapi.Get("/namespaces/{id}", getNamespace),
-		httpapi.Get("/orgs/{id}", getNamespace),
-		httpapi.Post("/namespaces", createNamespace),
-		httpapi.Post("/orgs", createNamespace),
-		httpapi.Patch("/namespaces/{id}", updateNamespace),
-		httpapi.Patch("/orgs/{id}", updateNamespace),
-		httpapi.Delete("/namespaces/{id}", deleteNamespace),
-		httpapi.Delete("/orgs/{id}", deleteNamespace),
-		httpapi.Get("/namespaces/{id}/members", listMembers),
-		httpapi.Get("/orgs/{id}/members", listMembers),
-		httpapi.Post("/namespaces/{id}/members", addMember),
-		httpapi.Post("/orgs/{id}/members", addMember),
+		httpapi.Get("/namespaces", e.listNamespaces),
+		httpapi.Get("/orgs", e.listNamespaces),
+		httpapi.Get("/namespaces/{id}", e.getNamespace),
+		httpapi.Get("/orgs/{id}", e.getNamespace),
+		httpapi.Post("/namespaces", e.createNamespace),
+		httpapi.Post("/orgs", e.createNamespace),
+		httpapi.Patch("/namespaces/{id}", e.updateNamespace),
+		httpapi.Patch("/orgs/{id}", e.updateNamespace),
+		httpapi.Delete("/namespaces/{id}", e.deleteNamespace),
+		httpapi.Delete("/orgs/{id}", e.deleteNamespace),
+		httpapi.Get("/namespaces/{id}/members", e.listMembers),
+		httpapi.Get("/orgs/{id}/members", e.listMembers),
+		httpapi.Post("/namespaces/{id}/members", e.addMember),
+		httpapi.Post("/orgs/{id}/members", e.addMember),
 	)
 }
 

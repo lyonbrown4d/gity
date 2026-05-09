@@ -1,16 +1,17 @@
-package issue
+package issue_test
 
 import (
 	"net/http"
 	"testing"
 
+	issue "github.com/DaiYuANg/gity/internal/interfaces/http/issue"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersCanonicalIssueRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(issue.NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/issues")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/issues")
@@ -21,7 +22,7 @@ func TestEndpointRegistersCanonicalIssueRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoIssueAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(issue.NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/issues")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/issues")

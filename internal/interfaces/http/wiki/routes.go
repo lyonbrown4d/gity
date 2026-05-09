@@ -1,8 +1,6 @@
 package wiki
 
 import (
-	"context"
-
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	wikiservice "github.com/DaiYuANg/gity/internal/application/wiki"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
@@ -69,85 +67,26 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
 	authRuntime := e.authRuntime
 	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
 
-	listPages := func(ctx context.Context, in *wikiPagesInput) (*wikiOutput, error) {
-		items, err := service.ListPages(ctx, in.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		return &wikiOutput{Body: items}, nil
-	}
-
-	createPage := func(ctx context.Context, in *createWikiPageInput) (*wikiOutput, error) {
-		input, err := mapperx.MapStrict[wikiservice.CreatePageInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
-		if err != nil {
-			return nil, err
-		}
-		input.AuthorUserID = authorUserID
-		item, err := service.CreatePage(ctx, in.ProjectID, input)
-		if err != nil {
-			return nil, err
-		}
-		return &wikiOutput{Body: item}, nil
-	}
-
-	getPage := func(ctx context.Context, in *wikiPageInput) (*wikiOutput, error) {
-		item, err := service.GetPage(ctx, in.ProjectID, in.Slug)
-		if err != nil {
-			return nil, err
-		}
-		return &wikiOutput{Body: item}, nil
-	}
-
-	updatePage := func(ctx context.Context, in *updateWikiPageInput) (*wikiOutput, error) {
-		input, err := mapperx.MapStrict[wikiservice.UpdatePageInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		editorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.EditorUserID)
-		if err != nil {
-			return nil, err
-		}
-		input.EditorUserID = editorUserID
-		item, err := service.UpdatePage(ctx, in.ProjectID, in.Slug, input)
-		if err != nil {
-			return nil, err
-		}
-		return &wikiOutput{Body: item}, nil
-	}
-
-	deletePage := func(ctx context.Context, in *wikiPageInput) (*wikiOutput, error) {
-		item, err := service.DeletePage(ctx, in.ProjectID, in.Slug)
-		if err != nil {
-			return nil, err
-		}
-		return &wikiOutput{Body: item}, nil
-	}
-
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/wiki/pages", listPages),
-		httpapi.Get("/repos/{id}/wiki/pages", listPages, httpapi.DeprecatedRoute[wikiPagesInput, wikiOutput]("Use GET /projects/{id}/wiki/pages instead.")),
-		httpapi.Post("/projects/{id}/wiki/pages", createPage, httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite)),
-		httpapi.Post("/repos/{id}/wiki/pages", createPage,
+		httpapi.Get("/projects/{id}/wiki/pages", e.listPages),
+		httpapi.Get("/repos/{id}/wiki/pages", e.listPages, httpapi.DeprecatedRoute[wikiPagesInput, wikiOutput]("Use GET /projects/{id}/wiki/pages instead.")),
+		httpapi.Post("/projects/{id}/wiki/pages", e.createPage, httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/wiki/pages", e.createPage,
 			httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[createWikiPageInput, wikiOutput]("Use POST /projects/{id}/wiki/pages instead."),
 		),
-		httpapi.Get("/projects/{id}/wiki/pages/{slug}", getPage),
-		httpapi.Get("/repos/{id}/wiki/pages/{slug}", getPage, httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use GET /projects/{id}/wiki/pages/{slug} instead.")),
-		httpapi.Patch("/projects/{id}/wiki/pages/{slug}", updatePage, httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite)),
-		httpapi.Patch("/repos/{id}/wiki/pages/{slug}", updatePage,
+		httpapi.Get("/projects/{id}/wiki/pages/{slug}", e.getPage),
+		httpapi.Get("/repos/{id}/wiki/pages/{slug}", e.getPage, httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use GET /projects/{id}/wiki/pages/{slug} instead.")),
+		httpapi.Patch("/projects/{id}/wiki/pages/{slug}", e.updatePage, httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Patch("/repos/{id}/wiki/pages/{slug}", e.updatePage,
 			httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[updateWikiPageInput, wikiOutput]("Use PATCH /projects/{id}/wiki/pages/{slug} instead."),
 		),
-		httpapi.Delete("/projects/{id}/wiki/pages/{slug}", deletePage, httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite)),
-		httpapi.Delete("/repos/{id}/wiki/pages/{slug}", deletePage,
+		httpapi.Delete("/projects/{id}/wiki/pages/{slug}", e.deletePage, httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Delete("/repos/{id}/wiki/pages/{slug}", e.deletePage,
 			httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use DELETE /projects/{id}/wiki/pages/{slug} instead."),
 		),

@@ -1,4 +1,4 @@
-package mergerequest
+package mergerequest_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
+	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
@@ -37,102 +38,43 @@ import (
 func TestMergeRequestFlow(t *testing.T) {
 	t.Parallel()
 
-	dbPath := filepath.Join(t.TempDir(), "gity-mr-test.db")
-	db, err := dbx.Open(
-		dbx.WithDriver("sqlite"),
-		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
-		dbx.WithDialect(sqliteDialect.New()),
-	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	testutil.CleanupClose(t, "db", db)
-
-	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
-
-	logger := slog.Default()
-	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
-	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
-	projectRepository := testutil.Must(projectrepo.NewRepository(db))
-	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
-	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
-	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
-	userRepository := testutil.Must(userrepo.NewRepository(db))
-	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
-
-	repoRoot := filepath.Join(t.TempDir(), "repos")
-	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
-	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
-
-	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
-	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
-	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, NewPipelineDeps(pipelineRepository, nil))
-
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	if pushErr := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
-		t.Fatalf("push fixture branches: %v", pushErr)
-	}
-
-	mr, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "merge feature", Description: "merge feature into main", SourceBranch: "feature", TargetBranch: "main"})
-	if err != nil {
-		t.Fatalf("create merge request: %v", err)
-	}
-	if mr.IID != 1 {
-		t.Fatalf("expected first merge request iid to be 1, got %d", mr.IID)
-	}
-	diff, err := mergeRequestSvc.GetDiff(ctx, project.ID, mr.IID)
-	if err != nil {
-		t.Fatalf("get merge request diff: %v", err)
-	}
-	if !strings.Contains(diff.Diff, "feature.txt") {
-		t.Fatalf("expected diff to include feature file, got %s", diff.Diff)
-	}
-	merged, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"})
-	if err != nil {
-		t.Fatalf("merge request: %v", err)
-	}
-	if merged.State != "merged" {
-		t.Fatalf("expected merged state, got %s", merged.State)
-	}
-
-	closedMR, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "close feature", Description: "close feature", SourceBranch: "feature", TargetBranch: "main"})
-	if err != nil {
-		t.Fatalf("create second merge request: %v", err)
-	}
-	updated, err := mergeRequestSvc.Update(ctx, project.ID, closedMR.IID, UpdateInput{State: new("closed")})
-	if err != nil {
-		t.Fatalf("update merge request: %v", err)
-	}
-	if updated.State != "closed" {
-		t.Fatalf("unexpected merge request state: %s", updated.State)
-	}
-
-	items, err := mergeRequestSvc.List(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list merge requests: %v", err)
-	}
-	if len(items) != 2 || items[0].SourceBranch != "feature" || items[0].TargetBranch != "main" {
-		t.Fatalf("unexpected merge requests: %+v", items)
-	}
+	fixture := newMergeRequestFixture(t, false)
+	mrIID := assertCreateMergeRequest(t, fixture, "merge feature")
+	assertMergeRequestDiff(t, fixture, mrIID)
+	assertMergeRequestMerge(t, fixture, mrIID)
+	assertCloseSecondMergeRequest(t, fixture)
+	assertListMergeRequests(t, fixture)
 }
 
 func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testing.T) {
 	t.Parallel()
+
+	fixture := newMergeRequestFixture(t, true)
+	sourceBranch := addMergeRequestCIConfig(t, fixture)
+	mrIID := assertCreateMergeRequest(t, fixture, "merge feature with checks")
+	assertMissingMergeRequestChecks(t, fixture, mrIID)
+	assertMergeRequestBlocked(t, fixture, mrIID)
+	createFailedPipelineAndMarkSucceeded(t, fixture, sourceBranch.Hash, mrIID)
+	assertMergeAfterSuccessfulPipeline(t, fixture, mrIID)
+	assertTargetBranchPipeline(t, fixture)
+}
+
+type mergeRequestFixture struct {
+	ctx                    context.Context
+	repoRoot               string
+	projectID              int64
+	projectFullPath        string
+	projectDefaultBranch   string
+	ownerID                int64
+	runner                 *gitexec.Runner
+	gitRepository          *gitrepo.Service
+	mergeRequestService    *mergerequestservice.Service
+	pipelineRepository     *projectpipelinerepo.Repository
+	projectPipelineService *pipelineservice.Service
+}
+
+func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequestFixture {
+	t.Helper()
 
 	dbPath := filepath.Join(t.TempDir(), "gity-mr-checks-test.db")
 	db, err := dbx.Open(
@@ -140,15 +82,11 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
 		dbx.WithDialect(sqliteDialect.New()),
 	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	testutil.RequireNoError(t, err, "open db")
 	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
 	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
@@ -157,8 +95,8 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
 	mergeRequestRepository := testutil.Must(projectmergerequestrepo.NewRepository(db))
 	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
-	pipelineJobRepository := testutil.Must(projectpipelinejobrepo.NewRepository(db))
-	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
+	pipelineJobRepository := createMRPipelineJobRepository(db, withPipelineService)
+	jobRepository := createMRJobRepository(db, withPipelineService)
 	userRepository := testutil.Must(userrepo.NewRepository(db))
 	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 
@@ -169,87 +107,160 @@ func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testin
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	jobSvc := jobservice.NewService(logger, projectRepository, jobRepository, nil, nil, nil)
-	pipelineSvc := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
-	mergeRequestSvc := NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, NewPipelineDeps(pipelineRepository, pipelineSvc))
+	pipelineSvc := createMRPipelineService(logger, projectRepository, pipelineRepository, pipelineJobRepository, jobRepository, gitRepository)
+	mergeRequestSvc := mergerequestservice.NewService(projectRepository, mergeRequestRepository, userRepository, gitRepository, runner, mergerequestservice.NewPipelineDeps(pipelineRepository, pipelineSvc))
 
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
+	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+	testutil.RequireNoError(t, pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"), "push fixture branches")
+
+	return mergeRequestFixture{
+		ctx:                    ctx,
+		repoRoot:               repoRoot,
+		projectID:              project.ID,
+		projectFullPath:        project.FullPath,
+		projectDefaultBranch:   project.DefaultBranch,
+		ownerID:                owner.ID,
+		runner:                 runner,
+		gitRepository:          gitRepository,
+		mergeRequestService:    mergeRequestSvc,
+		pipelineRepository:     pipelineRepository,
+		projectPipelineService: pipelineSvc,
 	}
-	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
+}
+
+func createMRPipelineJobRepository(db *dbx.DB, enabled bool) *projectpipelinejobrepo.Repository {
+	if !enabled {
+		return nil
 	}
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
+	return testutil.Must(projectpipelinejobrepo.NewRepository(db))
+}
+
+func createMRJobRepository(db *dbx.DB, enabled bool) *projectjobrepo.Repository {
+	if !enabled {
+		return nil
 	}
-	if pushErr := pushFixtureBranches(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
-		t.Fatalf("push fixture branches: %v", pushErr)
+	return testutil.Must(projectjobrepo.NewRepository(db))
+}
+
+func createMRPipelineService(logger *slog.Logger, projectRepository *projectrepo.Repository, pipelineRepository *projectpipelinerepo.Repository, pipelineJobRepository *projectpipelinejobrepo.Repository, jobRepository *projectjobrepo.Repository, gitRepository *gitrepo.Service) *pipelineservice.Service {
+	if pipelineJobRepository == nil || jobRepository == nil {
+		return nil
 	}
-	if createCommitErr := runner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+	jobSvc := jobservice.NewService(logger, projectRepository, jobRepository, nil, nil, nil)
+	return pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+}
+
+func assertCreateMergeRequest(t *testing.T, fixture mergeRequestFixture, title string) int64 {
+	t.Helper()
+
+	mr := testutil.Must(fixture.mergeRequestService.Create(fixture.ctx, fixture.projectID, mergerequestservice.CreateInput{AuthorUserID: fixture.ownerID, Title: title, Description: title, SourceBranch: "feature", TargetBranch: "main"}))
+	if mr.IID == 0 {
+		t.Fatalf("expected merge request iid to be assigned")
+	}
+	return mr.IID
+}
+
+func assertMergeRequestDiff(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	diff := testutil.Must(fixture.mergeRequestService.GetDiff(fixture.ctx, fixture.projectID, mrIID))
+	if !strings.Contains(diff.Diff, "feature.txt") {
+		t.Fatalf("expected diff to include feature file, got %s", diff.Diff)
+	}
+}
+
+func assertMergeRequestMerge(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	merged := testutil.Must(fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}))
+	if merged.State != "merged" {
+		t.Fatalf("expected merged state, got %s", merged.State)
+	}
+}
+
+func assertCloseSecondMergeRequest(t *testing.T, fixture mergeRequestFixture) {
+	t.Helper()
+
+	closedMR := testutil.Must(fixture.mergeRequestService.Create(fixture.ctx, fixture.projectID, mergerequestservice.CreateInput{AuthorUserID: fixture.ownerID, Title: "close feature", Description: "close feature", SourceBranch: "feature", TargetBranch: "main"}))
+	closedState := "closed"
+	updated := testutil.Must(fixture.mergeRequestService.Update(fixture.ctx, fixture.projectID, closedMR.IID, mergerequestservice.UpdateInput{State: &closedState}))
+	if updated.State != "closed" {
+		t.Fatalf("unexpected merge request state: %s", updated.State)
+	}
+}
+
+func assertListMergeRequests(t *testing.T, fixture mergeRequestFixture) {
+	t.Helper()
+
+	items := testutil.Must(fixture.mergeRequestService.List(fixture.ctx, fixture.projectID))
+	if len(items) != 2 || items[0].SourceBranch != "feature" || items[0].TargetBranch != "main" {
+		t.Fatalf("unexpected merge requests: %+v", items)
+	}
+}
+
+func addMergeRequestCIConfig(t *testing.T, fixture mergeRequestFixture) gitrepo.Branch {
+	t.Helper()
+
+	testutil.RequireNoError(t, fixture.runner.CreateFileCommit(fixture.ctx, fixture.projectFullPath+".git", gitexec.CreateFileCommitInput{
 		BranchName:  "feature",
 		FilePath:    ".gity-ci.plano",
 		Content:     mergeRequestCIConfig(),
 		Message:     "Add CI config",
 		AuthorName:  "Gity Test",
 		AuthorEmail: "test@gity.dev",
-	}); createCommitErr != nil {
-		t.Fatalf("add ci config: %v", createCommitErr)
-	}
-	sourceBranch := findBranch(ctx, t, gitRepository, project.FullPath+".git", project.DefaultBranch, "feature")
+	}), "add ci config")
+	return findBranch(fixture.ctx, t, fixture.gitRepository, fixture.projectFullPath+".git", fixture.projectDefaultBranch, "feature")
+}
 
-	mr, err := mergeRequestSvc.Create(ctx, project.ID, CreateInput{AuthorUserID: owner.ID, Title: "merge feature with checks", SourceBranch: "feature", TargetBranch: "main"})
-	if err != nil {
-		t.Fatalf("create merge request: %v", err)
-	}
-	checks, err := mergeRequestSvc.GetChecks(ctx, project.ID, mr.IID)
-	if err != nil {
-		t.Fatalf("get missing checks: %v", err)
-	}
+func assertMissingMergeRequestChecks(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
 	if !checks.Required || checks.Mergeable || checks.Status != "missing" {
 		t.Fatalf("expected missing required checks: %+v", checks)
 	}
-	if _, mergeErr := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); mergeErr == nil {
+}
+
+func assertMergeRequestBlocked(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	if _, mergeErr := fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); mergeErr == nil {
 		t.Fatalf("expected merge to be blocked before pipeline exists")
 	}
+}
 
-	pipeline, err := pipelineRepository.Create(ctx, projectpipelinerepo.CreateInput{
-		ProjectID:     project.ID,
+func createFailedPipelineAndMarkSucceeded(t *testing.T, fixture mergeRequestFixture, sourceHash string, mrIID int64) {
+	t.Helper()
+
+	pipeline := testutil.Must(fixture.pipelineRepository.Create(fixture.ctx, projectpipelinerepo.CreateInput{
+		ProjectID:     fixture.projectID,
 		Name:          "merge-request",
 		Source:        "push",
 		RefName:       "feature",
-		CommitSHA:     sourceBranch.Hash,
+		CommitSHA:     sourceHash,
 		Status:        projectpipelinerepo.StatusFailed,
 		ConfigSource:  ".gity-ci.plano",
 		ConfigContent: mergeRequestCIConfig(),
-	})
-	if err != nil {
-		t.Fatalf("create failed pipeline: %v", err)
-	}
-	checks, err = mergeRequestSvc.GetChecks(ctx, project.ID, mr.IID)
-	if err != nil {
-		t.Fatalf("get failed checks: %v", err)
-	}
+	}))
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
 	if checks.Mergeable || checks.Status != projectpipelinerepo.StatusFailed || checks.Pipeline == nil {
 		t.Fatalf("expected failed checks: %+v", checks)
 	}
-	if updateErr := pipelineRepository.UpdateStatus(ctx, pipeline, projectpipelinerepo.StatusSucceeded); updateErr != nil {
-		t.Fatalf("mark pipeline succeeded: %v", updateErr)
-	}
-	merged, err := mergeRequestSvc.Merge(ctx, project.ID, mr.IID, MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"})
-	if err != nil {
-		t.Fatalf("merge after successful pipeline: %v", err)
-	}
-	if merged.State != "merged" {
-		t.Fatalf("expected merged state, got %s", merged.State)
-	}
-	targetBranch := findBranch(ctx, t, gitRepository, project.FullPath+".git", project.DefaultBranch, "main")
-	targetPipeline, err := pipelineRepository.GetLatestByProjectRefCommit(ctx, project.ID, "main", targetBranch.Hash)
-	if err != nil {
-		t.Fatalf("get target branch pipeline: %v", err)
-	}
+	testutil.RequireNoError(t, fixture.pipelineRepository.UpdateStatus(fixture.ctx, pipeline, projectpipelinerepo.StatusSucceeded), "mark pipeline succeeded")
+}
+
+func assertMergeAfterSuccessfulPipeline(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+	assertMergeRequestMerge(t, fixture, mrIID)
+}
+
+func assertTargetBranchPipeline(t *testing.T, fixture mergeRequestFixture) {
+	t.Helper()
+
+	targetBranch := findBranch(fixture.ctx, t, fixture.gitRepository, fixture.projectFullPath+".git", fixture.projectDefaultBranch, "main")
+	targetPipeline := testutil.Must(fixture.pipelineRepository.GetLatestByProjectRefCommit(fixture.ctx, fixture.projectID, "main", targetBranch.Hash))
 	if targetPipeline.Source != "push" || targetPipeline.CommitSHA != targetBranch.Hash {
 		t.Fatalf("unexpected target branch pipeline: %+v", targetPipeline)
 	}

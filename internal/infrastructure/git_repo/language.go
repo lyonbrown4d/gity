@@ -112,15 +112,26 @@ func analyzeLanguageBytes(ctx context.Context, tree *object.Tree) ([]LanguageSta
 	if err != nil {
 		return nil, 0, fmt.Errorf("analyze repository languages: %w", err)
 	}
+	return buildLanguageStats(bytesByLanguage, total), total, nil
+}
 
+func buildLanguageStats(bytesByLanguage map[string]int64, total int64) []LanguageStat {
 	languages := collectionlist.NewListWithCapacity[LanguageStat](len(bytesByLanguage))
 	for language, bytes := range bytesByLanguage {
-		percentage := float64(0)
-		if total > 0 {
-			percentage = float64(bytes) * 100 / float64(total)
-		}
-		languages.Add(LanguageStat{Language: language, Bytes: bytes, Percentage: percentage})
+		languages.Add(LanguageStat{Language: language, Bytes: bytes, Percentage: languagePercentage(bytes, total)})
 	}
+	sortLanguageStats(languages)
+	return languages.Values()
+}
+
+func languagePercentage(bytes, total int64) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return float64(bytes) * 100 / float64(total)
+}
+
+func sortLanguageStats(languages *collectionlist.List[LanguageStat]) {
 	languages.Sort(func(a, b LanguageStat) int {
 		if a.Bytes != b.Bytes {
 			if a.Bytes > b.Bytes {
@@ -130,7 +141,6 @@ func analyzeLanguageBytes(ctx context.Context, tree *object.Tree) ([]LanguageSta
 		}
 		return strings.Compare(a.Language, b.Language)
 	})
-	return languages.Values(), total, nil
 }
 
 func detectLanguage(filePath string) string {

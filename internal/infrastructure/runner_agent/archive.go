@@ -32,38 +32,56 @@ func ExtractSourceArchive(content []byte, workDir string) (err error) {
 		}
 	}()
 	for _, file := range reader.File {
-		relative, err := archiveTargetPath(file.Name)
-		if err != nil {
-			return err
+		if entryErr := extractArchiveEntry(rootHandle, file); entryErr != nil {
+			return entryErr
 		}
-		info := file.FileInfo()
-		if info.IsDir() {
-			if mkdirErr := rootHandle.MkdirAll(relative, 0o750); mkdirErr != nil {
-				return fmt.Errorf("create source directory: %w", mkdirErr)
-			}
-			continue
+	}
+	return nil
+}
+
+func extractArchiveEntry(root *os.Root, file *zip.File) error {
+	relative, err := archiveTargetPath(file.Name)
+	if err != nil {
+		return err
+	}
+	info := file.FileInfo()
+	if info.IsDir() {
+		if err := root.MkdirAll(relative, 0o750); err != nil {
+			return fmt.Errorf("create source directory: %w", err)
 		}
-		if !info.Mode().IsRegular() {
-			continue
+		return nil
+	}
+	if !info.Mode().IsRegular() {
+		return nil
+	}
+	if err := ensureArchiveParent(root, relative); err != nil {
+		return err
+	}
+	return extractArchiveFile(root, relative, file, archiveFileMode(info.Mode().Perm()))
+}
+
+func ensureArchiveParent(root *os.Root, relative string) error {
+	if parent := path.Dir(relative); parent != "." {
+		if err := root.MkdirAll(parent, 0o750); err != nil {
+			return fmt.Errorf("create source parent directory: %w", err)
 		}
-		if parent := path.Dir(relative); parent != "." {
-			if mkdirErr := rootHandle.MkdirAll(parent, 0o750); mkdirErr != nil {
-				return fmt.Errorf("create source parent directory: %w", mkdirErr)
-			}
+	}
+	return nil
+}
+
+func extractArchiveFile(root *os.Root, relative string, file *zip.File, mode os.FileMode) error {
+	rc, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("open source archive entry: %w", err)
+	}
+	if err := writeArchiveFile(root, relative, rc, mode); err != nil {
+		if closeErr := rc.Close(); closeErr != nil {
+			return oops.In("runner_agent").With("target", relative).Wrapf(oops.Join(err, closeErr), "write source archive file and close archive entry")
 		}
-		rc, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("open source archive entry: %w", err)
-		}
-		if err := writeArchiveFile(rootHandle, relative, rc, archiveFileMode(info.Mode().Perm())); err != nil {
-			if closeErr := rc.Close(); closeErr != nil {
-				return oops.In("runner_agent").With("target", relative).Wrapf(oops.Join(err, closeErr), "write source archive file and close archive entry")
-			}
-			return oops.In("runner_agent").With("target", relative).Wrapf(err, "write source archive file")
-		}
-		if err := rc.Close(); err != nil {
-			return fmt.Errorf("close source archive entry: %w", err)
-		}
+		return oops.In("runner_agent").With("target", relative).Wrapf(err, "write source archive file")
+	}
+	if err := rc.Close(); err != nil {
+		return fmt.Errorf("close source archive entry: %w", err)
 	}
 	return nil
 }

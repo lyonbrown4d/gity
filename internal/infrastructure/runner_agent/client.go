@@ -121,33 +121,7 @@ func (c *Client) get(ctx context.Context, path string, out any) (err error) {
 	if err != nil {
 		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "create runner request")
 	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "send runner request")
-	}
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			if err != nil {
-				err = oops.In("runner_agent").With("path", path).Wrapf(oops.Join(err, closeErr), "runner get request and close response body")
-				return
-			}
-			err = oops.In("runner_agent").With("path", path).Wrapf(closeErr, "close runner get response body")
-		}
-	}()
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "read runner response")
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return oops.In("runner_agent").With("method", http.MethodGet, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
-	}
-	if out == nil {
-		return nil
-	}
-	if err := decodeBody(content, out); err != nil {
-		return oops.In("runner_agent").With("method", http.MethodGet, "path", path).Wrapf(err, "decode runner response")
-	}
-	return nil
+	return c.do(req, http.MethodGet, path, out)
 }
 
 func (c *Client) post(ctx context.Context, path string, payload, out any) (err error) {
@@ -160,31 +134,39 @@ func (c *Client) post(ctx context.Context, path string, payload, out any) (err e
 		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "create runner request")
 	}
 	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, http.MethodPost, path, out)
+}
+
+func (c *Client) do(req *http.Request, method, path string, out any) (err error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "send runner request")
+		return oops.In("runner_agent").With("method", method, "path", path).Wrapf(err, "send runner request")
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
 			if err != nil {
-				err = oops.In("runner_agent").With("path", path).Wrapf(oops.Join(err, closeErr), "runner post request and close response body")
+				err = oops.In("runner_agent").With("path", path).Wrapf(oops.Join(err, closeErr), "runner request and close response body")
 				return
 			}
-			err = oops.In("runner_agent").With("path", path).Wrapf(closeErr, "close runner post response body")
+			err = oops.In("runner_agent").With("path", path).Wrapf(closeErr, "close runner response body")
 		}
 	}()
+	return c.handleResponse(resp, method, path, out)
+}
+
+func (c *Client) handleResponse(resp *http.Response, method, path string, out any) error {
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "read runner response")
+		return oops.In("runner_agent").With("method", method, "path", path).Wrapf(err, "read runner response")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return oops.In("runner_agent").With("method", http.MethodPost, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
+		return oops.In("runner_agent").With("method", method, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
 	}
 	if out == nil {
 		return nil
 	}
 	if err := decodeBody(content, out); err != nil {
-		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "decode runner response")
+		return oops.In("runner_agent").With("method", method, "path", path).Wrapf(err, "decode runner response")
 	}
 	return nil
 }

@@ -32,101 +32,103 @@ import (
 func TestNamespaceProjectFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newProjectFixture(t)
+	assertCreateNamespace(t, fixture)
+	assertCreateProject(t, fixture)
+	seedProjectRepository(t, fixture)
+	assertNamespaceProjectLists(t, fixture)
+	assertNamespaceMembers(t, fixture)
+	assertProjectBranchWorkflow(t, fixture)
+	assertProjectRepositoryContent(t, fixture)
+}
+
+type projectFixture struct {
+	ctx              context.Context
+	repoRoot         string
+	ownerID          int64
+	namespaceID      int64
+	projectID        int64
+	projectFullPath  string
+	namespaceService *namespaceservice.Service
+	projectService   *projectservice.Service
+}
+
+func newProjectFixture(t *testing.T) *projectFixture {
+	t.Helper()
+
 	dbPath := filepath.Join(t.TempDir(), "gity-test.db")
 	db, err := dbx.Open(
 		dbx.WithDriver("sqlite"),
 		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
 		dbx.WithDialect(sqliteDialect.New()),
 	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	testutil.RequireNoError(t, err, "open db")
 	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	namespaceMemberRepository, err := namespacememberrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace member repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	projectBranchProtectionRepository, err := projectbranchprotectionrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project branch protection repo: %v", err)
-	}
-	userRepository, err := userrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new user repo: %v", err)
-	}
-	userTokenRepository, err := usertokenrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new user token repo: %v", err)
-	}
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	namespaceMemberRepository := testutil.Must(namespacememberrepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	projectBranchProtectionRepository := testutil.Must(projectbranchprotectionrepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	userTokenRepository := testutil.Must(usertokenrepo.NewRepository(db))
 	repoRoot := filepath.Join(t.TempDir(), "repos")
-	runner := gitexec.NewRunner(config.Settings{
-		Git: config.GitSettings{
-			Bin:      "git",
-			RepoRoot: repoRoot,
-		},
-	})
-	gitRepository := gitrepo.NewService(config.Settings{
-		Git: config.GitSettings{
-			RepoRoot: repoRoot,
-		},
-	})
+	settings := config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}}
+	runner := gitexec.NewRunner(settings)
+	gitRepository := gitrepo.NewService(settings)
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
 
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{
+	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{
 		Username:    "alice",
 		DisplayName: "Alice",
 		Email:       "alice@gity.dev",
-	})
-	if err != nil {
-		t.Fatalf("create owner user: %v", err)
-	}
+	}))
 
-	namespace, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{
+	return &projectFixture{
+		ctx:              ctx,
+		repoRoot:         repoRoot,
+		ownerID:          owner.ID,
+		namespaceService: namespaceSvc,
+		projectService:   projectSvc,
+	}
+}
+
+func assertCreateNamespace(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	namespace := testutil.Must(fixture.namespaceService.Create(fixture.ctx, namespaceservice.CreateInput{
 		Kind:        "group",
 		Name:        "Core Team",
 		PathKey:     "core-team",
-		OwnerUserID: owner.ID,
+		OwnerUserID: fixture.ownerID,
 		Description: "Core platform namespace",
-	})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
+	}))
 	if namespace.ID == 0 {
 		t.Fatalf("expected namespace id to be assigned")
 	}
 	if namespace.FullPath != "core-team" {
 		t.Fatalf("unexpected namespace full path: %s", namespace.FullPath)
 	}
+	fixture.namespaceID = namespace.ID
+}
 
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{
-		NamespaceID:   namespace.ID,
+func assertCreateProject(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	project := testutil.Must(fixture.projectService.Create(fixture.ctx, projectservice.CreateInput{
+		NamespaceID:   fixture.namespaceID,
 		Name:          "Gity",
 		PathKey:       "gity",
 		Visibility:    "private",
 		Description:   "Git hosting platform",
 		DefaultBranch: "main",
-	})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
+	}))
 	if project.ID == 0 {
 		t.Fatalf("expected project id to be assigned")
 	}
@@ -136,74 +138,73 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	if project.Visibility != "private" {
 		t.Fatalf("unexpected project visibility: %s", project.Visibility)
 	}
-	if _, statErr := os.Stat(filepath.Join(repoRoot, "core-team", "gity.git")); statErr != nil {
+	if _, statErr := os.Stat(filepath.Join(fixture.repoRoot, "core-team", "gity.git")); statErr != nil {
 		t.Fatalf("expected bare repo to exist: %v", statErr)
 	}
-	if pushErr := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
-		t.Fatalf("push fixture commit: %v", pushErr)
-	}
+	fixture.projectID = project.ID
+	fixture.projectFullPath = project.FullPath
+}
 
-	namespaces, err := namespaceSvc.List(ctx)
-	if err != nil {
-		t.Fatalf("list namespaces: %v", err)
-	}
+func seedProjectRepository(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+	testutil.RequireNoError(t, pushFixtureCommit(fixture.ctx, fixture.repoRoot, fixture.projectFullPath+".git"), "push fixture commit")
+}
+
+func assertNamespaceProjectLists(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	namespaces := testutil.Must(fixture.namespaceService.List(fixture.ctx))
 	if namespaces.Len() != 1 {
 		t.Fatalf("expected one namespace, got %d", namespaces.Len())
 	}
 
-	projects, err := projectSvc.List(ctx, &namespace.ID)
-	if err != nil {
-		t.Fatalf("list projects: %v", err)
-	}
+	projects := testutil.Must(fixture.projectService.List(fixture.ctx, &fixture.namespaceID))
 	if projects.Len() != 1 {
 		t.Fatalf("expected one project, got %d", projects.Len())
 	}
+}
 
-	members, err := namespaceSvc.ListMembers(ctx, namespace.ID)
-	if err != nil {
-		t.Fatalf("list namespace members: %v", err)
-	}
-	if len(members) != 1 || members[0].Role != "owner" || members[0].UserID != owner.ID {
+func assertNamespaceMembers(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	members := testutil.Must(fixture.namespaceService.ListMembers(fixture.ctx, fixture.namespaceID))
+	if len(members) != 1 || members[0].Role != "owner" || members[0].UserID != fixture.ownerID {
 		t.Fatalf("unexpected namespace members: %+v", members)
 	}
+}
 
-	branches, err := projectSvc.ListBranches(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list branches: %v", err)
-	}
+func assertProjectBranchWorkflow(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	branches := testutil.Must(fixture.projectService.ListBranches(fixture.ctx, fixture.projectID))
 	if len(branches) != 1 || branches[0].Name != "main" {
 		t.Fatalf("unexpected branches: %+v", branches)
 	}
-	featureBranch, err := projectSvc.CreateBranch(ctx, project.ID, "feature/editor", "main")
-	if err != nil {
-		t.Fatalf("create branch: %v", err)
-	}
+	featureBranch := testutil.Must(fixture.projectService.CreateBranch(fixture.ctx, fixture.projectID, "feature/editor", "main"))
 	if featureBranch.Name != "feature/editor" || featureBranch.LastCommitSHA == "" {
 		t.Fatalf("unexpected created branch: %+v", featureBranch)
 	}
-	if createCommitErr := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+	testutil.RequireNoError(t, fixture.projectService.CreateFileCommit(fixture.ctx, fixture.projectID, projectservice.CreateFileCommitInput{
 		BranchName: "feature/editor",
 		Path:       "docs/new.md",
 		Content:    "New file from API\n",
 		Message:    "Add new file",
-	}); createCommitErr != nil {
-		t.Fatalf("create file commit: %v", createCommitErr)
-	}
-	createdBlob, err := projectSvc.GetBlob(ctx, project.ID, "feature/editor", "docs/new.md")
-	if err != nil {
-		t.Fatalf("get created blob: %v", err)
-	}
+	}), "create file commit")
+	createdBlob := testutil.Must(fixture.projectService.GetBlob(fixture.ctx, fixture.projectID, "feature/editor", "docs/new.md"))
 	if createdBlob.Content != "New file from API\n" {
 		t.Fatalf("unexpected created blob: %+v", createdBlob)
 	}
-	protectedBranch, err := projectSvc.SetBranchProtection(ctx, project.ID, "feature/editor", true)
-	if err != nil {
-		t.Fatalf("protect branch: %v", err)
-	}
+	assertProjectBranchProtection(t, fixture)
+}
+
+func assertProjectBranchProtection(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	protectedBranch := testutil.Must(fixture.projectService.SetBranchProtection(fixture.ctx, fixture.projectID, "feature/editor", true))
 	if !protectedBranch.IsProtected {
 		t.Fatalf("expected branch to be protected: %+v", protectedBranch)
 	}
-	if createCommitErr := projectSvc.CreateFileCommit(ctx, project.ID, projectservice.CreateFileCommitInput{
+	if createCommitErr := fixture.projectService.CreateFileCommit(fixture.ctx, fixture.projectID, projectservice.CreateFileCommitInput{
 		BranchName: "feature/editor",
 		Path:       "docs/protected.md",
 		Content:    "blocked\n",
@@ -211,50 +212,46 @@ func TestNamespaceProjectFlow(t *testing.T) {
 	}); createCommitErr == nil {
 		t.Fatalf("expected protected branch file commit to fail")
 	}
+}
 
-	commits, err := projectSvc.ListCommits(ctx, project.ID, "", 10)
-	if err != nil {
-		t.Fatalf("list commits: %v", err)
-	}
+func assertProjectRepositoryContent(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	commits := testutil.Must(fixture.projectService.ListCommits(fixture.ctx, fixture.projectID, "", 10))
 	if len(commits) != 1 || commits[0].Message != "Initial repository content" {
 		t.Fatalf("unexpected commits: %+v", commits)
 	}
+	assertProjectReadmeAndLanguages(t, fixture)
+	assertProjectTreeAndBlob(t, fixture)
+}
 
-	readme, err := projectSvc.GetReadme(ctx, project.ID, "")
-	if err != nil {
-		t.Fatalf("get readme: %v", err)
-	}
+func assertProjectReadmeAndLanguages(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	readme := testutil.Must(fixture.projectService.GetReadme(fixture.ctx, fixture.projectID, ""))
 	if readme.Path != "README.md" || !strings.Contains(readme.Content, "Hello Gity") {
 		t.Fatalf("unexpected readme blob: %+v", readme)
 	}
-	languages, err := projectSvc.AnalyzeLanguages(ctx, project.ID, "main")
-	if err != nil {
-		t.Fatalf("analyze languages: %v", err)
-	}
+	languages := testutil.Must(fixture.projectService.AnalyzeLanguages(fixture.ctx, fixture.projectID, "main"))
 	if languages.TotalBytes == 0 || len(languages.Languages) == 0 || languages.Languages[0].Language != "Markdown" {
 		t.Fatalf("unexpected language analysis: %+v", languages)
 	}
+}
 
-	rootTree, err := projectSvc.ListTree(ctx, project.ID, "", "")
-	if err != nil {
-		t.Fatalf("list root tree: %v", err)
-	}
+func assertProjectTreeAndBlob(t *testing.T, fixture *projectFixture) {
+	t.Helper()
+
+	rootTree := testutil.Must(fixture.projectService.ListTree(fixture.ctx, fixture.projectID, "", ""))
 	if len(rootTree) != 2 {
 		t.Fatalf("expected two root entries, got %d", len(rootTree))
 	}
 
-	docsTree, err := projectSvc.ListTree(ctx, project.ID, "", "docs")
-	if err != nil {
-		t.Fatalf("list docs tree: %v", err)
-	}
+	docsTree := testutil.Must(fixture.projectService.ListTree(fixture.ctx, fixture.projectID, "", "docs"))
 	if len(docsTree) != 1 || docsTree[0].Path != "docs/guide.md" {
 		t.Fatalf("unexpected docs tree: %+v", docsTree)
 	}
 
-	blob, err := projectSvc.GetBlob(ctx, project.ID, "", "docs/guide.md")
-	if err != nil {
-		t.Fatalf("get blob: %v", err)
-	}
+	blob := testutil.Must(fixture.projectService.GetBlob(fixture.ctx, fixture.projectID, "", "docs/guide.md"))
 	if !strings.Contains(blob.Content, "Repository guide") {
 		t.Fatalf("unexpected blob content: %+v", blob)
 	}

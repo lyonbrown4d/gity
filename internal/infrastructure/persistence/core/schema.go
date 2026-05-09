@@ -40,6 +40,12 @@ func EnsureSchema(ctx context.Context, db *dbx.DB) error {
 }
 
 func migrations() []Migration {
+	items := coreMigrations()
+	items = append(items, featureMigrations()...)
+	return append(items, ciMigrations()...)
+}
+
+func coreMigrations() []Migration {
 	return []Migration{
 		{
 			Version: "0001_core",
@@ -69,6 +75,11 @@ func migrations() []Migration {
 				return autoMigrate(ctx, tx, "0004_project_packages", dbschema.ProjectPackageSchema, dbschema.ProjectPackageVersionSchema, dbschema.ProjectPackageFileSchema)
 			},
 		},
+	}
+}
+
+func featureMigrations() []Migration {
+	return []Migration{
 		{
 			Version: "0005_project_lfs",
 			Name:    "add project git lfs objects",
@@ -97,6 +108,11 @@ func migrations() []Migration {
 				return autoMigrate(ctx, tx, "0008_project_wiki_pages", dbschema.ProjectWikiPageSchema)
 			},
 		},
+	}
+}
+
+func ciMigrations() []Migration {
+	return []Migration{
 		{
 			Version: "0009_project_runners",
 			Name:    "add project runners",
@@ -184,13 +200,7 @@ func applyMigration(ctx context.Context, db *dbx.DB, migration Migration) (err e
 	committed := false
 	defer func() {
 		if !committed {
-			if rollbackErr := tx.RollbackContext(ctx); rollbackErr != nil {
-				if err != nil {
-					err = oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(oops.Join(err, rollbackErr), "apply migration and rollback")
-					return
-				}
-				err = oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(rollbackErr, "rollback migration")
-			}
+			err = rollbackMigration(ctx, tx, migration, err)
 		}
 	}()
 	if err := migration.Apply(ctx, tx); err != nil {
@@ -204,4 +214,15 @@ func applyMigration(ctx context.Context, db *dbx.DB, migration Migration) (err e
 	}
 	committed = true
 	return nil
+}
+
+func rollbackMigration(ctx context.Context, tx *dbx.Tx, migration Migration, err error) error {
+	rollbackErr := tx.RollbackContext(ctx)
+	if rollbackErr == nil {
+		return err
+	}
+	if err != nil {
+		return oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(oops.Join(err, rollbackErr), "apply migration and rollback")
+	}
+	return oops.In("persistence.schema").With("migration_version", migration.Version).Wrapf(rollbackErr, "rollback migration")
 }

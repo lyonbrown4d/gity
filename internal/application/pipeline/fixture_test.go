@@ -9,6 +9,9 @@ import (
 
 	jobservice "github.com/DaiYuANg/gity/internal/application/job"
 	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
+	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
+	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	namespacerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/namespace"
 	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
@@ -65,49 +68,76 @@ stage lint {
 }
 
 type pipelineTestEnv struct {
-	ProjectID  int64
-	JobService *jobservice.Service
-	Service    *pipelineservice.Service
+	ProjectID       int64
+	ProjectFullPath string
+	DefaultBranch   string
+	GitRunner       *gitexec.Runner
+	GitRepository   *gitrepo.Service
+	JobService      *jobservice.Service
+	Service         *pipelineservice.Service
 }
 
 func setupPipelineTest(ctx context.Context, t *testing.T) pipelineTestEnv {
 	t.Helper()
+	return setupPipelineEnv(ctx, t, false)
+}
+
+func setupGitPipelineTest(ctx context.Context, t *testing.T) pipelineTestEnv {
+	t.Helper()
+	return setupPipelineEnv(ctx, t, true)
+}
+
+func setupPipelineEnv(ctx context.Context, t *testing.T, withGit bool) pipelineTestEnv {
+	t.Helper()
+
 	db := openTestDB(t)
 	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	jobRepository, err := projectjobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job repo: %v", err)
-	}
-	pipelineRepository, err := projectpipelinerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new pipeline repo: %v", err)
-	}
-	pipelineJobRepository, err := projectpipelinejobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new pipeline job repo: %v", err)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
+
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
+	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
+	pipelineJobRepository := testutil.Must(projectpipelinejobrepo.NewRepository(db))
+	gitRunner, gitRepository := pipelineGitServices(t, withGit)
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
-	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, nil)
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
+	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
+	projectInput := projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}
+	if withGit {
+		projectInput.DefaultBranch = "main"
 	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
+	project := testutil.Must(projectRepository.Create(ctx, projectInput, namespace))
+
+	return pipelineTestEnv{
+		ProjectID:       project.ID,
+		ProjectFullPath: project.FullPath,
+		DefaultBranch:   project.DefaultBranch,
+		GitRunner:       gitRunner,
+		GitRepository:   gitRepository,
+		JobService:      jobSvc,
+		Service:         service,
 	}
-	return pipelineTestEnv{ProjectID: project.ID, JobService: jobSvc, Service: service}
+}
+
+func pipelineGitServices(t *testing.T, enabled bool) (*gitexec.Runner, *gitrepo.Service) {
+	t.Helper()
+	if !enabled {
+		return nil, nil
+	}
+	repoRoot := t.TempDir()
+	settings := config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}}
+	return gitexec.NewRunner(settings), gitrepo.NewService(settings)
+}
+
+func createTestPipeline(ctx context.Context, t *testing.T, env pipelineTestEnv, configContent string) pipelineservice.PipelineView {
+	t.Helper()
+	return testutil.Must(env.Service.CreatePipeline(ctx, env.ProjectID, pipelineservice.CreatePipelineInput{
+		Source:        "api",
+		RefName:       "main",
+		ConfigSource:  ".gity-ci.plano",
+		ConfigContent: configContent,
+	}))
 }
 
 func openTestDB(t *testing.T) *dbx.DB {

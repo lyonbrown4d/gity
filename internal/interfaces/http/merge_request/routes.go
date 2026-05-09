@@ -1,8 +1,6 @@
 package mergerequest
 
 import (
-	"context"
-
 	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
 	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
@@ -79,102 +77,29 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
 	authRuntime := e.authRuntime
 
-	listMergeRequests := func(ctx context.Context, in *mergeRequestsInput) (*mergeRequestOutput, error) {
-		items, err := service.List(ctx, in.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: items}, nil
-	}
-
-	getMergeRequest := func(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
-		item, err := service.GetByIID(ctx, in.ProjectID, in.MergeIID)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
-
-	getDiff := func(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
-		item, err := service.GetDiff(ctx, in.ProjectID, in.MergeIID)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
-
-	getChecks := func(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
-		item, err := service.GetChecks(ctx, in.ProjectID, in.MergeIID)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
-
-	createMergeRequest := func(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
-		input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		authorUserID, err := httpapi.ActorUserID(ctx, authRuntime, in.Authorization, input.AuthorUserID)
-		if err != nil {
-			return nil, err
-		}
-		input.AuthorUserID = authorUserID
-		item, err := service.Create(ctx, in.ProjectID, input)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
-
-	mergeMergeRequest := func(ctx context.Context, in *mergeMergeRequestInput) (*mergeRequestOutput, error) {
-		input, err := mapperx.MapStrict[mergerequestservice.MergeInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		item, err := service.Merge(ctx, in.ProjectID, in.MergeIID, input)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
-
-	updateMergeRequest := func(ctx context.Context, in *updateMergeRequestInput) (*mergeRequestOutput, error) {
-		input, err := mapperx.MapStrict[mergerequestservice.UpdateInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		item, err := service.Update(ctx, in.ProjectID, in.MergeIID, input)
-		if err != nil {
-			return nil, err
-		}
-		return &mergeRequestOutput{Body: item}, nil
-	}
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/merge-requests", listMergeRequests),
-		httpapi.Get("/repos/{id}/merge-requests", listMergeRequests, httpapi.DeprecatedRoute[mergeRequestsInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests instead.")),
-		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}", getMergeRequest),
-		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}", getMergeRequest, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid} instead.")),
-		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/diff", getDiff),
-		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/diff", getDiff, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/diff instead.")),
-		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/checks", getChecks),
-		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/checks", getChecks, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/checks instead.")),
-		httpapi.Post("/projects/{id}/merge-requests", createMergeRequest, httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime)),
-		httpapi.Post("/repos/{id}/merge-requests", createMergeRequest,
+		httpapi.Get("/projects/{id}/merge-requests", e.listMergeRequests),
+		httpapi.Get("/repos/{id}/merge-requests", e.listMergeRequests, httpapi.DeprecatedRoute[mergeRequestsInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests instead.")),
+		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}", e.getMergeRequest),
+		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}", e.getMergeRequest, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid} instead.")),
+		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/diff", e.getDiff),
+		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/diff", e.getDiff, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/diff instead.")),
+		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/checks", e.getChecks),
+		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/checks", e.getChecks, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/checks instead.")),
+		httpapi.Post("/projects/{id}/merge-requests", e.createMergeRequest, httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime)),
+		httpapi.Post("/repos/{id}/merge-requests", e.createMergeRequest,
 			httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime),
 			httpapi.DeprecatedRoute[createMergeRequestInput, mergeRequestOutput]("Use POST /projects/{id}/merge-requests instead."),
 		),
-		httpapi.Post("/projects/{id}/merge-requests/{merge_iid}/merge", mergeMergeRequest, httpapi.RequireUserRoute[mergeMergeRequestInput, mergeRequestOutput](authRuntime)),
-		httpapi.Post("/repos/{id}/merge-requests/{merge_iid}/merge", mergeMergeRequest,
+		httpapi.Post("/projects/{id}/merge-requests/{merge_iid}/merge", e.mergeMergeRequest, httpapi.RequireUserRoute[mergeMergeRequestInput, mergeRequestOutput](authRuntime)),
+		httpapi.Post("/repos/{id}/merge-requests/{merge_iid}/merge", e.mergeMergeRequest,
 			httpapi.RequireUserRoute[mergeMergeRequestInput, mergeRequestOutput](authRuntime),
 			httpapi.DeprecatedRoute[mergeMergeRequestInput, mergeRequestOutput]("Use POST /projects/{id}/merge-requests/{merge_iid}/merge instead."),
 		),
-		httpapi.Patch("/projects/{id}/merge-requests/{merge_iid}", updateMergeRequest, httpapi.RequireUserRoute[updateMergeRequestInput, mergeRequestOutput](authRuntime)),
-		httpapi.Patch("/repos/{id}/merge-requests/{merge_iid}", updateMergeRequest,
+		httpapi.Patch("/projects/{id}/merge-requests/{merge_iid}", e.updateMergeRequest, httpapi.RequireUserRoute[updateMergeRequestInput, mergeRequestOutput](authRuntime)),
+		httpapi.Patch("/repos/{id}/merge-requests/{merge_iid}", e.updateMergeRequest,
 			httpapi.RequireUserRoute[updateMergeRequestInput, mergeRequestOutput](authRuntime),
 			httpapi.DeprecatedRoute[updateMergeRequestInput, mergeRequestOutput]("Use PATCH /projects/{id}/merge-requests/{merge_iid} instead."),
 		),

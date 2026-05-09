@@ -28,32 +28,47 @@ func (s *Service) RetryPipeline(ctx context.Context, projectID, pipelineID int64
 	if err != nil {
 		return PipelineView{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID).Wrapf(err, "list pipeline jobs")
 	}
-	itemValues := items.Values()
-	for i := range itemValues {
-		item := itemValues[i]
-		job, err := s.jobRepo.GetByID(ctx, item.ProjectJobID)
-		if err != nil {
-			return PipelineView{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", item.ProjectJobID).Wrapf(err, "load pipeline project job")
-		}
-		if job.Status == gitports.ProjectJobStatusRunning {
-			return PipelineView{}, apperror.Conflict("pipeline has running job", fmt.Errorf("project job is running: %s", job.Status))
-		}
-		needs, err := decodeStringSlice(item.Needs)
-		if err != nil {
-			return PipelineView{}, err
-		}
-		runAfter := blockedRunAfter
-		if len(needs) == 0 {
-			runAfter = time.Now().UTC()
-		}
-		if err := s.jobRepo.RetryByID(ctx, job.ID, runAfter); err != nil {
-			return PipelineView{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", job.ID).Wrapf(err, "retry pipeline job")
-		}
+	if err := s.retryPipelineJobs(ctx, projectID, pipelineID, items.Values()); err != nil {
+		return PipelineView{}, err
 	}
 	if err := s.pipelineRepo.UpdateStatus(ctx, pipeline, gitports.ProjectPipelineStatusPending); err != nil {
 		return PipelineView{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "status", gitports.ProjectPipelineStatusPending).Wrapf(err, "update pipeline status")
 	}
 	return s.RefreshPipeline(ctx, projectID, pipelineID)
+}
+
+func (s *Service) retryPipelineJobs(ctx context.Context, projectID, pipelineID int64, items []cidomain.ProjectPipelineJob) error {
+	for i := range items {
+		if err := s.retryPipelineJob(ctx, projectID, pipelineID, items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) retryPipelineJob(ctx context.Context, projectID, pipelineID int64, item cidomain.ProjectPipelineJob) error {
+	job, err := s.jobRepo.GetByID(ctx, item.ProjectJobID)
+	if err != nil {
+		return oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", item.ProjectJobID).Wrapf(err, "load pipeline project job")
+	}
+	if job.Status == gitports.ProjectJobStatusRunning {
+		return apperror.Conflict("pipeline has running job", fmt.Errorf("project job is running: %s", job.Status))
+	}
+	needs, err := decodeStringSlice(item.Needs)
+	if err != nil {
+		return err
+	}
+	if err := s.jobRepo.RetryByID(ctx, job.ID, retryRunAfter(needs)); err != nil {
+		return oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", job.ID).Wrapf(err, "retry pipeline job")
+	}
+	return nil
+}
+
+func retryRunAfter(needs []string) time.Time {
+	if len(needs) == 0 {
+		return time.Now().UTC()
+	}
+	return blockedRunAfter
 }
 
 func (s *Service) CancelPipeline(ctx context.Context, projectID, pipelineID int64) (PipelineView, error) {

@@ -80,21 +80,9 @@ func (s *Service) GetByID(ctx context.Context, id int64) (projectdomain.Project,
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.Project, error) {
-	if input.NamespaceID <= 0 {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).New("project namespace_id is required")
-	}
-	if strings.TrimSpace(input.Name) == "" {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID).New("project name is required")
-	}
-	if strings.TrimSpace(input.PathKey) == "" {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name).New("project path_key is required")
-	}
-	visibility := strings.TrimSpace(strings.ToLower(input.Visibility))
-	if visibility == "" {
-		visibility = "private"
-	}
-	if !projectVisibilities.Contains(visibility) {
-		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "visibility", visibility).New("unsupported project visibility")
+	visibility, err := validateCreateInput(input)
+	if err != nil {
+		return projectdomain.Project{}, err
 	}
 	namespace, err := s.namespaceRepo.GetByID(ctx, input.NamespaceID)
 	if err != nil {
@@ -111,18 +99,49 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (projectdomain.
 	if err != nil {
 		return projectdomain.Project{}, oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name, "path_key", input.PathKey).Wrapf(err, "create project")
 	}
-	repoPath := project.FullPath + ".git"
-	if err := s.gitRunner.InitBare(ctx, repoPath, project.DefaultBranch); err != nil {
-		if cleanupErr := s.repo.DeleteByID(ctx, project.ID); cleanupErr != nil {
-			return projectdomain.Project{}, oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(oops.Join(err, cleanupErr), "provision bare repo and cleanup project")
-		}
-		return projectdomain.Project{}, oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(err, "provision bare repo")
+	if err := s.provisionRepository(ctx, project); err != nil {
+		return projectdomain.Project{}, err
 	}
 	if err := s.events.PublishAsync(ctx, projectdomain.NewProjectCreatedEvent(project)); err != nil {
 		wrapped := oops.In("project").With("project_id", project.ID).Wrapf(err, "publish project created event")
 		s.logger.Warn("publish project created event failed", slog.String("error", wrapped.Error()))
 	}
 	return project, nil
+}
+
+func validateCreateInput(input CreateInput) (string, error) {
+	if input.NamespaceID <= 0 {
+		return "", oops.In("project").With("namespace_id", input.NamespaceID).New("project namespace_id is required")
+	}
+	if strings.TrimSpace(input.Name) == "" {
+		return "", oops.In("project").With("namespace_id", input.NamespaceID).New("project name is required")
+	}
+	if strings.TrimSpace(input.PathKey) == "" {
+		return "", oops.In("project").With("namespace_id", input.NamespaceID, "name", input.Name).New("project path_key is required")
+	}
+	return normalizeVisibility(input.NamespaceID, input.Visibility)
+}
+
+func normalizeVisibility(namespaceID int64, value string) (string, error) {
+	visibility := strings.TrimSpace(strings.ToLower(value))
+	if visibility == "" {
+		visibility = "private"
+	}
+	if !projectVisibilities.Contains(visibility) {
+		return "", oops.In("project").With("namespace_id", namespaceID, "visibility", visibility).New("unsupported project visibility")
+	}
+	return visibility, nil
+}
+
+func (s *Service) provisionRepository(ctx context.Context, project projectdomain.Project) error {
+	repoPath := project.FullPath + ".git"
+	if err := s.gitRunner.InitBare(ctx, repoPath, project.DefaultBranch); err != nil {
+		if cleanupErr := s.repo.DeleteByID(ctx, project.ID); cleanupErr != nil {
+			return oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(oops.Join(err, cleanupErr), "provision bare repo and cleanup project")
+		}
+		return oops.In("project").With("project_id", project.ID, "repo_path", repoPath).Wrapf(err, "provision bare repo")
+	}
+	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {

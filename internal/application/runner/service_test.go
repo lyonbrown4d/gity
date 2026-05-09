@@ -32,161 +32,152 @@ import (
 func TestProjectRunnerFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newRunnerFixture(t)
+	token, runnerID := assertRegisterProjectRunner(t, fixture)
+	fixture.runnerToken = token
+	assertListProjectRunners(t, fixture, runnerID)
+	assertRunnerHeartbeat(t, fixture)
+	assertInternalNoopJob(t, fixture)
+	assertScriptJobLifecycle(t, fixture)
+	assertRetryableJobFailure(t, fixture)
+}
+
+type runnerFixture struct {
+	ctx             context.Context
+	projectID       int64
+	projectFullPath string
+	runnerToken     string
+	jobService      *jobservice.Service
+	runnerService   *runnerservice.Service
+}
+
+func newRunnerFixture(t *testing.T) runnerFixture {
+	t.Helper()
+
 	ctx := context.Background()
 	db := openTestDB(t)
 	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	jobRepository, err := projectjobrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job repo: %v", err)
-	}
-	logRepository, err := projectjoblogrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new job log repo: %v", err)
-	}
-	runnerRepository, err := projectrunnerrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new runner repo: %v", err)
-	}
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
+	logRepository := testutil.Must(projectjoblogrepo.NewRepository(db))
+	runnerRepository := testutil.Must(projectrunnerrepo.NewRepository(db))
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	gitRunner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, nil, nil)
 	runnerSvc := runnerservice.NewService(projectRepository, runnerRepository, jobSvc, nil, gitRunner)
 
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	if initErr := gitRunner.InitBare(ctx, project.FullPath+".git", "main"); initErr != nil {
-		t.Fatalf("init bare repo: %v", initErr)
-	}
-	if createCommitErr := gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
+	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
+	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, namespace))
+	testutil.RequireNoError(t, gitRunner.InitBare(ctx, project.FullPath+".git", "main"), "init bare repo")
+	testutil.RequireNoError(t, gitRunner.CreateFileCommit(ctx, project.FullPath+".git", gitexec.CreateFileCommitInput{
 		BranchName:  "main",
 		FilePath:    "README.md",
 		Content:     "hello source archive\n",
 		Message:     "Add README",
 		AuthorName:  "Gity Test",
 		AuthorEmail: "test@gity.dev",
-	}); createCommitErr != nil {
-		t.Fatalf("create source commit: %v", createCommitErr)
-	}
+	}), "create source commit")
 
-	registration, err := runnerSvc.RegisterProjectRunner(ctx, project.ID, runnerservice.RegisterInput{Name: "linux-amd64", Tags: "go, linux, go"})
-	if err != nil {
-		t.Fatalf("register runner: %v", err)
+	return runnerFixture{
+		ctx:             ctx,
+		projectID:       project.ID,
+		projectFullPath: project.FullPath,
+		jobService:      jobSvc,
+		runnerService:   runnerSvc,
 	}
+}
+
+func assertRegisterProjectRunner(t *testing.T, fixture runnerFixture) (string, int64) {
+	t.Helper()
+
+	registration := testutil.Must(fixture.runnerService.RegisterProjectRunner(fixture.ctx, fixture.projectID, runnerservice.RegisterInput{Name: "linux-amd64", Tags: "go, linux, go"}))
 	if !strings.HasPrefix(registration.Token, "grt_") || registration.Runner.Name != "linux-amd64" || registration.Runner.Tags != "go,linux" {
 		t.Fatalf("unexpected registration: %+v", registration)
 	}
+	return registration.Token, registration.Runner.ID
+}
 
-	runners, err := runnerSvc.ListProjectRunners(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list runners: %v", err)
-	}
-	if len(runners) != 1 || runners[0].ID != registration.Runner.ID || runners[0].Active != true {
+func assertListProjectRunners(t *testing.T, fixture runnerFixture, runnerID int64) {
+	t.Helper()
+
+	runners := testutil.Must(fixture.runnerService.ListProjectRunners(fixture.ctx, fixture.projectID))
+	if len(runners) != 1 || runners[0].ID != runnerID || runners[0].Active != true {
 		t.Fatalf("unexpected runners: %+v", runners)
 	}
+}
 
-	heartbeat, err := runnerSvc.Heartbeat(ctx, registration.Token)
-	if err != nil {
-		t.Fatalf("heartbeat: %v", err)
-	}
+func assertRunnerHeartbeat(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	heartbeat := testutil.Must(fixture.runnerService.Heartbeat(fixture.ctx, fixture.runnerToken))
 	if heartbeat.Status != projectrunnerrepo.StatusOnline || heartbeat.LastContactAt == nil {
 		t.Fatalf("unexpected heartbeat view: %+v", heartbeat)
 	}
+}
 
-	created, err := jobSvc.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{Payload: `{"runner":"test"}`})
-	if err != nil {
-		t.Fatalf("enqueue job: %v", err)
-	}
-	noopClaim, err := runnerSvc.ClaimJob(ctx, registration.Token, time.Minute)
-	if err != nil {
-		t.Fatalf("claim noop job: %v", err)
-	}
+func assertInternalNoopJob(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	created := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Payload: `{"runner":"test"}`}))
+	noopClaim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Minute))
 	if noopClaim.Claimed {
 		t.Fatalf("runner should not claim internal noop jobs: %+v", noopClaim)
 	}
-	if _, runErr := jobSvc.RunNext(ctx, "worker-a", time.Minute); runErr != nil {
-		t.Fatalf("run internal noop job: %v", runErr)
-	}
-	completedNoop, err := jobSvc.GetProjectJob(ctx, project.ID, created.ID)
-	if err != nil {
-		t.Fatalf("get internal noop job: %v", err)
-	}
+	_, runErr := fixture.jobService.RunNext(fixture.ctx, "worker-a", time.Minute)
+	testutil.RequireNoError(t, runErr, "run internal noop job")
+	completedNoop := testutil.Must(fixture.jobService.GetProjectJob(fixture.ctx, fixture.projectID, created.ID))
 	if completedNoop.Status != projectjobrepo.StatusSucceeded {
 		t.Fatalf("unexpected internal noop job status: %+v", completedNoop)
 	}
+}
 
-	created, err = jobSvc.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{
+func assertScriptJobLifecycle(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	created := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
 		Kind:    jobservice.KindScript,
-		Payload: fmt.Sprintf(`{"project_full_path":%q,"ref_name":"main","script":["echo hello"]}`, project.FullPath),
-	})
-	if err != nil {
-		t.Fatalf("enqueue script job: %v", err)
-	}
-	claim, err := runnerSvc.ClaimJob(ctx, registration.Token, time.Minute)
-	if err != nil {
-		t.Fatalf("claim job: %v", err)
-	}
+		Payload: fmt.Sprintf(`{"project_full_path":%q,"ref_name":"main","script":["echo hello"]}`, fixture.projectFullPath),
+	}))
+	claim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Minute))
 	if !claim.Claimed || claim.Job.ID != created.ID || claim.Job.Status != projectjobrepo.StatusRunning {
 		t.Fatalf("unexpected claim: %+v", claim)
 	}
-	trace, err := runnerSvc.AppendTrace(ctx, registration.Token, created.ID, runnerservice.AppendTraceInput{Output: "hello\n", DurationMillis: 10})
-	if err != nil {
-		t.Fatalf("append trace: %v", err)
-	}
+	trace := testutil.Must(fixture.runnerService.AppendTrace(fixture.ctx, fixture.runnerToken, created.ID, runnerservice.AppendTraceInput{Output: "hello\n", DurationMillis: 10}))
 	if trace.Trace != "hello" || trace.DurationMillis != 10 {
 		t.Fatalf("unexpected runner trace: %+v", trace)
 	}
-	archive, err := runnerSvc.DownloadSourceArchive(ctx, registration.Token, created.ID)
-	if err != nil {
-		t.Fatalf("download source archive: %v", err)
+	assertSourceArchive(t, fixture, created.ID)
+
+	completed := testutil.Must(fixture.runnerService.CompleteJob(fixture.ctx, fixture.runnerToken, created.ID, `{"ok":true}`))
+	if completed.Status != projectjobrepo.StatusSucceeded || completed.Result == "" {
+		t.Fatalf("unexpected completed job: %+v", completed)
 	}
+}
+
+func assertSourceArchive(t *testing.T, fixture runnerFixture, jobID int64) {
+	t.Helper()
+
+	archive := testutil.Must(fixture.runnerService.DownloadSourceArchive(fixture.ctx, fixture.runnerToken, jobID))
 	if archive.Encoding != "base64" || archive.FileName == "" {
 		t.Fatalf("unexpected source archive metadata: %+v", archive)
 	}
 	content, err := base64.StdEncoding.DecodeString(archive.ContentBase64)
-	if err != nil {
-		t.Fatalf("decode source archive: %v", err)
-	}
+	testutil.RequireNoError(t, err, "decode source archive")
 	if !zipContainsFile(t, content, "README.md", "hello source archive") {
 		t.Fatalf("source archive does not contain expected README")
 	}
+}
 
-	completed, err := runnerSvc.CompleteJob(ctx, registration.Token, created.ID, `{"ok":true}`)
-	if err != nil {
-		t.Fatalf("complete job: %v", err)
-	}
-	if completed.Status != projectjobrepo.StatusSucceeded || completed.Result == "" {
-		t.Fatalf("unexpected completed job: %+v", completed)
-	}
+func assertRetryableJobFailure(t *testing.T, fixture runnerFixture) {
+	t.Helper()
 
-	retryable, err := jobSvc.EnqueueProjectJob(ctx, project.ID, jobservice.CreateInput{Kind: jobservice.KindScript, Payload: `{"script":["echo retry"]}`, MaxAttempts: 2})
-	if err != nil {
-		t.Fatalf("enqueue retryable job: %v", err)
-	}
-	if _, claimErr := runnerSvc.ClaimJob(ctx, registration.Token, time.Minute); claimErr != nil {
-		t.Fatalf("claim retryable job: %v", claimErr)
-	}
-	failed, err := runnerSvc.FailJob(ctx, registration.Token, retryable.ID, "executor failed", "", time.Millisecond)
-	if err != nil {
-		t.Fatalf("fail retryable job: %v", err)
-	}
+	retryable := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Kind: jobservice.KindScript, Payload: `{"script":["echo retry"]}`, MaxAttempts: 2}))
+	_, claimErr := fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Minute)
+	testutil.RequireNoError(t, claimErr, "claim retryable job")
+	failed := testutil.Must(fixture.runnerService.FailJob(fixture.ctx, fixture.runnerToken, retryable.ID, "executor failed", "", time.Millisecond))
 	if failed.Status != projectjobrepo.StatusPending || failed.LastError != "executor failed" {
 		t.Fatalf("unexpected retryable failure state: %+v", failed)
 	}
@@ -199,26 +190,25 @@ func zipContainsFile(t *testing.T, content []byte, fileName, contains string) bo
 		t.Fatalf("open source archive: %v", err)
 	}
 	for _, file := range reader.File {
-		if file.Name != fileName {
-			continue
+		if file.Name == fileName {
+			return zipFileContains(t, file, contains)
 		}
-		rc, err := file.Open()
-		if err != nil {
-			t.Fatalf("open source archive file: %v", err)
-		}
-		var buffer bytes.Buffer
-		if _, err := buffer.ReadFrom(rc); err != nil {
-			if closeErr := rc.Close(); closeErr != nil {
-				t.Fatalf("read source archive file: %v; close source archive file: %v", err, closeErr)
-			}
-			t.Fatalf("read source archive file: %v", err)
-		}
+	}
+	return false
+}
+
+func zipFileContains(t *testing.T, file *zip.File, contains string) bool {
+	t.Helper()
+	rc := testutil.Must(file.Open())
+	defer func() {
 		if err := rc.Close(); err != nil {
 			t.Fatalf("close source archive file: %v", err)
 		}
-		return strings.Contains(buffer.String(), contains)
-	}
-	return false
+	}()
+	var buffer bytes.Buffer
+	_, err := buffer.ReadFrom(rc)
+	testutil.RequireNoError(t, err, "read source archive file")
+	return strings.Contains(buffer.String(), contains)
 }
 
 func openTestDB(t *testing.T) *dbx.DB {

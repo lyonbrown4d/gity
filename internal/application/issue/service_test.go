@@ -1,4 +1,4 @@
-package issue
+package issue_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
@@ -38,21 +39,38 @@ import (
 func TestIssueFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newIssueFixture(t)
+	testutil.RequireNoError(t, pushFixtureCommit(fixture.ctx, fixture.repoRoot, fixture.projectFullPath+".git"), "push fixture commit")
+
+	issueIID := createIssueRecord(t, fixture)
+	assertIssueUpdate(t, fixture, issueIID)
+	createIssueComment(t, fixture, issueIID)
+	attachmentID := createIssueAttachment(t, fixture, issueIID)
+	assertIssueCollections(t, fixture, issueIID)
+	assertIssueAttachmentContent(t, fixture, issueIID, attachmentID)
+}
+
+type issueFixture struct {
+	ctx             context.Context
+	repoRoot        string
+	projectID       int64
+	projectFullPath string
+	ownerID         int64
+	service         *issueservice.Service
+}
+
+func newIssueFixture(t *testing.T) issueFixture {
+	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "gity-issue-test.db")
-	db, err := dbx.Open(
+	db := testutil.Must(dbx.Open(
 		dbx.WithDriver("sqlite"),
 		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
 		dbx.WithDialect(sqliteDialect.New()),
-	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	))
 	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
 	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
@@ -69,101 +87,78 @@ func TestIssueFlow(t *testing.T) {
 	storageRoot := filepath.Join(t.TempDir(), "storage")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
-	storage, err := infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}})
-	if err != nil {
-		t.Fatalf("new storage service: %v", err)
-	}
+	storage := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	issueSvc := NewService(projectRepository, issueRepository, commentRepository, attachmentRepository, userRepository, storage)
+	issueSvc := issueservice.NewService(projectRepository, issueRepository, commentRepository, attachmentRepository, userRepository, storage)
 
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	if pushErr := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
-		t.Fatalf("push fixture commit: %v", pushErr)
-	}
+	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+	return issueFixture{ctx: ctx, repoRoot: repoRoot, projectID: project.ID, projectFullPath: project.FullPath, ownerID: owner.ID, service: issueSvc}
+}
 
-	issue, err := issueSvc.CreateIssue(ctx, project.ID, CreateIssueInput{AuthorUserID: owner.ID, Title: "first issue", Description: "seed issue"})
-	if err != nil {
-		t.Fatalf("create issue: %v", err)
-	}
+func createIssueRecord(t *testing.T, fixture issueFixture) int64 {
+	t.Helper()
+	issue := testutil.Must(fixture.service.CreateIssue(fixture.ctx, fixture.projectID, issueservice.CreateIssueInput{AuthorUserID: fixture.ownerID, Title: "first issue", Description: "seed issue"}))
 	if issue.IID != 1 {
 		t.Fatalf("expected first issue iid to be 1, got %d", issue.IID)
 	}
+	return issue.IID
+}
 
-	updated, err := issueSvc.UpdateIssue(ctx, project.ID, issue.IID, UpdateIssueInput{State: new("closed")})
-	if err != nil {
-		t.Fatalf("update issue: %v", err)
-	}
+func assertIssueUpdate(t *testing.T, fixture issueFixture, issueIID int64) {
+	t.Helper()
+	updated := testutil.Must(fixture.service.UpdateIssue(fixture.ctx, fixture.projectID, issueIID, issueservice.UpdateIssueInput{State: new("closed")}))
 	if updated.State != "closed" {
 		t.Fatalf("unexpected issue state: %s", updated.State)
 	}
+}
 
-	comment, err := issueSvc.CreateComment(ctx, project.ID, issue.IID, CreateCommentInput{AuthorUserID: owner.ID, Body: "looks good"})
-	if err != nil {
-		t.Fatalf("create comment: %v", err)
-	}
+func createIssueComment(t *testing.T, fixture issueFixture, issueIID int64) {
+	t.Helper()
+	comment := testutil.Must(fixture.service.CreateComment(fixture.ctx, fixture.projectID, issueIID, issueservice.CreateCommentInput{AuthorUserID: fixture.ownerID, Body: "looks good"}))
 	if comment.ID == 0 {
 		t.Fatalf("expected comment id")
 	}
+}
 
-	attachment, err := issueSvc.CreateAttachment(ctx, project.ID, issue.IID, CreateAttachmentInput{
-		UploadedByUserID: owner.ID,
+func createIssueAttachment(t *testing.T, fixture issueFixture, issueIID int64) int64 {
+	t.Helper()
+	attachment := testutil.Must(fixture.service.CreateAttachment(fixture.ctx, fixture.projectID, issueIID, issueservice.CreateAttachmentInput{
+		UploadedByUserID: fixture.ownerID,
 		FileName:         "note.txt",
 		ContentType:      "text/plain",
 		ContentBase64:    base64.StdEncoding.EncodeToString([]byte("hello attachment")),
-	})
-	if err != nil {
-		t.Fatalf("create attachment: %v", err)
-	}
+	}))
 	if attachment.ByteSize != int64(len("hello attachment")) {
 		t.Fatalf("unexpected attachment size: %d", attachment.ByteSize)
 	}
+	return attachment.ID
+}
 
-	issues, err := issueSvc.ListIssues(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list issues: %v", err)
-	}
+func assertIssueCollections(t *testing.T, fixture issueFixture, issueIID int64) {
+	t.Helper()
+	issues := testutil.Must(fixture.service.ListIssues(fixture.ctx, fixture.projectID))
 	if len(issues) != 1 {
 		t.Fatalf("expected one issue, got %d", len(issues))
 	}
-
-	comments, err := issueSvc.ListComments(ctx, project.ID, issue.IID)
-	if err != nil {
-		t.Fatalf("list comments: %v", err)
-	}
+	comments := testutil.Must(fixture.service.ListComments(fixture.ctx, fixture.projectID, issueIID))
 	if len(comments) != 1 || comments[0].Body != "looks good" {
 		t.Fatalf("unexpected comments: %+v", comments)
 	}
-
-	attachments, err := issueSvc.ListAttachments(ctx, project.ID, issue.IID)
-	if err != nil {
-		t.Fatalf("list attachments: %v", err)
-	}
+	attachments := testutil.Must(fixture.service.ListAttachments(fixture.ctx, fixture.projectID, issueIID))
 	if len(attachments) != 1 || attachments[0].FileName != "note.txt" {
 		t.Fatalf("unexpected attachments: %+v", attachments)
 	}
+}
 
-	attachmentContent, err := issueSvc.GetAttachmentContent(ctx, project.ID, issue.IID, attachment.ID)
-	if err != nil {
-		t.Fatalf("get attachment content: %v", err)
-	}
-	decoded, err := base64.StdEncoding.DecodeString(attachmentContent.Content)
-	if err != nil {
-		t.Fatalf("decode attachment content: %v", err)
-	}
+func assertIssueAttachmentContent(t *testing.T, fixture issueFixture, issueIID, attachmentID int64) {
+	t.Helper()
+	attachmentContent := testutil.Must(fixture.service.GetAttachmentContent(fixture.ctx, fixture.projectID, issueIID, attachmentID))
+	decoded := testutil.Must(base64.StdEncoding.DecodeString(attachmentContent.Content))
 	if string(decoded) != "hello attachment" {
 		t.Fatalf("unexpected attachment content: %s", string(decoded))
 	}

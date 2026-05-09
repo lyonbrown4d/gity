@@ -25,31 +25,35 @@ func (s *Service) ListTree(ctx context.Context, repoPath, refName, defaultBranch
 		}
 		return nil, err
 	}
+	entries := buildTreeEntries(tree, treePath)
+	sortTreeEntries(entries)
+	return entries.Values(), nil
+}
 
+func buildTreeEntries(tree *object.Tree, treePath string) *collectionlist.List[TreeEntry] {
 	entries := collectionlist.NewListWithCapacity[TreeEntry](len(tree.Entries))
 	for _, entry := range tree.Entries {
-		size := int64(0)
-		entryType := "blob"
-		if entry.Mode == filemode.Dir {
-			entryType = "tree"
-		} else {
-			file, fileErr := tree.File(entry.Name)
-			if fileErr == nil {
-				size = file.Size
-			}
-		}
-		entryPath := entry.Name
-		if strings.TrimSpace(treePath) != "" {
-			entryPath = path.Join(strings.Trim(strings.ReplaceAll(treePath, "\\", "/"), "/"), entry.Name)
-		}
-		entries.Add(TreeEntry{
-			Name: entry.Name,
-			Path: entryPath,
-			Type: entryType,
-			Mode: entry.Mode.String(),
-			Size: size,
-		})
+		entries.Add(buildTreeEntry(tree, treePath, entry))
 	}
+	return entries
+}
+
+func buildTreeEntry(tree *object.Tree, treePath string, entry object.TreeEntry) TreeEntry {
+	entryType := "blob"
+	size := int64(0)
+	if entry.Mode == filemode.Dir {
+		entryType = "tree"
+	} else if file, fileErr := tree.File(entry.Name); fileErr == nil {
+		size = file.Size
+	}
+	entryPath := entry.Name
+	if strings.TrimSpace(treePath) != "" {
+		entryPath = path.Join(strings.Trim(strings.ReplaceAll(treePath, "\\", "/"), "/"), entry.Name)
+	}
+	return TreeEntry{Name: entry.Name, Path: entryPath, Type: entryType, Mode: entry.Mode.String(), Size: size}
+}
+
+func sortTreeEntries(entries *collectionlist.List[TreeEntry]) {
 	entries.Sort(func(a, b TreeEntry) int {
 		if a.Type != b.Type {
 			if a.Type == "tree" {
@@ -59,7 +63,6 @@ func (s *Service) ListTree(ctx context.Context, repoPath, refName, defaultBranch
 		}
 		return strings.Compare(a.Name, b.Name)
 	})
-	return entries.Values(), nil
 }
 
 func (s *Service) GetBlob(ctx context.Context, repoPath, refName, defaultBranch, blobPath string) (Blob, error) {
@@ -121,45 +124,61 @@ func (s *Service) ListCommits(ctx context.Context, repoPath, refName, defaultBra
 		}
 		return nil, err
 	}
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
+	limit = normalizeCommitLimit(limit)
 	iter, err := repository.Log(&git.LogOptions{From: commit.Hash})
 	if err != nil {
 		return nil, fmt.Errorf("list commits: %w", err)
 	}
 	defer iter.Close()
+	commits, err := collectCommits(ctx, iter, limit)
+	if err != nil {
+		return nil, err
+	}
+	return commits.Values(), nil
+}
 
+func normalizeCommitLimit(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 100 {
+		return 100
+	}
+	return limit
+}
+
+func collectCommits(ctx context.Context, iter object.CommitIter, limit int) (*collectionlist.List[Commit], error) {
 	commits := collectionlist.NewListWithCapacity[Commit](limit)
 	count := 0
-	err = iter.ForEach(func(item *object.Commit) error {
+	err := iter.ForEach(func(item *object.Commit) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		if count >= limit {
 			return errStopIteration
 		}
-		hash := item.Hash.String()
-		shortHash := hash
-		if len(shortHash) > 8 {
-			shortHash = shortHash[:8]
-		}
-		commits.Add(Commit{
-			Hash:        hash,
-			ShortHash:   shortHash,
-			AuthorName:  item.Author.Name,
-			AuthorEmail: item.Author.Email,
-			Message:     strings.TrimSpace(item.Message),
-			CommittedAt: item.Author.When.UTC().Format("2006-01-02T15:04:05Z"),
-		})
+		commits.Add(buildCommit(item))
 		count++
 		return nil
 	})
 	if err != nil && !errors.Is(err, errStopIteration) {
 		return nil, fmt.Errorf("iterate commits: %w", err)
 	}
-	return commits.Values(), nil
+	return commits, nil
+}
+
+func buildCommit(item *object.Commit) Commit {
+	hash := item.Hash.String()
+	shortHash := hash
+	if len(shortHash) > 8 {
+		shortHash = shortHash[:8]
+	}
+	return Commit{
+		Hash:        hash,
+		ShortHash:   shortHash,
+		AuthorName:  item.Author.Name,
+		AuthorEmail: item.Author.Email,
+		Message:     strings.TrimSpace(item.Message),
+		CommittedAt: item.Author.When.UTC().Format("2006-01-02T15:04:05Z"),
+	}
 }

@@ -1,17 +1,18 @@
-package system
+package system_test
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/DaiYuANg/gity/internal/config"
+	system "github.com/DaiYuANg/gity/internal/interfaces/http/system"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersSystemRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(config.Settings{}))
+	server.RegisterOnly(system.NewEndpoint(config.Settings{}))
 
 	assertRoute(t, server, http.MethodGet, "/api/health")
 	assertRoute(t, server, http.MethodGet, "/api/v1/rewrite/info")

@@ -4,7 +4,6 @@ package plandsl
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/arcgolabs/collectionx/list"
@@ -14,8 +13,6 @@ import (
 )
 
 const defaultTimeoutSeconds = 600
-
-var safeShellArgPattern = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
 
 type PipelineSpec struct {
 	Name   string      `json:"name"`
@@ -143,37 +140,58 @@ func Lower(hir *compiler.HIR) (PipelineSpec, error) {
 	if hir == nil {
 		return PipelineSpec{}, oops.In("ci_plan_dsl").New("ci plano HIR is nil")
 	}
-	spec := PipelineSpec{}
-	for idx := range hir.Forms.Len() {
-		form, _ := hir.Forms.Get(idx)
-		switch form.Kind {
-		case "pipeline":
-			name, err := requiredStringField(form, "name")
-			if err != nil {
-				return PipelineSpec{}, err
-			}
-			if spec.Name != "" {
-				return PipelineSpec{}, oops.In("ci_plan_dsl").New("only one pipeline form is allowed")
-			}
-			spec.Name = name
-		case "stage":
-			stage, err := lowerStage(form)
-			if err != nil {
-				return PipelineSpec{}, err
-			}
-			spec.Stages = append(spec.Stages, stage)
-		}
+	spec, err := lowerPipelineForms(hir)
+	if err != nil {
+		return PipelineSpec{}, err
 	}
-	if spec.Name == "" {
-		return PipelineSpec{}, oops.In("ci_plan_dsl").New("pipeline form is required")
-	}
-	if len(spec.Stages) == 0 {
-		return PipelineSpec{}, oops.In("ci_plan_dsl").New("at least one stage form is required")
-	}
-	if err := validateStageGraph(spec.Stages); err != nil {
+	if err := validatePipelineSpec(spec); err != nil {
 		return PipelineSpec{}, err
 	}
 	return spec, nil
+}
+
+func lowerPipelineForms(hir *compiler.HIR) (PipelineSpec, error) {
+	spec := PipelineSpec{}
+	for idx := range hir.Forms.Len() {
+		form, _ := hir.Forms.Get(idx)
+		next, err := lowerPipelineForm(spec, form)
+		if err != nil {
+			return PipelineSpec{}, err
+		}
+		spec = next
+	}
+	return spec, nil
+}
+
+func lowerPipelineForm(spec PipelineSpec, form compiler.HIRForm) (PipelineSpec, error) {
+	switch form.Kind {
+	case "pipeline":
+		name, err := requiredStringField(form, "name")
+		if err != nil {
+			return PipelineSpec{}, err
+		}
+		if spec.Name != "" {
+			return PipelineSpec{}, oops.In("ci_plan_dsl").New("only one pipeline form is allowed")
+		}
+		spec.Name = name
+	case "stage":
+		stage, err := lowerStage(form)
+		if err != nil {
+			return PipelineSpec{}, err
+		}
+		spec.Stages = append(spec.Stages, stage)
+	}
+	return spec, nil
+}
+
+func validatePipelineSpec(spec PipelineSpec) error {
+	if spec.Name == "" {
+		return oops.In("ci_plan_dsl").New("pipeline form is required")
+	}
+	if len(spec.Stages) == 0 {
+		return oops.In("ci_plan_dsl").New("at least one stage form is required")
+	}
+	return validateStageGraph(spec.Stages)
 }
 
 func lowerStage(form compiler.HIRForm) (StageSpec, error) {
@@ -276,19 +294,4 @@ func commandsToScript(commands []CommandSpec) ([]string, error) {
 		}
 	}
 	return script, nil
-}
-
-func shellJoin(args []string) string {
-	quoted := make([]string, 0, len(args))
-	for _, arg := range args {
-		quoted = append(quoted, shellQuote(arg))
-	}
-	return strings.Join(quoted, " ")
-}
-
-func shellQuote(value string) string {
-	if value != "" && safeShellArgPattern.MatchString(value) {
-		return value
-	}
-	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }

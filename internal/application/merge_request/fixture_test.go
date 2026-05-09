@@ -1,4 +1,4 @@
-package mergerequest
+package mergerequest_test
 
 import (
 	"context"
@@ -43,6 +43,16 @@ func findBranch(ctx context.Context, t *testing.T, gitRepository *gitrepo.Servic
 
 func pushFixtureBranches(ctx context.Context, repoRoot, repoPath string) error {
 	worktree := filepath.Join(filepath.Dir(repoRoot), "fixture-worktree-mr")
+	if err := prepareFixtureWorktree(ctx, worktree); err != nil {
+		return err
+	}
+	if err := commitFeatureBranch(ctx, worktree); err != nil {
+		return err
+	}
+	return pushFixtureRefs(ctx, repoRoot, repoPath, worktree)
+}
+
+func prepareFixtureWorktree(ctx context.Context, worktree string) error {
 	if err := os.MkdirAll(worktree, 0o750); err != nil {
 		return fmt.Errorf("create fixture worktree: %w", err)
 	}
@@ -64,9 +74,10 @@ func pushFixtureBranches(ctx context.Context, repoRoot, repoPath string) error {
 	if err := runGit(ctx, worktree, "commit", "-m", "Initial repository content"); err != nil {
 		return err
 	}
-	if err := runGit(ctx, worktree, "branch", "feature"); err != nil {
-		return err
-	}
+	return runGit(ctx, worktree, "branch", "feature")
+}
+
+func commitFeatureBranch(ctx context.Context, worktree string) error {
 	if err := runGit(ctx, worktree, "checkout", "feature"); err != nil {
 		return err
 	}
@@ -82,7 +93,10 @@ func pushFixtureBranches(ctx context.Context, repoRoot, repoPath string) error {
 	if err := runGit(ctx, worktree, "checkout", "main"); err != nil {
 		return err
 	}
+	return nil
+}
 
+func pushFixtureRefs(ctx context.Context, repoRoot, repoPath, worktree string) error {
 	absRepo := filepath.Join(repoRoot, filepath.FromSlash(repoPath))
 	repoURL := "file:///" + filepath.ToSlash(absRepo)
 	if err := runGit(ctx, worktree, "push", repoURL, "main:refs/heads/main"); err != nil {

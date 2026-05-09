@@ -1,4 +1,4 @@
-package runneragent
+package runneragent_test
 
 import (
 	"archive/zip"

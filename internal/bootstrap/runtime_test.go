@@ -1,4 +1,4 @@
-package bootstrap
+package bootstrap_test
 
 import (
 	"context"
@@ -6,16 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DaiYuANg/gity/internal/bootstrap"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dix"
 )
 
 func TestRuntimeAppsValidate(t *testing.T) {
 	cases := map[string]func() interface{ Validate() error }{
-		"migration":  func() interface{ Validate() error } { return NewMigrationApp() },
-		"server":     func() interface{ Validate() error } { return NewServerApp() },
-		"worker":     func() interface{ Validate() error } { return NewWorkerApp() },
-		"standalone": func() interface{ Validate() error } { return NewStandaloneApp() },
+		"migration":  func() interface{ Validate() error } { return bootstrap.NewMigrationApp() },
+		"server":     func() interface{ Validate() error } { return bootstrap.NewServerApp() },
+		"worker":     func() interface{ Validate() error } { return bootstrap.NewWorkerApp() },
+		"standalone": func() interface{ Validate() error } { return bootstrap.NewStandaloneApp() },
 	}
 	for name, factory := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -35,7 +36,7 @@ func TestServerRuntimeStarts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	runtime, err := NewServerApp().Start(ctx)
+	runtime, err := bootstrap.NewServerApp().Start(ctx)
 	if err != nil {
 		t.Fatalf("start server runtime: %v", err)
 	}
@@ -53,17 +54,17 @@ func TestRuntimeStartsEnsureSchema(t *testing.T) {
 		"server": func() interface {
 			Start(context.Context) (*dix.Runtime, error)
 		} {
-			return NewServerApp()
+			return bootstrap.NewServerApp()
 		},
 		"worker": func() interface {
 			Start(context.Context) (*dix.Runtime, error)
 		} {
-			return NewWorkerApp()
+			return bootstrap.NewWorkerApp()
 		},
 		"standalone": func() interface {
 			Start(context.Context) (*dix.Runtime, error)
 		} {
-			return NewStandaloneApp()
+			return bootstrap.NewStandaloneApp()
 		},
 	}
 	for name, factory := range cases {

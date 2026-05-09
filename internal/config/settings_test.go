@@ -1,6 +1,10 @@
-package config
+package config_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/DaiYuANg/gity/internal/config"
+)
 
 func TestSettingsEnvironmentOverridesTypedDefaults(t *testing.T) {
 	t.Setenv("GITY_HTTP__ADDRESS", "127.0.0.1:0")
@@ -10,11 +14,11 @@ func TestSettingsEnvironmentOverridesTypedDefaults(t *testing.T) {
 	t.Setenv("GITY_STORAGE__ROOT", "./tmp/storage")
 	t.Setenv("GITY_WORKER__POLL_INTERVAL_MILLIS", "42")
 
-	cfg, err := NewConfig()
+	cfg, err := config.NewConfig()
 	if err != nil {
 		t.Fatalf("new config: %v", err)
 	}
-	settings, err := NewSettings(cfg)
+	settings, err := config.NewSettings(cfg)
 	if err != nil {
 		t.Fatalf("new settings: %v", err)
 	}

@@ -14,6 +14,13 @@ func Must[T any](value T, err error) T {
 	return value
 }
 
+func RequireNoError(tb testing.TB, err error, name string) {
+	tb.Helper()
+	if err != nil {
+		tb.Fatalf("%s: %v", name, err)
+	}
+}
+
 func CleanupClose(tb testing.TB, name string, closer closeFunc) {
 	tb.Helper()
 	tb.Cleanup(func() {

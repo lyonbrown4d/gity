@@ -1,4 +1,4 @@
-package httpserver
+package httpserver_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
+	"github.com/DaiYuANg/gity/internal/interfaces/http_server"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
 )
@@ -37,7 +38,7 @@ func (e *testEndpoint) Probe(context.Context, *struct{}) (*testEndpointOutput, e
 func TestNewServerRegistersInjectedEndpoints(t *testing.T) {
 	endpoints := collectionlist.NewList[httpx.Endpoint](&testEndpoint{})
 
-	server, err := NewServer(NewFiberApp(), config.DefaultSettings(), slog.Default(), endpoints)
+	server, err := httpserver.NewServer(httpserver.NewFiberApp(), config.DefaultSettings(), slog.Default(), endpoints)
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}

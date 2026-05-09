@@ -63,110 +63,35 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 }
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
-	service := e.service
 	authRuntime := e.authRuntime
 	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
 
-	listProjectJobs := func(ctx context.Context, in *projectJobsInput) (*jobOutput, error) {
-		items, err := service.ListProjectJobs(ctx, in.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: items}, nil
-	}
-
-	createJob := func(ctx context.Context, in *createJobInput) (*jobOutput, error) {
-		input, err := mapperx.MapStrict[jobservice.CreateInput](e.mapper, in.Body)
-		if err != nil {
-			return nil, err
-		}
-		item, err := service.EnqueueProjectJob(ctx, in.ProjectID, input)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
-	getProjectJob := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-		item, err := service.GetProjectJob(ctx, in.ProjectID, in.JobID)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
-	cancelProjectJob := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-		item, err := service.CancelProjectJob(ctx, in.ProjectID, in.JobID)
-		if err != nil {
-			return nil, err
-		}
-		if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
-	retryProjectJob := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-		item, err := service.RetryProjectJob(ctx, in.ProjectID, in.JobID)
-		if err != nil {
-			return nil, err
-		}
-		if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
-	getProjectJobTrace := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-		item, err := service.GetProjectJobTrace(ctx, in.ProjectID, in.JobID)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
-	listProjectJobArtifacts := func(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-		items, err := service.ListProjectJobArtifacts(ctx, in.ProjectID, in.JobID)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: items}, nil
-	}
-
-	getProjectJobArtifact := func(ctx context.Context, in *projectJobArtifactInput) (*jobOutput, error) {
-		item, err := service.GetProjectJobArtifactContent(ctx, in.ProjectID, in.JobID, in.ArtifactID)
-		if err != nil {
-			return nil, err
-		}
-		return &jobOutput{Body: item}, nil
-	}
-
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/jobs", listProjectJobs),
-		httpapi.Get("/repos/{id}/jobs", listProjectJobs, httpapi.DeprecatedRoute[projectJobsInput, jobOutput]("Use GET /projects/{id}/jobs instead.")),
-		httpapi.Post("/projects/{id}/jobs", createJob, httpapi.RequireProjectWriteRoute[createJobInput, jobOutput](authRuntime, projectWrite)),
-		httpapi.Post("/repos/{id}/jobs", createJob,
+		httpapi.Get("/projects/{id}/jobs", e.listProjectJobs),
+		httpapi.Get("/repos/{id}/jobs", e.listProjectJobs, httpapi.DeprecatedRoute[projectJobsInput, jobOutput]("Use GET /projects/{id}/jobs instead.")),
+		httpapi.Post("/projects/{id}/jobs", e.createJob, httpapi.RequireProjectWriteRoute[createJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/jobs", e.createJob,
 			httpapi.RequireProjectWriteRoute[createJobInput, jobOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[createJobInput, jobOutput]("Use POST /projects/{id}/jobs instead."),
 		),
-		httpapi.Get("/projects/{id}/jobs/{job_id}", getProjectJob),
-		httpapi.Get("/repos/{id}/jobs/{job_id}", getProjectJob, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id} instead.")),
-		httpapi.Post("/projects/{id}/jobs/{job_id}/cancel", cancelProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
-		httpapi.Post("/repos/{id}/jobs/{job_id}/cancel", cancelProjectJob,
+		httpapi.Get("/projects/{id}/jobs/{job_id}", e.getProjectJob),
+		httpapi.Get("/repos/{id}/jobs/{job_id}", e.getProjectJob, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id} instead.")),
+		httpapi.Post("/projects/{id}/jobs/{job_id}/cancel", e.cancelProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/jobs/{job_id}/cancel", e.cancelProjectJob,
 			httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use POST /projects/{id}/jobs/{job_id}/cancel instead."),
 		),
-		httpapi.Post("/projects/{id}/jobs/{job_id}/retry", retryProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
-		httpapi.Post("/repos/{id}/jobs/{job_id}/retry", retryProjectJob,
+		httpapi.Post("/projects/{id}/jobs/{job_id}/retry", e.retryProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Post("/repos/{id}/jobs/{job_id}/retry", e.retryProjectJob,
 			httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite),
 			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use POST /projects/{id}/jobs/{job_id}/retry instead."),
 		),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/trace", getProjectJobTrace),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/trace", getProjectJobTrace, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/trace instead.")),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts", listProjectJobArtifacts),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts", listProjectJobArtifacts, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts instead.")),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts/{artifact_id}", getProjectJobArtifact),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts/{artifact_id}", getProjectJobArtifact, httpapi.DeprecatedRoute[projectJobArtifactInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts/{artifact_id} instead.")),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/trace", e.getProjectJobTrace),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/trace", e.getProjectJobTrace, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/trace instead.")),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts instead.")),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact, httpapi.DeprecatedRoute[projectJobArtifactInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts/{artifact_id} instead.")),
 	)
 }
 

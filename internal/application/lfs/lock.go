@@ -170,20 +170,27 @@ func (s *Service) listLockEntities(ctx context.Context, projectID int64, input L
 		return nil, "", apperror.NotFound("project not found", err)
 	}
 	if strings.TrimSpace(input.ID) != "" {
-		lockID, err := parseLockID(input.ID)
-		if err != nil {
-			return nil, "", apperror.BadRequest("invalid lock id", err)
-		}
-		item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, lockID)
-		if err != nil {
-			if errors.Is(err, storageports.ErrNotFound) {
-				return []lfsdomain.ProjectLFSLock{}, "", nil
-			}
-			return nil, "", oops.In("lfs").With("project_id", projectID, "lock_id", lockID).Wrapf(err, "load lfs lock by id")
-		}
-		return []lfsdomain.ProjectLFSLock{item}, "", nil
+		return s.listLockEntityByID(ctx, projectID, input.ID)
 	}
+	return s.listLockEntitiesPage(ctx, projectID, input)
+}
 
+func (s *Service) listLockEntityByID(ctx context.Context, projectID int64, rawID string) ([]lfsdomain.ProjectLFSLock, string, error) {
+	lockID, err := parseLockID(rawID)
+	if err != nil {
+		return nil, "", apperror.BadRequest("invalid lock id", err)
+	}
+	item, err := s.lockRepo.GetByProjectAndID(ctx, projectID, lockID)
+	if err != nil {
+		if errors.Is(err, storageports.ErrNotFound) {
+			return []lfsdomain.ProjectLFSLock{}, "", nil
+		}
+		return nil, "", oops.In("lfs").With("project_id", projectID, "lock_id", lockID).Wrapf(err, "load lfs lock by id")
+	}
+	return []lfsdomain.ProjectLFSLock{item}, "", nil
+}
+
+func (s *Service) listLockEntitiesPage(ctx context.Context, projectID int64, input LockListInput) ([]lfsdomain.ProjectLFSLock, string, error) {
 	lockPath := ""
 	if strings.TrimSpace(input.Path) != "" {
 		var err error

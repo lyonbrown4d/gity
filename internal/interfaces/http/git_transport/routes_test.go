@@ -1,9 +1,11 @@
-package gittransport
+package gittransport_test
 
 import (
 	"fmt"
 	"strings"
 	"testing"
+
+	gittransport "github.com/DaiYuANg/gity/internal/interfaces/http/git_transport"
 )
 
 func TestParseReceivePackBranchUpdates(t *testing.T) {
@@ -13,7 +15,7 @@ func TestParseReceivePackBranchUpdates(t *testing.T) {
 			pkt("1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 refs/tags/v1\n") +
 			"0000",
 	)
-	branches := receivePackBranchNames(parseReceivePackUpdates(body))
+	branches := receivePackBranchNames(body)
 	if strings.Join(branches, ",") != "main,feature/test" {
 		t.Fatalf("unexpected branches: %+v", branches)
 	}
@@ -25,7 +27,7 @@ func TestParseReceivePackUpdatesMarksBranchDeletes(t *testing.T) {
 			pkt("1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 refs/heads/main\n") +
 			"0000",
 	)
-	updates := parseReceivePackUpdates(body)
+	updates := gittransport.ParseReceivePackUpdates(body)
 	if len(updates) != 2 {
 		t.Fatalf("updates = %d: %+v", len(updates), updates)
 	}
@@ -41,7 +43,8 @@ func pkt(payload string) string {
 	return fmt.Sprintf("%04x%s", len(payload)+4, payload)
 }
 
-func receivePackBranchNames(updates []receivePackUpdate) []string {
+func receivePackBranchNames(body []byte) []string {
+	updates := gittransport.ParseReceivePackUpdates(body)
 	branches := make([]string, 0, len(updates))
 	for _, update := range updates {
 		if update.BranchName != "" {

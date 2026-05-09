@@ -30,7 +30,14 @@ type ProjectScope struct {
 }
 
 func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *namespacememberrepo.Repository) *authx.Engine {
-	provider := authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
+	return authx.NewEngine(
+		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository))),
+		authx.WithAuthorizer(newProjectAuthorizer(memberRepository)),
+	)
+}
+
+func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository) authx.AuthenticationProvider {
+	return authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
 		record, err := tokenRepository.GetByToken(ctx, credential.Token)
 		if err != nil {
 			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
@@ -41,43 +48,60 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 		}
 		return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username}}, nil
 	})
+}
 
-	authorizer := authx.AuthorizerFunc(func(ctx context.Context, input authx.AuthorizationModel) (authx.Decision, error) {
-		principal, ok := input.Principal.(Principal)
+func newProjectAuthorizer(memberRepository *namespacememberrepo.Repository) authx.Authorizer {
+	return authx.AuthorizerFunc(func(ctx context.Context, input authx.AuthorizationModel) (authx.Decision, error) {
+		principal, namespaceID, visibility, ok := authorizationProjectScope(input)
 		if !ok {
-			return authx.Decision{Allowed: false, Reason: "invalid_principal"}, nil
-		}
-		namespaceID, namespaceIDFound := input.Context.Get("namespace_id")
-		visibility, visibilityFound := input.Context.Get("visibility")
-		namespaceIDValue, namespaceIDOK := namespaceID.(int64)
-		visibilityValue, visibilityOK := visibility.(string)
-		if !namespaceIDFound || !namespaceIDOK || !visibilityFound || !visibilityOK {
 			return authx.Decision{Allowed: false, Reason: "invalid_project_scope"}, nil
 		}
-
-		switch input.Action {
-		case "project.read":
-			if policyID, ok := projectReadVisibilityPolicies.Get(visibilityValue); ok {
-				return authx.Decision{Allowed: true, PolicyID: policyID}, nil
-			}
-			if _, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceIDValue, principal.UserID); err == nil {
-				return authx.Decision{Allowed: true, PolicyID: "project_private_read"}, nil
-			}
-		case "project.write":
-			member, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceIDValue, principal.UserID)
-			if err == nil {
-				if projectWriteRoles.Contains(strings.TrimSpace(member.Role)) {
-					return authx.Decision{Allowed: true, PolicyID: "project_write"}, nil
-				}
-			}
-		}
-		return authx.Decision{Allowed: false, Reason: "deny"}, nil
+		return authorizeProject(ctx, memberRepository, input.Action, principal, namespaceID, visibility), nil
 	})
+}
 
-	return authx.NewEngine(
-		authx.WithAuthenticationManager(authx.NewProviderManager(provider)),
-		authx.WithAuthorizer(authorizer),
-	)
+func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64, string, bool) {
+	principal, ok := input.Principal.(Principal)
+	if !ok {
+		return Principal{}, 0, "", false
+	}
+	namespaceID, namespaceIDFound := input.Context.Get("namespace_id")
+	visibility, visibilityFound := input.Context.Get("visibility")
+	namespaceIDValue, namespaceIDOK := namespaceID.(int64)
+	visibilityValue, visibilityOK := visibility.(string)
+	return principal, namespaceIDValue, visibilityValue, namespaceIDFound && namespaceIDOK && visibilityFound && visibilityOK
+}
+
+func authorizeProject(ctx context.Context, memberRepository *namespacememberrepo.Repository, action string, principal Principal, namespaceID int64, visibility string) authx.Decision {
+	switch action {
+	case "project.read":
+		return authorizeProjectRead(ctx, memberRepository, principal, namespaceID, visibility)
+	case "project.write":
+		return authorizeProjectWrite(ctx, memberRepository, principal, namespaceID)
+	default:
+		return authx.Decision{Allowed: false, Reason: "deny"}
+	}
+}
+
+func authorizeProjectRead(ctx context.Context, memberRepository *namespacememberrepo.Repository, principal Principal, namespaceID int64, visibility string) authx.Decision {
+	if policyID, ok := projectReadVisibilityPolicies.Get(visibility); ok {
+		return authx.Decision{Allowed: true, PolicyID: policyID}
+	}
+	if _, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceID, principal.UserID); err == nil {
+		return authx.Decision{Allowed: true, PolicyID: "project_private_read"}
+	}
+	return authx.Decision{Allowed: false, Reason: "deny"}
+}
+
+func authorizeProjectWrite(ctx context.Context, memberRepository *namespacememberrepo.Repository, principal Principal, namespaceID int64) authx.Decision {
+	member, err := memberRepository.FindByNamespaceAndUser(ctx, namespaceID, principal.UserID)
+	if err != nil {
+		return authx.Decision{Allowed: false, Reason: "deny"}
+	}
+	if projectWriteRoles.Contains(strings.TrimSpace(member.Role)) {
+		return authx.Decision{Allowed: true, PolicyID: "project_write"}
+	}
+	return authx.Decision{Allowed: false, Reason: "deny"}
 }
 
 func tokenFromAuthorizationHeader(value string) (string, bool) {

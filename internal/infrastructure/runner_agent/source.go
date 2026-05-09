@@ -18,10 +18,7 @@ func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.Project
 		return nil
 	}
 	if repoRoot == "" {
-		if sourceFetcher == nil {
-			return nil
-		}
-		return sourceFetcher(ctx, job, payload, workDir)
+		return fetchProjectSource(ctx, job, payload, workDir, sourceFetcher)
 	}
 	repoPath, err := resolveLocalBareRepo(repoRoot, projectFullPath)
 	if err != nil {
@@ -30,6 +27,20 @@ func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.Project
 	if _, err := os.Stat(repoPath); err != nil {
 		return fmt.Errorf("local repository is not available for checkout: %w", err)
 	}
+	if err := prepareLocalCheckout(ctx, repoPath, workDir); err != nil {
+		return err
+	}
+	return checkoutSourceRevision(ctx, workDir, payload)
+}
+
+func fetchProjectSource(ctx context.Context, job cidomain.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {
+	if sourceFetcher == nil {
+		return nil
+	}
+	return sourceFetcher(ctx, job, payload, workDir)
+}
+
+func prepareLocalCheckout(ctx context.Context, repoPath, workDir string) error {
 	if _, err := os.Stat(filepath.Join(workDir, ".git")); err == nil {
 		if err := runGit(ctx, workDir, "fetch", "--all", "--prune"); err != nil {
 			return err
@@ -37,7 +48,10 @@ func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.Project
 	} else if err := runGit(ctx, workDir, "clone", "--no-checkout", repoPath, "."); err != nil {
 		return err
 	}
+	return nil
+}
 
+func checkoutSourceRevision(ctx context.Context, workDir string, payload ScriptPayload) error {
 	revision := strings.TrimSpace(payload.CommitSHA)
 	if revision != "" {
 		return runGit(ctx, workDir, "checkout", "--detach", revision)

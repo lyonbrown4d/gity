@@ -1,8 +1,10 @@
-package mapperx
+package mapperx_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
 )
 
 type sourceDTO struct {
@@ -26,7 +28,7 @@ type timeTargetDTO struct {
 func TestMapStrictUsesJSONFallbackTagsAndConverters(t *testing.T) {
 	createdAt := time.Date(2026, 5, 7, 12, 0, 0, 0, time.FixedZone("CST", 8*60*60))
 
-	target, err := MapStrict[targetDTO](NewMapper(), sourceDTO{
+	target, err := mapperx.MapStrict[targetDTO](mapperx.NewMapper(), sourceDTO{
 		RefName:   "main",
 		CreatedAt: createdAt,
 	})
@@ -42,7 +44,7 @@ func TestMapStrictUsesJSONFallbackTagsAndConverters(t *testing.T) {
 }
 
 func TestMapStrictParsesRFC3339Time(t *testing.T) {
-	target, err := MapStrict[timeTargetDTO](NewMapper(), timeSourceDTO{RunAfter: "2026-05-07T04:00:00Z"})
+	target, err := mapperx.MapStrict[timeTargetDTO](mapperx.NewMapper(), timeSourceDTO{RunAfter: "2026-05-07T04:00:00Z"})
 	if err != nil {
 		t.Fatalf("map strict: %v", err)
 	}

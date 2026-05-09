@@ -1,16 +1,17 @@
-package user
+package user_test
 
 import (
 	"net/http"
 	"testing"
 
+	user "github.com/DaiYuANg/gity/internal/interfaces/http/user"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersUserRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil))
+	server.RegisterOnly(user.NewEndpoint(nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/users")
 	assertRoute(t, server, http.MethodGet, "/api/v1/users/me")

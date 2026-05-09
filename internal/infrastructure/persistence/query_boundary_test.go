@@ -26,12 +26,34 @@ import (
 func TestProjectScopedRepositoryQueriesDoNotLeakAcrossProjects(t *testing.T) {
 	t.Parallel()
 
+	fixture := newBoundaryFixture(t)
+	assertIssueQueryBoundary(t, fixture)
+	assertMergeRequestQueryBoundary(t, fixture)
+	assertPackageQueryBoundary(t, fixture)
+	assertLFSObjectQueryBoundary(t, fixture)
+	assertLFSLockQueryBoundary(t, fixture)
+}
+
+type boundaryFixture struct {
+	ctx             context.Context
+	ownerID         int64
+	firstProjectID  int64
+	secondProjectID int64
+	issues          *projectissuerepo.Repository
+	mergeRequests   *projectmergerequestrepo.Repository
+	packages        *projectpackagerepo.Repository
+	versions        *projectpackageversionrepo.Repository
+	lfsObjects      *projectlfsobjectrepo.Repository
+	lfsLocks        *projectlfslockrepo.Repository
+}
+
+func newBoundaryFixture(t *testing.T) boundaryFixture {
+	t.Helper()
+
 	ctx := context.Background()
 	db := openBoundaryTestDB(t)
 	testutil.CleanupClose(t, "db", db)
-	if err := core.EnsureSchema(ctx, db); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	namespaces := testutil.Must(namespacerepo.NewRepository(db))
 	projects := testutil.Must(projectrepo.NewRepository(db))
@@ -43,123 +65,92 @@ func TestProjectScopedRepositoryQueriesDoNotLeakAcrossProjects(t *testing.T) {
 	lfsObjects := testutil.Must(projectlfsobjectrepo.NewRepository(db))
 	lfsLocks := testutil.Must(projectlfslockrepo.NewRepository(db))
 
-	owner, err := users.Create(ctx, userrepo.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	namespace, err := namespaces.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	firstProject, err := projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "First", PathKey: "first", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create first project: %v", err)
-	}
-	secondProject, err := projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Second", PathKey: "second", Visibility: "private"}, namespace)
-	if err != nil {
-		t.Fatalf("create second project: %v", err)
-	}
+	owner := testutil.Must(users.Create(ctx, userrepo.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	namespace := testutil.Must(namespaces.Create(ctx, namespacerepo.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team"}))
+	firstProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "First", PathKey: "first", Visibility: "private"}, namespace))
+	secondProject := testutil.Must(projects.Create(ctx, projectrepo.CreateInput{NamespaceID: namespace.ID, Name: "Second", PathKey: "second", Visibility: "private"}, namespace))
 
-	firstIssue, err := issues.Create(ctx, projectissuerepo.CreateInput{ProjectID: firstProject.ID, AuthorUserID: owner.ID, Title: "first issue"})
-	if err != nil {
-		t.Fatalf("create first issue: %v", err)
+	return boundaryFixture{
+		ctx:             ctx,
+		ownerID:         owner.ID,
+		firstProjectID:  firstProject.ID,
+		secondProjectID: secondProject.ID,
+		issues:          issues,
+		mergeRequests:   mergeRequests,
+		packages:        packages,
+		versions:        versions,
+		lfsObjects:      lfsObjects,
+		lfsLocks:        lfsLocks,
 	}
-	secondIssue, err := issues.Create(ctx, projectissuerepo.CreateInput{ProjectID: secondProject.ID, AuthorUserID: owner.ID, Title: "second issue"})
-	if err != nil {
-		t.Fatalf("create second issue: %v", err)
-	}
-	foundIssue, err := issues.GetByProjectAndIID(ctx, secondProject.ID, secondIssue.IID)
-	if err != nil {
-		t.Fatalf("get scoped issue: %v", err)
-	}
+}
+
+func assertIssueQueryBoundary(t *testing.T, fixture boundaryFixture) {
+	t.Helper()
+
+	firstIssue := testutil.Must(fixture.issues.Create(fixture.ctx, projectissuerepo.CreateInput{ProjectID: fixture.firstProjectID, AuthorUserID: fixture.ownerID, Title: "first issue"}))
+	secondIssue := testutil.Must(fixture.issues.Create(fixture.ctx, projectissuerepo.CreateInput{ProjectID: fixture.secondProjectID, AuthorUserID: fixture.ownerID, Title: "second issue"}))
+	foundIssue := testutil.Must(fixture.issues.GetByProjectAndIID(fixture.ctx, fixture.secondProjectID, secondIssue.IID))
 	if foundIssue.ID != secondIssue.ID || foundIssue.ID == firstIssue.ID {
 		t.Fatalf("issue query leaked across projects: got %+v, want %+v", foundIssue, secondIssue)
 	}
+}
 
-	firstMR, err := mergeRequests.Create(ctx, projectmergerequestrepo.CreateInput{ProjectID: firstProject.ID, AuthorUserID: owner.ID, Title: "first mr", SourceBranch: "feature", TargetBranch: "main"})
-	if err != nil {
-		t.Fatalf("create first merge request: %v", err)
-	}
-	secondMR, err := mergeRequests.Create(ctx, projectmergerequestrepo.CreateInput{ProjectID: secondProject.ID, AuthorUserID: owner.ID, Title: "second mr", SourceBranch: "feature", TargetBranch: "main"})
-	if err != nil {
-		t.Fatalf("create second merge request: %v", err)
-	}
-	foundMR, err := mergeRequests.GetByProjectAndIID(ctx, secondProject.ID, secondMR.IID)
-	if err != nil {
-		t.Fatalf("get scoped merge request: %v", err)
-	}
+func assertMergeRequestQueryBoundary(t *testing.T, fixture boundaryFixture) {
+	t.Helper()
+
+	firstMR := testutil.Must(fixture.mergeRequests.Create(fixture.ctx, projectmergerequestrepo.CreateInput{ProjectID: fixture.firstProjectID, AuthorUserID: fixture.ownerID, Title: "first mr", SourceBranch: "feature", TargetBranch: "main"}))
+	secondMR := testutil.Must(fixture.mergeRequests.Create(fixture.ctx, projectmergerequestrepo.CreateInput{ProjectID: fixture.secondProjectID, AuthorUserID: fixture.ownerID, Title: "second mr", SourceBranch: "feature", TargetBranch: "main"}))
+	foundMR := testutil.Must(fixture.mergeRequests.GetByProjectAndIID(fixture.ctx, fixture.secondProjectID, secondMR.IID))
 	if foundMR.ID != secondMR.ID || foundMR.ID == firstMR.ID {
 		t.Fatalf("merge request query leaked across projects: got %+v, want %+v", foundMR, secondMR)
 	}
+}
 
-	firstPackage, err := packages.Create(ctx, projectpackagerepo.CreateInput{ProjectID: firstProject.ID, Type: "maven", Name: "io.gity:gity-api"})
-	if err != nil {
-		t.Fatalf("create first package: %v", err)
-	}
-	secondPackage, err := packages.Create(ctx, projectpackagerepo.CreateInput{ProjectID: secondProject.ID, Type: "maven", Name: "io.gity:gity-api"})
-	if err != nil {
-		t.Fatalf("create second package: %v", err)
-	}
-	foundPackage, err := packages.GetByProjectTypeAndName(ctx, secondProject.ID, "maven", "io.gity:gity-api")
-	if err != nil {
-		t.Fatalf("get scoped package: %v", err)
-	}
+func assertPackageQueryBoundary(t *testing.T, fixture boundaryFixture) {
+	t.Helper()
+
+	firstPackage := testutil.Must(fixture.packages.Create(fixture.ctx, projectpackagerepo.CreateInput{ProjectID: fixture.firstProjectID, Type: "maven", Name: "io.gity:gity-api"}))
+	secondPackage := testutil.Must(fixture.packages.Create(fixture.ctx, projectpackagerepo.CreateInput{ProjectID: fixture.secondProjectID, Type: "maven", Name: "io.gity:gity-api"}))
+	foundPackage := testutil.Must(fixture.packages.GetByProjectTypeAndName(fixture.ctx, fixture.secondProjectID, "maven", "io.gity:gity-api"))
 	if foundPackage.ID != secondPackage.ID || foundPackage.ID == firstPackage.ID {
 		t.Fatalf("package query leaked across projects: got %+v, want %+v", foundPackage, secondPackage)
 	}
+	assertPackageVersionQueryBoundary(t, fixture, firstPackage.ID, secondPackage.ID)
+}
 
-	firstVersion, err := versions.Create(ctx, projectpackageversionrepo.CreateInput{ProjectPackageID: firstPackage.ID, Version: "1.0.0"})
-	if err != nil {
-		t.Fatalf("create first package version: %v", err)
-	}
-	secondVersion, err := versions.Create(ctx, projectpackageversionrepo.CreateInput{ProjectPackageID: secondPackage.ID, Version: "1.0.0"})
-	if err != nil {
-		t.Fatalf("create second package version: %v", err)
-	}
-	foundVersion, err := versions.GetByPackageAndVersion(ctx, secondPackage.ID, "1.0.0")
-	if err != nil {
-		t.Fatalf("get scoped package version: %v", err)
-	}
+func assertPackageVersionQueryBoundary(t *testing.T, fixture boundaryFixture, firstPackageID, secondPackageID int64) {
+	t.Helper()
+
+	firstVersion := testutil.Must(fixture.versions.Create(fixture.ctx, projectpackageversionrepo.CreateInput{ProjectPackageID: firstPackageID, Version: "1.0.0"}))
+	secondVersion := testutil.Must(fixture.versions.Create(fixture.ctx, projectpackageversionrepo.CreateInput{ProjectPackageID: secondPackageID, Version: "1.0.0"}))
+	foundVersion := testutil.Must(fixture.versions.GetByPackageAndVersion(fixture.ctx, secondPackageID, "1.0.0"))
 	if foundVersion.ID != secondVersion.ID || foundVersion.ID == firstVersion.ID {
 		t.Fatalf("package version query leaked across packages: got %+v, want %+v", foundVersion, secondVersion)
 	}
+}
+
+func assertLFSObjectQueryBoundary(t *testing.T, fixture boundaryFixture) {
+	t.Helper()
 
 	oid := "2222222222222222222222222222222222222222222222222222222222222222"
-	firstObject, err := lfsObjects.Create(ctx, firstProject.ID, oid, 1, "lfs/first")
-	if err != nil {
-		t.Fatalf("create first lfs object: %v", err)
-	}
-	secondObject, err := lfsObjects.Create(ctx, secondProject.ID, oid, 2, "lfs/second")
-	if err != nil {
-		t.Fatalf("create second lfs object: %v", err)
-	}
-	foundObject, err := lfsObjects.GetByProjectAndOID(ctx, secondProject.ID, oid)
-	if err != nil {
-		t.Fatalf("get scoped lfs object: %v", err)
-	}
+	firstObject := testutil.Must(fixture.lfsObjects.Create(fixture.ctx, fixture.firstProjectID, oid, 1, "lfs/first"))
+	secondObject := testutil.Must(fixture.lfsObjects.Create(fixture.ctx, fixture.secondProjectID, oid, 2, "lfs/second"))
+	foundObject := testutil.Must(fixture.lfsObjects.GetByProjectAndOID(fixture.ctx, fixture.secondProjectID, oid))
 	if foundObject.ID != secondObject.ID || foundObject.ID == firstObject.ID {
 		t.Fatalf("lfs object query leaked across projects: got %+v, want %+v", foundObject, secondObject)
 	}
+}
 
-	_, err = lfsLocks.Create(ctx, projectlfslockrepo.CreateInput{ProjectID: firstProject.ID, OwnerUserID: owner.ID, Path: "assets/big.bin"})
-	if err != nil {
-		t.Fatalf("create first lfs lock: %v", err)
-	}
-	secondLock, err := lfsLocks.Create(ctx, projectlfslockrepo.CreateInput{ProjectID: secondProject.ID, OwnerUserID: owner.ID, Path: "assets/big.bin"})
-	if err != nil {
-		t.Fatalf("create second lfs lock: %v", err)
-	}
-	foundLock, err := lfsLocks.GetByProjectAndPath(ctx, secondProject.ID, "assets/big.bin")
-	if err != nil {
-		t.Fatalf("get scoped lfs lock: %v", err)
-	}
+func assertLFSLockQueryBoundary(t *testing.T, fixture boundaryFixture) {
+	t.Helper()
+
+	_ = testutil.Must(fixture.lfsLocks.Create(fixture.ctx, projectlfslockrepo.CreateInput{ProjectID: fixture.firstProjectID, OwnerUserID: fixture.ownerID, Path: "assets/big.bin"}))
+	secondLock := testutil.Must(fixture.lfsLocks.Create(fixture.ctx, projectlfslockrepo.CreateInput{ProjectID: fixture.secondProjectID, OwnerUserID: fixture.ownerID, Path: "assets/big.bin"}))
+	foundLock := testutil.Must(fixture.lfsLocks.GetByProjectAndPath(fixture.ctx, fixture.secondProjectID, "assets/big.bin"))
 	if foundLock.ID != secondLock.ID {
 		t.Fatalf("lfs lock path query leaked across projects: got %+v, want %+v", foundLock, secondLock)
 	}
-	listedLocks, err := lfsLocks.ListByProjectID(ctx, projectlfslockrepo.ListInput{ProjectID: secondProject.ID, Path: "assets/big.bin", Limit: 10})
-	if err != nil {
-		t.Fatalf("list scoped lfs locks: %v", err)
-	}
+	listedLocks := testutil.Must(fixture.lfsLocks.ListByProjectID(fixture.ctx, projectlfslockrepo.ListInput{ProjectID: fixture.secondProjectID, Path: "assets/big.bin", Limit: 10}))
 	if listedLocks.Len() != 1 || listedLocks.Values()[0].ID != secondLock.ID {
 		t.Fatalf("lfs lock list leaked across projects: %+v", listedLocks.Values())
 	}

@@ -23,116 +23,129 @@ import (
 func TestProjectWikiPageFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newWikiFixture(t)
+	pageID := assertCreateWikiPage(t, fixture)
+	assertDuplicateWikiPageFails(t, fixture)
+	assertListWikiPages(t, fixture, pageID)
+	assertGetWikiPage(t, fixture, pageID)
+	assertUpdateWikiPage(t, fixture)
+	assertDeleteWikiPage(t, fixture, pageID)
+}
+
+type wikiFixture struct {
+	ctx       context.Context
+	projectID int64
+	authorID  int64
+	service   *wikiservice.Service
+}
+
+func newWikiFixture(t *testing.T) wikiFixture {
+	t.Helper()
+
 	ctx := context.Background()
 	db := openTestDB(t)
 	testutil.CleanupClose(t, "db", db)
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
-	namespaceRepository, err := namespacerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new namespace repo: %v", err)
-	}
-	projectRepository, err := projectrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new project repo: %v", err)
-	}
-	userRepository, err := userrepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new user repo: %v", err)
-	}
-	pageRepository, err := projectwikipagerepo.NewRepository(db)
-	if err != nil {
-		t.Fatalf("new wiki page repo: %v", err)
-	}
+	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
+	projectRepository := testutil.Must(projectrepo.NewRepository(db))
+	userRepository := testutil.Must(userrepo.NewRepository(db))
+	pageRepository := testutil.Must(projectwikipagerepo.NewRepository(db))
 	service := wikiservice.NewService(projectRepository, pageRepository, userRepository)
 
-	author, err := userRepository.Create(ctx, userrepo.CreateInput{
+	author := testutil.Must(userRepository.Create(ctx, userrepo.CreateInput{
 		Username:    "alice",
 		DisplayName: "Alice",
 		Email:       "alice@gity.dev",
-	})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
-	}
-	namespace, err := namespaceRepository.Create(ctx, namespacerepo.CreateInput{
+	}))
+	namespace := testutil.Must(namespaceRepository.Create(ctx, namespacerepo.CreateInput{
 		Kind:    "group",
 		Name:    "Core Team",
 		PathKey: "core-team",
-	})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectRepository.Create(ctx, projectrepo.CreateInput{
+	}))
+	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{
 		NamespaceID: namespace.ID,
 		Name:        "Gity",
 		PathKey:     "gity",
 		Visibility:  "private",
-	}, namespace)
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
+	}, namespace))
 
-	created, err := service.CreatePage(ctx, project.ID, wikiservice.CreatePageInput{
+	return wikiFixture{
+		ctx:       ctx,
+		projectID: project.ID,
+		authorID:  author.ID,
+		service:   service,
+	}
+}
+
+func assertCreateWikiPage(t *testing.T, fixture wikiFixture) int64 {
+	t.Helper()
+
+	created := testutil.Must(fixture.service.CreatePage(fixture.ctx, fixture.projectID, wikiservice.CreatePageInput{
 		Title:        "Getting Started",
 		Content:      "# Getting Started\n",
-		AuthorUserID: author.ID,
-	})
-	if err != nil {
-		t.Fatalf("create wiki page: %v", err)
-	}
-	if created.Slug != "getting-started" || created.Format != "markdown" || created.AuthorUserID != author.ID {
+		AuthorUserID: fixture.authorID,
+	}))
+	if created.Slug != "getting-started" || created.Format != "markdown" || created.AuthorUserID != fixture.authorID {
 		t.Fatalf("unexpected created wiki page: %+v", created)
 	}
+	return created.ID
+}
 
-	if _, createPageErr := service.CreatePage(ctx, project.ID, wikiservice.CreatePageInput{
+func assertDuplicateWikiPageFails(t *testing.T, fixture wikiFixture) {
+	t.Helper()
+
+	if _, createPageErr := fixture.service.CreatePage(fixture.ctx, fixture.projectID, wikiservice.CreatePageInput{
 		Slug:         "getting-started",
 		Title:        "Duplicate",
 		Content:      "duplicate",
-		AuthorUserID: author.ID,
+		AuthorUserID: fixture.authorID,
 	}); createPageErr == nil {
 		t.Fatalf("expected duplicate wiki page slug to fail")
 	}
+}
 
-	pages, err := service.ListPages(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list wiki pages: %v", err)
-	}
-	if len(pages) != 1 || pages[0].ID != created.ID {
+func assertListWikiPages(t *testing.T, fixture wikiFixture, pageID int64) {
+	t.Helper()
+
+	pages := testutil.Must(fixture.service.ListPages(fixture.ctx, fixture.projectID))
+	if len(pages) != 1 || pages[0].ID != pageID {
 		t.Fatalf("unexpected wiki page list: %+v", pages)
 	}
+}
 
-	loaded, err := service.GetPage(ctx, project.ID, "getting-started")
-	if err != nil {
-		t.Fatalf("get wiki page: %v", err)
-	}
-	if loaded.ID != created.ID || !strings.Contains(loaded.Content, "Getting Started") {
+func assertGetWikiPage(t *testing.T, fixture wikiFixture, pageID int64) {
+	t.Helper()
+
+	loaded := testutil.Must(fixture.service.GetPage(fixture.ctx, fixture.projectID, "getting-started"))
+	if loaded.ID != pageID || !strings.Contains(loaded.Content, "Getting Started") {
 		t.Fatalf("unexpected loaded wiki page: %+v", loaded)
 	}
+}
+
+func assertUpdateWikiPage(t *testing.T, fixture wikiFixture) {
+	t.Helper()
 
 	updatedTitle := "Getting Started v2"
 	updatedContent := "# Getting Started v2\n\nUpdated."
-	updated, err := service.UpdatePage(ctx, project.ID, "getting-started", wikiservice.UpdatePageInput{
+	updated := testutil.Must(fixture.service.UpdatePage(fixture.ctx, fixture.projectID, "getting-started", wikiservice.UpdatePageInput{
 		Title:        &updatedTitle,
 		Content:      &updatedContent,
-		EditorUserID: author.ID,
-	})
-	if err != nil {
-		t.Fatalf("update wiki page: %v", err)
-	}
-	if updated.Title != updatedTitle || updated.Content != updatedContent || updated.LastEditedByUserID != author.ID {
+		EditorUserID: fixture.authorID,
+	}))
+	if updated.Title != updatedTitle || updated.Content != updatedContent || updated.LastEditedByUserID != fixture.authorID {
 		t.Fatalf("unexpected updated wiki page: %+v", updated)
 	}
+}
 
-	deleted, err := service.DeletePage(ctx, project.ID, "getting-started")
-	if err != nil {
-		t.Fatalf("delete wiki page: %v", err)
-	}
-	if deleted.ID != created.ID {
+func assertDeleteWikiPage(t *testing.T, fixture wikiFixture, pageID int64) {
+	t.Helper()
+
+	deleted := testutil.Must(fixture.service.DeletePage(fixture.ctx, fixture.projectID, "getting-started"))
+	if deleted.ID != pageID {
 		t.Fatalf("unexpected deleted wiki page: %+v", deleted)
 	}
-	if _, getPageErr := service.GetPage(ctx, project.ID, "getting-started"); getPageErr == nil {
+	if _, getPageErr := fixture.service.GetPage(fixture.ctx, fixture.projectID, "getting-started"); getPageErr == nil {
 		t.Fatalf("expected deleted wiki page to be missing")
 	}
 }

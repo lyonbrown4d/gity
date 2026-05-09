@@ -28,27 +28,41 @@ func (b *cappedBuffer) Write(p []byte) (int, error) {
 	}
 	remaining := b.limit - b.buffer.Len()
 	if remaining <= 0 {
-		b.truncated = true
-		if !b.truncatedSent {
-			b.truncatedSent = true
-			if err := b.stream(nil); err != nil {
-				return len(p), oops.In("runner_agent").Wrapf(err, "stream truncated job output")
-			}
-		}
-		return len(p), nil
+		err := b.markTruncated()
+		return len(p), err
 	}
 	if len(p) > remaining {
-		b.truncated = true
-		b.truncatedSent = true
-		captured := p[:remaining]
-		if _, err := b.buffer.Write(captured); err != nil {
-			return len(p), oops.In("runner_agent").With("remaining", remaining).Wrapf(err, "capture truncated job output")
-		}
-		if err := b.stream(captured); err != nil {
-			return len(p), oops.In("runner_agent").Wrapf(err, "stream captured truncated job output")
-		}
-		return len(p), nil
+		return b.writeTruncated(p, remaining)
 	}
+	return b.writeCaptured(p)
+}
+
+func (b *cappedBuffer) markTruncated() error {
+	b.truncated = true
+	if b.truncatedSent {
+		return nil
+	}
+	b.truncatedSent = true
+	if err := b.stream(nil); err != nil {
+		return oops.In("runner_agent").Wrapf(err, "stream truncated job output")
+	}
+	return nil
+}
+
+func (b *cappedBuffer) writeTruncated(p []byte, remaining int) (int, error) {
+	b.truncated = true
+	b.truncatedSent = true
+	captured := p[:remaining]
+	if _, err := b.buffer.Write(captured); err != nil {
+		return len(p), oops.In("runner_agent").With("remaining", remaining).Wrapf(err, "capture truncated job output")
+	}
+	if err := b.stream(captured); err != nil {
+		return len(p), oops.In("runner_agent").Wrapf(err, "stream captured truncated job output")
+	}
+	return len(p), nil
+}
+
+func (b *cappedBuffer) writeCaptured(p []byte) (int, error) {
 	n, err := b.buffer.Write(p)
 	if streamErr := b.stream(p); streamErr != nil {
 		if err != nil {

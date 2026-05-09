@@ -1,4 +1,4 @@
-package packageregistry
+package packageregistry_test
 
 import (
 	"context"
@@ -12,9 +12,11 @@ import (
 	"testing"
 
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
+	packageregistryservice "github.com/DaiYuANg/gity/internal/application/package_registry"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
 	"github.com/DaiYuANg/gity/internal/config"
+	packagedomain "github.com/DaiYuANg/gity/internal/domain/package_registry"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
 	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	"github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
@@ -38,21 +40,34 @@ import (
 func TestPackageRegistryFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newPackageRegistryFixture(t)
+	testutil.RequireNoError(t, pushFixtureCommit(fixture.ctx, fixture.repoRoot, fixture.projectFullPath+".git"), "push fixture commit")
+
+	fileRecord := uploadPackageFile(t, fixture)
+	assertPackageFile(t, fileRecord)
+	assertPackageList(t, fixture, fileRecord.ID)
+}
+
+type packageRegistryFixture struct {
+	ctx             context.Context
+	repoRoot        string
+	projectID       int64
+	projectFullPath string
+	service         *packageregistryservice.Service
+}
+
+func newPackageRegistryFixture(t *testing.T) packageRegistryFixture {
+	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "gity-package-test.db")
-	db, err := dbx.Open(
+	db := testutil.Must(dbx.Open(
 		dbx.WithDriver("sqlite"),
 		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
 		dbx.WithDialect(sqliteDialect.New()),
-	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	))
 	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
 	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
@@ -69,33 +84,28 @@ func TestPackageRegistryFlow(t *testing.T) {
 	storageRoot := filepath.Join(t.TempDir(), "storage")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
-	storage, err := infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}})
-	if err != nil {
-		t.Fatalf("new storage service: %v", err)
-	}
+	storage := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	packageSvc := NewService(projectRepository, packageRepository, versionRepository, fileRepository, storage)
+	packageSvc := packageregistryservice.NewService(projectRepository, packageRepository, versionRepository, fileRepository, storage)
 
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create user: %v", err)
+	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+	return packageRegistryFixture{
+		ctx:             ctx,
+		repoRoot:        repoRoot,
+		projectID:       project.ID,
+		projectFullPath: project.FullPath,
+		service:         packageSvc,
 	}
-	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	if pushErr := pushFixtureCommit(ctx, repoRoot, project.FullPath+".git"); pushErr != nil {
-		t.Fatalf("push fixture commit: %v", pushErr)
-	}
+}
 
-	fileRecord, err := packageSvc.UploadFile(ctx, project.ID, UploadFileInput{
+func uploadPackageFile(t *testing.T, fixture packageRegistryFixture) packagedomain.ProjectPackageFile {
+	t.Helper()
+	return testutil.Must(fixture.service.UploadFile(fixture.ctx, fixture.projectID, packageregistryservice.UploadFileInput{
 		Type:          "maven",
 		Name:          "io.gity:gity-api",
 		Version:       "1.0.0",
@@ -103,38 +113,38 @@ func TestPackageRegistryFlow(t *testing.T) {
 		FilePath:      "io/gity/gity-api/1.0.0/gity-api-1.0.0.jar",
 		ContentType:   "application/java-archive",
 		ContentBase64: base64.StdEncoding.EncodeToString([]byte("jar-binary")),
-	})
-	if err != nil {
-		t.Fatalf("upload package file: %v", err)
-	}
+	}))
+}
+
+func assertPackageFile(t *testing.T, fileRecord packagedomain.ProjectPackageFile) {
+	t.Helper()
 	if fileRecord.ByteSize != int64(len("jar-binary")) {
 		t.Fatalf("unexpected package file size: %d", fileRecord.ByteSize)
 	}
+}
 
-	packages, err := packageSvc.ListPackages(ctx, project.ID)
-	if err != nil {
-		t.Fatalf("list packages: %v", err)
-	}
+func assertPackageList(t *testing.T, fixture packageRegistryFixture, fileID int64) {
+	t.Helper()
+	packages := testutil.Must(fixture.service.ListPackages(fixture.ctx, fixture.projectID))
 	if len(packages) != 1 || packages[0].Type != "maven" {
 		t.Fatalf("unexpected packages: %+v", packages)
 	}
+	assertPackageDetail(t, fixture, packages[0].ID)
+	assertPackageContent(t, fixture, fileID)
+}
 
-	detail, err := packageSvc.GetPackage(ctx, project.ID, packages[0].ID)
-	if err != nil {
-		t.Fatalf("get package detail: %v", err)
-	}
+func assertPackageDetail(t *testing.T, fixture packageRegistryFixture, packageID int64) {
+	t.Helper()
+	detail := testutil.Must(fixture.service.GetPackage(fixture.ctx, fixture.projectID, packageID))
 	if len(detail.Versions) != 1 || len(detail.Versions[0].Files) != 1 {
 		t.Fatalf("unexpected package detail: %+v", detail)
 	}
+}
 
-	content, err := packageSvc.GetFileContent(ctx, project.ID, fileRecord.ID)
-	if err != nil {
-		t.Fatalf("get package file content: %v", err)
-	}
-	decoded, err := base64.StdEncoding.DecodeString(content.Content)
-	if err != nil {
-		t.Fatalf("decode package file content: %v", err)
-	}
+func assertPackageContent(t *testing.T, fixture packageRegistryFixture, fileID int64) {
+	t.Helper()
+	content := testutil.Must(fixture.service.GetFileContent(fixture.ctx, fixture.projectID, fileID))
+	decoded := testutil.Must(base64.StdEncoding.DecodeString(content.Content))
 	if string(decoded) != "jar-binary" {
 		t.Fatalf("unexpected package content: %s", string(decoded))
 	}

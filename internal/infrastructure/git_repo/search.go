@@ -16,11 +16,10 @@ import (
 )
 
 func (s *Service) Search(ctx context.Context, repoPath, refName, defaultBranch string, input SearchParams) ([]SearchResult, error) {
-	query := strings.TrimSpace(input.Query)
-	if query == "" {
-		return nil, fmt.Errorf("%w: query is required", ErrInvalidSearchQuery)
+	plan, err := newSearchPlan(input)
+	if err != nil {
+		return nil, err
 	}
-
 	repository, err := s.openRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -39,66 +38,100 @@ func (s *Service) Search(ctx context.Context, repoPath, refName, defaultBranch s
 		return nil, fmt.Errorf("load commit tree: %w", err)
 	}
 
-	limit := normalizeSearchLimit(input.Limit)
-	maxFiles := normalizeSearchMaxFiles(input.MaxFiles)
-	maxFileSize := normalizeSearchMaxFileSize(input.MaxFileSize)
+	return s.searchTree(ctx, repoPath, tree, plan)
+}
 
+type searchPlan struct {
+	limit       int
+	maxFiles    int
+	maxFileSize int64
+	pathPrefix  string
+	matcher     searchMatcher
+}
+
+func newSearchPlan(input SearchParams) (searchPlan, error) {
+	query := strings.TrimSpace(input.Query)
+	if query == "" {
+		return searchPlan{}, fmt.Errorf("%w: query is required", ErrInvalidSearchQuery)
+	}
 	matcher, err := buildSearchMatcher(query, input.MatchCase, input.UseRegex)
 	if err != nil {
-		return nil, err
+		return searchPlan{}, err
 	}
+	return searchPlan{
+		limit:       normalizeSearchLimit(input.Limit),
+		maxFiles:    normalizeSearchMaxFiles(input.MaxFiles),
+		maxFileSize: normalizeSearchMaxFileSize(input.MaxFileSize),
+		pathPrefix:  normalizePathPrefix(input.Path),
+		matcher:     matcher,
+	}, nil
+}
 
-	pathPrefix := normalizePathPrefix(input.Path)
-	results := collectionlist.NewListWithCapacity[SearchResult](limit)
-	fileCount := 0
-
-	err = tree.Files().ForEach(func(file *object.File) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		if fileCount >= maxFiles {
-			return errStopIteration
-		}
-		if pathPrefix != "" {
-			if !isPathInScope(file.Name, pathPrefix) {
-				return nil
-			}
-		}
-		if file.Size > maxFileSize {
-			return nil
-		}
-		content, readErr := readBlobContent(file)
-		if readErr != nil {
-			return oops.In("git_repo").With("repo_path", repoPath, "path", file.Name).Wrapf(readErr, "read searchable blob")
-		}
-		if !isReadableContent(content) {
-			return nil
-		}
-
-		for lineNumber, line := range strings.Split(string(content), "\n") {
-			column, matchLength, matched := matchLine(line, matcher)
-			if !matched {
-				continue
-			}
-			results.Add(SearchResult{
-				Path:        file.Name,
-				LineNumber:  lineNumber + 1,
-				Column:      column,
-				MatchLength: matchLength,
-				LineContent: line,
-			})
-			if results.Len() >= limit {
-				return errStopIteration
-			}
-		}
-
-		fileCount++
-		return nil
+func (s *Service) searchTree(ctx context.Context, repoPath string, tree *object.Tree, plan searchPlan) ([]SearchResult, error) {
+	results := collectionlist.NewListWithCapacity[SearchResult](plan.limit)
+	state := searchTreeState{}
+	err := tree.Files().ForEach(func(file *object.File) error {
+		return s.searchTreeFile(ctx, repoPath, file, plan, &state, results)
 	})
 	if err != nil && !errors.Is(err, errStopIteration) {
 		return nil, fmt.Errorf("search repository: %w", err)
 	}
 	return results.Values(), nil
+}
+
+type searchTreeState struct {
+	fileCount int
+}
+
+func (s *Service) searchTreeFile(ctx context.Context, repoPath string, file *object.File, plan searchPlan, state *searchTreeState, results *collectionlist.List[SearchResult]) error {
+	if ctx.Err() != nil {
+		return oops.In("git_repo").With("repo_path", repoPath).Wrapf(ctx.Err(), "search repository canceled")
+	}
+	if state.fileCount >= plan.maxFiles {
+		return errStopIteration
+	}
+	searched, err := s.searchFile(repoPath, file, plan, results)
+	if err != nil {
+		return err
+	}
+	if searched {
+		state.fileCount++
+	}
+	if results.Len() >= plan.limit {
+		return errStopIteration
+	}
+	return nil
+}
+
+func (s *Service) searchFile(repoPath string, file *object.File, plan searchPlan, results *collectionlist.List[SearchResult]) (bool, error) {
+	if plan.pathPrefix != "" && !isPathInScope(file.Name, plan.pathPrefix) {
+		return false, nil
+	}
+	if file.Size > plan.maxFileSize {
+		return false, nil
+	}
+	content, readErr := readBlobContent(file)
+	if readErr != nil {
+		return false, oops.In("git_repo").With("repo_path", repoPath, "path", file.Name).Wrapf(readErr, "read searchable blob")
+	}
+	if !isReadableContent(content) {
+		return true, nil
+	}
+	appendSearchMatches(file.Name, content, plan.matcher, results, plan.limit)
+	return true, nil
+}
+
+func appendSearchMatches(fileName string, content []byte, matcher searchMatcher, results *collectionlist.List[SearchResult], limit int) {
+	for lineNumber, line := range strings.Split(string(content), "\n") {
+		column, matchLength, matched := matchLine(line, matcher)
+		if !matched {
+			continue
+		}
+		results.Add(SearchResult{Path: fileName, LineNumber: lineNumber + 1, Column: column, MatchLength: matchLength, LineContent: line})
+		if results.Len() >= limit {
+			return
+		}
+	}
 }
 
 type searchMatcher struct {

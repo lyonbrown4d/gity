@@ -1,4 +1,4 @@
-package lfs
+package lfs_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
 	namespaceservice "github.com/DaiYuANg/gity/internal/application/namespace"
 	projectservice "github.com/DaiYuANg/gity/internal/application/project"
 	userservice "github.com/DaiYuANg/gity/internal/application/user"
@@ -33,21 +34,34 @@ import (
 func TestLFSFlow(t *testing.T) {
 	t.Parallel()
 
+	fixture := newLFSFixture(t)
+	assertLFSObjectFlow(t, fixture)
+	assertLFSLockFlow(t, fixture)
+}
+
+type lfsFixture struct {
+	ctx             context.Context
+	projectID       int64
+	projectFullPath string
+	ownerID         int64
+	otherID         int64
+	service         *lfsservice.Service
+}
+
+func newLFSFixture(t *testing.T) lfsFixture {
+	t.Helper()
+
 	dbPath := filepath.Join(t.TempDir(), "gity-lfs-test.db")
 	db, err := dbx.Open(
 		dbx.WithDriver("sqlite"),
 		dbx.WithDSN(fmt.Sprintf("file:%s?_pragma=foreign_keys(1)", dbPath)),
 		dbx.WithDialect(sqliteDialect.New()),
 	)
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	testutil.RequireNoError(t, err, "open db")
 	testutil.CleanupClose(t, "db", db)
 
 	ctx := context.Background()
-	if schemaErr := core.EnsureSchema(ctx, db); schemaErr != nil {
-		t.Fatalf("ensure schema: %v", schemaErr)
-	}
+	testutil.RequireNoError(t, core.EnsureSchema(ctx, db), "ensure schema")
 
 	logger := slog.Default()
 	namespaceRepository := testutil.Must(namespacerepo.NewRepository(db))
@@ -63,114 +77,105 @@ func TestLFSFlow(t *testing.T) {
 	storageRoot := filepath.Join(t.TempDir(), "storage")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
-	storage, err := infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}})
-	if err != nil {
-		t.Fatalf("new storage service: %v", err)
-	}
+	storage := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	namespaceSvc := namespaceservice.NewService(logger, namespaceRepository, namespaceMemberRepository, userRepository)
 	projectSvc := projectservice.NewService(logger, projectRepository, runner, gitRepository, namespaceRepository, projectBranchProtectionRepository)
-	lfsSvc := NewService(projectRepository, projectLFSObjectRepository, projectLFSLockRepository, userRepository, storage)
+	lfsSvc := lfsservice.NewService(projectRepository, projectLFSObjectRepository, projectLFSLockRepository, userRepository, storage)
 
-	owner, err := userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"})
-	if err != nil {
-		t.Fatalf("create owner user: %v", err)
+	owner := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "alice", DisplayName: "Alice", Email: "alice@gity.dev"}))
+	other := testutil.Must(userSvc.Create(ctx, userservice.CreateInput{Username: "bob", DisplayName: "Bob", Email: "bob@gity.dev"}))
+	space := testutil.Must(namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID}))
+	project := testutil.Must(projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"}))
+
+	return lfsFixture{
+		ctx:             ctx,
+		projectID:       project.ID,
+		projectFullPath: project.FullPath,
+		ownerID:         owner.ID,
+		otherID:         other.ID,
+		service:         lfsSvc,
 	}
-	other, err := userSvc.Create(ctx, userservice.CreateInput{Username: "bob", DisplayName: "Bob", Email: "bob@gity.dev"})
-	if err != nil {
-		t.Fatalf("create other user: %v", err)
-	}
-	space, err := namespaceSvc.Create(ctx, namespaceservice.CreateInput{Kind: "group", Name: "Core Team", PathKey: "core-team", OwnerUserID: owner.ID})
-	if err != nil {
-		t.Fatalf("create namespace: %v", err)
-	}
-	project, err := projectSvc.Create(ctx, projectservice.CreateInput{NamespaceID: space.ID, Name: "Gity", PathKey: "gity", DefaultBranch: "main", Visibility: "private"})
-	if err != nil {
-		t.Fatalf("create project: %v", err)
-	}
+}
+
+func assertLFSObjectFlow(t *testing.T, fixture lfsFixture) {
+	t.Helper()
 
 	oid := "1111111111111111111111111111111111111111111111111111111111111111"
-	batchUpload, err := lfsSvc.PrepareBatch(ctx, project.ID, BatchRequest{
+	batchUpload := testutil.Must(fixture.service.PrepareBatch(fixture.ctx, fixture.projectID, lfsservice.BatchRequest{
 		Operation: "upload",
-		Objects:   []BatchObjectRequest{{OID: oid, Size: int64(len("hello-lfs"))}},
-	}, "http://localhost:3000", project.FullPath+".git")
-	if err != nil {
-		t.Fatalf("prepare upload batch: %v", err)
-	}
-	if len(batchUpload.Objects) != 1 || batchUpload.Objects[0].Actions["upload"].Href == "" {
-		t.Fatalf("unexpected upload batch response: %+v", batchUpload)
-	}
+		Objects:   []lfsservice.BatchObjectRequest{{OID: oid, Size: int64(len("hello-lfs"))}},
+	}, "http://localhost:3000", fixture.projectFullPath+".git"))
+	assertLFSBatchAction(t, batchUpload, "upload")
 
-	uploaded, err := lfsSvc.UploadObject(ctx, project.ID, oid, []byte("hello-lfs"))
-	if err != nil {
-		t.Fatalf("upload lfs object: %v", err)
-	}
+	uploaded := testutil.Must(fixture.service.UploadObject(fixture.ctx, fixture.projectID, oid, []byte("hello-lfs")))
 	if uploaded.ByteSize != int64(len("hello-lfs")) {
 		t.Fatalf("unexpected lfs object size: %d", uploaded.ByteSize)
 	}
 
-	batchDownload, err := lfsSvc.PrepareBatch(ctx, project.ID, BatchRequest{
+	batchDownload := testutil.Must(fixture.service.PrepareBatch(fixture.ctx, fixture.projectID, lfsservice.BatchRequest{
 		Operation: "download",
-		Objects:   []BatchObjectRequest{{OID: oid}},
-	}, "http://localhost:3000", project.FullPath+".git")
-	if err != nil {
-		t.Fatalf("prepare download batch: %v", err)
-	}
-	if len(batchDownload.Objects) != 1 || batchDownload.Objects[0].Actions["download"].Href == "" {
-		t.Fatalf("unexpected download batch response: %+v", batchDownload)
-	}
+		Objects:   []lfsservice.BatchObjectRequest{{OID: oid}},
+	}, "http://localhost:3000", fixture.projectFullPath+".git"))
+	assertLFSBatchAction(t, batchDownload, "download")
 
-	downloaded, err := lfsSvc.DownloadObject(ctx, project.ID, oid)
-	if err != nil {
-		t.Fatalf("download lfs object: %v", err)
-	}
+	downloaded := testutil.Must(fixture.service.DownloadObject(fixture.ctx, fixture.projectID, oid))
 	if string(downloaded.Content) != "hello-lfs" {
 		t.Fatalf("unexpected lfs content: %s", string(downloaded.Content))
 	}
+}
 
-	createdLock, err := lfsSvc.CreateLock(ctx, project.ID, owner.ID, CreateLockInput{Path: "assets/big.bin"})
-	if err != nil {
-		t.Fatalf("create lfs lock: %v", err)
+func assertLFSBatchAction(t *testing.T, response lfsservice.BatchResponse, actionName string) {
+	t.Helper()
+	if len(response.Objects) != 1 {
+		t.Fatalf("unexpected lfs batch response: %+v", response)
 	}
+	if response.Objects[0].Actions[actionName].Href == "" {
+		t.Fatalf("missing %s action href in lfs batch response: %+v", actionName, response)
+	}
+}
+
+func assertLFSLockFlow(t *testing.T, fixture lfsFixture) {
+	t.Helper()
+
+	createdLock := testutil.Must(fixture.service.CreateLock(fixture.ctx, fixture.projectID, fixture.ownerID, lfsservice.CreateLockInput{Path: "assets/big.bin"}))
 	if createdLock.Lock.ID == "" || createdLock.Lock.Owner.Name != "Alice" {
 		t.Fatalf("unexpected created lock: %+v", createdLock)
 	}
 
-	if _, createLockErr := lfsSvc.CreateLock(ctx, project.ID, other.ID, CreateLockInput{Path: "assets/big.bin"}); createLockErr == nil {
+	if _, createLockErr := fixture.service.CreateLock(fixture.ctx, fixture.projectID, fixture.otherID, lfsservice.CreateLockInput{Path: "assets/big.bin"}); createLockErr == nil {
 		t.Fatalf("expected duplicate lock create to fail")
 	}
 
-	createdOtherLock, err := lfsSvc.CreateLock(ctx, project.ID, other.ID, CreateLockInput{Path: "assets/other.bin"})
-	if err != nil {
-		t.Fatalf("create second lfs lock: %v", err)
-	}
+	createdOtherLock := testutil.Must(fixture.service.CreateLock(fixture.ctx, fixture.projectID, fixture.otherID, lfsservice.CreateLockInput{Path: "assets/other.bin"}))
+	assertLFSLockLists(t, fixture)
+	assertLFSUnlock(t, fixture, createdOtherLock.Lock.ID)
+}
 
-	listed, err := lfsSvc.ListLocks(ctx, project.ID, LockListInput{Limit: 10})
-	if err != nil {
-		t.Fatalf("list lfs locks: %v", err)
-	}
+func assertLFSLockLists(t *testing.T, fixture lfsFixture) {
+	t.Helper()
+
+	listed := testutil.Must(fixture.service.ListLocks(fixture.ctx, fixture.projectID, lfsservice.LockListInput{Limit: 10}))
 	if len(listed.Locks) != 2 {
 		t.Fatalf("expected 2 lfs locks, got %d", len(listed.Locks))
 	}
 
-	verified, err := lfsSvc.VerifyLocks(ctx, project.ID, owner.ID, LockListInput{Limit: 10})
-	if err != nil {
-		t.Fatalf("verify lfs locks: %v", err)
-	}
+	verified := testutil.Must(fixture.service.VerifyLocks(fixture.ctx, fixture.projectID, fixture.ownerID, lfsservice.LockListInput{Limit: 10}))
 	if len(verified.Ours) != 1 || len(verified.Theirs) != 1 {
 		t.Fatalf("unexpected lfs verify result: %+v", verified)
 	}
+}
 
-	if _, unlockErr := lfsSvc.Unlock(ctx, project.ID, owner.ID, createdOtherLock.Lock.ID, UnlockInput{}); unlockErr == nil {
+func assertLFSUnlock(t *testing.T, fixture lfsFixture, lockID string) {
+	t.Helper()
+
+	if _, unlockErr := fixture.service.Unlock(fixture.ctx, fixture.projectID, fixture.ownerID, lockID, lfsservice.UnlockInput{}); unlockErr == nil {
 		t.Fatalf("expected unlocking another user's lock without force to fail")
 	}
 
-	unlocked, err := lfsSvc.Unlock(ctx, project.ID, owner.ID, createdOtherLock.Lock.ID, UnlockInput{Force: true})
-	if err != nil {
-		t.Fatalf("force unlock lfs lock: %v", err)
-	}
-	if unlocked.Lock.ID != createdOtherLock.Lock.ID {
+	unlocked := testutil.Must(fixture.service.Unlock(fixture.ctx, fixture.projectID, fixture.ownerID, lockID, lfsservice.UnlockInput{Force: true}))
+	if unlocked.Lock.ID != lockID {
 		t.Fatalf("unexpected unlocked lfs lock: %+v", unlocked)
 	}
 }

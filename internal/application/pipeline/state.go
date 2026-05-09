@@ -30,31 +30,17 @@ func (s *Service) refreshPipelineState(ctx context.Context, projectID, pipelineI
 	if err != nil {
 		return cidomain.ProjectPipeline{}, err
 	}
-	items, err := s.pipelineJobRepo.ListByPipelineID(ctx, projectID, pipelineID)
+	items, jobs, err := s.loadPipelineJobState(ctx, projectID, pipelineID)
 	if err != nil {
-		return cidomain.ProjectPipeline{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID).Wrapf(err, "list pipeline jobs")
-	}
-	jobs := make(map[string]cidomain.ProjectJob, items.Len())
-	itemValues := items.Values()
-	for i := range itemValues {
-		item := itemValues[i]
-		job, jobErr := s.jobRepo.GetByID(ctx, item.ProjectJobID)
-		if jobErr != nil {
-			return cidomain.ProjectPipeline{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", item.ProjectJobID).Wrapf(jobErr, "load pipeline project job")
-		}
-		jobs[item.Stage] = job
+		return cidomain.ProjectPipeline{}, err
 	}
 	nextStatus := pipelineStatus(jobs)
-	if nextStatus != gitports.ProjectPipelineStatusFailed && nextStatus != gitports.ProjectPipelineStatusCancelled {
-		if releaseErr := s.releaseReadyJobs(ctx, itemValues, jobs); releaseErr != nil {
-			return cidomain.ProjectPipeline{}, releaseErr
-		}
-		nextStatus = pipelineStatus(jobs)
+	nextStatus, err = s.advancePipelineJobs(ctx, items, jobs, nextStatus)
+	if err != nil {
+		return cidomain.ProjectPipeline{}, err
 	}
-	if nextStatus == gitports.ProjectPipelineStatusFailed || nextStatus == gitports.ProjectPipelineStatusCancelled {
-		if cancelErr := s.cancelPendingJobs(ctx, jobs); cancelErr != nil {
-			return cidomain.ProjectPipeline{}, cancelErr
-		}
+	if cancelErr := s.cancelTerminalPipelineJobs(ctx, jobs, nextStatus); cancelErr != nil {
+		return cidomain.ProjectPipeline{}, cancelErr
 	}
 	if updateErr := s.pipelineRepo.UpdateStatus(ctx, pipeline, nextStatus); updateErr != nil {
 		return cidomain.ProjectPipeline{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "status", nextStatus).Wrapf(updateErr, "update pipeline status")
@@ -64,6 +50,45 @@ func (s *Service) refreshPipelineState(ctx context.Context, projectID, pipelineI
 		return cidomain.ProjectPipeline{}, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID).Wrapf(err, "reload pipeline")
 	}
 	return updated, nil
+}
+
+func (s *Service) advancePipelineJobs(ctx context.Context, items []cidomain.ProjectPipelineJob, jobs map[string]cidomain.ProjectJob, status string) (string, error) {
+	if isTerminalPipelineStopStatus(status) {
+		return status, nil
+	}
+	if err := s.releaseReadyJobs(ctx, items, jobs); err != nil {
+		return "", err
+	}
+	return pipelineStatus(jobs), nil
+}
+
+func (s *Service) cancelTerminalPipelineJobs(ctx context.Context, jobs map[string]cidomain.ProjectJob, status string) error {
+	if !isTerminalPipelineStopStatus(status) {
+		return nil
+	}
+	return s.cancelPendingJobs(ctx, jobs)
+}
+
+func isTerminalPipelineStopStatus(status string) bool {
+	return status == gitports.ProjectPipelineStatusFailed || status == gitports.ProjectPipelineStatusCancelled
+}
+
+func (s *Service) loadPipelineJobState(ctx context.Context, projectID, pipelineID int64) ([]cidomain.ProjectPipelineJob, map[string]cidomain.ProjectJob, error) {
+	items, err := s.pipelineJobRepo.ListByPipelineID(ctx, projectID, pipelineID)
+	if err != nil {
+		return nil, nil, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID).Wrapf(err, "list pipeline jobs")
+	}
+	itemValues := items.Values()
+	jobs := make(map[string]cidomain.ProjectJob, len(itemValues))
+	for i := range itemValues {
+		item := itemValues[i]
+		job, jobErr := s.jobRepo.GetByID(ctx, item.ProjectJobID)
+		if jobErr != nil {
+			return nil, nil, oops.In("pipeline").With("project_id", projectID, "pipeline_id", pipelineID, "project_job_id", item.ProjectJobID).Wrapf(jobErr, "load pipeline project job")
+		}
+		jobs[item.Stage] = job
+	}
+	return itemValues, jobs, nil
 }
 
 func (s *Service) releaseReadyJobs(ctx context.Context, items []cidomain.ProjectPipelineJob, jobs map[string]cidomain.ProjectJob) error {

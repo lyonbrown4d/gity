@@ -1,16 +1,17 @@
-package mergerequest
+package mergerequest_test
 
 import (
 	"net/http"
 	"testing"
 
+	mergerequest "github.com/DaiYuANg/gity/internal/interfaces/http/merge_request"
 	"github.com/arcgolabs/httpx"
 )
 
 func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(mergerequest.NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-requests")
@@ -22,7 +23,7 @@ func TestEndpointRegistersCanonicalMergeRequestRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoMergeRequestAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(NewEndpoint(nil, nil, nil))
+	server.RegisterOnly(mergerequest.NewEndpoint(nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/merge-requests")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/merge-requests")
