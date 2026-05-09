@@ -10,7 +10,8 @@ func Module() dix.Module {
 		dix.Providers(
 			dix.Provider2(NewPipelineDeps),
 			dix.Provider2(NewGitDependencies),
-			dix.Provider6(NewServiceWithDependencies),
+			dix.Provider5(NewRepositories),
+			dix.Provider4(NewServiceWithDependencies),
 		),
 	)
 }

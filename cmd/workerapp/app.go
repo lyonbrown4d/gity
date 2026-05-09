@@ -38,6 +38,7 @@ import (
 	projectlfslockrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_lock"
 	projectlfsobjectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_lfs_object"
 	projectmergerequestrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request"
+	projectmergerequestparticipantrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_merge_request_participant"
 	projectpackagerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package"
 	projectpackagefilerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package_file"
 	projectpackageversionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_package_version"
@@ -125,6 +126,7 @@ func repositoryRuntimeModule() dix.Module {
 			projectlfslockrepo.Module(),
 			projectlfsobjectrepo.Module(),
 			projectmergerequestrepo.Module(),
+			projectmergerequestparticipantrepo.Module(),
 			projectpackagerepo.Module(),
 			projectpackageversionrepo.Module(),
 			projectpackagefilerepo.Module(),

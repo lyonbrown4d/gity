@@ -169,6 +169,13 @@ func fixMigrations() []Migration {
 				return autoMigrate(ctx, tx, "0016_project_audit_events", dbschema.ProjectAuditEventSchema)
 			},
 		},
+		{
+			Version: "0017_project_merge_request_participants",
+			Name:    "add project merge request participants",
+			Apply: func(ctx context.Context, tx *dbx.Tx) error {
+				return autoMigrate(ctx, tx, "0017_project_merge_request_participants", dbschema.ProjectMergeRequestParticipantSchema)
+			},
+		},
 	}
 }
 

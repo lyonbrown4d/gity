@@ -93,6 +93,9 @@ func (p ProjectBranchProtection) MatchesBranch(branchName string) bool {
 }
 
 func (p ProjectBranchProtection) BlocksDirectPush() bool {
+	if p.RequiresMergeRequest() {
+		return true
+	}
 	accessLevel := NormalizeProjectBranchProtectionAccessLevel(p.PushAccessLevel, ProjectBranchProtectionAccessNoOne)
 	return accessLevel == ProjectBranchProtectionAccessNoOne
 }
@@ -103,6 +106,14 @@ func (p ProjectBranchProtection) BlocksDelete() bool {
 
 func (p ProjectBranchProtection) BlocksForcePush() bool {
 	return p.AllowForcePush == 0
+}
+
+func (p ProjectBranchProtection) RequiresMergeRequest() bool {
+	return p.RequireMergeRequest != 0
+}
+
+func (p ProjectBranchProtection) RequiresPipelineSuccess() bool {
+	return p.RequirePipelineSuccess != 0
 }
 
 func wildcardMatch(pattern, value string) bool {

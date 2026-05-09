@@ -14,6 +14,11 @@ type ProjectMergeRequestRepository interface {
 	UpdateByID(ctx context.Context, id int64, input UpdateProjectMergeRequestInput) error
 }
 
+type ProjectMergeRequestParticipantRepository interface {
+	ListByMergeRequestID(ctx context.Context, mergeRequestID int64) (*collectionx.List[mergedomain.ProjectMergeRequestParticipant], error)
+	ReplaceByMergeRequestAndRole(ctx context.Context, mergeRequestID int64, role string, userIDs []int64) (*collectionx.List[mergedomain.ProjectMergeRequestParticipant], error)
+}
+
 type CreateProjectMergeRequestInput struct {
 	ProjectID    int64
 	AuthorUserID int64

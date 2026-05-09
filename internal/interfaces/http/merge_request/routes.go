@@ -38,6 +38,13 @@ type mergeMergeRequestInput struct {
 	Body          mergeMergeRequestBody `json:"body"`
 }
 
+type setParticipantsInput struct {
+	ProjectID     int64            `path:"id"`
+	MergeIID      int64            `path:"merge_iid"`
+	Authorization string           `header:"Authorization"`
+	Body          participantsBody `json:"body"`
+}
+
 type mergeRequestOutput struct {
 	Body any `json:"body"`
 }
@@ -60,6 +67,10 @@ type mergeMergeRequestBody struct {
 	AuthorName  string `json:"author_name"`
 	AuthorEmail string `json:"author_email"`
 	Message     string `json:"message"`
+}
+
+type participantsBody struct {
+	UserIDs []int64 `json:"user_ids"`
 }
 
 type Endpoint struct {
@@ -88,6 +99,8 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/diff", e.getDiff, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/diff instead.")),
 		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/checks", e.getChecks),
 		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/checks", e.getChecks, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/checks instead.")),
+		httpapi.Get("/projects/{id}/merge-requests/{merge_iid}/participants", e.listParticipants),
+		httpapi.Get("/repos/{id}/merge-requests/{merge_iid}/participants", e.listParticipants, httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/participants instead.")),
 		httpapi.Post("/projects/{id}/merge-requests", e.createMergeRequest, httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime)),
 		httpapi.Post("/repos/{id}/merge-requests", e.createMergeRequest,
 			httpapi.RequireUserRoute[createMergeRequestInput, mergeRequestOutput](authRuntime),
@@ -97,6 +110,16 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Post("/repos/{id}/merge-requests/{merge_iid}/merge", e.mergeMergeRequest,
 			httpapi.RequireUserRoute[mergeMergeRequestInput, mergeRequestOutput](authRuntime),
 			httpapi.DeprecatedRoute[mergeMergeRequestInput, mergeRequestOutput]("Use POST /projects/{id}/merge-requests/{merge_iid}/merge instead."),
+		),
+		httpapi.Patch("/projects/{id}/merge-requests/{merge_iid}/reviewers", e.setReviewers, httpapi.RequireUserRoute[setParticipantsInput, mergeRequestOutput](authRuntime)),
+		httpapi.Patch("/repos/{id}/merge-requests/{merge_iid}/reviewers", e.setReviewers,
+			httpapi.RequireUserRoute[setParticipantsInput, mergeRequestOutput](authRuntime),
+			httpapi.DeprecatedRoute[setParticipantsInput, mergeRequestOutput]("Use PATCH /projects/{id}/merge-requests/{merge_iid}/reviewers instead."),
+		),
+		httpapi.Patch("/projects/{id}/merge-requests/{merge_iid}/assignees", e.setAssignees, httpapi.RequireUserRoute[setParticipantsInput, mergeRequestOutput](authRuntime)),
+		httpapi.Patch("/repos/{id}/merge-requests/{merge_iid}/assignees", e.setAssignees,
+			httpapi.RequireUserRoute[setParticipantsInput, mergeRequestOutput](authRuntime),
+			httpapi.DeprecatedRoute[setParticipantsInput, mergeRequestOutput]("Use PATCH /projects/{id}/merge-requests/{merge_iid}/assignees instead."),
 		),
 		httpapi.Patch("/projects/{id}/merge-requests/{merge_iid}", e.updateMergeRequest, httpapi.RequireUserRoute[updateMergeRequestInput, mergeRequestOutput](authRuntime)),
 		httpapi.Patch("/repos/{id}/merge-requests/{merge_iid}", e.updateMergeRequest,
@@ -115,5 +138,9 @@ func (in updateMergeRequestInput) AuthorizationHeader() string {
 }
 
 func (in mergeMergeRequestInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in setParticipantsInput) AuthorizationHeader() string {
 	return in.Authorization
 }

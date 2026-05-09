@@ -36,17 +36,43 @@ func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Proj
 		MergeRequest:    mr,
 		SourceBranch:    branch.Name,
 		SourceCommitSHA: branch.Hash,
+		TargetBranch:    mr.TargetBranch,
 		Mergeable:       true,
 		Status:          "not_required",
 	}
-	required, err := s.hasCIConfig(ctx, project, branch.Hash)
+	if protectionErr := s.applyTargetBranchProtection(ctx, project.ID, mr.TargetBranch, &view); protectionErr != nil {
+		return CheckStatusView{}, protectionErr
+	}
+	ciRequired, err := s.hasCIConfig(ctx, project, branch.Hash)
 	if err != nil {
 		return CheckStatusView{}, err
 	}
-	if !required {
+	if !view.pipelineIsRequired(ciRequired) {
 		return view, nil
 	}
+	return s.evaluateRequiredPipeline(ctx, project, mr, branch, view)
+}
+
+func (s *Service) applyTargetBranchProtection(ctx context.Context, projectID int64, targetBranch string, view *CheckStatusView) error {
+	protection, protected, err := s.targetBranchProtection(ctx, projectID, targetBranch)
+	if err != nil {
+		return err
+	}
+	if protected {
+		view.TargetBranchProtected = true
+		view.RequireMergeRequest = protection.RequiresMergeRequest()
+		view.RequirePipelineSuccess = protection.RequiresPipelineSuccess()
+	}
+	return nil
+}
+
+func (view CheckStatusView) pipelineIsRequired(ciRequired bool) bool {
+	return ciRequired || view.RequirePipelineSuccess
+}
+
+func (s *Service) evaluateRequiredPipeline(ctx context.Context, project projectdomain.Project, mr mergedomain.ProjectMergeRequest, branch gitports.Branch, view CheckStatusView) (CheckStatusView, error) {
 	view.Required = true
+	view.PipelineRequired = true
 	view.Mergeable = false
 	if s.pipelineRepo == nil {
 		view.Status = "missing"
@@ -69,6 +95,20 @@ func (s *Service) evaluateChecks(ctx context.Context, project projectdomain.Proj
 		view.BlockingReason = "pipeline status is " + pipeline.Status
 	}
 	return view, nil
+}
+
+func (s *Service) targetBranchProtection(ctx context.Context, projectID int64, branchName string) (projectdomain.ProjectBranchProtection, bool, error) {
+	if s.branchRepo == nil {
+		return projectdomain.ProjectBranchProtection{}, false, nil
+	}
+	protection, err := s.branchRepo.MatchByProjectAndBranch(ctx, projectID, branchName)
+	if err == nil {
+		return protection, true, nil
+	}
+	if errors.Is(err, gitports.ErrNotFound) {
+		return projectdomain.ProjectBranchProtection{}, false, nil
+	}
+	return projectdomain.ProjectBranchProtection{}, false, oops.In("merge_request").With("project_id", projectID, "target_branch", branchName).Wrapf(err, "check target branch protection")
 }
 
 func (s *Service) hasCIConfig(ctx context.Context, project projectdomain.Project, commitSHA string) (bool, error) {

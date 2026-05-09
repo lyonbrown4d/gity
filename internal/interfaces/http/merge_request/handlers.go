@@ -40,6 +40,14 @@ func (e *Endpoint) getChecks(ctx context.Context, in *mergeRequestInput) (*merge
 	return &mergeRequestOutput{Body: item}, nil
 }
 
+func (e *Endpoint) listParticipants(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
+	item, err := e.service.ListParticipants(ctx, in.ProjectID, in.MergeIID)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
 func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
 	input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
 	if err != nil {
@@ -68,6 +76,30 @@ func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestI
 	}
 	input.ActorUserID = actorUserID
 	item, err := e.service.Merge(ctx, in.ProjectID, in.MergeIID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) setReviewers(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.ParticipantsInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.SetReviewers(ctx, in.ProjectID, in.MergeIID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) setAssignees(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.ParticipantsInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.SetAssignees(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {
 		return nil, err
 	}

@@ -58,6 +58,10 @@ func (s ProjectMergeRequestSchemaDef) AllColumns() *collectionx.List[querydsl.Se
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectMergeRequestParticipantSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectPackageFileSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
