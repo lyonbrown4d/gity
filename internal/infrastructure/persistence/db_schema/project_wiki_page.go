@@ -21,7 +21,7 @@ type ProjectWikiPageSchemaDef struct {
 	LastEditedByUserID column.Column[wikidomain.ProjectWikiPage, int64]                      `dbx:"last_edited_by_user_id,index,ref=users.id,ondelete=restrict"`
 	CreatedAt          column.Column[wikidomain.ProjectWikiPage, time.Time]                  `dbx:"created_at,type=TIMESTAMP"`
 	UpdatedAt          column.Column[wikidomain.ProjectWikiPage, time.Time]                  `dbx:"updated_at,type=TIMESTAMP"`
-	ProjectSlugUnique  schema.Unique[wikidomain.ProjectWikiPage]                             `idx:"columns=project_id,slug"`
+	ProjectSlugUnique  schema.Unique[wikidomain.ProjectWikiPage]                             `idx:"columns=project_id|slug"`
 }
 
 var ProjectWikiPageSchema = schema.MustSchema("project_wiki_pages", ProjectWikiPageSchemaDef{})

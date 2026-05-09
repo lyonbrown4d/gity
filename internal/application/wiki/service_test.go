@@ -25,8 +25,9 @@ func TestProjectWikiPageFlow(t *testing.T) {
 
 	fixture := newWikiFixture(t)
 	pageID := assertCreateWikiPage(t, fixture)
+	otherPageID := assertCreateAnotherWikiPage(t, fixture)
 	assertDuplicateWikiPageFails(t, fixture)
-	assertListWikiPages(t, fixture, pageID)
+	assertListWikiPages(t, fixture, pageID, otherPageID)
 	assertGetWikiPage(t, fixture, pageID)
 	assertUpdateWikiPage(t, fixture)
 	assertDeleteWikiPage(t, fixture, pageID)
@@ -91,6 +92,21 @@ func assertCreateWikiPage(t *testing.T, fixture wikiFixture) int64 {
 	return created.ID
 }
 
+func assertCreateAnotherWikiPage(t *testing.T, fixture wikiFixture) int64 {
+	t.Helper()
+
+	created := testutil.Must(fixture.service.CreatePage(fixture.ctx, fixture.projectID, wikiservice.CreatePageInput{
+		Slug:         "architecture-notes",
+		Title:        "Architecture Notes",
+		Content:      "# Architecture Notes\n",
+		AuthorUserID: fixture.authorID,
+	}))
+	if created.Slug != "architecture-notes" || created.ProjectID != fixture.projectID {
+		t.Fatalf("unexpected second wiki page: %+v", created)
+	}
+	return created.ID
+}
+
 func assertDuplicateWikiPageFails(t *testing.T, fixture wikiFixture) {
 	t.Helper()
 
@@ -104,12 +120,19 @@ func assertDuplicateWikiPageFails(t *testing.T, fixture wikiFixture) {
 	}
 }
 
-func assertListWikiPages(t *testing.T, fixture wikiFixture, pageID int64) {
+func assertListWikiPages(t *testing.T, fixture wikiFixture, pageID, otherPageID int64) {
 	t.Helper()
 
 	pages := testutil.Must(fixture.service.ListPages(fixture.ctx, fixture.projectID))
-	if len(pages) != 1 || pages[0].ID != pageID {
+	if len(pages) != 2 {
 		t.Fatalf("unexpected wiki page list: %+v", pages)
+	}
+	seen := map[int64]bool{}
+	for _, page := range pages {
+		seen[page.ID] = true
+	}
+	if !seen[pageID] || !seen[otherPageID] {
+		t.Fatalf("wiki page list does not include expected pages: %+v", pages)
 	}
 }
 

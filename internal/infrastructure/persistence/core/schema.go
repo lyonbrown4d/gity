@@ -42,7 +42,8 @@ func EnsureSchema(ctx context.Context, db *dbx.DB) error {
 func migrations() []Migration {
 	items := coreMigrations()
 	items = append(items, featureMigrations()...)
-	return append(items, ciMigrations()...)
+	items = append(items, ciMigrations()...)
+	return append(items, fixMigrations()...)
 }
 
 func coreMigrations() []Migration {
@@ -142,6 +143,65 @@ func ciMigrations() []Migration {
 			},
 		},
 	}
+}
+
+func fixMigrations() []Migration {
+	return []Migration{
+		{
+			Version: "0013_project_wiki_page_slug_unique",
+			Name:    "fix project wiki page project slug unique index",
+			Apply: func(ctx context.Context, tx *dbx.Tx) error {
+				return fixProjectWikiPageSlugUniqueIndex(ctx, tx)
+			},
+		},
+	}
+}
+
+func fixProjectWikiPageSlugUniqueIndex(ctx context.Context, tx *dbx.Tx) error {
+	dialectName := ""
+	if tx != nil && tx.Dialect() != nil {
+		dialectName = tx.Dialect().Name()
+	}
+	switch dialectName {
+	case "sqlite", "postgres":
+		if _, err := tx.ExecContext(ctx, `DROP INDEX IF EXISTS "ux_project_wiki_pages_project_slug_unique"`); err != nil {
+			return oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "dialect", dialectName).Wrapf(err, "drop old project wiki unique index")
+		}
+		if _, err := tx.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS "ux_project_wiki_pages_project_slug_unique" ON "project_wiki_pages" ("project_id", "slug")`); err != nil {
+			return oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "dialect", dialectName).Wrapf(err, "create project wiki project slug unique index")
+		}
+		return nil
+	case "mysql":
+		exists, err := mysqlIndexExists(ctx, tx, "project_wiki_pages", "ux_project_wiki_pages_project_slug_unique")
+		if err != nil {
+			return err
+		}
+		if exists {
+			if _, err := tx.ExecContext(ctx, "DROP INDEX `ux_project_wiki_pages_project_slug_unique` ON `project_wiki_pages`"); err != nil {
+				return oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "dialect", dialectName).Wrapf(err, "drop old project wiki unique index")
+			}
+		}
+		if _, err := tx.ExecContext(ctx, "CREATE UNIQUE INDEX `ux_project_wiki_pages_project_slug_unique` ON `project_wiki_pages` (`project_id`, `slug`)"); err != nil {
+			return oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "dialect", dialectName).Wrapf(err, "create project wiki project slug unique index")
+		}
+		return nil
+	default:
+		return oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "dialect", dialectName).New("unsupported database dialect")
+	}
+}
+
+func mysqlIndexExists(ctx context.Context, tx *dbx.Tx, tableName, indexName string) (bool, error) {
+	var count int
+	err := tx.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM information_schema.statistics
+WHERE table_schema = DATABASE()
+  AND table_name = ?
+  AND index_name = ?`, tableName, indexName).Scan(&count)
+	if err != nil {
+		return false, oops.In("persistence.schema").With("migration_version", "0013_project_wiki_page_slug_unique", "table", tableName, "index", indexName).Wrapf(err, "check mysql index")
+	}
+	return count > 0, nil
 }
 
 func autoMigrate(ctx context.Context, tx *dbx.Tx, migrationVersion string, schemas ...schemamigrate.Resource) error {
