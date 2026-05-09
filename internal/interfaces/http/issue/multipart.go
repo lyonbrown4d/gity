@@ -153,9 +153,9 @@ func parseOptionalInt64(value string) (int64, error) {
 }
 
 func toIssueAttachmentUploadView(projectID, issueIID int64, item issueservice.AttachmentUploadView) issueAttachmentUploadView {
-	downloadURL := fmt.Sprintf("/api/v1/repos/%d/issues/attachments/raw?object_key=%s", projectID, url.QueryEscape(item.ObjectKey))
+	downloadURL := fmt.Sprintf("/api/v1/projects/%d/issues/attachments/raw?object_key=%s", projectID, url.QueryEscape(item.ObjectKey))
 	if item.Attachment != nil {
-		downloadURL = fmt.Sprintf("/api/v1/repos/%d/issues/%d/attachments/%d/raw", projectID, issueIID, item.Attachment.ID)
+		downloadURL = fmt.Sprintf("/api/v1/projects/%d/issues/%d/attachments/%d/raw", projectID, issueIID, item.Attachment.ID)
 	}
 	return issueAttachmentUploadView{
 		URL:         downloadURL,

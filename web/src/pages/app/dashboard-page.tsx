@@ -20,7 +20,7 @@ export function AppDashboardPage(): JSX.Element {
     resource: "organizations",
   });
   const repoQuery = useList<RepositoryView>({
-    resource: "my-repositories",
+    resource: "my-projects",
   });
 
   const user = userQuery.data?.data ?? null;
@@ -41,11 +41,11 @@ export function AppDashboardPage(): JSX.Element {
       <ProductHero
         eyebrow={t("User Workspace")}
         title={t("Dashboard")}
-        description={t("Overview of your account, organizations, and repository workspace.")}
+        description={t("Overview of your account, organizations, and project workspace.")}
         actions={(
           <>
             <Button asChild className="action-pop">
-              <Link to="/app/repositories">{t("Open Repositories")}</Link>
+              <Link to="/app/projects">{t("Open Projects")}</Link>
             </Button>
             <Button asChild variant="outline" className="action-pop">
               <Link to="/app/profile">{t("Edit Profile")}</Link>
@@ -95,9 +95,9 @@ export function AppDashboardPage(): JSX.Element {
         />
         <ProductMetricCard
           icon={FolderGit2}
-          label={t("Repositories")}
+          label={t("Projects")}
           value={isLoading ? "--" : String(repos.length)}
-          description={t("Total repositories visible to you.")}
+          description={t("Total projects visible to you.")}
         />
         <ProductMetricCard
           icon={ShieldCheck}

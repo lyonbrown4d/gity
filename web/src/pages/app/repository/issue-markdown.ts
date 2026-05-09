@@ -6,7 +6,7 @@ export const buildIssueDetailPath = (
   repoId: string,
   issueNumber: number | string,
 ): string => {
-  return `/app/repositories/${organizationId}/${repoId}/issues/${issueNumber}`;
+  return `/app/projects/${organizationId}/${repoId}/issues/${issueNumber}`;
 };
 
 export const linkifyLocalIssueReferences = (

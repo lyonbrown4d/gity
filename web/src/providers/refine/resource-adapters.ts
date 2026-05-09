@@ -91,7 +91,7 @@ const organizationsAdapter: ResourceAdapter = {
   },
 };
 
-const repositoriesAdapter: ResourceAdapter = {
+const projectsAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
     const ids = resolveFilterIds(params);
     const query = new URLSearchParams();
@@ -107,12 +107,12 @@ const repositoriesAdapter: ResourceAdapter = {
     if (ids.length === 0) {
       appendPagination(query, params.pagination, 50);
     }
-    const path = query.size > 0 ? `/repos?${query.toString()}` : "/repos";
+    const path = query.size > 0 ? `/projects?${query.toString()}` : "/projects";
     const payload = await apiRequest<ListPayload<TData>>(path);
     return normalizeListPayload(payload);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => ({
-    data: await apiRequest<TData>(`/repos/${params.id}`),
+    data: await apiRequest<TData>(`/projects/${params.id}`),
   }),
   getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
     const query = new URLSearchParams();
@@ -125,13 +125,13 @@ const repositoriesAdapter: ResourceAdapter = {
       query.set("all", "true");
     }
     appendIds(query, params.ids);
-    const payload = await apiRequest<ListPayload<TData>>(`/repos?${query.toString()}`);
+    const payload = await apiRequest<ListPayload<TData>>(`/projects?${query.toString()}`);
     return { data: normalizeListPayload(payload).data };
   },
   create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: CreateParams<TVariables>,
   ) => {
-    const data = await apiRequest<TData>("/repos", {
+    const data = await apiRequest<TData>("/projects", {
       method: "POST",
       body: JSON.stringify(params.variables),
     });
@@ -140,7 +140,7 @@ const repositoriesAdapter: ResourceAdapter = {
   deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
     params: DeleteOneParams<TVariables>,
   ) => {
-    const data = await apiRequest<TData>(`/repos/${params.id}`, { method: "DELETE" });
+    const data = await apiRequest<TData>(`/projects/${params.id}`, { method: "DELETE" });
     return { data };
   },
 };
@@ -245,8 +245,10 @@ const profileAdapter: ResourceAdapter = {
 
 const resourceAdapters: Record<string, ResourceAdapter> = {
   organizations: organizationsAdapter,
-  repositories: repositoriesAdapter,
-  "my-repositories": repositoriesAdapter,
+  projects: projectsAdapter,
+  "my-projects": projectsAdapter,
+  repositories: projectsAdapter,
+  "my-repositories": projectsAdapter,
   "organization-members": organizationMembersAdapter,
   users: usersAdapter,
   profile: profileAdapter,

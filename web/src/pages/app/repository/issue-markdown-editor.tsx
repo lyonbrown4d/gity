@@ -262,7 +262,7 @@ export const IssueMarkdownEditor = (props: IssueMarkdownEditorProps): JSX.Elemen
     }
     const suffix = query.toString() ? `?${query.toString()}` : "";
     const response = await uploadAttachment({
-      url: `/repos/${repoId}/issues/attachments${suffix}`,
+      url: `/projects/${repoId}/issues/attachments${suffix}`,
       method: "post",
       values: form,
     });

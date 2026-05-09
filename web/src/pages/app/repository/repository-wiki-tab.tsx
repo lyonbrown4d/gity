@@ -3,8 +3,10 @@ import { BookOpen, Edit3, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmAction } from "@/components/common/confirm-action";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryWikiPageView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 import { renderMarkdown } from "./repository-utils";
@@ -136,11 +138,6 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
     if (!selectedPage) {
       return;
     }
-    const confirmText = t("Delete wiki page \"{title}\"?").replace("{title}", selectedPage.title);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
-
     onError(null);
     try {
       await deleteWikiPage({
@@ -300,8 +297,8 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                 />
               </div>
             </div>
-            <textarea
-              className="min-h-44 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+            <Textarea
+              className="min-h-44"
               value={newContent}
               onChange={(event) => setNewContent(event.target.value)}
               placeholder="# Getting Started"
@@ -354,16 +351,23 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                       {t("Last edited by")}: {selectedPage.last_edited_by_user_id || "--"}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isDeletingPage}
-                    onClick={() => void submitDeletePage()}
+                  <ConfirmAction
+                    title={selectedPage ? t("Delete wiki page \"{title}\"?").replace("{title}", selectedPage.title) : t("Delete")}
+                    description={t("This action cannot be undone.")}
+                    confirmLabel={t("Delete")}
+                    cancelLabel={t("Cancel")}
+                    onConfirm={() => void submitDeletePage()}
                   >
-                    <Trash2 className="size-4" />
-                    {t("Delete")}
-                  </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isDeletingPage}
+                    >
+                      <Trash2 className="size-4" />
+                      {t("Delete")}
+                    </Button>
+                  </ConfirmAction>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-[1fr_180px]">
@@ -396,8 +400,8 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                       <Edit3 className="size-4" />
                       {t("Write")}
                     </div>
-                    <textarea
-                      className="min-h-80 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                    <Textarea
+                      className="min-h-80"
                       value={draftContent}
                       onChange={(event) => setDraftContent(event.target.value)}
                     />

@@ -16,7 +16,7 @@ export function AdminLayout(): JSX.Element {
   const adminMenus = [
     { to: "/admin", label: t("Overview"), icon: Shield },
     { to: "/admin/orgs", label: t("Organizations"), icon: Building2 },
-    { to: "/admin/repos", label: t("Repositories"), icon: Boxes },
+    { to: "/admin/projects", label: t("Projects"), icon: Boxes },
   ];
   const menuItems = permissions?.isSuperAdmin
     ? [...adminMenus, { to: "/admin/users", label: t("Users"), icon: Users }]

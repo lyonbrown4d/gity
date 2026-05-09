@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type {
   RepositoryBranchView,
   RepositoryMergeRequestDiffView,
@@ -35,7 +36,7 @@ export const RepositoryMergeRequestsTab = ({
   onMerged,
 }: RepositoryMergeRequestsTabProps): JSX.Element => {
   const mergeRequestsQuery = useCustom<RawRecord[]>({
-    url: `/repos/${repoId}/merge-requests`,
+    url: `/projects/${repoId}/merge-requests`,
     method: "get",
     queryOptions: {
       enabled: Boolean(repoId),
@@ -44,7 +45,7 @@ export const RepositoryMergeRequestsTab = ({
   });
   const [selectedIID, setSelectedIID] = useState<number | null>(null);
   const diffQuery = useCustom<RawRecord>({
-    url: selectedIID ? `/repos/${repoId}/merge-requests/${selectedIID}/diff` : `/repos/${repoId}/merge-requests/0/diff`,
+    url: selectedIID ? `/projects/${repoId}/merge-requests/${selectedIID}/diff` : `/projects/${repoId}/merge-requests/0/diff`,
     method: "get",
     queryOptions: {
       enabled: Boolean(repoId && selectedIID),
@@ -121,7 +122,7 @@ export const RepositoryMergeRequestsTab = ({
     onError(null);
     try {
       const response = await createMergeRequest({
-        url: `/repos/${repoId}/merge-requests`,
+        url: `/projects/${repoId}/merge-requests`,
         method: "post",
         values: {
           title: normalizedTitle,
@@ -150,7 +151,7 @@ export const RepositoryMergeRequestsTab = ({
     onError(null);
     try {
       await updateMergeRequest({
-        url: `/repos/${repoId}/merge-requests/${selectedMergeRequest.iid}`,
+        url: `/projects/${repoId}/merge-requests/${selectedMergeRequest.iid}`,
         method: "patch",
         values: { state: nextState },
       });
@@ -168,7 +169,7 @@ export const RepositoryMergeRequestsTab = ({
     onError(null);
     try {
       await mergeMergeRequest({
-        url: `/repos/${repoId}/merge-requests/${selectedMergeRequest.iid}/merge`,
+        url: `/projects/${repoId}/merge-requests/${selectedMergeRequest.iid}/merge`,
         method: "post",
         values: {},
       });
@@ -280,8 +281,8 @@ export const RepositoryMergeRequestsTab = ({
                   onChange={(event) => setTitle(event.target.value)}
                   required
                 />
-                <textarea
-                  className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                <Textarea
+                  className="min-h-24"
                   placeholder={t("Describe the merge request (optional)")}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}

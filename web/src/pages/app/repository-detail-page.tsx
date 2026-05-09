@@ -23,9 +23,9 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const params = useParams<{ organizationId: string; repoId: string }>();
+  const params = useParams<{ organizationId: string; projectId?: string; repoId?: string }>();
   const organizationId = params.organizationId ?? "";
-  const repoId = params.repoId ?? "";
+  const repoId = params.projectId ?? params.repoId ?? "";
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
@@ -34,7 +34,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
     organizationId,
     repoId,
     t,
-    onDeleted: () => navigate("/app/repositories", { replace: true }),
+    onDeleted: () => navigate("/app/projects", { replace: true }),
   });
   const source = useRepositorySourceController({
     repoId,
@@ -71,8 +71,8 @@ export const RepositoryDetailPage = (): JSX.Element => {
   return (
     <div className="space-y-4 page-enter">
       <div className="text-sm text-muted-foreground">
-        <Link to="/app/repositories" className="underline underline-offset-4">
-          {t("My Repositories")}
+        <Link to="/app/projects" className="underline underline-offset-4">
+          {t("My Projects")}
         </Link>
       </div>
 
@@ -96,7 +96,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {!meta.isLoading && !meta.repository ? (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">{t("Repository not found in selected organization.")}</p>
+            <p className="text-sm text-muted-foreground">{t("Project not found in selected organization.")}</p>
           </CardContent>
         </Card>
       ) : null}

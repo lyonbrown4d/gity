@@ -15,7 +15,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 
 const routeTitleMap: Record<string, string> = {
   "/app/dashboard": "Dashboard",
-  "/app/repositories": "My Repositories",
+  "/app/projects": "My Projects",
+  "/app/repositories": "My Projects",
   "/app/profile": "Profile",
 };
 
@@ -26,8 +27,8 @@ export function UserLayout(): JSX.Element {
   const { data: identity } = useGetIdentity<{ name?: string; email?: string; isSuperAdmin?: boolean }>();
   const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>();
   const currentTitle = t(
-    location.pathname.startsWith("/app/repositories/")
-      ? "Repository"
+    location.pathname.startsWith("/app/projects/") || location.pathname.startsWith("/app/repositories/")
+      ? "Project"
       : (routeTitleMap[location.pathname] ?? "Workspace"),
   );
 

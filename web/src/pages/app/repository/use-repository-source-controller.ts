@@ -266,7 +266,7 @@ export const useRepositorySourceController = ({
     onError(null);
     try {
       await createFileCommit({
-        url: `/projects/${repoId}/file-commits`,
+        url: `/projects/${repoId}/repository/files`,
         method: "post",
         values: { branch_name: branchName, path: filePath, content: newFileContent, message },
       });

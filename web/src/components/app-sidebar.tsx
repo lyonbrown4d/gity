@@ -29,7 +29,7 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
   const location = useLocation();
   const mainNavItems = [
     { title: t("Dashboard"), url: "/app/dashboard", icon: House },
-    { title: t("My Repositories"), url: "/app/repositories", icon: FolderGit2 },
+    { title: t("My Projects"), url: "/app/projects", icon: FolderGit2 },
     { title: t("Profile"), url: "/app/profile", icon: User },
   ] as const;
 
@@ -57,7 +57,7 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
             <span className="font-semibold text-sidebar-foreground">{t("Workspace")}</span>
             <span className="gity-dot bg-sidebar-primary" />
           </div>
-          <p className="leading-5">{t("Unified workspace for auth, organization management, and repository operations.")}</p>
+          <p className="leading-5">{t("Unified workspace for auth, organization management, and project operations.")}</p>
         </div>
       </SidebarHeader>
       <SidebarContent>

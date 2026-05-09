@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
+import { ConfirmAction } from "@/components/common/confirm-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,11 +80,6 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
   };
 
   const submitDeleteRunner = async (runner: RepositoryRunnerView) => {
-    const confirmText = t("Delete runner \"{name}\"?").replace("{name}", runner.name);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
-
     onError(null);
     try {
       await deleteRunner({
@@ -212,16 +208,23 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
                     {runner.last_contact_at ? <span>{formatRelativeTime(runner.last_contact_at)}</span> : <span>{t("No heartbeat yet")}</span>}
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={isDeleting}
-                  onClick={() => void submitDeleteRunner(runner)}
+                <ConfirmAction
+                  title={t("Delete runner \"{name}\"?").replace("{name}", runner.name)}
+                  description={t("This action cannot be undone.")}
+                  confirmLabel={t("Delete")}
+                  cancelLabel={t("Cancel")}
+                  onConfirm={() => void submitDeleteRunner(runner)}
                 >
-                  <Trash2 className="size-4" />
-                  {t("Delete")}
-                </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="size-4" />
+                    {t("Delete")}
+                  </Button>
+                </ConfirmAction>
               </div>
             </div>
           ))}

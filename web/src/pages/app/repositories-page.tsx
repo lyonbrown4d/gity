@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
+import { ConfirmAction } from "@/components/common/confirm-action";
+import { FormDialog as Modal } from "@/components/common/form-dialog";
 import { ProductHero, ProductStatusBadge } from "@/components/ui/product";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { OrganizationView, RepositoryView } from "@/pages/types";
@@ -49,7 +50,7 @@ export function AppRepositoriesPage(): JSX.Element {
   }, [createOwnerOrg, selectedOrg]);
 
   const repoQuery = useList<RepositoryView>({
-    resource: "my-repositories",
+    resource: "my-projects",
     meta: {
       organization_id: selectedOrg,
     },
@@ -76,7 +77,7 @@ export function AppRepositoriesPage(): JSX.Element {
     }
     createRepository(
       {
-        resource: "my-repositories",
+        resource: "my-projects",
         values: {
           organization_id: createOwnerOrg,
           key,
@@ -107,21 +108,17 @@ export function AppRepositoriesPage(): JSX.Element {
           }
         },
         onError: (error) => {
-          setActionError(error instanceof Error ? error.message : t("Failed to create repository"));
+          setActionError(error instanceof Error ? error.message : t("Failed to create project"));
         },
       },
     );
   };
 
   const submitDelete = (repo: RepositoryView) => {
-    const confirmText = t("Delete repository \"{name}\"?").replace("{name}", repo.name);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
     setActionError(null);
     deleteRepository(
       {
-        resource: "my-repositories",
+        resource: "my-projects",
         id: repo.id,
       },
       {
@@ -129,7 +126,7 @@ export function AppRepositoriesPage(): JSX.Element {
           await repoQuery.refetch();
         },
         onError: (error) => {
-          setActionError(error instanceof Error ? error.message : t("Failed to delete repository"));
+          setActionError(error instanceof Error ? error.message : t("Failed to delete project"));
         },
       },
     );
@@ -153,12 +150,12 @@ export function AppRepositoriesPage(): JSX.Element {
       <ProductHero
         className="card-enter"
         eyebrow={t("Workspace")}
-        title={t("My Repositories")}
-        description={t("Create, clone, and manage repositories in your organizations.")}
+        title={t("My Projects")}
+        description={t("Create, clone, and manage projects in your organizations.")}
         aside={(
             <Button type="button" onClick={openCreateModal} className="h-10 action-pop">
               <Plus className="size-4" />
-              {t("New Repository")}
+              {t("New Project")}
             </Button>
         )}
         contentClassName="space-y-4"
@@ -181,7 +178,7 @@ export function AppRepositoriesPage(): JSX.Element {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ProductStatusBadge icon={FolderGit2} variant="secondary">
-                {repos.length} {t("repos")}
+                {repos.length} {t("projects")}
               </ProductStatusBadge>
               <ProductStatusBadge icon={ShieldCheck}>
                 {selectedOrg ? t("organization selected") : t("no organization")}
@@ -203,17 +200,17 @@ export function AppRepositoriesPage(): JSX.Element {
               <FolderGit2 className="size-5" />
             </div>
             <div>
-              <CardTitle>{t("Repository List")}</CardTitle>
+              <CardTitle>{t("Project List")}</CardTitle>
               <CardDescription>
                 {selectedOrg
-                  ? t("Repositories under the selected organization.")
-                  : t("Select an organization to view repositories.")}
+                  ? t("Projects under the selected organization.")
+                  : t("Select an organization to view projects.")}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {isLoading ? <p className="text-sm text-muted-foreground">{t("Loading repositories...")}</p> : null}
+          {isLoading ? <p className="text-sm text-muted-foreground">{t("Loading projects...")}</p> : null}
 
           {repos.map((repo) => (
             <div key={repo.id} className="group space-y-4 rounded-2xl border border-border/70 bg-background/55 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-background/75 hover:shadow-[0_22px_70px_-55px_hsl(var(--foreground)/0.65)]">
@@ -221,7 +218,7 @@ export function AppRepositoriesPage(): JSX.Element {
                 <div className="min-w-0 space-y-1">
                   <p className="truncate font-medium">
                     <Link
-                      to={`/app/repositories/${repo.organization_id}/${repo.id}`}
+                      to={`/app/projects/${repo.organization_id}/${repo.id}`}
                       className="underline-offset-4 hover:underline"
                     >
                       {repo.name}
@@ -255,7 +252,7 @@ export function AppRepositoriesPage(): JSX.Element {
                   className="action-pop"
                   asChild
                 >
-                  <Link to={`/app/repositories/${repo.organization_id}/${repo.id}`}>
+                  <Link to={`/app/projects/${repo.organization_id}/${repo.id}`}>
                     <FolderGit2 className="size-4" />
                     {t("Open")}
                   </Link>
@@ -270,28 +267,35 @@ export function AppRepositoriesPage(): JSX.Element {
                   <Copy className="size-4" />
                   {t("Copy Clone URL")}
                 </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="action-pop"
-                  disabled={isDeleting}
-                  onClick={() => submitDelete(repo)}
+                <ConfirmAction
+                  title={t("Delete project \"{name}\"?").replace("{name}", repo.name)}
+                  description={t("This action cannot be undone.")}
+                  confirmLabel={t("Delete")}
+                  cancelLabel={t("Cancel")}
+                  onConfirm={() => submitDelete(repo)}
                 >
-                  <Trash2 className="size-4" />
-                  {t("Delete")}
-                </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="action-pop"
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="size-4" />
+                    {t("Delete")}
+                  </Button>
+                </ConfirmAction>
               </div>
             </div>
           ))}
 
           {repos.length === 0 && !errorMessage && !isLoading ? (
-            <p className="text-sm text-muted-foreground">{t("No repositories available.")}</p>
+            <p className="text-sm text-muted-foreground">{t("No projects available.")}</p>
           ) : null}
         </CardContent>
       </Card>
 
-      <Modal open={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} title={t("Create Repository")}>
+      <Modal open={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} title={t("Create Project")}>
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitCreate}>
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="repo-owner">{t("Owner")}</Label>
@@ -309,20 +313,20 @@ export function AppRepositoriesPage(): JSX.Element {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="repo-key">{t("Repository key")}</Label>
+            <Label htmlFor="repo-key">{t("Project key")}</Label>
             <Input
               id="repo-key"
-              placeholder={t("Repository key")}
+              placeholder={t("Project key")}
               value={key}
               onChange={(event) => setKey(event.target.value)}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="repo-name">{t("Repository name")}</Label>
+            <Label htmlFor="repo-name">{t("Project name")}</Label>
             <Input
               id="repo-name"
-              placeholder={t("Repository Name")}
+              placeholder={t("Project Name")}
               value={name}
               onChange={(event) => setName(event.target.value)}
               required

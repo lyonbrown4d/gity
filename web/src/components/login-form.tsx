@@ -43,7 +43,7 @@ export function LoginForm({
                 <div className="space-y-2">
                   <h1 className="text-3xl font-semibold tracking-[-0.04em] md:text-4xl">{t("Welcome back")}</h1>
                   <p className="text-balance text-sm leading-6 text-muted-foreground">
-                    {t("Sign in to manage repositories and organizations.")}
+                    {t("Sign in to manage projects and organizations.")}
                   </p>
                 </div>
               </div>
@@ -54,7 +54,7 @@ export function LoginForm({
                 </div>
                 <div className="flex items-center gap-2">
                   <GitBranch className="size-4 text-primary" />
-                  <span>{t("Repository source view and clone information.")}</span>
+                  <span>{t("Project source view and clone information.")}</span>
                 </div>
               </div>
               <div className="grid gap-2">
@@ -111,18 +111,18 @@ export function LoginForm({
 
               <div className="space-y-6">
                 <div className="max-w-md space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-background/55">Repository OS</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-background/55">Project OS</p>
                   <h2 className="text-5xl font-semibold tracking-[-0.06em]">
                     Ship code, review changes, run pipelines.
                   </h2>
                   <p className="text-sm leading-6 text-background/65">
-                    Unified repository, issue, wiki, runner, and package workflows on a compact Go service.
+                    Unified project, issue, wiki, runner, and package workflows on a compact Go service.
                   </p>
                 </div>
 
                 <ProductFeatureList
                   items={[
-                    { icon: CheckCircle2, text: "Repository, issue, MR, wiki" },
+                    { icon: CheckCircle2, text: "Project, issue, MR, wiki" },
                     { icon: Workflow, text: "Runner jobs and CI pipeline control" },
                     { icon: GitBranch, text: "Code search and branch operations" },
                   ]}

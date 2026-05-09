@@ -48,14 +48,14 @@ const MarkdownContent = ({
 export const RepositoryIssueDetailPage = (): JSX.Element => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const params = useParams<{ organizationId: string; repoId: string; issueNumber: string }>();
+  const params = useParams<{ organizationId: string; projectId?: string; repoId?: string; issueNumber: string }>();
   const organizationId = params.organizationId ?? "";
-  const repoId = params.repoId ?? "";
+  const repoId = params.projectId ?? params.repoId ?? "";
   const issueNumber = Number.parseInt(params.issueNumber ?? "", 10);
   const isIssueNumberValid = Number.isFinite(issueNumber) && issueNumber > 0;
 
   const issueQuery = useCustom<RepositoryIssueView>({
-    url: `/repos/${repoId}/issues/by-number/${issueNumber}`,
+    url: `/projects/${repoId}/issues/${issueNumber}`,
     method: "get",
     queryOptions: {
       enabled: Boolean(repoId) && isIssueNumberValid,
@@ -64,11 +64,11 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   });
   const issue = issueQuery.data?.data ?? null;
   const commentsQuery = useCustom<RepositoryIssueCommentView[]>({
-    url: issue?.id ? `/repos/${repoId}/issues/${issue.id}/comments` : `/repos/${repoId}/issues/comments`,
+    url: issue?.number ? `/projects/${repoId}/issues/${issue.number}/comments` : `/projects/${repoId}/issues/0/comments`,
     method: "get",
     config: { query: { limit: 200 } },
     queryOptions: {
-      enabled: Boolean(repoId) && Boolean(issue?.id),
+      enabled: Boolean(repoId) && Boolean(issue?.number),
       refetchOnWindowFocus: false,
     },
   });
@@ -94,7 +94,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   };
 
   const loadComments = async (): Promise<void> => {
-    if (!issue?.id) {
+    if (!issue?.number) {
       return;
     }
     const result = await commentsQuery.refetch();
@@ -113,7 +113,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
     setActionError(null);
     try {
       await updateIssueStatus({
-        url: `/repos/${repoId}/issues/${issue.id}`,
+        url: `/projects/${repoId}/issues/${issue.number}`,
         method: "patch",
         values: { status: nextStatus },
       });
@@ -136,7 +136,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
     setActionError(null);
     try {
       await createIssueComment({
-        url: `/repos/${repoId}/issues/${issue.id}/comments`,
+        url: `/projects/${repoId}/issues/${issue.number}/comments`,
         method: "post",
         values: { content },
       });
@@ -172,15 +172,15 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   return (
     <div className="space-y-4 page-enter">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-        <Link to="/app/repositories" className="underline underline-offset-4">
-          {t("My Repositories")}
+        <Link to="/app/projects" className="underline underline-offset-4">
+          {t("My Projects")}
         </Link>
         <span>/</span>
-        <Link to={`/app/repositories/${organizationId}/${repoId}`} className="underline underline-offset-4">
-          {t("Repository")}
+        <Link to={`/app/projects/${organizationId}/${repoId}`} className="underline underline-offset-4">
+          {t("Project")}
         </Link>
         <span>/</span>
-        <Link to={`/app/repositories/${organizationId}/${repoId}?tab=issues`} className="underline underline-offset-4">
+        <Link to={`/app/projects/${organizationId}/${repoId}?tab=issues`} className="underline underline-offset-4">
           {t("Issues")}
         </Link>
       </div>
@@ -248,7 +248,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
               <IssueMarkdownEditor
                 organizationId={organizationId}
                 repoId={repoId}
-                issueId={issue.id}
+                issueId={String(issue.number)}
                 t={t}
                 value={newComment}
                 placeholder={t("Comment with markdown, mention #123, or upload files...")}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type {
   RepositoryBlobView,
@@ -250,7 +251,7 @@ export const RepositoryCodeTab = ({
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <CardTitle>{t("Code")}</CardTitle>
-            <CardDescription>{t("Repository source view and clone information.")}</CardDescription>
+            <CardDescription>{t("Project source view and clone information.")}</CardDescription>
           </div>
           <div className="space-y-2">
             <Label htmlFor="code-branch-select">{t("Branch")}</Label>
@@ -284,7 +285,7 @@ export const RepositoryCodeTab = ({
         <div className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
           <div className="space-y-2 rounded-md border p-2">
             <div className="space-y-2">
-              <p className="text-sm font-medium">{t("Search in repository")}</p>
+              <p className="text-sm font-medium">{t("Search in project")}</p>
               <div className="space-y-2">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -340,7 +341,8 @@ export const RepositoryCodeTab = ({
                 <p className="px-2 py-1 text-xs text-muted-foreground">
                   {searchResults.length} {t("result(s)")}
                 </p>
-                <div className="max-h-56 space-y-1 overflow-y-auto">
+                <ScrollArea className="h-56">
+                  <div className="space-y-1 pr-3">
                   {searchResults.map((result, index) => (
                     <button
                       key={`${result.path}-${result.line_number}-${result.column}-${result.match_length}-${index}`}
@@ -359,15 +361,18 @@ export const RepositoryCodeTab = ({
                       </p>
                     </button>
                   ))}
-                </div>
+                  </div>
+                </ScrollArea>
               </div>
             ) : null}
             <div className="border-t pt-2" />
-            {isLoadingTree ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
-            {!isLoadingTree ? renderTreeNodes(treeNodes) : null}
-            {!isLoadingTree && treeNodes.length === 0 ? (
-              <p className="px-2 py-1 text-xs text-muted-foreground">{t("No files found.")}</p>
-            ) : null}
+            <ScrollArea className="h-[42vh] pr-3">
+              {isLoadingTree ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
+              {!isLoadingTree ? renderTreeNodes(treeNodes) : null}
+              {!isLoadingTree && treeNodes.length === 0 ? (
+                <p className="px-2 py-1 text-xs text-muted-foreground">{t("No files found.")}</p>
+              ) : null}
+            </ScrollArea>
           </div>
 
           <div className="rounded-md border">

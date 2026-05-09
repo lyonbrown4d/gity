@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useCreate, useDelete, useTable, useUpdate } from "@refinedev/core";
+import { ConfirmAction } from "@/components/common/confirm-action";
+import { FormDialog as Modal } from "@/components/common/form-dialog";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -136,11 +137,6 @@ export function AdminUsersPage(): JSX.Element {
   };
 
   const submitDeleteUser = (user: UserView) => {
-    const confirmText = t("Delete user \"{name}\"?").replace("{name}", user.username);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
-
     setActionError(null);
     deleteUser(
       {
@@ -239,15 +235,22 @@ export function AdminUsersPage(): JSX.Element {
                         <Button type="button" size="sm" variant="outline" onClick={() => openEditModal(user)}>
                           {t("Edit")}
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          disabled={isDeleting || user.is_super_admin}
-                          onClick={() => submitDeleteUser(user)}
+                        <ConfirmAction
+                          title={t("Delete user \"{name}\"?").replace("{name}", user.username)}
+                          description={t("This action cannot be undone.")}
+                          confirmLabel={t("Delete")}
+                          cancelLabel={t("Cancel")}
+                          onConfirm={() => submitDeleteUser(user)}
                         >
-                          {t("Delete")}
-                        </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            disabled={isDeleting || user.is_super_admin}
+                          >
+                            {t("Delete")}
+                          </Button>
+                        </ConfirmAction>
                       </div>
                     </TableCell>
                   </TableRow>

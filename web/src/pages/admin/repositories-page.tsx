@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDelete, useList } from "@refinedev/core";
+import { ConfirmAction } from "@/components/common/confirm-action";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +29,7 @@ export function AdminRepositoriesPage(): JSX.Element {
   }, [orgs, selectedOrg]);
 
   const repoQuery = useList<RepositoryView>({
-    resource: "repositories",
+    resource: "projects",
     meta: {
       organization_id: selectedOrg,
     },
@@ -51,14 +52,10 @@ export function AdminRepositoriesPage(): JSX.Element {
         : null);
 
   const submitDelete = (repo: RepositoryView) => {
-    const confirmText = t("Delete repository \"{name}\"?").replace("{name}", repo.name);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
     setActionError(null);
     deleteRepository(
       {
-        resource: "repositories",
+        resource: "projects",
         id: repo.id,
       },
       {
@@ -66,7 +63,7 @@ export function AdminRepositoriesPage(): JSX.Element {
           await repoQuery.refetch();
         },
         onError: (error) => {
-          setActionError(error instanceof Error ? error.message : t("Failed to delete repository"));
+          setActionError(error instanceof Error ? error.message : t("Failed to delete project"));
         },
       },
     );
@@ -84,9 +81,9 @@ export function AdminRepositoriesPage(): JSX.Element {
     <div className="space-y-4 page-enter">
       <Card className="card-enter">
         <CardHeader>
-          <CardTitle>{t("Repositories")}</CardTitle>
+          <CardTitle>{t("Projects")}</CardTitle>
           <CardDescription>
-            {t("Admin can view and delete repositories. New repository creation is handled in user workspace.")}
+            {t("Admin can view and delete projects. New project creation is handled in user workspace.")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -109,7 +106,7 @@ export function AdminRepositoriesPage(): JSX.Element {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{selectedOrgName}</Badge>
               <Badge variant="outline">
-                {repos.length} {t("repos")}
+                {repos.length} {t("projects")}
               </Badge>
             </div>
           </div>
@@ -124,11 +121,11 @@ export function AdminRepositoriesPage(): JSX.Element {
 
       <Card className="card-enter">
         <CardHeader>
-          <CardTitle>{t("Repository List")}</CardTitle>
-          <CardDescription>{t("Repositories under the selected organization.")}</CardDescription>
+          <CardTitle>{t("Project List")}</CardTitle>
+          <CardDescription>{t("Projects under the selected organization.")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isLoading ? <p className="text-sm text-muted-foreground">{t("Loading repositories...")}</p> : null}
+          {isLoading ? <p className="text-sm text-muted-foreground">{t("Loading projects...")}</p> : null}
           <div className="space-y-3">
             {repos.map((repo) => (
               <div key={repo.id} className="space-y-3 rounded-lg border p-4">
@@ -163,21 +160,28 @@ export function AdminRepositoriesPage(): JSX.Element {
                   >
                     {t("Copy Clone URL")}
                   </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    type="button"
-                    className="action-pop"
-                    disabled={isDeleting}
-                    onClick={() => submitDelete(repo)}
+                  <ConfirmAction
+                    title={t("Delete project \"{name}\"?").replace("{name}", repo.name)}
+                    description={t("This action cannot be undone.")}
+                    confirmLabel={t("Delete")}
+                    cancelLabel={t("Cancel")}
+                    onConfirm={() => submitDelete(repo)}
                   >
-                    {t("Delete")}
-                  </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      type="button"
+                      className="action-pop"
+                      disabled={isDeleting}
+                    >
+                      {t("Delete")}
+                    </Button>
+                  </ConfirmAction>
                 </div>
               </div>
             ))}
             {repos.length === 0 && !errorMessage && !isLoading ? (
-              <p className="text-sm text-muted-foreground">{t("No repositories in this organization.")}</p>
+              <p className="text-sm text-muted-foreground">{t("No projects in this organization.")}</p>
             ) : null}
           </div>
         </CardContent>

@@ -27,7 +27,7 @@ export const RepositoryIssuesTab = ({
 }: RepositoryIssuesTabProps): JSX.Element => {
   const navigate = useNavigate();
   const issuesQuery = useCustom<RepositoryIssueView[]>({
-    url: `/repos/${repoId}/issues`,
+    url: `/projects/${repoId}/issues`,
     method: "get",
     config: {
       query: {
@@ -84,7 +84,7 @@ export const RepositoryIssuesTab = ({
     onError(null);
     try {
       const response = await createIssue({
-        url: `/repos/${repoId}/issues`,
+        url: `/projects/${repoId}/issues`,
         method: "post",
         values: {
           title,
@@ -121,7 +121,7 @@ export const RepositoryIssuesTab = ({
     <Card className="card-enter">
       <CardHeader>
         <CardTitle>{t("Issues")}</CardTitle>
-        <CardDescription>{t("Track bugs, tasks, and discussions for this repository.")}</CardDescription>
+        <CardDescription>{t("Track bugs, tasks, and discussions for this project.")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">

@@ -1,8 +1,8 @@
 import Editor from "@monaco-editor/react";
+import { FormDialog as Modal } from "@/components/common/form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryBranchView } from "@/pages/types";
 import { detectLanguage } from "./repository-utils";

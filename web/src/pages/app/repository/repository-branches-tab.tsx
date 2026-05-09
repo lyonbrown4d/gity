@@ -32,7 +32,7 @@ export const RepositoryBranchesTab = ({
     <Card className="card-enter">
       <CardHeader>
         <CardTitle>{t("Branches")}</CardTitle>
-        <CardDescription>{t("Manage repository branches and protections.")}</CardDescription>
+        <CardDescription>{t("Manage project branches and protections.")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form className="grid gap-2 md:grid-cols-[1fr_auto]" onSubmit={onSubmitCreateBranch}>

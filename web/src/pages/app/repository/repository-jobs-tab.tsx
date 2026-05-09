@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryJobStatus, RepositoryJobView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 
@@ -177,9 +178,9 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
               <label className="text-xs font-medium text-muted-foreground" htmlFor="job-payload">
                 {t("Payload JSON")}
               </label>
-              <textarea
+              <Textarea
                 id="job-payload"
-                className="min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
+                className="min-h-24"
                 value={payload}
                 onChange={(event) => setPayload(event.target.value)}
                 placeholder='{"reason":"manual"}'

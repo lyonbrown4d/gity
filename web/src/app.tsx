@@ -64,10 +64,10 @@ export function App(): JSX.Element {
           resources={[
             { name: "admin-overview", list: "/admin", meta: { label: t("Overview") } },
             { name: "organizations", list: "/admin/orgs", meta: { label: t("Organizations") } },
-            { name: "repositories", list: "/admin/repos", meta: { label: t("Repositories") } },
+            { name: "projects", list: "/admin/projects", meta: { label: t("Projects") } },
             { name: "users", list: "/admin/users", meta: { label: t("Users") } },
             { name: "dashboard", list: "/app/dashboard", meta: { label: t("Dashboard") } },
-            { name: "my-repositories", list: "/app/repositories", meta: { label: t("My Repositories") } },
+            { name: "my-projects", list: "/app/projects", meta: { label: t("My Projects") } },
             { name: "profile", list: "/app/profile", meta: { label: t("Profile") } },
           ]}
           options={{
@@ -94,7 +94,8 @@ export function App(): JSX.Element {
               >
                 <Route path="/admin" element={<AdminOverviewPage />} />
                 <Route path="/admin/orgs" element={<AdminOrganizationsPage />} />
-                <Route path="/admin/repos" element={<AdminRepositoriesPage />} />
+                <Route path="/admin/projects" element={<AdminRepositoriesPage />} />
+                <Route path="/admin/repos" element={<Navigate to="/admin/projects" replace />} />
                 <Route path="/admin/users" element={<AdminUsersPage />} />
               </Route>
 
@@ -106,8 +107,14 @@ export function App(): JSX.Element {
                 }
               >
                 <Route path="/app/dashboard" element={<AppDashboardPage />} />
-                <Route path="/app/repositories" element={<AppRepositoriesPage />} />
+                <Route path="/app/projects" element={<AppRepositoriesPage />} />
+                <Route path="/app/repositories" element={<Navigate to="/app/projects" replace />} />
+                <Route path="/app/projects/:organizationId/:projectId" element={<RepositoryDetailPage />} />
                 <Route path="/app/repositories/:organizationId/:repoId" element={<RepositoryDetailPage />} />
+                <Route
+                  path="/app/projects/:organizationId/:projectId/issues/:issueNumber"
+                  element={<RepositoryIssueDetailPage />}
+                />
                 <Route
                   path="/app/repositories/:organizationId/:repoId/issues/:issueNumber"
                   element={<RepositoryIssueDetailPage />}

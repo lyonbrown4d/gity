@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCreate, useDelete, useList, useUpdate } from "@refinedev/core";
+import { ConfirmAction } from "@/components/common/confirm-action";
+import { FormDialog as Modal } from "@/components/common/form-dialog";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OrganizationMemberView, OrganizationView, RepositoryView } from "@/pages/types";
@@ -63,7 +64,7 @@ export function AdminOrganizationsPage(): JSX.Element {
   const members = membersQuery.data?.data ?? [];
 
   const reposQuery = useList<RepositoryView>({
-    resource: "repositories",
+    resource: "projects",
     meta: {
       organization_id: selectedOrg,
     },
@@ -171,11 +172,6 @@ export function AdminOrganizationsPage(): JSX.Element {
       setActionError(t("Please select an organization first."));
       return;
     }
-    const confirmText = t("Delete organization \"{name}\"?").replace("{name}", selectedOrgModel.name);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
-
     setActionError(null);
     deleteOrganization(
       {
@@ -275,14 +271,21 @@ export function AdminOrganizationsPage(): JSX.Element {
             <Button type="button" variant="outline" onClick={openEditModal} disabled={!selectedOrgModel}>
               {t("Edit Organization")}
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={submitDeleteOrganization}
-              disabled={!selectedOrgModel || isDeletingOrg}
+            <ConfirmAction
+              title={selectedOrgModel ? t("Delete organization \"{name}\"?").replace("{name}", selectedOrgModel.name) : t("Delete Organization")}
+              description={t("This action cannot be undone.")}
+              confirmLabel={t("Delete")}
+              cancelLabel={t("Cancel")}
+              onConfirm={submitDeleteOrganization}
             >
-              {isDeletingOrg ? `${t("Delete")}...` : t("Delete Organization")}
-            </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={!selectedOrgModel || isDeletingOrg}
+              >
+                {isDeletingOrg ? `${t("Delete")}...` : t("Delete Organization")}
+              </Button>
+            </ConfirmAction>
             <Button type="button" variant="secondary" onClick={() => setMemberModalOpen(true)} disabled={!selectedOrg}>
               {t("Add Member")}
             </Button>
@@ -332,8 +335,8 @@ export function AdminOrganizationsPage(): JSX.Element {
 
         <Card className="card-enter">
           <CardHeader>
-            <CardTitle>{t("Repositories")}</CardTitle>
-            <CardDescription>{t("Repositories under the selected organization.")}</CardDescription>
+            <CardTitle>{t("Projects")}</CardTitle>
+            <CardDescription>{t("Projects under the selected organization.")}</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -356,7 +359,7 @@ export function AdminOrganizationsPage(): JSX.Element {
                   </div>
                 ))}
                 {repos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("No repositories found.")}</p>
+                  <p className="text-sm text-muted-foreground">{t("No projects found.")}</p>
                 ) : null}
               </div>
             )}

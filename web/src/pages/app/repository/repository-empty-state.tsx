@@ -90,19 +90,19 @@ export const RepositoryEmptyState = ({
       <div className="rounded-md border border-dashed p-4">
         <div className="mb-2 flex items-center gap-2">
           <Terminal className="size-4" />
-          <p className="text-sm font-semibold">{t("This repository is empty")}</p>
+          <p className="text-sm font-semibold">{t("This project is empty")}</p>
         </div>
         <p className="text-xs text-muted-foreground">{t("Push your code from the command line.")}</p>
       </div>
       <CommandSection
-        title={t("Create a new repository on the command line")}
+        title={t("Create a new project on the command line")}
         commands={bootstrapCommands}
         copiedCommand={copiedCommand}
         t={t}
         onCopy={copyCommand}
       />
       <CommandSection
-        title={t("Push an existing repository from the command line")}
+        title={t("Push an existing project from the command line")}
         commands={pushExistingCommands}
         copiedCommand={copiedCommand}
         t={t}

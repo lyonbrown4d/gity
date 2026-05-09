@@ -28,7 +28,7 @@ export const RepositoryCommitsTab = ({
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <CardTitle>{t("Commits")}</CardTitle>
-            <CardDescription>{t("Recent commit activity in this repository.")}</CardDescription>
+            <CardDescription>{t("Recent commit activity in this project.")}</CardDescription>
           </div>
           <div className="space-y-2">
             <Label htmlFor="branch-filter">{t("Branch")}</Label>

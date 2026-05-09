@@ -26,7 +26,7 @@ export const useRepositoryMetaController = ({
 
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const repoQuery = useList<RepositoryView>({
-    resource: "my-repositories",
+    resource: "my-projects",
     meta: { organization_id: organizationId },
     queryOptions: { enabled: Boolean(organizationId) },
   });
@@ -37,7 +37,7 @@ export const useRepositoryMetaController = ({
     return { limit: 50, branch_name: branchFilter };
   }, [branchFilter]);
   const branchesQuery = useCustom<RepositoryBranchView[]>({
-    url: `/repos/${repoId}/branches`,
+    url: `/projects/${repoId}/repository/branches`,
     method: "get",
     queryOptions: {
       enabled: Boolean(repoId),
@@ -45,7 +45,7 @@ export const useRepositoryMetaController = ({
     },
   });
   const commitsQuery = useCustom<RepositoryCommitView[]>({
-    url: `/repos/${repoId}/commits`,
+    url: `/projects/${repoId}/repository/commits`,
     method: "get",
     config: { query: commitQuery },
     queryOptions: {
@@ -91,7 +91,7 @@ export const useRepositoryMetaController = ({
     setActionError(null);
     try {
       await createBranch({
-        url: `/repos/${repoId}/branches`,
+        url: `/projects/${repoId}/repository/branches`,
         method: "post",
         values: { name: newBranchName.trim() },
       });
@@ -107,7 +107,7 @@ export const useRepositoryMetaController = ({
     try {
       const op = protect ? "protect" : "unprotect";
       await patchBranchProtection({
-        url: `/repos/${repoId}/branches/${encodeURIComponent(branch.name)}/${op}`,
+        url: `/projects/${repoId}/repository/branches/${encodeURIComponent(branch.name)}/${op}`,
         method: "post",
         values: {},
       });
@@ -132,13 +132,9 @@ export const useRepositoryMetaController = ({
     if (!repository) {
       return;
     }
-    const confirmText = t("Delete repository \"{name}\"?").replace("{name}", repository.name);
-    if (!window.confirm(confirmText)) {
-      return;
-    }
     setActionError(null);
     deleteRepository(
-      { resource: "my-repositories", id: repository.id },
+      { resource: "my-projects", id: repository.id },
       { onSuccess: onDeleted, onError: (error) => setActionError(extractErrorMessage(error)) },
     );
   };

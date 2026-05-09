@@ -15,7 +15,7 @@ export function AdminOverviewPage(): JSX.Element {
   const primaryOrgId = orgs[0]?.id;
 
   const repoQuery = useList<RepositoryView>({
-    resource: "repositories",
+    resource: "projects",
     meta: {
       organization_id: primaryOrgId,
     },
@@ -36,7 +36,7 @@ export function AdminOverviewPage(): JSX.Element {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">{t("Admin Overview")}</h2>
         <p className="text-sm text-muted-foreground">
-          {t("Monitor organizations, repositories, and current control-plane baseline.")}
+          {t("Monitor organizations, projects, and current control-plane baseline.")}
         </p>
       </div>
 
@@ -59,11 +59,11 @@ export function AdminOverviewPage(): JSX.Element {
 
         <Card className="card-enter">
           <CardHeader>
-            <CardDescription>{t("Repositories")}</CardDescription>
+            <CardDescription>{t("Projects")}</CardDescription>
             <CardTitle className="text-3xl">{isLoading ? "--" : repos.length}</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <p className="text-xs text-muted-foreground">{t("Repositories under the primary organization.")}</p>
+            <p className="text-xs text-muted-foreground">{t("Projects under the primary organization.")}</p>
           </CardContent>
         </Card>
 
