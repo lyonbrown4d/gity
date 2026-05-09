@@ -9,7 +9,6 @@ import (
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
-	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"strings"
 	"time"
@@ -30,8 +29,10 @@ func NewProjectPackageVersionRepository(repo *Repository) packageports.ProjectPa
 }
 
 func (r *Repository) ListByPackageID(ctx context.Context, packageID int64) (*collectionx.List[packagedomain.ProjectPackageVersion], error) {
-	query := querydsl.Select(dbschema.ProjectPackageVersionSchema.AllColumns().Values()...).From(dbschema.ProjectPackageVersionSchema).Where(dbschema.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID)).OrderBy(dbschema.ProjectPackageVersionSchema.ID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID)).
+		OrderBy(dbschema.ProjectPackageVersionSchema.ID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackageVersion, error) {
@@ -39,8 +40,10 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.Proje
 }
 
 func (r *Repository) GetByPackageAndVersion(ctx context.Context, packageID int64, version string) (packagedomain.ProjectPackageVersion, error) {
-	query := querydsl.Select(dbschema.ProjectPackageVersionSchema.AllColumns().Values()...).From(dbschema.ProjectPackageVersionSchema).Where(querydsl.And(dbschema.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID), dbschema.ProjectPackageVersionSchema.Version.Eq(strings.TrimSpace(version)))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPackageVersionSchema.ProjectPackageID.Eq(packageID)).
+		Where(dbschema.ProjectPackageVersionSchema.Version.Eq(strings.TrimSpace(version))).
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (packagedomain.ProjectPackageVersion, error) {

@@ -32,6 +32,8 @@ func NewSubApp() *dix.App {
 func appOptions(metaModuleName, appName, description string) []dix.AppOption {
 	return []dix.AppOption{
 		dix.UseLoggerErr1(infralogger.NewLogger),
+		dix.LifecycleConcurrency(2),
+		dix.RecentEvents(128),
 		dix.Modules(
 			gitydebug.Module(metaModuleName, appName, description),
 			migrationRuntimeModule(),

@@ -33,21 +33,27 @@ func NewProjectMergeRequestRepository(repo *Repository) mergeports.ProjectMergeR
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[mergedomain.ProjectMergeRequest], error) {
-	query := querydsl.Select(dbschema.ProjectMergeRequestSchema.AllColumns().Values()...).From(dbschema.ProjectMergeRequestSchema).Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).OrderBy(dbschema.ProjectMergeRequestSchema.IID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).
+		OrderBy(dbschema.ProjectMergeRequestSchema.IID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int64) (mergedomain.ProjectMergeRequest, error) {
-	query := querydsl.Select(dbschema.ProjectMergeRequestSchema.AllColumns().Values()...).From(dbschema.ProjectMergeRequestSchema).Where(querydsl.And(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(projectID), dbschema.ProjectMergeRequestSchema.IID.Eq(iid))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectMergeRequestSchema.IID.Eq(iid)).
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (mergedomain.ProjectMergeRequest, error) {
 	var created mergedomain.ProjectMergeRequest
 	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[mergedomain.ProjectMergeRequest, dbschema.ProjectMergeRequestSchemaDef]) error {
 		nextIID := int64(1)
-		query := querydsl.Select(dbschema.ProjectMergeRequestSchema.AllColumns().Values()...).From(dbschema.ProjectMergeRequestSchema).Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(input.ProjectID)).OrderBy(dbschema.ProjectMergeRequestSchema.IID.Desc()).Limit(1)
-		last, err := repo.First(ctx, query)
+		last, err := dbxrepo.Query(repo).
+			Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(input.ProjectID)).
+			OrderBy(dbschema.ProjectMergeRequestSchema.IID.Desc()).
+			First(ctx)
 		if err == nil {
 			nextIID = last.IID + 1
 		} else if !persistence.IsNotFound(err) {
@@ -90,8 +96,12 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.ProjectMergeRequestSchema.State.Set(strings.TrimSpace(*input.State)))
 	}
 	assignments = append(assignments, dbschema.ProjectMergeRequestSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectMergeRequestSchema.ID).Update(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.PatchSet(r.base, projectMergeRequestKey(id)).Set(assignments...).Apply(ctx); err != nil {
 		return fmt.Errorf("update merge request: %w", err)
 	}
 	return nil
+}
+
+func projectMergeRequestKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectMergeRequestSchema.ID, id))
 }

@@ -11,6 +11,7 @@ import (
 	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/DaiYuANg/gity/internal/config"
 	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	collectionx "github.com/arcgolabs/collectionx/list"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -77,9 +78,27 @@ func (s *Service) RefreshAll(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if batchRepo, ok := s.projectRepo.(gitports.ProjectBatchRepository); ok {
+		if err := batchRepo.Batch(ctx, nil, 100, func(projects *collectionx.List[projectdomain.Project]) error {
+			s.refreshProjects(ctx, projects)
+			return nil
+		}); err != nil {
+			return oops.In("search_index").Wrapf(err, "batch projects for search indexing")
+		}
+		return nil
+	}
+
 	projects, err := s.projectRepo.List(ctx, nil)
 	if err != nil {
 		return oops.In("search_index").Wrapf(err, "list projects for search indexing")
+	}
+	s.refreshProjects(ctx, projects)
+	return nil
+}
+
+func (s *Service) refreshProjects(ctx context.Context, projects *collectionx.List[projectdomain.Project]) {
+	if projects == nil {
+		return
 	}
 	projectValues := projects.Values()
 	for i := range projectValues {
@@ -88,7 +107,6 @@ func (s *Service) RefreshAll(ctx context.Context) error {
 			s.logError("refresh project search index failed", err, slog.Int64("project_id", project.ID), slog.String("full_path", project.FullPath))
 		}
 	}
-	return nil
 }
 
 func (s *Service) RefreshProject(ctx context.Context, project projectdomain.Project) error {

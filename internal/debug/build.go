@@ -48,7 +48,7 @@ func Module(moduleName, appName, description string) dix.Module {
 		dix.Providers(
 			dix.Provider0(func() dix.AppMeta {
 				return AppMeta(appName, description)
-			}),
+			}, dix.Eager()),
 		),
 	)
 }

@@ -35,34 +35,27 @@ func NewProjectIssueRepository(repo *Repository) issueports.ProjectIssueReposito
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[issuedomain.ProjectIssue], error) {
-	query := querydsl.Select(dbschema.ProjectIssueSchema.AllColumns().Values()...).
-		From(dbschema.ProjectIssueSchema).
+	return persistence.Many(dbxrepo.Query(r.base).
 		Where(dbschema.ProjectIssueSchema.ProjectID.Eq(projectID)).
-		OrderBy(dbschema.ProjectIssueSchema.IID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+		OrderBy(dbschema.ProjectIssueSchema.IID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int64) (issuedomain.ProjectIssue, error) {
-	query := querydsl.Select(dbschema.ProjectIssueSchema.AllColumns().Values()...).
-		From(dbschema.ProjectIssueSchema).
-		Where(querydsl.And(
-			dbschema.ProjectIssueSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectIssueSchema.IID.Eq(iid),
-		)).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectIssueSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectIssueSchema.IID.Eq(iid)).
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain.ProjectIssue, error) {
 	var created issuedomain.ProjectIssue
 	err := r.base.InTx(ctx, nil, func(tx *dbx.Tx, repo *dbxrepo.Base[issuedomain.ProjectIssue, dbschema.ProjectIssueSchemaDef]) error {
 		nextIID := int64(1)
-		query := querydsl.Select(dbschema.ProjectIssueSchema.AllColumns().Values()...).
-			From(dbschema.ProjectIssueSchema).
+		last, err := dbxrepo.Query(repo).
 			Where(dbschema.ProjectIssueSchema.ProjectID.Eq(input.ProjectID)).
 			OrderBy(dbschema.ProjectIssueSchema.IID.Desc()).
-			Limit(1)
-		last, err := repo.First(ctx, query)
+			First(ctx)
 		if err == nil {
 			nextIID = last.IID + 1
 		} else if !persistence.IsNotFound(err) {
@@ -108,8 +101,12 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.ProjectIssueSchema.State.Set(strings.TrimSpace(*input.State)))
 	}
 	assignments = append(assignments, dbschema.ProjectIssueSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectIssueSchema.ID).Update(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.PatchSet(r.base, projectIssueKey(id)).Set(assignments...).Apply(ctx); err != nil {
 		return fmt.Errorf("update project issue: %w", err)
 	}
 	return nil
+}
+
+func projectIssueKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectIssueSchema.ID, id))
 }

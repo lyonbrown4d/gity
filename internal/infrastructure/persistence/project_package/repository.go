@@ -9,7 +9,6 @@ import (
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
-	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"strings"
 	"time"
@@ -30,8 +29,10 @@ func NewProjectPackageRepository(repo *Repository) packageports.ProjectPackageRe
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[packagedomain.ProjectPackage], error) {
-	query := querydsl.Select(dbschema.ProjectPackageSchema.AllColumns().Values()...).From(dbschema.ProjectPackageSchema).Where(dbschema.ProjectPackageSchema.ProjectID.Eq(projectID)).OrderBy(dbschema.ProjectPackageSchema.ID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPackageSchema.ProjectID.Eq(projectID)).
+		OrderBy(dbschema.ProjectPackageSchema.ID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackage, error) {
@@ -39,8 +40,11 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.Proje
 }
 
 func (r *Repository) GetByProjectTypeAndName(ctx context.Context, projectID int64, packageType, name string) (packagedomain.ProjectPackage, error) {
-	query := querydsl.Select(dbschema.ProjectPackageSchema.AllColumns().Values()...).From(dbschema.ProjectPackageSchema).Where(querydsl.And(dbschema.ProjectPackageSchema.ProjectID.Eq(projectID), dbschema.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType)), dbschema.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name)))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPackageSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectPackageSchema.Type.Eq(strings.TrimSpace(packageType))).
+		Where(dbschema.ProjectPackageSchema.Name.Eq(strings.TrimSpace(name))).
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (packagedomain.ProjectPackage, error) {

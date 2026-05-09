@@ -39,10 +39,10 @@ github.com/arcgolabs/collectionx/set v0.8.0 h1:qIE6LHMWFjcETzikv+acNNvkIShmyAVVt
 github.com/arcgolabs/collectionx/set v0.8.0/go.mod h1:575TbrhYlQ2LlnYuIDXb7TZRVru9EipuPG5bTE5RxAk=
 github.com/arcgolabs/configx v0.3.2 h1:3bCS+hLenLF/jErdxqGeU+vSkjeZxAUT8OVRViZV8fA=
 github.com/arcgolabs/configx v0.3.2/go.mod h1:RHryBzLrfeyMWhSaDBZkiFsAuQ4MyvkiQkCt4Bo2fWI=
-github.com/arcgolabs/dbx v0.1.6 h1:n4yJnvCWOPw4cwJ+jG1f18zJlFzECpRkrGhIiOH+rmo=
-github.com/arcgolabs/dbx v0.1.6/go.mod h1:IIQry0/WVxqvqyb34cMfH2XZdtreGREN6jmP2KpRcdU=
-github.com/arcgolabs/dix v0.8.0 h1:GiXI+9JHDualW1hww9LLRlfY+L+F2bI2zvKZw4BXJiw=
-github.com/arcgolabs/dix v0.8.0/go.mod h1:KkNnogQ4iQU5GfYNf0ziuB4lpIqGUcLOvwQRHmsFpUU=
+github.com/arcgolabs/dbx v0.1.7 h1:4bvYedqT+EyVn89G7YOwcIlQkuYy6jbbZa6bGkZN9NQ=
+github.com/arcgolabs/dbx v0.1.7/go.mod h1:UjHgI+XVwvUdRn18DMgyrhwvY2FEJy97p7xoYUmK+Tc=
+github.com/arcgolabs/dix v0.10.0 h1:hudJ1V0oqNYL/P6iOhVAApFmEelarmXk5eFDGxw4T2E=
+github.com/arcgolabs/dix v0.10.0/go.mod h1:976qdvz/PsMhDT6zzwtnoo5OiMuEzWbcMcM2XOT3HRs=
 github.com/arcgolabs/eventx v0.1.2 h1:ikt4Cw+GW9Q1NsJVmmen74rQkNZBCdpqlwIfryYrGuk=
 github.com/arcgolabs/eventx v0.1.2/go.mod h1:8pvEz7hCLMyC8Y1VdX8+s7RjnY0haFLau4aiRmrkJkw=
 github.com/arcgolabs/httpx v0.1.5 h1:q8xb7ULdB08A1gK/KymHDFzd+s7I+OvuWqAVj86fzjE=
@@ -59,8 +59,8 @@ github.com/arcgolabs/observabilityx v0.4.0 h1:7ihfQev5KSV8xcO+6DcbMcUYSDVsYhnENH
 github.com/arcgolabs/observabilityx v0.4.0/go.mod h1:yZeU3QmYUwhd051UnoD4cFu89sdLjPYGU15QKX+TVac=
 github.com/arcgolabs/pkg/option v0.0.3 h1:SS7WDMUAr7XW2/sOZkaqDrIUrygJK8u1gdPs9A4K5+A=
 github.com/arcgolabs/pkg/option v0.0.3/go.mod h1:91/Ov3tYLKEZ+ytBT30ay4l6JNTRjzk/HRRfDTElhyA=
-github.com/arcgolabs/plano v0.7.1 h1:A8VakPN5dnVa60WWAdqrPzZIjKS2/XPGkwFdfK4JOIw=
-github.com/arcgolabs/plano v0.7.1/go.mod h1:jujemkQXc44lcKp0CLBDZC+rZT13CId6A8lTP16rAcI=
+github.com/arcgolabs/plano v0.8.0 h1:N/Ic9htN8Eu6jwVdKIRnPxOOTjo4BRNlwu4bLV/nXCw=
+github.com/arcgolabs/plano v0.8.0/go.mod h1:+cZU5btJTs0BbLz5DC84C6T7Q9yRrwCVXbt14SEGd9c=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
 github.com/aws/aws-sdk-go-v2 v1.41.5 h1:dj5kopbwUsVUVFgO4Fi5BIT3t4WyqIDjGKCangnV/yY=
@@ -426,8 +426,8 @@ golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9sn
 golang.org/x/term v0.42.0 h1:UiKe+zDFmJobeJ5ggPwOshJIVt6/Ft0rcfrXZDLWAWY=
 golang.org/x/term v0.42.0/go.mod h1:Dq/D+snpsbazcBG5+F9Q1n2rXV8Ma+71xEjTRufARgY=
 golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
-golang.org/x/text v0.36.0 h1:JfKh3XmcRPqZPKevfXVpI1wXPTqbkE5f7JA92a55Yxg=
-golang.org/x/text v0.36.0/go.mod h1:NIdBknypM8iqVmPiuco0Dh6P5Jcdk8lJL0CUebqK164=
+golang.org/x/text v0.37.0 h1:Cqjiwd9eSg8e0QAkyCaQTNHFIIzWtidPahFWR83rTrc=
+golang.org/x/text v0.37.0/go.mod h1:a5sjxXGs9hsn/AJVwuElvCAo9v8QYLzvavO5z2PiM38=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.44.0 h1:UP4ajHPIcuMjT1GqzDWRlalUEoY+uzoZKnhOjbIPD2c=
 golang.org/x/tools v0.44.0/go.mod h1:KA0AfVErSdxRZIsOVipbv3rQhVXTnlU6UhKxHd1seDI=

@@ -10,7 +10,6 @@ import (
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
-	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"strings"
 	"time"
@@ -33,22 +32,17 @@ func NewProjectBranchProtectionRepository(repo *Repository) projectports.Project
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[projectdomain.ProjectBranchProtection], error) {
-	query := querydsl.Select(dbschema.ProjectBranchProtectionSchema.AllColumns().Values()...).
-		From(dbschema.ProjectBranchProtectionSchema).
+	return persistence.Many(dbxrepo.Query(r.base).
 		Where(dbschema.ProjectBranchProtectionSchema.ProjectID.Eq(projectID)).
-		OrderBy(dbschema.ProjectBranchProtectionSchema.BranchName.Asc())
-	return persistence.Many(r.base.List(ctx, query))
+		OrderBy(dbschema.ProjectBranchProtectionSchema.BranchName.Asc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByProjectAndBranch(ctx context.Context, projectID int64, branchName string) (projectdomain.ProjectBranchProtection, error) {
-	query := querydsl.Select(dbschema.ProjectBranchProtectionSchema.AllColumns().Values()...).
-		From(dbschema.ProjectBranchProtectionSchema).
-		Where(querydsl.And(
-			dbschema.ProjectBranchProtectionSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectBranchProtectionSchema.BranchName.Eq(normalizeBranchName(branchName)),
-		)).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectBranchProtectionSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectBranchProtectionSchema.BranchName.Eq(normalizeBranchName(branchName))).
+		First(ctx))
 }
 
 func (r *Repository) MatchByProjectAndBranch(ctx context.Context, projectID int64, branchName string) (projectdomain.ProjectBranchProtection, error) {
@@ -116,7 +110,7 @@ func (r *Repository) Upsert(ctx context.Context, projectID int64, input UpsertIn
 		}
 		return item, nil
 	}
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectBranchProtectionSchema.ID).Update(ctx, existing.ID,
+	if _, err := dbxrepo.PatchSet(r.base, projectBranchProtectionKey(existing.ID)).Set(
 		dbschema.ProjectBranchProtectionSchema.RuleType.Set(item.RuleType),
 		dbschema.ProjectBranchProtectionSchema.PushAccessLevel.Set(item.PushAccessLevel),
 		dbschema.ProjectBranchProtectionSchema.MergeAccessLevel.Set(item.MergeAccessLevel),
@@ -125,7 +119,7 @@ func (r *Repository) Upsert(ctx context.Context, projectID int64, input UpsertIn
 		dbschema.ProjectBranchProtectionSchema.AllowForcePush.Set(item.AllowForcePush),
 		dbschema.ProjectBranchProtectionSchema.AllowDelete.Set(item.AllowDelete),
 		dbschema.ProjectBranchProtectionSchema.UpdatedAt.Set(now),
-	); err != nil {
+	).Apply(ctx); err != nil {
 		return projectdomain.ProjectBranchProtection{}, fmt.Errorf("update project branch protection: %w", err)
 	}
 	return r.GetByProjectAndBranch(ctx, projectID, branchName)
@@ -139,10 +133,14 @@ func (r *Repository) Unprotect(ctx context.Context, projectID int64, branchName 
 		}
 		return err
 	}
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectBranchProtectionSchema.ID).Delete(ctx, item.ID); err != nil {
+	if _, err := r.base.DeleteByKeySet(ctx, projectBranchProtectionKey(item.ID)); err != nil {
 		return fmt.Errorf("delete project branch protection: %w", err)
 	}
 	return nil
+}
+
+func projectBranchProtectionKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectBranchProtectionSchema.ID, id))
 }
 
 func normalizeBranchName(value string) string {

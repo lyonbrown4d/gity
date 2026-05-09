@@ -32,13 +32,17 @@ func NewProjectLFSLockRepository(repo *Repository) lfsports.ProjectLFSLockReposi
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (lfsdomain.ProjectLFSLock, error) {
-	query := querydsl.Select(dbschema.ProjectLFSLockSchema.AllColumns().Values()...).From(dbschema.ProjectLFSLockSchema).Where(querydsl.And(dbschema.ProjectLFSLockSchema.ProjectID.Eq(projectID), dbschema.ProjectLFSLockSchema.ID.Eq(id))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectLFSLockSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectLFSLockSchema.ID.Eq(id)).
+		First(ctx))
 }
 
 func (r *Repository) GetByProjectAndPath(ctx context.Context, projectID int64, path string) (lfsdomain.ProjectLFSLock, error) {
-	query := querydsl.Select(dbschema.ProjectLFSLockSchema.AllColumns().Values()...).From(dbschema.ProjectLFSLockSchema).Where(querydsl.And(dbschema.ProjectLFSLockSchema.ProjectID.Eq(projectID), dbschema.ProjectLFSLockSchema.Path.Eq(strings.TrimSpace(path)))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectLFSLockSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectLFSLockSchema.Path.Eq(strings.TrimSpace(path))).
+		First(ctx))
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, input ListInput) (*collectionx.List[lfsdomain.ProjectLFSLock], error) {
@@ -53,8 +57,11 @@ func (r *Repository) ListByProjectID(ctx context.Context, input ListInput) (*col
 	if input.AfterID > 0 {
 		predicates = append(predicates, dbschema.ProjectLFSLockSchema.ID.Gt(input.AfterID))
 	}
-	query := querydsl.Select(dbschema.ProjectLFSLockSchema.AllColumns().Values()...).From(dbschema.ProjectLFSLockSchema).Where(querydsl.And(predicates...)).OrderBy(dbschema.ProjectLFSLockSchema.ID.Asc()).Limit(limit)
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(querydsl.And(predicates...)).
+		OrderBy(dbschema.ProjectLFSLockSchema.ID.Asc()).
+		Limit(limit).
+		List(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (lfsdomain.ProjectLFSLock, error) {
@@ -67,8 +74,12 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (lfsdomain.P
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectLFSLockSchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.DeleteByKeySet(ctx, projectLFSLockKey(id)); err != nil {
 		return fmt.Errorf("delete project lfs lock: %w", err)
 	}
 	return nil
+}
+
+func projectLFSLockKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectLFSLockSchema.ID, id))
 }

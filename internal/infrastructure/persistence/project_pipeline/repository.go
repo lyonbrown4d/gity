@@ -41,49 +41,36 @@ func NewProjectPipelineRepository(repo *Repository) ciports.ProjectPipelineRepos
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[cidomain.ProjectPipeline], error) {
-	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-		From(dbschema.ProjectPipelineSchema).
+	return persistence.Many(dbxrepo.Query(r.base).
 		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
-		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64) (cidomain.ProjectPipeline, error) {
-	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-		From(dbschema.ProjectPipelineSchema).
-		Where(querydsl.And(
-			dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectPipelineSchema.ID.Eq(id),
-		)).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectPipelineSchema.ID.Eq(id)).
+		First(ctx))
 }
 
 func (r *Repository) GetByProjectSourceRefCommit(ctx context.Context, projectID int64, source, refName, commitSHA string) (cidomain.ProjectPipeline, error) {
-	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-		From(dbschema.ProjectPipelineSchema).
-		Where(querydsl.And(
-			dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectPipelineSchema.Source.Eq(strings.TrimSpace(source)),
-			dbschema.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
-			dbschema.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA)),
-		)).
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectPipelineSchema.Source.Eq(strings.TrimSpace(source))).
+		Where(dbschema.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName))).
+		Where(dbschema.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA))).
 		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+		First(ctx))
 }
 
 func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID int64, refName, commitSHA string) (cidomain.ProjectPipeline, error) {
-	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-		From(dbschema.ProjectPipelineSchema).
-		Where(querydsl.And(
-			dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName)),
-			dbschema.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA)),
-		)).
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectPipelineSchema.RefName.Eq(strings.TrimSpace(refName))).
+		Where(dbschema.ProjectPipelineSchema.CommitSHA.Eq(strings.TrimSpace(commitSHA))).
 		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectPipeline, error) {
@@ -107,12 +94,10 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 }
 
 func nextPipelineIID(ctx context.Context, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef], projectID int64) (int64, error) {
-	query := querydsl.Select(dbschema.ProjectPipelineSchema.AllColumns().Values()...).
-		From(dbschema.ProjectPipelineSchema).
+	last, err := dbxrepo.Query(repo).
 		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
 		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
-		Limit(1)
-	last, err := repo.First(ctx, query)
+		First(ctx)
 	if err == nil {
 		return last.IID + 1, nil
 	}
@@ -182,10 +167,14 @@ func (r *Repository) UpdateStatus(ctx context.Context, item cidomain.ProjectPipe
 		}
 		assignments = append(assignments, dbschema.ProjectPipelineSchema.FinishedAt.Set(now))
 	}
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectPipelineSchema.ID).Update(ctx, item.ID, assignments...); err != nil {
+	if _, err := dbxrepo.PatchSet(r.base, projectPipelineKey(item.ID)).Set(assignments...).Apply(ctx); err != nil {
 		return fmt.Errorf("update project pipeline status: %w", err)
 	}
 	return nil
+}
+
+func projectPipelineKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectPipelineSchema.ID, id))
 }
 
 func isTerminalStatus(status string) bool {

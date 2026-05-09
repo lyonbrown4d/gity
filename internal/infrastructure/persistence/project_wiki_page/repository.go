@@ -32,22 +32,17 @@ func NewProjectWikiPageRepository(repo *Repository) wikiports.ProjectWikiPageRep
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[wikidomain.ProjectWikiPage], error) {
-	query := querydsl.Select(dbschema.ProjectWikiPageSchema.AllColumns().Values()...).
-		From(dbschema.ProjectWikiPageSchema).
+	return persistence.Many(dbxrepo.Query(r.base).
 		Where(dbschema.ProjectWikiPageSchema.ProjectID.Eq(projectID)).
-		OrderBy(dbschema.ProjectWikiPageSchema.UpdatedAt.Desc(), dbschema.ProjectWikiPageSchema.ID.Desc())
-	return persistence.Many(r.base.List(ctx, query))
+		OrderBy(dbschema.ProjectWikiPageSchema.UpdatedAt.Desc(), dbschema.ProjectWikiPageSchema.ID.Desc()).
+		List(ctx))
 }
 
 func (r *Repository) GetByProjectAndSlug(ctx context.Context, projectID int64, slug string) (wikidomain.ProjectWikiPage, error) {
-	query := querydsl.Select(dbschema.ProjectWikiPageSchema.AllColumns().Values()...).
-		From(dbschema.ProjectWikiPageSchema).
-		Where(querydsl.And(
-			dbschema.ProjectWikiPageSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectWikiPageSchema.Slug.Eq(strings.TrimSpace(slug)),
-		)).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectWikiPageSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectWikiPageSchema.Slug.Eq(strings.TrimSpace(slug))).
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (wikidomain.ProjectWikiPage, error) {
@@ -89,15 +84,19 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.ProjectWikiPageSchema.LastEditedByUserID.Set(input.LastEditedByUserID))
 	}
 	assignments = append(assignments, dbschema.ProjectWikiPageSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectWikiPageSchema.ID).Update(ctx, id, assignments...); err != nil {
+	if _, err := dbxrepo.PatchSet(r.base, projectWikiPageKey(id)).Set(assignments...).Apply(ctx); err != nil {
 		return fmt.Errorf("update project wiki page: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectWikiPageSchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.DeleteByKeySet(ctx, projectWikiPageKey(id)); err != nil {
 		return fmt.Errorf("delete project wiki page: %w", err)
 	}
 	return nil
+}
+
+func projectWikiPageKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectWikiPageSchema.ID, id))
 }

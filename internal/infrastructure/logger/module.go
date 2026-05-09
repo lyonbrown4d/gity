@@ -7,7 +7,7 @@ func Module() dix.Module {
 		"infrastructure.logger",
 		dix.Description("Structured logging"),
 		dix.Providers(
-			dix.ProviderErr1(NewLogger),
+			dix.ProviderErr1(NewLogger, dix.Eager()),
 		),
 	)
 }

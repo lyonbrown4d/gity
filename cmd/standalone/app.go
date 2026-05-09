@@ -18,6 +18,8 @@ func newStandaloneApp() *dix.App {
 				"Gity standalone runtime with migration, server, and worker sub-apps",
 			),
 		),
+		dix.LifecycleConcurrency(4),
+		dix.RecentEvents(512),
 		dix.SubApps(
 			migrationapp.NewSubApp(),
 			serverapp.NewSubApp(),

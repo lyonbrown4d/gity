@@ -88,6 +88,8 @@ func appOptions(metaModuleName, appName, description string, modules ...dix.Modu
 	runtimeModules = append(runtimeModules, modules...)
 	return []dix.AppOption{
 		dix.UseLoggerErr1(infralogger.NewLogger),
+		dix.LifecycleConcurrency(4),
+		dix.RecentEvents(256),
 		dix.Modules(runtimeModules...),
 	}
 }

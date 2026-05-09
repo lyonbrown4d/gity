@@ -29,8 +29,10 @@ func NewProjectLFSObjectRepository(repo *Repository) lfsports.ProjectLFSObjectRe
 }
 
 func (r *Repository) GetByProjectAndOID(ctx context.Context, projectID int64, oid string) (lfsdomain.ProjectLFSObject, error) {
-	query := querydsl.Select(dbschema.ProjectLFSObjectSchema.AllColumns().Values()...).From(dbschema.ProjectLFSObjectSchema).Where(querydsl.And(dbschema.ProjectLFSObjectSchema.ProjectID.Eq(projectID), dbschema.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid)))).Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectLFSObjectSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectLFSObjectSchema.OID.Eq(strings.TrimSpace(oid))).
+		First(ctx))
 }
 
 func (r *Repository) ListByProjectID(ctx context.Context, input lfsports.ListProjectLFSObjectsInput) (*collectionlist.List[lfsdomain.ProjectLFSObject], error) {
@@ -42,8 +44,11 @@ func (r *Repository) ListByProjectID(ctx context.Context, input lfsports.ListPro
 	if input.AfterID > 0 {
 		predicates = append(predicates, dbschema.ProjectLFSObjectSchema.ID.Gt(input.AfterID))
 	}
-	query := querydsl.Select(dbschema.ProjectLFSObjectSchema.AllColumns().Values()...).From(dbschema.ProjectLFSObjectSchema).Where(querydsl.And(predicates...)).OrderBy(dbschema.ProjectLFSObjectSchema.ID.Asc()).Limit(limit)
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(querydsl.And(predicates...)).
+		OrderBy(dbschema.ProjectLFSObjectSchema.ID.Asc()).
+		Limit(limit).
+		List(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, projectID int64, oid string, byteSize int64, storageKey string) (lfsdomain.ProjectLFSObject, error) {
@@ -56,13 +61,17 @@ func (r *Repository) Create(ctx context.Context, projectID int64, oid string, by
 }
 
 func (r *Repository) UpdateStored(ctx context.Context, id, byteSize int64, storageKey string) error {
-	_, err := dbxrepo.By(r.base, dbschema.ProjectLFSObjectSchema.ID).Update(ctx, id,
+	_, err := dbxrepo.PatchSet(r.base, projectLFSObjectKey(id)).Set(
 		dbschema.ProjectLFSObjectSchema.ByteSize.Set(byteSize),
 		dbschema.ProjectLFSObjectSchema.StorageKey.Set(strings.TrimSpace(storageKey)),
 		dbschema.ProjectLFSObjectSchema.UpdatedAt.Set(time.Now().UTC()),
-	)
+	).Apply(ctx)
 	if err != nil {
 		return fmt.Errorf("update project lfs object: %w", err)
 	}
 	return nil
+}
+
+func projectLFSObjectKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectLFSObjectSchema.ID, id))
 }

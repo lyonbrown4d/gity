@@ -19,6 +19,10 @@ type ProjectRepository interface {
 	DeleteByID(ctx context.Context, id int64) error
 }
 
+type ProjectBatchRepository interface {
+	Batch(ctx context.Context, organizationID *int64, size int, handle func(*collectionx.List[projectdomain.Project]) error) error
+}
+
 type ProjectBranchProtectionRepository interface {
 	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[projectdomain.ProjectBranchProtection], error)
 	GetByProjectAndBranch(ctx context.Context, projectID int64, branchName string) (projectdomain.ProjectBranchProtection, error)

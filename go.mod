@@ -9,14 +9,14 @@ require (
 	github.com/arcgolabs/collectionx/mapping v0.8.0
 	github.com/arcgolabs/collectionx/set v0.8.0
 	github.com/arcgolabs/configx v0.3.2
-	github.com/arcgolabs/dbx v0.1.6
-	github.com/arcgolabs/dix v0.8.0
+	github.com/arcgolabs/dbx v0.1.7
+	github.com/arcgolabs/dix v0.10.0
 	github.com/arcgolabs/eventx v0.1.2
 	github.com/arcgolabs/httpx v0.1.5
 	github.com/arcgolabs/httpx/adapter/fiber v0.1.5
 	github.com/arcgolabs/logx v0.1.2
 	github.com/arcgolabs/mapper v0.1.2
-	github.com/arcgolabs/plano v0.7.1
+	github.com/arcgolabs/plano v0.8.0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.14
@@ -176,7 +176,7 @@ require (
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

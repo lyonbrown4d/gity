@@ -8,8 +8,8 @@ func Module() dix.Module {
 		"config",
 		dix.Description("Configuration loading"),
 		dix.Providers(
-			dix.ProviderErr0(NewConfig),
-			dix.ProviderErr1(NewSettings),
+			dix.ProviderErr0(NewConfig, dix.Eager()),
+			dix.ProviderErr1(NewSettings, dix.Eager()),
 		),
 	)
 }

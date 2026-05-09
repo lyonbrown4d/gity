@@ -9,7 +9,6 @@ import (
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
-	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
 	"strings"
 	"time"
@@ -34,39 +33,28 @@ func NewProjectJobLogRepository(repo *Repository) ciports.ProjectJobLogRepositor
 }
 
 func (r *Repository) ListByProjectJobID(ctx context.Context, projectID, projectJobID int64) (*collectionx.List[cidomain.ProjectJobLog], error) {
-	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
-		From(dbschema.ProjectJobLogSchema).
-		Where(querydsl.And(
-			dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
-		)).
-		OrderBy(dbschema.ProjectJobLogSchema.Attempt.Asc(), dbschema.ProjectJobLogSchema.ID.Asc())
-	return persistence.Many(r.base.List(ctx, query))
+	return persistence.Many(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID)).
+		OrderBy(dbschema.ProjectJobLogSchema.Attempt.Asc(), dbschema.ProjectJobLogSchema.ID.Asc()).
+		List(ctx))
 }
 
 func (r *Repository) LatestByProjectJobID(ctx context.Context, projectID, projectJobID int64) (cidomain.ProjectJobLog, error) {
-	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
-		From(dbschema.ProjectJobLogSchema).
-		Where(querydsl.And(
-			dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
-		)).
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID)).
 		OrderBy(dbschema.ProjectJobLogSchema.Attempt.Desc(), dbschema.ProjectJobLogSchema.ID.Desc()).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+		First(ctx))
 }
 
 func (r *Repository) GetByProjectJobAttempt(ctx context.Context, projectID, projectJobID int64, attempt int) (cidomain.ProjectJobLog, error) {
-	query := querydsl.Select(dbschema.ProjectJobLogSchema.AllColumns().Values()...).
-		From(dbschema.ProjectJobLogSchema).
-		Where(querydsl.And(
-			dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID),
-			dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID),
-			dbschema.ProjectJobLogSchema.Attempt.Eq(attempt),
-		)).
+	return persistence.One(dbxrepo.Query(r.base).
+		Where(dbschema.ProjectJobLogSchema.ProjectID.Eq(projectID)).
+		Where(dbschema.ProjectJobLogSchema.ProjectJobID.Eq(projectJobID)).
+		Where(dbschema.ProjectJobLogSchema.Attempt.Eq(attempt)).
 		OrderBy(dbschema.ProjectJobLogSchema.ID.Desc()).
-		Limit(1)
-	return persistence.One(r.base.First(ctx, query))
+		First(ctx))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectJobLog, error) {
@@ -139,16 +127,20 @@ func (r *Repository) UpsertAttempt(ctx context.Context, input CreateInput) (cido
 func (r *Repository) update(ctx context.Context, item cidomain.ProjectJobLog) (cidomain.ProjectJobLog, error) {
 	now := time.Now().UTC()
 	output := strings.TrimRight(item.Output, "\r\n")
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectJobLogSchema.ID).Update(ctx, item.ID,
+	if _, err := dbxrepo.PatchSet(r.base, projectJobLogKey(item.ID)).Set(
 		dbschema.ProjectJobLogSchema.ExitCode.Set(item.ExitCode),
 		dbschema.ProjectJobLogSchema.Output.Set(output),
 		dbschema.ProjectJobLogSchema.OutputTruncated.Set(item.OutputTruncated),
 		dbschema.ProjectJobLogSchema.DurationMillis.Set(item.DurationMillis),
 		dbschema.ProjectJobLogSchema.UpdatedAt.Set(now),
-	); err != nil {
+	).Apply(ctx); err != nil {
 		return cidomain.ProjectJobLog{}, fmt.Errorf("update project job log: %w", err)
 	}
 	item.Output = output
 	item.UpdatedAt = now
 	return item, nil
+}
+
+func projectJobLogKey(id int64) dbxrepo.TypedKeySet {
+	return dbxrepo.KeySet(dbxrepo.Part(dbschema.ProjectJobLogSchema.ID, id))
 }
