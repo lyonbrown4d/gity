@@ -20,6 +20,23 @@ func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo
 	return nil
 }
 
+func protectedForcePushRefs(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, updates []receivePackUpdate) ([]string, error) {
+	refs := make([]string, 0, len(updates))
+	for _, update := range updates {
+		if update.BranchName == "" || update.Delete || isZeroOID(update.OldSHA) || isZeroOID(update.NewSHA) {
+			continue
+		}
+		protection, protected, err := gitTransportBranchProtection(ctx, repo, project.ID, update.BranchName)
+		if err != nil {
+			return nil, err
+		}
+		if protected && protection.BlocksForcePush() {
+			refs = append(refs, update.RefName)
+		}
+	}
+	return refs, nil
+}
+
 func rejectProtectedBranchUpdate(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, update receivePackUpdate) error {
 	if update.BranchName == "" {
 		return nil

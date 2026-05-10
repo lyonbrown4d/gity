@@ -13,17 +13,20 @@ import (
 )
 
 type projectPackagesInput struct {
-	ProjectID int64 `path:"id"`
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type packageInput struct {
-	ProjectID int64 `path:"id"`
-	PackageID int64 `path:"package_id"`
+	ProjectID     int64  `path:"id"`
+	PackageID     int64  `path:"package_id"`
+	Authorization string `header:"Authorization"`
 }
 
 type packageFileInput struct {
-	ProjectID int64 `path:"id"`
-	FileID    int64 `path:"file_id"`
+	ProjectID     int64  `path:"id"`
+	FileID        int64  `path:"file_id"`
+	Authorization string `header:"Authorization"`
 }
 
 type uploadPackageFileInput struct {
@@ -64,7 +67,7 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	service := e.service
 	authRuntime := e.authRuntime
-	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+	projectScope := httpapi.ProjectScopeResolverFrom(e.projectService)
 
 	listPackages := func(ctx context.Context, in *projectPackagesInput) (*packageOutput, error) {
 		items, err := service.ListPackages(ctx, in.ProjectID)
@@ -103,18 +106,51 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/packages", listPackages),
-		httpapi.Get("/repos/{id}/packages", listPackages, httpapi.DeprecatedRoute[projectPackagesInput, packageOutput]("Use GET /projects/{id}/packages instead.")),
-		httpapi.Get("/projects/{id}/packages/{package_id}", getPackage),
-		httpapi.Get("/repos/{id}/packages/{package_id}", getPackage, httpapi.DeprecatedRoute[packageInput, packageOutput]("Use GET /projects/{id}/packages/{package_id} instead.")),
-		httpapi.Post("/projects/{id}/packages/files", uploadPackageFile, httpapi.RequireProjectWriteRoute[uploadPackageFileInput, packageOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/packages", listPackages, httpapi.RequireProjectActionRoute[projectPackagesInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead)),
+		httpapi.Get("/repos/{id}/packages", listPackages,
+			httpapi.RequireProjectActionRoute[projectPackagesInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.DeprecatedRoute[projectPackagesInput, packageOutput]("Use GET /projects/{id}/packages instead."),
+		),
+		httpapi.Get("/projects/{id}/packages/{package_id}", getPackage, httpapi.RequireProjectActionRoute[packageInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead)),
+		httpapi.Get("/repos/{id}/packages/{package_id}", getPackage,
+			httpapi.RequireProjectActionRoute[packageInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.DeprecatedRoute[packageInput, packageOutput]("Use GET /projects/{id}/packages/{package_id} instead."),
+		),
+		httpapi.Post("/projects/{id}/packages/files", uploadPackageFile, httpapi.RequireProjectActionRoute[uploadPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite)),
 		httpapi.Post("/repos/{id}/packages/files", uploadPackageFile,
-			httpapi.RequireProjectWriteRoute[uploadPackageFileInput, packageOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[uploadPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
 			httpapi.DeprecatedRoute[uploadPackageFileInput, packageOutput]("Use POST /projects/{id}/packages/files instead."),
 		),
-		httpapi.Get("/projects/{id}/packages/files/{file_id}", getPackageFile),
-		httpapi.Get("/repos/{id}/packages/files/{file_id}", getPackageFile, httpapi.DeprecatedRoute[packageFileInput, packageOutput]("Use GET /projects/{id}/packages/files/{file_id} instead.")),
+		httpapi.Get("/projects/{id}/packages/files/{file_id}", getPackageFile, httpapi.RequireProjectActionRoute[packageFileInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead)),
+		httpapi.Get("/repos/{id}/packages/files/{file_id}", getPackageFile,
+			httpapi.RequireProjectActionRoute[packageFileInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.DeprecatedRoute[packageFileInput, packageOutput]("Use GET /projects/{id}/packages/files/{file_id} instead."),
+		),
 	)
+}
+
+func (in projectPackagesInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectPackagesInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in packageInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in packageInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in packageFileInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in packageFileInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }
 
 func (in uploadPackageFileInput) AuthorizationHeader() string {

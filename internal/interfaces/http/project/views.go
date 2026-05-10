@@ -148,6 +148,22 @@ func (in createFileCommitInput) ProjectIDValue() int64 {
 	return in.ID
 }
 
+func (in projectRepositoryInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectRepositoryInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
+func (in projectRepositorySearchInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectRepositorySearchInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
 func parseIDFilter(raw string) *setx.Set[int64] {
 	ids := setx.NewSet[int64]()
 	raw = strings.TrimSpace(raw)

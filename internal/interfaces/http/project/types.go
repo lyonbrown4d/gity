@@ -24,11 +24,12 @@ type projectsInput struct {
 }
 
 type projectRepositoryInput struct {
-	ID     int64  `path:"id"`
-	Ref    string `query:"ref"`
-	Branch string `query:"branch_name"`
-	Path   string `query:"path"`
-	Limit  int    `query:"limit"`
+	ID            int64  `path:"id"`
+	Authorization string `header:"Authorization"`
+	Ref           string `query:"ref"`
+	Branch        string `query:"branch_name"`
+	Path          string `query:"path"`
+	Limit         int    `query:"limit"`
 }
 
 type createBranchInput struct {
@@ -57,16 +58,17 @@ type createFileCommitInput struct {
 }
 
 type projectRepositorySearchInput struct {
-	ID          int64  `path:"id"`
-	Ref         string `query:"ref"`
-	Branch      string `query:"branch_name"`
-	Query       string `query:"query"`
-	Path        string `query:"path"`
-	Limit       int    `query:"limit"`
-	MaxFiles    int    `query:"max_files"`
-	MaxFileSize int64  `query:"max_file_size"`
-	MatchCase   bool   `query:"match_case"`
-	Regex       bool   `query:"regex"`
+	ID            int64  `path:"id"`
+	Authorization string `header:"Authorization"`
+	Ref           string `query:"ref"`
+	Branch        string `query:"branch_name"`
+	Query         string `query:"query"`
+	Path          string `query:"path"`
+	Limit         int    `query:"limit"`
+	MaxFiles      int    `query:"max_files"`
+	MaxFileSize   int64  `query:"max_file_size"`
+	MatchCase     bool   `query:"match_case"`
+	Regex         bool   `query:"regex"`
 }
 
 type projectOutput struct {

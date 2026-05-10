@@ -11,7 +11,8 @@ import (
 )
 
 type projectRunnersInput struct {
-	ProjectID int64 `path:"id"`
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type projectRunnerInput struct {
@@ -113,19 +114,22 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	authRuntime := e.authRuntime
-	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+	projectScope := httpapi.ProjectScopeResolverFrom(e.projectService)
 
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/runners", e.listProjectRunners),
-		httpapi.Get("/repos/{id}/runners", e.listProjectRunners, httpapi.DeprecatedRoute[projectRunnersInput, runnerOutput]("Use GET /projects/{id}/runners instead.")),
-		httpapi.Post("/projects/{id}/runners", e.registerProjectRunner, httpapi.RequireProjectWriteRoute[registerRunnerInput, runnerOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/runners", e.listProjectRunners, httpapi.RequireProjectActionRoute[projectRunnersInput, runnerOutput]("require_runner_read", authRuntime, projectScope, infraauth.ProjectActionRunnerRead)),
+		httpapi.Get("/repos/{id}/runners", e.listProjectRunners,
+			httpapi.RequireProjectActionRoute[projectRunnersInput, runnerOutput]("require_runner_read", authRuntime, projectScope, infraauth.ProjectActionRunnerRead),
+			httpapi.DeprecatedRoute[projectRunnersInput, runnerOutput]("Use GET /projects/{id}/runners instead."),
+		),
+		httpapi.Post("/projects/{id}/runners", e.registerProjectRunner, httpapi.RequireProjectActionRoute[registerRunnerInput, runnerOutput]("require_runner_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin)),
 		httpapi.Post("/repos/{id}/runners", e.registerProjectRunner,
-			httpapi.RequireProjectWriteRoute[registerRunnerInput, runnerOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[registerRunnerInput, runnerOutput]("require_runner_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin),
 			httpapi.DeprecatedRoute[registerRunnerInput, runnerOutput]("Use POST /projects/{id}/runners instead."),
 		),
-		httpapi.Delete("/projects/{id}/runners/{runner_id}", e.deleteProjectRunner, httpapi.RequireProjectWriteRoute[projectRunnerInput, runnerOutput](authRuntime, projectWrite)),
+		httpapi.Delete("/projects/{id}/runners/{runner_id}", e.deleteProjectRunner, httpapi.RequireProjectActionRoute[projectRunnerInput, runnerOutput]("require_runner_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin)),
 		httpapi.Delete("/repos/{id}/runners/{runner_id}", e.deleteProjectRunner,
-			httpapi.RequireProjectWriteRoute[projectRunnerInput, runnerOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[projectRunnerInput, runnerOutput]("require_runner_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin),
 			httpapi.DeprecatedRoute[projectRunnerInput, runnerOutput]("Use DELETE /projects/{id}/runners/{runner_id} instead."),
 		),
 		httpapi.Post("/runners/heartbeat", e.heartbeat),
@@ -136,6 +140,14 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 		httpapi.Post("/runners/jobs/{job_id}/source-archive", e.downloadSourceArchive),
 		httpapi.Post("/runners/jobs/{job_id}/artifacts", e.uploadArtifact),
 	)
+}
+
+func (in projectRunnersInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectRunnersInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }
 
 func (in projectRunnerInput) AuthorizationHeader() string {

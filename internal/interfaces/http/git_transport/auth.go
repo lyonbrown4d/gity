@@ -26,9 +26,9 @@ func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project proj
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	switch service {
 	case serviceUploadPack:
-		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
+		allowed, err = authRuntime.CanProjectAction(c.UserContext(), principal, scope, infraauth.ProjectActionRepositoryRead)
 	case serviceReceivePack:
-		allowed, err = authRuntime.CanWriteProject(c.UserContext(), principal, scope)
+		allowed, err = authRuntime.CanProjectAction(c.UserContext(), principal, scope, infraauth.ProjectActionRepositoryPush)
 	}
 	if err != nil {
 		return fiber.NewError(http.StatusForbidden, "authorization failed")

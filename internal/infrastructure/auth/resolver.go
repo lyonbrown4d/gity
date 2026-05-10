@@ -22,12 +22,17 @@ var (
 	})
 	projectWriteRoles  = setx.NewSet("developer", "maintainer", "owner")
 	projectMergeRoles  = setx.NewSet("maintainer", "owner")
+	projectOwnerRoles  = setx.NewSet("owner")
 	projectReportRoles = setx.NewSet("guest", "reporter", "developer", "maintainer", "owner")
 )
 
 const (
 	ProjectActionRead                = "project.read"
 	ProjectActionWrite               = "project.write"
+	ProjectActionDelete              = "project.delete"
+	ProjectActionRepositoryRead      = "project.repository.read"
+	ProjectActionRepositoryPush      = "project.repository.push"
+	ProjectActionRepositoryAdmin     = "project.repository.admin"
 	ProjectActionIssueCreate         = "project.issues.create"
 	ProjectActionIssueWrite          = "project.issues.write"
 	ProjectActionIssueComment        = "project.issues.comment"
@@ -35,6 +40,14 @@ const (
 	ProjectActionMergeRequestWrite   = "project.merge_requests.write"
 	ProjectActionMergeRequestComment = "project.merge_requests.comment"
 	ProjectActionMergeRequestMerge   = "project.merge_requests.merge"
+	ProjectActionPackageRead         = "project.packages.read"
+	ProjectActionPackageWrite        = "project.packages.write"
+	ProjectActionWikiRead            = "project.wiki.read"
+	ProjectActionWikiWrite           = "project.wiki.write"
+	ProjectActionJobRead             = "project.jobs.read"
+	ProjectActionJobWrite            = "project.jobs.write"
+	ProjectActionRunnerRead          = "project.runners.read"
+	ProjectActionRunnerAdmin         = "project.runners.admin"
 )
 
 type ProjectScope struct {
@@ -88,14 +101,25 @@ func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64
 
 func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, action string, principal Principal, organizationID int64, visibility string) authx.Decision {
 	switch action {
-	case ProjectActionRead:
+	case ProjectActionRead, ProjectActionRepositoryRead, ProjectActionPackageRead, ProjectActionWikiRead:
 		return authorizeProjectRead(ctx, memberRepository, principal, organizationID, visibility)
-	case ProjectActionWrite, ProjectActionIssueWrite, ProjectActionMergeRequestCreate, ProjectActionMergeRequestWrite:
+	case ProjectActionJobRead, ProjectActionRunnerRead:
+		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectReportRoles)
+	case ProjectActionWrite,
+		ProjectActionRepositoryPush,
+		ProjectActionIssueWrite,
+		ProjectActionMergeRequestCreate,
+		ProjectActionMergeRequestWrite,
+		ProjectActionPackageWrite,
+		ProjectActionWikiWrite,
+		ProjectActionJobWrite:
 		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectWriteRoles)
 	case ProjectActionIssueCreate, ProjectActionIssueComment, ProjectActionMergeRequestComment:
 		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectReportRoles)
-	case ProjectActionMergeRequestMerge:
+	case ProjectActionMergeRequestMerge, ProjectActionRepositoryAdmin, ProjectActionRunnerAdmin:
 		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectMergeRoles)
+	case ProjectActionDelete:
+		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectOwnerRoles)
 	default:
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}

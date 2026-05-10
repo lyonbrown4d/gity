@@ -36,9 +36,10 @@ func TestProjectJobFlow(t *testing.T) {
 }
 
 type jobFixture struct {
-	ctx       context.Context
-	projectID int64
-	service   *jobservice.Service
+	ctx           context.Context
+	projectID     int64
+	jobRepository *projectjobrepo.Repository
+	service       *jobservice.Service
 }
 
 func newJobFixture(t *testing.T, withArtifacts bool) jobFixture {
@@ -60,7 +61,7 @@ func newJobFixture(t *testing.T, withArtifacts bool) jobFixture {
 	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
 	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, organization))
 
-	return jobFixture{ctx: ctx, projectID: project.ID, service: service}
+	return jobFixture{ctx: ctx, projectID: project.ID, jobRepository: jobRepository, service: service}
 }
 
 func createJobLogRepository(t *testing.T, db *dbx.DB, enabled bool) *projectjoblogrepo.Repository {
@@ -164,6 +165,10 @@ func assertAppendProjectJobTrace(t *testing.T, fixture jobFixture, jobID int64) 
 	if streamed.Trace != "streaming" || streamed.DurationMillis != 12 {
 		t.Fatalf("unexpected streamed trace: %+v", streamed)
 	}
+	page := testutil.Must(fixture.service.GetProjectJobTracePage(fixture.ctx, fixture.projectID, jobID, jobservice.TracePageInput{Offset: 3, Limit: 4}))
+	if page.Trace != "eami" || page.TraceTotal != len("streaming") || !page.HasMore {
+		t.Fatalf("unexpected paged trace: %+v", page)
+	}
 }
 
 func assertCompleteScriptJob(t *testing.T, fixture jobFixture, jobID int64) {
@@ -214,6 +219,30 @@ func TestProjectJobRetry(t *testing.T) {
 	fixture := newJobFixture(t, true)
 	claimedID := assertClaimRetryableJob(t, fixture)
 	assertRetryProjectJob(t, fixture, claimedID)
+}
+
+func TestProjectJobExpiredLeaseIsRequeued(t *testing.T) {
+	t.Parallel()
+
+	fixture := newJobFixture(t, true)
+	created := testutil.Must(fixture.service.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
+		Kind:        jobservice.KindScript,
+		Payload:     `{"script":["echo lease"]}`,
+		MaxAttempts: 2,
+	}))
+	claimed, ok, err := fixture.service.ClaimProjectJob(fixture.ctx, fixture.projectID, "runner-a", time.Minute)
+	testutil.RequireNoError(t, err, "claim job")
+	if !ok || claimed.ID != created.ID {
+		t.Fatalf("unexpected claim result: ok=%v job=%+v", ok, claimed)
+	}
+	expired := testutil.Must(fixture.jobRepository.RequeueExpiredLeases(fixture.ctx, time.Now().UTC().Add(time.Hour)))
+	if expired != 1 {
+		t.Fatalf("expected one expired lease, got %d", expired)
+	}
+	requeued := testutil.Must(fixture.service.GetProjectJob(fixture.ctx, fixture.projectID, created.ID))
+	if requeued.Status != projectjobrepo.StatusPending || requeued.LastError != "runner lease expired" {
+		t.Fatalf("unexpected requeued job: %+v", requeued)
+	}
 }
 
 func assertClaimRetryableJob(t *testing.T, fixture jobFixture) int64 {

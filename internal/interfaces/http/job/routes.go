@@ -14,7 +14,8 @@ import (
 )
 
 type projectJobsInput struct {
-	ProjectID int64 `path:"id"`
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type projectJobInput struct {
@@ -23,10 +24,19 @@ type projectJobInput struct {
 	Authorization string `header:"Authorization"`
 }
 
+type projectJobTraceInput struct {
+	ProjectID     int64  `path:"id"`
+	JobID         int64  `path:"job_id"`
+	Authorization string `header:"Authorization"`
+	Offset        int    `query:"offset"`
+	Limit         int    `query:"limit"`
+}
+
 type projectJobArtifactInput struct {
-	ProjectID  int64 `path:"id"`
-	JobID      int64 `path:"job_id"`
-	ArtifactID int64 `path:"artifact_id"`
+	ProjectID     int64  `path:"id"`
+	JobID         int64  `path:"job_id"`
+	ArtifactID    int64  `path:"artifact_id"`
+	Authorization string `header:"Authorization"`
 }
 
 type createJobInput struct {
@@ -64,35 +74,58 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	authRuntime := e.authRuntime
-	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+	projectScope := httpapi.ProjectScopeResolverFrom(e.projectService)
 
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/jobs", e.listProjectJobs),
-		httpapi.Get("/repos/{id}/jobs", e.listProjectJobs, httpapi.DeprecatedRoute[projectJobsInput, jobOutput]("Use GET /projects/{id}/jobs instead.")),
-		httpapi.Post("/projects/{id}/jobs", e.createJob, httpapi.RequireProjectWriteRoute[createJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/jobs", e.listProjectJobs, httpapi.RequireProjectActionRoute[projectJobsInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)),
+		httpapi.Get("/repos/{id}/jobs", e.listProjectJobs,
+			httpapi.RequireProjectActionRoute[projectJobsInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead),
+			httpapi.DeprecatedRoute[projectJobsInput, jobOutput]("Use GET /projects/{id}/jobs instead."),
+		),
+		httpapi.Post("/projects/{id}/jobs", e.createJob, httpapi.RequireProjectActionRoute[createJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite)),
 		httpapi.Post("/repos/{id}/jobs", e.createJob,
-			httpapi.RequireProjectWriteRoute[createJobInput, jobOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[createJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite),
 			httpapi.DeprecatedRoute[createJobInput, jobOutput]("Use POST /projects/{id}/jobs instead."),
 		),
-		httpapi.Get("/projects/{id}/jobs/{job_id}", e.getProjectJob),
-		httpapi.Get("/repos/{id}/jobs/{job_id}", e.getProjectJob, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id} instead.")),
-		httpapi.Post("/projects/{id}/jobs/{job_id}/cancel", e.cancelProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/jobs/{job_id}", e.getProjectJob, httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)),
+		httpapi.Get("/repos/{id}/jobs/{job_id}", e.getProjectJob,
+			httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead),
+			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id} instead."),
+		),
+		httpapi.Post("/projects/{id}/jobs/{job_id}/cancel", e.cancelProjectJob, httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite)),
 		httpapi.Post("/repos/{id}/jobs/{job_id}/cancel", e.cancelProjectJob,
-			httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite),
 			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use POST /projects/{id}/jobs/{job_id}/cancel instead."),
 		),
-		httpapi.Post("/projects/{id}/jobs/{job_id}/retry", e.retryProjectJob, httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite)),
+		httpapi.Post("/projects/{id}/jobs/{job_id}/retry", e.retryProjectJob, httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite)),
 		httpapi.Post("/repos/{id}/jobs/{job_id}/retry", e.retryProjectJob,
-			httpapi.RequireProjectWriteRoute[projectJobInput, jobOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_write", authRuntime, projectScope, infraauth.ProjectActionJobWrite),
 			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use POST /projects/{id}/jobs/{job_id}/retry instead."),
 		),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/trace", e.getProjectJobTrace),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/trace", e.getProjectJobTrace, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/trace instead.")),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts, httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts instead.")),
-		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact),
-		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact, httpapi.DeprecatedRoute[projectJobArtifactInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts/{artifact_id} instead.")),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/trace", e.getProjectJobTrace, httpapi.RequireProjectActionRoute[projectJobTraceInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/trace", e.getProjectJobTrace,
+			httpapi.RequireProjectActionRoute[projectJobTraceInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead),
+			httpapi.DeprecatedRoute[projectJobTraceInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/trace instead."),
+		),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts, httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts", e.listProjectJobArtifacts,
+			httpapi.RequireProjectActionRoute[projectJobInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead),
+			httpapi.DeprecatedRoute[projectJobInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts instead."),
+		),
+		httpapi.Get("/projects/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact, httpapi.RequireProjectActionRoute[projectJobArtifactInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)),
+		httpapi.Get("/repos/{id}/jobs/{job_id}/artifacts/{artifact_id}", e.getProjectJobArtifact,
+			httpapi.RequireProjectActionRoute[projectJobArtifactInput, jobOutput]("require_job_read", authRuntime, projectScope, infraauth.ProjectActionJobRead),
+			httpapi.DeprecatedRoute[projectJobArtifactInput, jobOutput]("Use GET /projects/{id}/jobs/{job_id}/artifacts/{artifact_id} instead."),
+		),
 	)
+}
+
+func (in projectJobsInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectJobsInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }
 
 func (in projectJobInput) AuthorizationHeader() string {
@@ -100,6 +133,22 @@ func (in projectJobInput) AuthorizationHeader() string {
 }
 
 func (in projectJobInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in projectJobTraceInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectJobTraceInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in projectJobArtifactInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectJobArtifactInput) ProjectIDValue() int64 {
 	return in.ProjectID
 }
 

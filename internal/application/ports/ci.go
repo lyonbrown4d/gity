@@ -35,6 +35,7 @@ type ProjectJobRepository interface {
 	ClaimNextByKinds(ctx context.Context, kinds []string, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
 	ClaimNextByProjectID(ctx context.Context, projectID int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
 	ClaimNextByProjectIDAndKinds(ctx context.Context, projectID int64, kinds []string, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
+	RequeueExpiredLeases(ctx context.Context, now time.Time) (int64, error)
 	MarkSucceeded(ctx context.Context, id int64, result string) error
 	ScheduleByID(ctx context.Context, id int64, runAfter time.Time) error
 	MarkFailed(ctx context.Context, item cidomain.ProjectJob, message string, retryAfter time.Duration) error

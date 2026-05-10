@@ -72,7 +72,19 @@ func RequireProjectWrite[I ProjectInput, O any](authRuntime *infraauth.Runtime, 
 }
 
 func RequireProjectAction[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, action string) httpx.RoutePolicy[I, O] {
-	return projectPolicy[I, O](name, authRuntime, resolver, action, false)
+	return projectPolicy[I, O](name, authRuntime, resolver, action, isAnonymousProjectReadAction(action))
+}
+
+func isAnonymousProjectReadAction(action string) bool {
+	switch action {
+	case infraauth.ProjectActionRead,
+		infraauth.ProjectActionRepositoryRead,
+		infraauth.ProjectActionPackageRead,
+		infraauth.ProjectActionWikiRead:
+		return true
+	default:
+		return false
+	}
 }
 
 func projectPolicy[I ProjectInput, O any](name string, authRuntime *infraauth.Runtime, resolver ProjectScopeResolver, action string, allowAnonymousPublicRead bool) httpx.RoutePolicy[I, O] {

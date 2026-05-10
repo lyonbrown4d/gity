@@ -11,7 +11,8 @@ import (
 )
 
 type wikiPagesInput struct {
-	ProjectID int64 `path:"id"`
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type wikiPageInput struct {
@@ -68,29 +69,43 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	authRuntime := e.authRuntime
-	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+	projectScope := httpapi.ProjectScopeResolverFrom(e.projectService)
 
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/wiki/pages", e.listPages),
-		httpapi.Get("/repos/{id}/wiki/pages", e.listPages, httpapi.DeprecatedRoute[wikiPagesInput, wikiOutput]("Use GET /projects/{id}/wiki/pages instead.")),
-		httpapi.Post("/projects/{id}/wiki/pages", e.createPage, httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/wiki/pages", e.listPages, httpapi.RequireProjectActionRoute[wikiPagesInput, wikiOutput]("require_wiki_read", authRuntime, projectScope, infraauth.ProjectActionWikiRead)),
+		httpapi.Get("/repos/{id}/wiki/pages", e.listPages,
+			httpapi.RequireProjectActionRoute[wikiPagesInput, wikiOutput]("require_wiki_read", authRuntime, projectScope, infraauth.ProjectActionWikiRead),
+			httpapi.DeprecatedRoute[wikiPagesInput, wikiOutput]("Use GET /projects/{id}/wiki/pages instead."),
+		),
+		httpapi.Post("/projects/{id}/wiki/pages", e.createPage, httpapi.RequireProjectActionRoute[createWikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite)),
 		httpapi.Post("/repos/{id}/wiki/pages", e.createPage,
-			httpapi.RequireProjectWriteRoute[createWikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[createWikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite),
 			httpapi.DeprecatedRoute[createWikiPageInput, wikiOutput]("Use POST /projects/{id}/wiki/pages instead."),
 		),
-		httpapi.Get("/projects/{id}/wiki/pages/{slug}", e.getPage),
-		httpapi.Get("/repos/{id}/wiki/pages/{slug}", e.getPage, httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use GET /projects/{id}/wiki/pages/{slug} instead.")),
-		httpapi.Patch("/projects/{id}/wiki/pages/{slug}", e.updatePage, httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/wiki/pages/{slug}", e.getPage, httpapi.RequireProjectActionRoute[wikiPageInput, wikiOutput]("require_wiki_read", authRuntime, projectScope, infraauth.ProjectActionWikiRead)),
+		httpapi.Get("/repos/{id}/wiki/pages/{slug}", e.getPage,
+			httpapi.RequireProjectActionRoute[wikiPageInput, wikiOutput]("require_wiki_read", authRuntime, projectScope, infraauth.ProjectActionWikiRead),
+			httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use GET /projects/{id}/wiki/pages/{slug} instead."),
+		),
+		httpapi.Patch("/projects/{id}/wiki/pages/{slug}", e.updatePage, httpapi.RequireProjectActionRoute[updateWikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite)),
 		httpapi.Patch("/repos/{id}/wiki/pages/{slug}", e.updatePage,
-			httpapi.RequireProjectWriteRoute[updateWikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[updateWikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite),
 			httpapi.DeprecatedRoute[updateWikiPageInput, wikiOutput]("Use PATCH /projects/{id}/wiki/pages/{slug} instead."),
 		),
-		httpapi.Delete("/projects/{id}/wiki/pages/{slug}", e.deletePage, httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite)),
+		httpapi.Delete("/projects/{id}/wiki/pages/{slug}", e.deletePage, httpapi.RequireProjectActionRoute[wikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite)),
 		httpapi.Delete("/repos/{id}/wiki/pages/{slug}", e.deletePage,
-			httpapi.RequireProjectWriteRoute[wikiPageInput, wikiOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectActionRoute[wikiPageInput, wikiOutput]("require_wiki_write", authRuntime, projectScope, infraauth.ProjectActionWikiWrite),
 			httpapi.DeprecatedRoute[wikiPageInput, wikiOutput]("Use DELETE /projects/{id}/wiki/pages/{slug} instead."),
 		),
 	)
+}
+
+func (in wikiPagesInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in wikiPagesInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }
 
 func (in wikiPageInput) AuthorizationHeader() string {

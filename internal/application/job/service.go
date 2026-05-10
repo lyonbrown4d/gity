@@ -135,6 +135,9 @@ func (s *Service) RetryProjectJob(ctx context.Context, projectID, jobID int64) (
 }
 
 func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Duration) (bool, error) {
+	if _, err := s.RequeueExpiredProjectJobs(ctx); err != nil {
+		return false, err
+	}
 	job, claimed, err := s.jobRepo.ClaimNextByKinds(ctx, []string{KindNoop}, normalizeWorkerID(workerID), lease)
 	if err != nil {
 		return claimed, oops.In("job").With("worker_id", normalizeWorkerID(workerID)).Wrapf(err, "claim next project job")
@@ -161,11 +164,25 @@ func (s *Service) ClaimProjectJob(ctx context.Context, projectID int64, workerID
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return cidomain.ProjectJob{}, false, apperror.NotFound("project not found", err)
 	}
+	if _, err := s.RequeueExpiredProjectJobs(ctx); err != nil {
+		return cidomain.ProjectJob{}, false, err
+	}
 	job, claimed, err := s.jobRepo.ClaimNextByProjectIDAndKinds(ctx, projectID, []string{KindScript}, normalizeWorkerID(workerID), lease)
 	if err != nil {
 		return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "worker_id", normalizeWorkerID(workerID)).Wrapf(err, "claim project script job")
 	}
 	return job, claimed, nil
+}
+
+func (s *Service) RequeueExpiredProjectJobs(ctx context.Context) (int64, error) {
+	expired, err := s.jobRepo.RequeueExpiredLeases(ctx, time.Now().UTC())
+	if err != nil {
+		return expired, oops.In("job").Wrapf(err, "requeue expired project job leases")
+	}
+	if expired > 0 && s.logger != nil {
+		s.logger.Warn("expired project job leases requeued", slog.Int64("count", expired))
+	}
+	return expired, nil
 }
 
 func (s *Service) CompleteProjectJob(ctx context.Context, projectID, jobID int64, result string) (cidomain.ProjectJob, error) {

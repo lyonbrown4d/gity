@@ -181,6 +181,8 @@ GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tar
 
 UPX compression is enabled for Linux and Windows release binaries. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
 
+Production Docker deployment templates live in [docs/production-deployment.md](docs/production-deployment.md). Use `docker-compose.prod.yaml` with `.env.production` for split `migration/server/worker` deployments or standalone single-process deployments.
+
 ## Roadmap
 
 Detailed planning lives in [ROADMAP.md](ROADMAP.md).

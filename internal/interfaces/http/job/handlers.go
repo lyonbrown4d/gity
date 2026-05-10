@@ -57,8 +57,8 @@ func (e *Endpoint) retryProjectJob(ctx context.Context, in *projectJobInput) (*j
 	return &jobOutput{Body: item}, nil
 }
 
-func (e *Endpoint) getProjectJobTrace(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
-	item, err := e.service.GetProjectJobTrace(ctx, in.ProjectID, in.JobID)
+func (e *Endpoint) getProjectJobTrace(ctx context.Context, in *projectJobTraceInput) (*jobOutput, error) {
+	item, err := e.service.GetProjectJobTracePage(ctx, in.ProjectID, in.JobID, jobservice.TracePageInput{Offset: in.Offset, Limit: in.Limit})
 	if err != nil {
 		return nil, err
 	}

@@ -15,6 +15,8 @@ import (
 	"github.com/samber/oops"
 )
 
+const runnerOfflineAfter = 2 * time.Minute
+
 func (s *Service) authenticateRunner(ctx context.Context, token string) (cidomain.ProjectRunner, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -52,6 +54,7 @@ func (s *Service) refreshPipelineForJob(ctx context.Context, projectID, jobID in
 }
 
 func toRunnerView(item cidomain.ProjectRunner) RunnerView {
+	now := time.Now().UTC()
 	var lastContactAt *time.Time
 	if !item.LastContactAt.IsZero() {
 		value := item.LastContactAt
@@ -63,12 +66,25 @@ func toRunnerView(item cidomain.ProjectRunner) RunnerView {
 		Name:          item.Name,
 		Description:   item.Description,
 		Tags:          item.Tags,
-		Status:        item.Status,
+		Status:        effectiveRunnerStatus(item, now),
 		Active:        item.Active == 1,
 		LastContactAt: lastContactAt,
 		CreatedAt:     item.CreatedAt,
 		UpdatedAt:     item.UpdatedAt,
 	}
+}
+
+func effectiveRunnerStatus(item cidomain.ProjectRunner, now time.Time) string {
+	if item.Active != 1 {
+		return gitports.ProjectRunnerStatusOffline
+	}
+	if item.LastContactAt.IsZero() {
+		return gitports.ProjectRunnerStatusOffline
+	}
+	if now.Sub(item.LastContactAt) > runnerOfflineAfter {
+		return gitports.ProjectRunnerStatusOffline
+	}
+	return gitports.ProjectRunnerStatusOnline
 }
 
 func runnerWorkerID(item cidomain.ProjectRunner) string {

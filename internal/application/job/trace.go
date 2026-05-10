@@ -18,10 +18,19 @@ type AppendTraceInput struct {
 	DurationMillis  int64  `json:"duration_millis"`
 }
 
+type TracePageInput struct {
+	Offset int `json:"offset"`
+	Limit  int `json:"limit"`
+}
+
 type ProjectJobTrace struct {
 	Job             cidomain.ProjectJob      `json:"job"`
 	Logs            []cidomain.ProjectJobLog `json:"logs"`
 	Trace           string                   `json:"trace"`
+	TraceOffset     int                      `json:"trace_offset"`
+	TraceLimit      int                      `json:"trace_limit"`
+	TraceTotal      int                      `json:"trace_total"`
+	HasMore         bool                     `json:"has_more"`
 	ExitCode        int                      `json:"exit_code"`
 	OutputTruncated bool                     `json:"output_truncated"`
 	DurationMillis  int64                    `json:"duration_millis"`
@@ -36,6 +45,10 @@ type scriptResult struct {
 }
 
 func (s *Service) GetProjectJobTrace(ctx context.Context, projectID, jobID int64) (ProjectJobTrace, error) {
+	return s.GetProjectJobTracePage(ctx, projectID, jobID, TracePageInput{})
+}
+
+func (s *Service) GetProjectJobTracePage(ctx context.Context, projectID, jobID int64, input TracePageInput) (ProjectJobTrace, error) {
 	job, err := s.GetProjectJob(ctx, projectID, jobID)
 	if err != nil {
 		return ProjectJobTrace{}, err
@@ -47,6 +60,7 @@ func (s *Service) GetProjectJobTrace(ctx context.Context, projectID, jobID int64
 	trace := ProjectJobTrace{Job: job, Logs: logs.Values()}
 	if logs.Len() == 0 {
 		trace.Trace = fallbackTrace(job)
+		applyTracePage(&trace, input)
 		return trace, nil
 	}
 	latest, _ := logs.Get(logs.Len() - 1)
@@ -54,7 +68,23 @@ func (s *Service) GetProjectJobTrace(ctx context.Context, projectID, jobID int64
 	trace.ExitCode = latest.ExitCode
 	trace.OutputTruncated = latest.OutputTruncated == 1
 	trace.DurationMillis = latest.DurationMillis
+	applyTracePage(&trace, input)
 	return trace, nil
+}
+
+func applyTracePage(trace *ProjectJobTrace, input TracePageInput) {
+	total := len(trace.Trace)
+	offset := min(max(input.Offset, 0), total)
+	limit := max(input.Limit, 0)
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	trace.TraceTotal = total
+	trace.TraceOffset = offset
+	trace.TraceLimit = limit
+	trace.HasMore = end < total
+	trace.Trace = trace.Trace[offset:end]
 }
 
 func (s *Service) AppendProjectJobTrace(ctx context.Context, projectID, jobID int64, input AppendTraceInput) (ProjectJobTrace, error) {

@@ -160,7 +160,11 @@ func executeRPC(c *fiber.Ctx, project projectView, service string, services *Rou
 		if err := rejectProtectedBranchUpdates(c.UserContext(), project, services.branchProtectionRepo, updates); err != nil {
 			return err
 		}
-		if err := transport.ReceivePack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr); err != nil {
+		denyForcePushRefs, err := protectedForcePushRefs(c.UserContext(), project, services.branchProtectionRepo, updates)
+		if err != nil {
+			return err
+		}
+		if err := transport.ReceivePackWithOptions(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr, infragittransport.ReceivePackOptions{DenyForcePushRefs: denyForcePushRefs}); err != nil {
 			return oops.In("http.git_transport").With("project", project.FullPath, "service", service).Wrapf(err, "execute receive-pack")
 		}
 		return nil

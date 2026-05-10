@@ -23,6 +23,30 @@ var (
 	ErrMergeConflict           = gitports.ErrMergeConflict
 )
 
+const updateHookScript = `#!/bin/sh
+refname="$1"
+oldrev="$2"
+newrev="$3"
+zero="0000000000000000000000000000000000000000"
+
+case "
+$GITY_DENY_FORCE_PUSH_REFS
+" in
+*"
+$refname
+"*)
+	if [ "$oldrev" != "$zero" ] && [ "$newrev" != "$zero" ]; then
+		if ! git merge-base --is-ancestor "$oldrev" "$newrev"; then
+			echo "force push is not allowed for protected branch: ${refname#refs/heads/}" >&2
+			exit 1
+		fi
+	fi
+	;;
+esac
+
+exit 0
+`
+
 type Runner struct {
 	gitBin   string
 	repoRoot string
@@ -36,6 +60,14 @@ func NewRunner(settings config.Settings) *Runner {
 }
 
 func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return r.runWithEnv(ctx, repoPath, args, nil, stdin, stdout, stderr)
+}
+
+func (r *Runner) RunWithEnv(ctx context.Context, repoPath string, args []string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return r.runWithEnv(ctx, repoPath, args, env, stdin, stdout, stderr)
+}
+
+func (r *Runner) runWithEnv(ctx context.Context, repoPath string, args []string, env map[string]string, stdin io.Reader, stdout, stderr io.Writer) error {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
 		return err
@@ -45,6 +77,12 @@ func (r *Runner) Run(ctx context.Context, repoPath string, args []string, stdin 
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.Dir = absRepo
+	if len(env) > 0 {
+		cmd.Env = os.Environ()
+		for key, value := range env {
+			cmd.Env = append(cmd.Env, key+"="+value)
+		}
+	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("run git %v: %w", args, err)
 	}
@@ -73,7 +111,29 @@ func (r *Runner) InitBare(ctx context.Context, repoPath, initialBranch string) e
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("init bare repo %s: %w", repoPath, err)
 	}
+	return r.EnsureUpdateHook(ctx, repoPath)
+}
+
+func (r *Runner) EnsureUpdateHook(_ context.Context, repoPath string) error {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return err
+	}
+	hookPath := filepath.Join(absRepo, "hooks", "update")
+	if err := os.MkdirAll(filepath.Dir(hookPath), 0o750); err != nil {
+		return fmt.Errorf("create git hooks directory: %w", err)
+	}
+	if err := os.WriteFile(hookPath, []byte(updateHookScript), 0o600); err != nil {
+		return fmt.Errorf("write git update hook: %w", err)
+	}
+	if err := os.Chmod(hookPath, executableHookMode()); err != nil {
+		return fmt.Errorf("mark git update hook executable: %w", err)
+	}
 	return nil
+}
+
+func executableHookMode() os.FileMode {
+	return 0o755
 }
 
 func (r *Runner) CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error {

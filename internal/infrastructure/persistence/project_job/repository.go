@@ -101,6 +101,32 @@ func (r *Repository) ClaimNextByProjectIDAndKinds(ctx context.Context, projectID
 	return r.claimNext(ctx, projectID, kinds, workerID, lease)
 }
 
+func (r *Repository) RequeueExpiredLeases(ctx context.Context, now time.Time) (int64, error) {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	} else {
+		now = now.UTC()
+	}
+	items, err := dbxrepo.Query(r.base).
+		Where(dbschema.ProjectJobSchema.Status.Eq(StatusRunning)).
+		Where(dbschema.ProjectJobSchema.LockedUntil.Le(now)).
+		OrderBy(dbschema.ProjectJobSchema.LockedUntil.Asc(), dbschema.ProjectJobSchema.ID.Asc()).
+		List(ctx)
+	if err != nil {
+		return 0, oops.In("persistence.project_job").Wrapf(err, "list expired project job leases")
+	}
+	var expired int64
+	values := items.Values()
+	for index := range values {
+		item := values[index]
+		if err := r.MarkFailed(ctx, item, "runner lease expired", 0); err != nil {
+			return expired, oops.In("persistence.project_job").With("project_id", item.ProjectID, "job_id", item.ID).Wrapf(err, "requeue expired project job lease")
+		}
+		expired++
+	}
+	return expired, nil
+}
+
 func (r *Repository) claimNext(ctx context.Context, projectID int64, kinds []string, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error) {
 	if lease <= 0 {
 		lease = time.Minute
