@@ -15,7 +15,9 @@ var (
 	ErrInvalidSearchQuery      = errors.New("invalid search query")
 	ErrInvalidSearchRegexp     = errors.New("invalid search regex")
 	ErrBranchExists            = errors.New("git branch already exists")
+	ErrTagExists               = errors.New("git tag already exists")
 	ErrInvalidBranchName       = errors.New("invalid git branch name")
+	ErrInvalidTagName          = errors.New("invalid git tag name")
 	ErrSourceReferenceNotFound = errors.New("git source reference not found")
 	ErrFileAlreadyExists       = errors.New("git file already exists")
 	ErrMergeConflict           = errors.New("git merge conflict")
@@ -23,6 +25,7 @@ var (
 
 type GitRepository interface {
 	ListBranches(ctx context.Context, repoPath, defaultBranch string) ([]Branch, error)
+	ListTags(ctx context.Context, repoPath string) ([]Tag, error)
 	ListTree(ctx context.Context, repoPath, refName, defaultBranch, treePath string) ([]TreeEntry, error)
 	GetBlob(ctx context.Context, repoPath, refName, defaultBranch, blobPath string) (Blob, error)
 	GetReadme(ctx context.Context, repoPath, refName, defaultBranch string) (Blob, error)
@@ -36,6 +39,8 @@ type GitRunner interface {
 	InitBare(ctx context.Context, repoPath, initialBranch string) error
 	CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error
 	DeleteBranch(ctx context.Context, repoPath, branchName string) error
+	CreateTag(ctx context.Context, repoPath, tagName, sourceRef string) error
+	DeleteTag(ctx context.Context, repoPath, tagName string) error
 	CreateFileCommit(ctx context.Context, repoPath string, input CreateFileCommitInput) error
 	DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error)
 	Archive(ctx context.Context, repoPath, revision string) ([]byte, error)
@@ -46,6 +51,16 @@ type Branch struct {
 	Name      string `json:"name"`
 	Hash      string `json:"hash"`
 	IsDefault bool   `json:"is_default"`
+}
+
+type Tag struct {
+	Name       string `json:"name"`
+	TargetSHA  string `json:"target_sha"`
+	Message    string `json:"message"`
+	CreatedAt  string `json:"created_at"`
+	Annotated  bool   `json:"annotated"`
+	ObjectSHA  string `json:"object_sha"`
+	ObjectType string `json:"object_type"`
 }
 
 type TreeEntry struct {

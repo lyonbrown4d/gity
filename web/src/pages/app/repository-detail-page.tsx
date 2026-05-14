@@ -17,6 +17,7 @@ import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-me
 import { RepositoryPackagesTab } from "@/pages/app/repository/repository-packages-tab";
 import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
 import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
+import { RepositoryReleasesTab } from "@/pages/app/repository/repository-releases-tab";
 import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
 import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
@@ -222,6 +223,16 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
+      {meta.repository && activeTab === "releases" ? (
+        <RepositoryReleasesTab
+          repoId={repoId}
+          defaultBranch={meta.repository.default_branch}
+          permissions={repositoryPermissions}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
       {meta.repository && activeTab === "lfs" ? (
         <RepositoryLFSTab
           repoId={repoId}
@@ -317,6 +328,7 @@ const isRepoTab = (value: string | null): value is RepoTab =>
   || value === "merge-requests"
   || value === "wiki"
   || value === "packages"
+  || value === "releases"
   || value === "lfs"
   || value === "pipelines"
   || value === "jobs"

@@ -44,6 +44,7 @@ const TAB_GROUPS: Array<{
       { value: "code", label: "Code", icon: Code2 },
       { value: "wiki", label: "Wiki", icon: BookOpen },
       { value: "packages", label: "Packages", icon: Package },
+      { value: "releases", label: "Releases", icon: Rocket },
     ],
   },
   {
@@ -126,7 +127,7 @@ export const RepositoryHeaderCard = ({
       </CardHeader>
       <CardContent className="relative z-10">
         <Tabs value={activeTab} onValueChange={(value) => onChangeTab(value as RepoTab)} className="space-y-3">
-          <div className="grid gap-3 xl:grid-cols-[1fr_1fr_1fr_1.25fr_0.8fr]">
+          <div className="grid gap-3 xl:grid-cols-[1.15fr_1fr_1fr_1.25fr_0.8fr]">
             {TAB_GROUPS.map((group) => (
               <div key={group.label} className="rounded-2xl border border-border/70 bg-background/45 p-2">
                 <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

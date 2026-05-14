@@ -37,8 +37,12 @@ func mapGitExecError(err error) error {
 	switch {
 	case errors.Is(err, gitports.ErrBranchExists):
 		return apperror.Conflict("branch already exists", err)
+	case errors.Is(err, gitports.ErrTagExists):
+		return apperror.Conflict("tag already exists", err)
 	case errors.Is(err, gitports.ErrInvalidBranchName):
 		return apperror.BadRequest("invalid branch name", err)
+	case errors.Is(err, gitports.ErrInvalidTagName):
+		return apperror.BadRequest("invalid tag name", err)
 	case errors.Is(err, gitports.ErrSourceReferenceNotFound):
 		return apperror.NotFound("git reference not found", err)
 	case errors.Is(err, gitports.ErrFileAlreadyExists):

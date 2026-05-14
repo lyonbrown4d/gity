@@ -32,6 +32,7 @@ Available now:
 - Wiki pages
 - Git LFS object and lock management
 - Package registry baseline
+- Release and Git tag management with release asset links
 - CI pipeline/job lifecycle using Plano DSL
 - Runner registration, heartbeat, job claim, trace, artifact upload, source archive download, tag matching, masked variables, and project-scoped variables
 - Audit logging through asynchronous events for sensitive project operations
@@ -129,7 +130,6 @@ Scope:
 - More complete package registry protocols
 - MR discussions beyond flat comments
 - Issue boards and milestones
-- Release/tag management
 - Deploy keys, deploy tokens, and project access tokens
 - Webhook and notification foundation
 

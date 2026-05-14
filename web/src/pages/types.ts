@@ -28,6 +28,16 @@ export interface RepositoryBranchView {
   protection?: RepositoryBranchProtectionView | null;
 }
 
+export interface RepositoryTagView {
+  name: string;
+  target_sha: string;
+  message?: string | null;
+  created_at?: string | null;
+  annotated: boolean;
+  object_sha: string;
+  object_type: string;
+}
+
 export type RepositoryBranchProtectionRuleType = "exact" | "pattern";
 export type RepositoryBranchAccessLevel = "no_one" | "developer" | "maintainer" | "owner";
 
@@ -440,6 +450,34 @@ export interface RepositoryPackageDetailView {
 export interface RepositoryPackageFileContentView {
   file: RepositoryPackageFileView;
   content_base64: string;
+}
+
+export interface RepositoryReleaseView {
+  id: string;
+  project_id: string;
+  tag_name: string;
+  name: string;
+  description?: string | null;
+  created_by_user_id: string;
+  released_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryReleaseLinkView {
+  id: string;
+  project_release_id: string;
+  name: string;
+  url: string;
+  link_type: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryReleaseDetailView {
+  release: RepositoryReleaseView;
+  links: RepositoryReleaseLinkView[];
+  tag?: RepositoryTagView | null;
 }
 
 export interface RepositoryAuditEventView {

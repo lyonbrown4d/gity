@@ -66,6 +66,7 @@ Relations:
 - `project_merge_requests`
 - `project_wiki_pages`
 - `project_packages`
+- `project_releases`
 - `project_lfs_objects`
 - `project_runners`
 - `project_pipelines`

@@ -12,6 +12,7 @@ import (
 	packageregistryservice "github.com/lyonbrown4d/gity/internal/application/package_registry"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	releaseservice "github.com/lyonbrown4d/gity/internal/application/release"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
@@ -52,6 +53,8 @@ import (
 	projectpackageversionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_package_version"
 	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
 	projectpipelinejobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline_job"
+	projectreleaserepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_release"
+	projectreleaselinkrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_release_link"
 	projectrunnerrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_runner"
 	projectwikipagerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
@@ -69,6 +72,7 @@ import (
 	packageregistryendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/package_registry"
 	pipelineendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/pipeline"
 	projectendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/project"
+	releaseendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/release"
 	runnerendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/runner"
 	systemendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/system"
 	userendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/user"
@@ -164,6 +168,8 @@ func repositoryRuntimeModule() dix.Module {
 			projectpackagefilerepo.Module(),
 			projectpipelinerepo.Module(),
 			projectpipelinejobrepo.Module(),
+			projectreleaserepo.Module(),
+			projectreleaselinkrepo.Module(),
 			projectrunnerrepo.Module(),
 			projectwikipagerepo.Module(),
 		),
@@ -202,6 +208,7 @@ func applicationRuntimeModule() dix.Module {
 			mergerequestservice.Module(),
 			packageregistryservice.Module(),
 			pipelineservice.Module(),
+			releaseservice.Module(),
 			runnerservice.Module(),
 			wikiservice.Module(),
 		),
@@ -237,6 +244,7 @@ func endpointRuntimeModule() dix.Module {
 			mergerequestendpoint.Module(),
 			packageregistryendpoint.Module(),
 			pipelineendpoint.Module(),
+			releaseendpoint.Module(),
 			runnerendpoint.Module(),
 			wikiendpoint.Module(),
 		),

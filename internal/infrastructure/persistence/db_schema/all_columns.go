@@ -110,6 +110,14 @@ func (s ProjectPipelineSchemaDef) AllColumns() *collectionx.List[querydsl.Select
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectReleaseSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
+func (s ProjectReleaseLinkSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectRunnerSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }

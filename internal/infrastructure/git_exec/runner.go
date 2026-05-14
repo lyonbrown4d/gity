@@ -17,7 +17,9 @@ import (
 
 var (
 	ErrBranchExists            = gitports.ErrBranchExists
+	ErrTagExists               = gitports.ErrTagExists
 	ErrInvalidBranchName       = gitports.ErrInvalidBranchName
+	ErrInvalidTagName          = gitports.ErrInvalidTagName
 	ErrSourceReferenceNotFound = gitports.ErrSourceReferenceNotFound
 	ErrFileAlreadyExists       = gitports.ErrFileAlreadyExists
 	ErrMergeConflict           = gitports.ErrMergeConflict
@@ -177,6 +179,52 @@ func (r *Runner) DeleteBranch(ctx context.Context, repoPath, branchName string) 
 	return nil
 }
 
+func (r *Runner) CreateTag(ctx context.Context, repoPath, tagName, sourceRef string) error {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return err
+	}
+	tagName = strings.TrimSpace(tagName)
+	if err := r.validateTagName(ctx, absRepo, tagName); err != nil {
+		return err
+	}
+	refName := "refs/tags/" + tagName
+	if err := r.runGit(ctx, absRepo, "show-ref", "--verify", "--quiet", refName); err == nil {
+		return ErrTagExists
+	}
+	sourceRef = strings.TrimSpace(sourceRef)
+	if sourceRef == "" {
+		sourceRef = "HEAD"
+	}
+	sha, err := r.runGitOutput(ctx, absRepo, "rev-parse", "--verify", sourceRef+"^{commit}")
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrSourceReferenceNotFound, sourceRef)
+	}
+	if err := r.runGit(ctx, absRepo, "update-ref", refName, strings.TrimSpace(sha)); err != nil {
+		return fmt.Errorf("create tag %s: %w", tagName, err)
+	}
+	return nil
+}
+
+func (r *Runner) DeleteTag(ctx context.Context, repoPath, tagName string) error {
+	absRepo, err := r.resolveRepoPath(repoPath)
+	if err != nil {
+		return err
+	}
+	tagName = strings.TrimSpace(tagName)
+	if err := r.validateTagName(ctx, absRepo, tagName); err != nil {
+		return err
+	}
+	refName := "refs/tags/" + tagName
+	if err := r.runGit(ctx, absRepo, "show-ref", "--verify", "--quiet", refName); err != nil {
+		return gitports.ErrReferenceNotFound
+	}
+	if err := r.runGit(ctx, absRepo, "update-ref", "-d", refName); err != nil {
+		return fmt.Errorf("delete tag %s: %w", tagName, err)
+	}
+	return nil
+}
+
 func (r *Runner) DiffBranches(ctx context.Context, repoPath, targetBranch, sourceBranch string) (string, error) {
 	absRepo, err := r.resolveRepoPath(repoPath)
 	if err != nil {
@@ -242,6 +290,16 @@ func (r *Runner) validateBranchName(ctx context.Context, dir, branchName string)
 	}
 	if err := r.runGit(ctx, dir, "check-ref-format", "--branch", branchName); err != nil {
 		return ErrInvalidBranchName
+	}
+	return nil
+}
+
+func (r *Runner) validateTagName(ctx context.Context, dir, tagName string) error {
+	if tagName == "" || strings.HasPrefix(tagName, "-") || strings.Contains(tagName, "..") {
+		return ErrInvalidTagName
+	}
+	if err := r.runGit(ctx, dir, "check-ref-format", "refs/tags/"+tagName); err != nil {
+		return ErrInvalidTagName
 	}
 	return nil
 }
