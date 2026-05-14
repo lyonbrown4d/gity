@@ -2,7 +2,9 @@ package project
 
 import (
 	"context"
+	"net/http"
 
+	"github.com/arcgolabs/httpx"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
@@ -18,6 +20,27 @@ func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (infraauth
 
 func projectAuthScope(item projectdomain.Project) infraauth.ProjectScope {
 	return infraauth.ProjectScope{ID: item.ID, OrganizationID: item.OrganizationID, Visibility: item.Visibility}
+}
+
+func (e *Endpoint) requireProjectCreate(ctx context.Context, authorization string, organizationID int64) error {
+	principal, err := e.requirePermissionPrincipal(ctx, authorization)
+	if err != nil {
+		return err
+	}
+	if principal.IsSuperAdmin {
+		return nil
+	}
+	if e.organizationService == nil {
+		return httpx.NewError(http.StatusInternalServerError, "organization service is not configured")
+	}
+	allowed, err := e.organizationService.CanCreateProject(ctx, organizationID, principal.UserID)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return httpx.NewError(http.StatusForbidden, "forbidden")
+	}
+	return nil
 }
 
 func (e *Endpoint) attachPipelineTrigger(ctx context.Context, body map[string]any, projectID int64, branchName string) {

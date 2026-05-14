@@ -16,6 +16,7 @@ import (
 var organizationMemberRoles = setx.NewSet("guest", "reporter", "developer", "maintainer", "owner")
 var organizationVisibilities = setx.NewSet("private", "internal", "public")
 var organizationManageRoles = setx.NewSet("owner")
+var organizationProjectCreateRoles = setx.NewSet("maintainer", "owner")
 
 type Service struct {
 	logger     *slog.Logger
@@ -199,6 +200,19 @@ func (s *Service) CanManage(ctx context.Context, organizationID, userID int64) (
 			Wrapf(err, "load organization membership")
 	}
 	return organizationManageRoles.Contains(strings.TrimSpace(member.Role)), nil
+}
+
+func (s *Service) CanCreateProject(ctx context.Context, organizationID, userID int64) (bool, error) {
+	member, err := s.memberRepo.FindByOrganizationAndUser(ctx, organizationID, userID)
+	if err != nil {
+		if errors.Is(err, organizationports.ErrNotFound) {
+			return false, nil
+		}
+		return false, oops.In("organization").
+			With("organization_id", organizationID, "user_id", userID).
+			Wrapf(err, "load organization membership")
+	}
+	return organizationProjectCreateRoles.Contains(strings.TrimSpace(member.Role)), nil
 }
 
 func (s *Service) AddMember(ctx context.Context, organizationID int64, input AddMemberInput) (MemberView, error) {

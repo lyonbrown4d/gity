@@ -2,6 +2,7 @@ package project
 
 import (
 	"github.com/arcgolabs/httpx"
+	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	"github.com/lyonbrown4d/gity/internal/config"
@@ -10,14 +11,15 @@ import (
 )
 
 type Endpoint struct {
-	service         *projectservice.Service
-	settings        config.Settings
-	authRuntime     *infraauth.Runtime
-	pipelineService *pipelineservice.Service
+	service             *projectservice.Service
+	settings            config.Settings
+	authRuntime         *infraauth.Runtime
+	pipelineService     *pipelineservice.Service
+	organizationService *organizationservice.Service
 }
 
-func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service) *Endpoint {
-	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService}
+func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service, organizationService *organizationservice.Service) *Endpoint {
+	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService, organizationService: organizationService}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {

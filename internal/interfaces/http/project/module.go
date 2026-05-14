@@ -11,7 +11,7 @@ func Module() dix.Module {
 		"endpoint.project",
 		dix.Description("Project routes"),
 		dix.Providers(
-			dix.Provider4(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(50))),
+			dix.Provider5(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(50))),
 		),
 	)
 }
