@@ -5,16 +5,19 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryIssueView } from "@/pages/types";
 import { buildIssueDetailPath } from "./issue-markdown";
 import { IssueMarkdownEditor } from "./issue-markdown-editor";
 import { extractErrorMessage, filterAndSortIssues, formatRelativeTime, type IssueSortMode } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 
 interface RepositoryIssuesTabProps {
   organizationId: string;
   repoId: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
@@ -22,6 +25,7 @@ interface RepositoryIssuesTabProps {
 export const RepositoryIssuesTab = ({
   organizationId,
   repoId,
+  permissions,
   t,
   onError,
 }: RepositoryIssuesTabProps): JSX.Element => {
@@ -63,6 +67,8 @@ export const RepositoryIssuesTab = ({
     [issues, issueStatusFilter, issueSearchQuery, issueSort],
   );
   const isLoadingIssues = issuesQuery.isFetching && !issuesQuery.data;
+  const { mutateAsync: setIssueAssignees } = useCustomMutation<RepositoryIssueView>();
+  const canCreateIssue = permissions.issueCreate;
 
   const loadIssues = async () => {
     const result = await issuesQuery.refetch();
@@ -89,9 +95,18 @@ export const RepositoryIssuesTab = ({
         values: {
           title,
           description: newIssueDescription.trim() || null,
-          assignee_user_id: newIssueAssigneeId.trim() || null,
         },
       });
+      const assigneeID = newIssueAssigneeId.trim();
+      if (assigneeID) {
+        await setIssueAssignees({
+          url: `/projects/${repoId}/issues/${response.data.number}/assignees`,
+          method: "patch",
+          values: {
+            user_ids: [Number.parseInt(assigneeID, 10)].filter(Number.isFinite),
+          },
+        });
+      }
       setNewIssueTitle("");
       setNewIssueDescription("");
       setNewIssueAssigneeId("");
@@ -181,6 +196,7 @@ export const RepositoryIssuesTab = ({
           <Button
             type="button"
             variant={isIssueComposerOpen ? "secondary" : "outline"}
+            disabled={!canCreateIssue}
             onClick={() => setIssueComposerOpen((current) => !current)}
           >
             {isIssueComposerOpen ? t("Hide new issue form") : t("New issue")}
@@ -189,6 +205,12 @@ export const RepositoryIssuesTab = ({
             {t("Reload")}
           </Button>
         </div>
+
+        {!canCreateIssue ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect issues, but cannot create them.")}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {isIssueComposerOpen ? (
           <form className="space-y-3 rounded-md border p-3" onSubmit={submitCreateIssue}>
@@ -213,7 +235,7 @@ export const RepositoryIssuesTab = ({
               onChange={(event) => setNewIssueAssigneeId(event.target.value)}
             />
             <div className="flex justify-end">
-              <Button type="submit" disabled={isCreatingIssue}>
+              <Button type="submit" disabled={!canCreateIssue || isCreatingIssue}>
                 {isCreatingIssue ? t("Creating issue...") : t("Create issue")}
               </Button>
             </div>

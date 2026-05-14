@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Clock3, Download, FileArchive, GitBranch, Loader2, RefreshCw, Repeat2, ScrollText, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, Clock3, Download, FileArchive, GitBranch, Loader2, Play, RefreshCw, Repeat2, ScrollText, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type {
   RepositoryJobArtifactContentView,
   RepositoryJobArtifactView,
@@ -18,6 +22,7 @@ import type {
   RepositoryPipelineView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import {
   isRecord,
   normalizeBoolean,
@@ -25,12 +30,15 @@ import {
   normalizeOptionalString,
   normalizeString,
   normalizeStringArray,
+  resolveBody,
   resolveRecordArray,
   type RawRecord,
 } from "./repository-normalizers";
 
 interface RepositoryPipelinesTabProps {
   repoId: string;
+  defaultBranch: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
@@ -38,8 +46,18 @@ interface RepositoryPipelinesTabProps {
 const terminalPipelineStatuses: RepositoryPipelineStatus[] = ["succeeded", "failed", "cancelled"];
 const terminalJobStatuses: RepositoryJobStatus[] = ["succeeded", "failed", "cancelled"];
 const emptyPipelineJobs: RepositoryPipelineJobView[] = [];
+const defaultPipelineConfig = `pipeline {
+  name = "manual"
+}
 
-export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelinesTabProps): JSX.Element => {
+stage test {
+  run {
+    shell("go test ./...")
+  }
+}
+`;
+
+export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, onError }: RepositoryPipelinesTabProps): JSX.Element => {
   const dataProvider = useDataProvider();
   const pipelinesQuery = useCustom<RawRecord[]>({
     url: `/projects/${repoId}/pipelines`,
@@ -77,8 +95,20 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
   });
   const { mutateAsync: cancelPipeline, isLoading: isCancelling } = useCustomMutation<RawRecord>();
   const { mutateAsync: retryPipeline, isLoading: isRetrying } = useCustomMutation<RawRecord>();
+  const { mutateAsync: refreshPipeline, isLoading: isRefreshingPipeline } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createPipeline, isLoading: isCreatingPipeline } = useCustomMutation<RawRecord>();
+  const { mutateAsync: lintPipeline, isLoading: isLintingPipeline } = useCustomMutation<RawRecord>();
   const { mutateAsync: cancelJob, isLoading: isCancellingJob } = useCustomMutation<RawRecord>();
   const { mutateAsync: retryJob, isLoading: isRetryingJob } = useCustomMutation<RawRecord>();
+  const [isComposerOpen, setComposerOpen] = useState(false);
+  const [pipelineSource, setPipelineSource] = useState("web");
+  const [pipelineRefName, setPipelineRefName] = useState(defaultBranch || "main");
+  const [pipelineCommitSHA, setPipelineCommitSHA] = useState("");
+  const [pipelineConfigSource, setPipelineConfigSource] = useState(".gity-ci.plano");
+  const [pipelineConfigContent, setPipelineConfigContent] = useState(defaultPipelineConfig);
+  const [lintResult, setLintResult] = useState<string | null>(null);
+  const canMutateCI = permissions.ciWrite;
+  const canMutateJobs = permissions.jobWrite;
 
   const pipelines = useMemo(
     () => resolvePipelineList(pipelinesQuery.data?.data).map(normalizePipeline).sort((a, b) => b.iid - a.iid),
@@ -153,6 +183,86 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
       return;
     }
     onError(null);
+  };
+
+  const submitLintPipeline = async () => {
+    const normalizedConfig = pipelineConfigContent.trim();
+    if (!normalizedConfig) {
+      onError(t("CI config content is required"));
+      return;
+    }
+    onError(null);
+    try {
+      const response = await lintPipeline({
+        url: `/projects/${repoId}/ci/lint`,
+        method: "post",
+        values: { config_content: normalizedConfig },
+      });
+      setLintResult(JSON.stringify(resolveBody(response.data), null, 2));
+    } catch (error) {
+      setLintResult(null);
+      onError(extractErrorMessage(error));
+    }
+  };
+
+  const submitCreatePipeline = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedRef = pipelineRefName.trim();
+    const normalizedConfig = pipelineConfigContent.trim();
+    if (!normalizedRef) {
+      onError(t("Pipeline ref is required"));
+      return;
+    }
+    if (!normalizedConfig) {
+      onError(t("CI config content is required"));
+      return;
+    }
+
+    onError(null);
+    try {
+      const response = await createPipeline({
+        url: `/projects/${repoId}/pipelines`,
+        method: "post",
+        values: {
+          source: pipelineSource,
+          ref_name: normalizedRef,
+          commit_sha: pipelineCommitSHA.trim(),
+          config_source: pipelineConfigSource.trim() || ".gity-ci.plano",
+          config_content: normalizedConfig,
+        },
+      });
+      const created = normalizePipelineDetail(response.data);
+      if (created?.pipeline.id) {
+        setSelectedPipelineID(created.pipeline.id);
+      }
+      setLintResult(null);
+      setComposerOpen(false);
+      await loadPipelines();
+      await loadDetail();
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
+  const submitRefreshPipeline = async () => {
+    if (!visiblePipeline) {
+      return;
+    }
+    onError(null);
+    try {
+      const response = await refreshPipeline({
+        url: `/projects/${repoId}/pipelines/${visiblePipeline.id}/refresh`,
+        method: "post",
+        values: {},
+      });
+      const refreshed = normalizePipelineDetail(response.data);
+      if (refreshed?.pipeline.id) {
+        setSelectedPipelineID(refreshed.pipeline.id);
+      }
+      await Promise.all([loadPipelines(), loadDetail()]);
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
   };
 
   const submitCancelPipeline = async () => {
@@ -256,6 +366,10 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
   }, [repoId, onError]);
 
   useEffect(() => {
+    setPipelineRefName((current) => current.trim() || defaultBranch || "main");
+  }, [defaultBranch]);
+
+  useEffect(() => {
     if (selectedPipelineID !== null || pipelines.length === 0) {
       return;
     }
@@ -305,14 +419,122 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
           <PipelineStat label={t("Failed")} value={stats.failed} tone="rose" />
         </div>
 
+        {!canMutateCI ? (
+          <Alert>
+            <AlertDescription>
+              {t("Your current project role can inspect CI, but cannot create or mutate pipelines.")}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button
+            type="button"
+            variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canMutateCI}
+            onClick={() => setComposerOpen((current) => !current)}
+          >
+            <Play className="size-4" />
+            {isComposerOpen ? t("Hide pipeline form") : t("New pipeline")}
+          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">
+              {t("Role")}: {t(permissions.roleLabel)}
+            </Badge>
+            <Button type="button" size="sm" variant="ghost" onClick={() => void loadPipelines()}>
+              <RefreshCw className="size-4" />
+              {t("Reload")}
+            </Button>
+          </div>
+        </div>
+
+        {isComposerOpen ? (
+          <form className="space-y-3 rounded-md border bg-muted/10 p-3" onSubmit={submitCreatePipeline}>
+            <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr]">
+              <div className="space-y-1">
+                <Label htmlFor="pipeline-source" className="text-xs text-muted-foreground">
+                  {t("Source")}
+                </Label>
+                <Select value={pipelineSource} onValueChange={setPipelineSource}>
+                  <SelectTrigger id="pipeline-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="web">{t("web")}</SelectItem>
+                    <SelectItem value="manual">{t("manual")}</SelectItem>
+                    <SelectItem value="push">{t("push")}</SelectItem>
+                    <SelectItem value="merge_request">{t("merge_request")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="pipeline-ref" className="text-xs text-muted-foreground">
+                  {t("Ref")}
+                </Label>
+                <Input
+                  id="pipeline-ref"
+                  value={pipelineRefName}
+                  onChange={(event) => setPipelineRefName(event.target.value)}
+                  placeholder={defaultBranch || "main"}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="pipeline-commit" className="text-xs text-muted-foreground">
+                  {t("Commit SHA")}
+                </Label>
+                <Input
+                  id="pipeline-commit"
+                  value={pipelineCommitSHA}
+                  onChange={(event) => setPipelineCommitSHA(event.target.value)}
+                  placeholder={t("Optional")}
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="pipeline-config-source" className="text-xs text-muted-foreground">
+                {t("Config source")}
+              </Label>
+              <Input
+                id="pipeline-config-source"
+                value={pipelineConfigSource}
+                onChange={(event) => setPipelineConfigSource(event.target.value)}
+                placeholder=".gity-ci.plano"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="pipeline-config-content" className="text-xs text-muted-foreground">
+                {t("Plano CI config")}
+              </Label>
+              <Textarea
+                id="pipeline-config-content"
+                className="min-h-64 font-mono text-xs"
+                value={pipelineConfigContent}
+                onChange={(event) => setPipelineConfigContent(event.target.value)}
+              />
+            </div>
+            {lintResult ? (
+              <pre className="max-h-72 overflow-auto rounded-md bg-background p-3 text-xs">{lintResult}</pre>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canMutateCI || isLintingPipeline}
+                onClick={() => void submitLintPipeline()}
+              >
+                {isLintingPipeline ? t("Linting...") : t("Lint config")}
+              </Button>
+              <Button type="submit" disabled={!canMutateCI || isCreatingPipeline}>
+                {isCreatingPipeline ? t("Creating pipeline...") : t("Create pipeline")}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">{t("Pipelines")}</p>
-              <Button type="button" size="sm" variant="ghost" onClick={() => void loadPipelines()}>
-                <RefreshCw className="size-4" />
-                {t("Reload")}
-              </Button>
             </div>
             <div className="space-y-2 rounded-md border p-2">
               {isLoadingPipelines ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading pipelines...")}</p> : null}
@@ -368,14 +590,24 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
                       <RefreshCw className="size-4" />
                       {t("Reload pipeline")}
                     </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!canMutateCI || isRefreshingPipeline}
+                      onClick={() => void submitRefreshPipeline()}
+                    >
+                      <RefreshCw className="size-4" />
+                      {isRefreshingPipeline ? t("Refreshing...") : t("Refresh state")}
+                    </Button>
                     {!terminalPipelineStatuses.includes(visiblePipeline.status) ? (
-                      <Button type="button" size="sm" variant="outline" disabled={isCancelling} onClick={() => void submitCancelPipeline()}>
+                      <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isCancelling} onClick={() => void submitCancelPipeline()}>
                         <Ban className="size-4" />
                         {isCancelling ? t("Cancelling...") : t("Cancel pipeline")}
                       </Button>
                     ) : null}
                     {visiblePipeline.status !== "running" ? (
-                      <Button type="button" size="sm" variant="outline" disabled={isRetrying} onClick={() => void submitRetryPipeline()}>
+                      <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isRetrying} onClick={() => void submitRetryPipeline()}>
                         <Repeat2 className="size-4" />
                         {isRetrying ? t("Retrying...") : t("Retry pipeline")}
                       </Button>
@@ -404,6 +636,7 @@ export const RepositoryPipelinesTab = ({ repoId, t, onError }: RepositoryPipelin
                       active={selectedJobID === job.project_job.id}
                       isCancelling={isCancellingJob}
                       isRetrying={isRetryingJob}
+                      canMutate={canMutateJobs}
                       t={t}
                       onInspect={() => setSelectedJobID(job.project_job.id)}
                       onCancel={() => void submitCancelJob(job)}
@@ -461,6 +694,7 @@ const PipelineJobCard = ({
   active,
   isCancelling,
   isRetrying,
+  canMutate,
   t,
   onInspect,
   onCancel,
@@ -470,6 +704,7 @@ const PipelineJobCard = ({
   active: boolean;
   isCancelling: boolean;
   isRetrying: boolean;
+  canMutate: boolean;
   t: (text: string) => string;
   onInspect: () => void;
   onCancel: () => void;
@@ -495,13 +730,13 @@ const PipelineJobCard = ({
           {t("Logs")}
         </Button>
         {!terminalJobStatuses.includes(item.project_job.status) ? (
-          <Button type="button" size="sm" variant="outline" disabled={isCancelling} onClick={onCancel}>
+          <Button type="button" size="sm" variant="outline" disabled={!canMutate || isCancelling} onClick={onCancel}>
             <Ban className="size-4" />
             {isCancelling ? t("Cancelling...") : t("Cancel")}
           </Button>
         ) : null}
         {item.project_job.status !== "running" ? (
-          <Button type="button" size="sm" variant="outline" disabled={isRetrying} onClick={onRetry}>
+          <Button type="button" size="sm" variant="outline" disabled={!canMutate || isRetrying} onClick={onRetry}>
             <Repeat2 className="size-4" />
             {isRetrying ? t("Retrying...") : t("Retry")}
           </Button>
@@ -789,6 +1024,9 @@ const normalizeJob = (rawValue: unknown): RepositoryJobView => {
 
 const normalizePipelineStatus = (value: unknown): RepositoryPipelineStatus => {
   const normalized = normalizeString(value);
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
   if (normalized === "pending" || normalized === "running" || normalized === "succeeded" || normalized === "failed" || normalized === "cancelled") {
     return normalized;
   }
@@ -805,6 +1043,9 @@ const normalizePipelineJobStatus = (value: unknown): RepositoryPipelineJobStatus
 
 const normalizeJobStatus = (value: unknown): RepositoryJobStatus => {
   const normalized = normalizeString(value);
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
   if (normalized === "pending" || normalized === "running" || normalized === "succeeded" || normalized === "failed" || normalized === "cancelled") {
     return normalized;
   }

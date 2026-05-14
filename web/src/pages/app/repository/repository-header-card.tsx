@@ -10,7 +10,9 @@ import {
   Package,
   PlayCircle,
   Rocket,
+  ScrollText,
   Settings,
+  ShieldCheck,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -19,12 +21,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ProductEyebrow, ProductStatusBadge } from "@/components/ui/product";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { RepositoryView } from "@/pages/types";
+import type { RepositoryPermissions } from "./repository-permissions";
 import type { RepoTab } from "./repository-types";
 
 interface RepositoryHeaderCardProps {
   activeTab: RepoTab;
   organizationName?: string;
   repository: RepositoryView | null;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onChangeTab: (tab: RepoTab) => void;
   onCopyCloneUrl: () => void;
@@ -68,6 +72,7 @@ const TAB_GROUPS: Array<{
   {
     label: "Operate",
     items: [
+      { value: "audit", label: "Audit", icon: ScrollText },
       { value: "settings", label: "Settings", icon: Settings },
     ],
   },
@@ -77,6 +82,7 @@ export const RepositoryHeaderCard = ({
   activeTab,
   organizationName,
   repository,
+  permissions,
   t,
   onChangeTab,
   onCopyCloneUrl,
@@ -102,6 +108,9 @@ export const RepositoryHeaderCard = ({
               <ProductStatusBadge>{repository?.visibility ?? t("N/A")}</ProductStatusBadge>
               <ProductStatusBadge icon={GitBranch} variant="secondary">
                 {repository?.default_branch ?? "main"}
+              </ProductStatusBadge>
+              <ProductStatusBadge icon={ShieldCheck} variant={permissions.canWrite ? "default" : "secondary"}>
+                {t("Role")}: {t(permissions.roleLabel)}
               </ProductStatusBadge>
             </div>
           </div>

@@ -5,14 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryJobStatus, RepositoryJobView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryJobsTabProps {
   repoId: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
@@ -21,7 +24,7 @@ type RawProjectJob = RawRecord;
 
 const terminalStatuses: RepositoryJobStatus[] = ["succeeded", "failed", "cancelled"];
 
-export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps): JSX.Element => {
+export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: RepositoryJobsTabProps): JSX.Element => {
   const jobsQuery = useCustom<RawProjectJob[]>({
     url: `/projects/${repoId}/jobs`,
     method: "get",
@@ -36,6 +39,7 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
   const [kind, setKind] = useState("noop");
   const [payload, setPayload] = useState("");
   const [maxAttempts, setMaxAttempts] = useState("3");
+  const canMutateJobs = permissions.jobWrite;
 
   const jobs = useMemo(
     () => resolveJobList(jobsQuery.data?.data).map(normalizeJob),
@@ -137,6 +141,7 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
           <Button
             type="button"
             variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canMutateJobs}
             onClick={() => setComposerOpen((current) => !current)}
           >
             <Play className="size-4" />
@@ -148,13 +153,19 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
           </Button>
         </div>
 
+        {!canMutateJobs ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect jobs, but cannot enqueue or cancel them.")}</AlertDescription>
+          </Alert>
+        ) : null}
+
         {isComposerOpen ? (
           <form className="space-y-3 rounded-md border p-3" onSubmit={submitEnqueueJob}>
             <div className="grid gap-3 md:grid-cols-[1fr_160px]">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="job-kind">
+                <Label className="text-xs text-muted-foreground" htmlFor="job-kind">
                   {t("Job kind")}
-                </label>
+                </Label>
                 <Input
                   id="job-kind"
                   value={kind}
@@ -163,9 +174,9 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="job-max-attempts">
+                <Label className="text-xs text-muted-foreground" htmlFor="job-max-attempts">
                   {t("Max attempts")}
-                </label>
+                </Label>
                 <Input
                   id="job-max-attempts"
                   type="number"
@@ -176,9 +187,9 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="job-payload">
+              <Label className="text-xs text-muted-foreground" htmlFor="job-payload">
                 {t("Payload JSON")}
-              </label>
+              </Label>
               <Textarea
                 id="job-payload"
                 className="min-h-24"
@@ -188,7 +199,7 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={isEnqueueing}>
+              <Button type="submit" disabled={!canMutateJobs || isEnqueueing}>
                 {isEnqueueing ? t("Enqueueing job...") : t("Enqueue job")}
               </Button>
             </div>
@@ -221,7 +232,7 @@ export const RepositoryJobsTab = ({ repoId, t, onError }: RepositoryJobsTabProps
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={isCancelling}
+                    disabled={!canMutateJobs || isCancelling}
                     onClick={() => void submitCancelJob(job)}
                   >
                     <Ban className="size-4" />
@@ -306,6 +317,9 @@ const resolveJobList = (payload: unknown): RawProjectJob[] => {
 
 const normalizeStatus = (value: unknown): RepositoryJobStatus => {
   const normalized = normalizeString(value);
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
   if (normalized === "pending" || normalized === "running" || normalized === "succeeded" || normalized === "failed" || normalized === "cancelled") {
     return normalized;
   }

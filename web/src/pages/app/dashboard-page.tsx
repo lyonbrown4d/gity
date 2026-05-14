@@ -50,11 +50,6 @@ export function AppDashboardPage(): JSX.Element {
             <Button asChild variant="outline" className="action-pop">
               <Link to="/app/profile">{t("Edit Profile")}</Link>
             </Button>
-            {user?.is_super_admin ? (
-              <Button asChild variant="secondary" className="action-pop">
-                <Link to="/admin">{t("Go Admin")}</Link>
-              </Button>
-            ) : null}
           </>
         )}
         aside={(

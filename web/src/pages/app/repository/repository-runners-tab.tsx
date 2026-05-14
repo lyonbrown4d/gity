@@ -6,19 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
 import type { RepositoryRunnerView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeBoolean, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryRunnersTabProps {
   repoId: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
 
 type RawRunner = RawRecord;
 
-export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTabProps): JSX.Element => {
+export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: RepositoryRunnersTabProps): JSX.Element => {
   const runnersQuery = useCustom<RawRunner[]>({
     url: `/projects/${repoId}/runners`,
     method: "get",
@@ -39,6 +43,7 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
   const [tags, setTags] = useState("linux,go");
   const [lastToken, setLastToken] = useState<string | null>(null);
   const isLoadingRunners = runnersQuery.isFetching && !runnersQuery.data;
+  const canAdminRunners = permissions.runnerAdmin;
 
   const loadRunners = async () => {
     const result = await runnersQuery.refetch();
@@ -133,6 +138,7 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
           <Button
             type="button"
             variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canAdminRunners}
             onClick={() => setComposerOpen((current) => !current)}
           >
             <Plus className="size-4" />
@@ -144,13 +150,19 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
           </Button>
         </div>
 
+        {!canAdminRunners ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect runners, but cannot register or delete them.")}</AlertDescription>
+          </Alert>
+        ) : null}
+
         {isComposerOpen ? (
           <form className="space-y-3 rounded-md border p-3" onSubmit={submitRegisterRunner}>
             <div className="grid gap-3 md:grid-cols-[1fr_240px]">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="runner-name">
+                <Label className="text-xs text-muted-foreground" htmlFor="runner-name">
                   {t("Runner name")}
-                </label>
+                </Label>
                 <Input
                   id="runner-name"
                   value={name}
@@ -159,9 +171,9 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="runner-tags">
+                <Label className="text-xs text-muted-foreground" htmlFor="runner-tags">
                   {t("Runner tags")}
-                </label>
+                </Label>
                 <Input
                   id="runner-tags"
                   value={tags}
@@ -171,9 +183,9 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
               </div>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground" htmlFor="runner-description">
+              <Label className="text-xs text-muted-foreground" htmlFor="runner-description">
                 {t("Description")}
-              </label>
+              </Label>
               <Input
                 id="runner-description"
                 value={description}
@@ -182,7 +194,7 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={isRegistering}>
+              <Button type="submit" disabled={!canAdminRunners || isRegistering}>
                 {isRegistering ? t("Registering runner...") : t("Register runner")}
               </Button>
             </div>
@@ -220,7 +232,7 @@ export const RepositoryRunnersTab = ({ repoId, t, onError }: RepositoryRunnersTa
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={isDeleting}
+                    disabled={!canAdminRunners || isDeleting}
                   >
                     <Trash2 className="size-4" />
                     {t("Delete")}

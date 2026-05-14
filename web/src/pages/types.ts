@@ -115,9 +115,28 @@ export interface RepositoryIssueView {
   status: "open" | "closed";
   author_user_id: string;
   assignee_user_id?: string | null;
+  assignee_user_ids?: string[];
+  labels?: RepositoryIssueLabelView[];
   created_at: string;
   updated_at: string;
   closed_at?: string | null;
+}
+
+export interface RepositoryIssueAssigneeView {
+  id: string;
+  issue_id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RepositoryIssueLabelView {
+  id: string;
+  issue_id: string;
+  name: string;
+  color?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RepositoryIssueCommentView {
@@ -180,6 +199,33 @@ export interface RepositoryMergeRequestParticipantView {
 export interface RepositoryMergeRequestParticipantsView {
   merge_request: RepositoryMergeRequestView;
   participants: RepositoryMergeRequestParticipantView[];
+}
+
+export interface RepositoryMergeRequestCommentView {
+  id: string;
+  merge_request_id: string;
+  author_user_id: string;
+  body: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryMergeRequestCommentsView {
+  merge_request: RepositoryMergeRequestView;
+  comments: RepositoryMergeRequestCommentView[];
+}
+
+export interface RepositoryMergeRequestApprovalView {
+  id: string;
+  merge_request_id: string;
+  user_id: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryMergeRequestApprovalsView {
+  merge_request: RepositoryMergeRequestView;
+  approvals: RepositoryMergeRequestApprovalView[];
 }
 
 export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
@@ -346,6 +392,20 @@ export interface RepositoryPackageDetailView {
 export interface RepositoryPackageFileContentView {
   file: RepositoryPackageFileView;
   content_base64: string;
+}
+
+export interface RepositoryAuditEventView {
+  id: string;
+  project_id: string;
+  organization_id: string;
+  event_name: string;
+  action: string;
+  actor_user_id: string;
+  target_type: string;
+  target_id: string;
+  summary: string;
+  payload?: string | null;
+  created_at: string;
 }
 
 export interface RepositoryLFSObjectView {

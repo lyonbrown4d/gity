@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { usePermissions } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { RepositoryAuditTab } from "@/pages/app/repository/repository-audit-tab";
 import { RepositoryBranchesTab } from "@/pages/app/repository/repository-branches-tab";
 import { RepositoryCodeTab } from "@/pages/app/repository/repository-code-tab";
 import { RepositoryCommitsTab } from "@/pages/app/repository/repository-commits-tab";
@@ -13,6 +15,7 @@ import { RepositoryLFSTab } from "@/pages/app/repository/repository-lfs-tab";
 import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
 import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
 import { RepositoryPackagesTab } from "@/pages/app/repository/repository-packages-tab";
+import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
 import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
 import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
 import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
@@ -31,6 +34,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
+  const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>();
 
   const meta = useRepositoryMetaController({
     organizationId,
@@ -48,6 +52,10 @@ export const RepositoryDetailPage = (): JSX.Element => {
     refreshBranches: meta.loadBranches,
     refreshCommits: meta.loadCommits,
   });
+  const repositoryPermissions = useMemo(
+    () => buildRepositoryPermissions(meta.organization?.role, Boolean(permissionsQuery.data?.isSuperAdmin)),
+    [meta.organization?.role, permissionsQuery.data?.isSuperAdmin],
+  );
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -82,6 +90,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
         activeTab={activeTab}
         organizationName={meta.organization?.name}
         repository={meta.repository}
+        permissions={repositoryPermissions}
         t={t}
         onChangeTab={handleChangeTab}
         onCopyCloneUrl={() => void meta.copyCloneUrl()}
@@ -146,6 +155,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
         <RepositoryIssuesTab
           organizationId={organizationId}
           repoId={repoId}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -156,6 +166,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
           repoId={repoId}
           branches={meta.branches}
           defaultBranch={meta.repository.default_branch}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
           onMerged={async () => {
@@ -167,6 +178,8 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "pipelines" ? (
         <RepositoryPipelinesTab
           repoId={repoId}
+          defaultBranch={meta.repository.default_branch}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -175,6 +188,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "jobs" ? (
         <RepositoryJobsTab
           repoId={repoId}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -208,6 +222,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "runners" ? (
         <RepositoryRunnersTab
           repoId={repoId}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -251,6 +266,14 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
+      {meta.repository && activeTab === "audit" ? (
+        <RepositoryAuditTab
+          repoId={repoId}
+          t={t}
+          onError={meta.setActionError}
+        />
+      ) : null}
+
       <RepositoryCreateFileModal
         open={source.isCreateFileModalOpen}
         t={t}
@@ -284,4 +307,5 @@ const isRepoTab = (value: string | null): value is RepoTab =>
   || value === "runners"
   || value === "commits"
   || value === "branches"
+  || value === "audit"
   || value === "settings";

@@ -1,4 +1,4 @@
-import { ArrowRightLeft, FolderGit2, House, Shield, User } from "lucide-react";
+import { ArrowRightLeft, FolderGit2, House, User } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { NavUser } from "@/components/nav-user";
@@ -81,24 +81,6 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {user.isSuperAdmin ? (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("Admin Side")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname.startsWith("/admin")} tooltip={t("Admin Dashboard")}>
-                    <NavLink to="/admin">
-                      <Shield />
-                      <span>{t("Admin Dashboard")}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ) : null}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} onLogout={onLogout} />

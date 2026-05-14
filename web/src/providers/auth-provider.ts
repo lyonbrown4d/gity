@@ -17,7 +17,7 @@ export const authProvider: AuthBindings = {
       await login({ username, password });
       return {
         success: true,
-        redirectTo: "/admin",
+        redirectTo: "/app/dashboard",
       };
     } catch (error) {
       return {

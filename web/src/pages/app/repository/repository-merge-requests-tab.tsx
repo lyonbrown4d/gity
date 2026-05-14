@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, GitMerge, GitPullRequest, RefreshCw, Search, ShieldCheck, UserRound, XCircle } from "lucide-react";
-import { useCustom, useCustomMutation } from "@refinedev/core";
+import { CheckCircle2, Clock3, GitMerge, GitPullRequest, MessageSquare, RefreshCw, Search, ShieldCheck, ThumbsUp, UserRound, XCircle } from "lucide-react";
+import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type {
   RepositoryBranchView,
+  RepositoryMergeRequestApprovalView,
+  RepositoryMergeRequestApprovalsView,
   RepositoryMergeRequestCheckStatusView,
+  RepositoryMergeRequestCommentView,
+  RepositoryMergeRequestCommentsView,
   RepositoryMergeRequestDiffView,
   RepositoryMergeRequestParticipantRole,
   RepositoryMergeRequestParticipantsView,
@@ -19,12 +24,14 @@ import type {
   UserView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime, toTimestamp } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import {
   isRecord,
   normalizeBoolean as normalizeBool,
   normalizeNumber,
   normalizeOptionalString,
   normalizeString,
+  resolveBody,
   resolveRecordArray,
   type RawRecord,
 } from "./repository-normalizers";
@@ -33,6 +40,7 @@ interface RepositoryMergeRequestsTabProps {
   repoId: string;
   branches: RepositoryBranchView[];
   defaultBranch: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
   onMerged: () => Promise<void>;
@@ -42,6 +50,7 @@ export const RepositoryMergeRequestsTab = ({
   repoId,
   branches,
   defaultBranch,
+  permissions,
   t,
   onError,
   onMerged,
@@ -79,6 +88,22 @@ export const RepositoryMergeRequestsTab = ({
       refetchOnWindowFocus: false,
     },
   });
+  const commentsQuery = useCustom<RawRecord>({
+    url: selectedIID ? `/projects/${repoId}/merge-requests/${selectedIID}/comments` : `/projects/${repoId}/merge-requests/0/comments`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId && selectedIID),
+      refetchOnWindowFocus: false,
+    },
+  });
+  const approvalsQuery = useCustom<RawRecord>({
+    url: selectedIID ? `/projects/${repoId}/merge-requests/${selectedIID}/approvals` : `/projects/${repoId}/merge-requests/0/approvals`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId && selectedIID),
+      refetchOnWindowFocus: false,
+    },
+  });
   const usersQuery = useCustom<RawRecord[]>({
     url: "/users",
     method: "get",
@@ -87,10 +112,13 @@ export const RepositoryMergeRequestsTab = ({
       refetchOnWindowFocus: false,
     },
   });
+  const identityQuery = useGetIdentity<{ id?: string | number }>();
   const { mutateAsync: createMergeRequest, isLoading: isCreating } = useCustomMutation<RawRecord>();
   const { mutateAsync: updateMergeRequest, isLoading: isUpdating } = useCustomMutation<RawRecord>();
   const { mutateAsync: mergeMergeRequest, isLoading: isMerging } = useCustomMutation<RawRecord>();
   const { mutateAsync: setMergeRequestParticipants, isLoading: isUpdatingParticipants } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createMergeRequestComment, isLoading: isCreatingComment } = useCustomMutation<RawRecord>();
+  const { mutateAsync: approveMergeRequest, isLoading: isUpdatingApproval } = useCustomMutation<RawRecord>();
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<RepositoryMergeRequestState | "all">("opened");
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,6 +128,7 @@ export const RepositoryMergeRequestsTab = ({
   const [targetBranch, setTargetBranch] = useState(defaultBranch || "main");
   const [reviewerDraftUserID, setReviewerDraftUserID] = useState("");
   const [assigneeDraftUserID, setAssigneeDraftUserID] = useState("");
+  const [newComment, setNewComment] = useState("");
 
   const mergeRequests = useMemo(
     () => resolveMergeRequestList(mergeRequestsQuery.data?.data).map(normalizeMergeRequest),
@@ -133,6 +162,14 @@ export const RepositoryMergeRequestsTab = ({
     () => normalizeParticipantsView(participantsQuery.data?.data),
     [participantsQuery.data?.data],
   );
+  const commentsView = useMemo(
+    () => normalizeCommentsView(commentsQuery.data?.data),
+    [commentsQuery.data?.data],
+  );
+  const approvalsView = useMemo(
+    () => normalizeApprovalsView(approvalsQuery.data?.data),
+    [approvalsQuery.data?.data],
+  );
   const users = useMemo(
     () => resolveUserList(usersQuery.data?.data).map(normalizeUser),
     [usersQuery.data?.data],
@@ -150,8 +187,16 @@ export const RepositoryMergeRequestsTab = ({
     () => participants.filter((item) => item.role === "assignee"),
     [participants],
   );
+  const comments = commentsView?.comments ?? [];
+  const approvals = approvalsView?.approvals ?? [];
+  const currentUserID = identityQuery.data?.id === undefined ? "" : String(identityQuery.data.id);
+  const currentUserApproved = Boolean(currentUserID && approvals.some((item) => item.user_id === currentUserID));
   const isMergeBlocked = Boolean(checksView?.required && !checksView.mergeable);
   const isLoadingMergeRequests = mergeRequestsQuery.isFetching && !mergeRequestsQuery.data;
+  const canCreateMergeRequest = permissions.mergeRequestCreate;
+  const canWriteMergeRequest = permissions.mergeRequestWrite;
+  const canCommentMergeRequest = permissions.mergeRequestComment;
+  const canMergeMergeRequest = permissions.mergeRequestMerge;
 
   const loadMergeRequests = async () => {
     const result = await mergeRequestsQuery.refetch();
@@ -191,6 +236,30 @@ export const RepositoryMergeRequestsTab = ({
       return;
     }
     const result = await participantsQuery.refetch();
+    if (result.error) {
+      onError(extractErrorMessage(result.error));
+      return;
+    }
+    onError(null);
+  };
+
+  const loadComments = async () => {
+    if (!selectedIID) {
+      return;
+    }
+    const result = await commentsQuery.refetch();
+    if (result.error) {
+      onError(extractErrorMessage(result.error));
+      return;
+    }
+    onError(null);
+  };
+
+  const loadApprovals = async () => {
+    if (!selectedIID) {
+      return;
+    }
+    const result = await approvalsQuery.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -290,6 +359,47 @@ export const RepositoryMergeRequestsTab = ({
     }
   };
 
+  const submitCreateComment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedMergeRequest) {
+      return;
+    }
+    const content = newComment.trim();
+    if (!content) {
+      onError(t("Comment content is required"));
+      return;
+    }
+    onError(null);
+    try {
+      await createMergeRequestComment({
+        url: `/projects/${repoId}/merge-requests/${selectedMergeRequest.iid}/comments`,
+        method: "post",
+        values: { content },
+      });
+      setNewComment("");
+      await loadComments();
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
+  const submitApproval = async (approved: boolean) => {
+    if (!selectedMergeRequest) {
+      return;
+    }
+    onError(null);
+    try {
+      await approveMergeRequest({
+        url: `/projects/${repoId}/merge-requests/${selectedMergeRequest.iid}/${approved ? "approve" : "unapprove"}`,
+        method: "post",
+        values: {},
+      });
+      await Promise.all([loadApprovals(), loadChecks()]);
+    } catch (error) {
+      onError(extractErrorMessage(error));
+    }
+  };
+
   useEffect(() => {
     if (!repoId) {
       return;
@@ -310,6 +420,10 @@ export const RepositoryMergeRequestsTab = ({
     }
     setTargetBranch(defaultBranch);
   }, [defaultBranch]);
+
+  useEffect(() => {
+    setNewComment("");
+  }, [selectedIID]);
 
   useEffect(() => {
     if (!mergeRequestsQuery.error) {
@@ -338,6 +452,20 @@ export const RepositoryMergeRequestsTab = ({
     }
     onError(extractErrorMessage(participantsQuery.error));
   }, [participantsQuery.error, onError]);
+
+  useEffect(() => {
+    if (!commentsQuery.error) {
+      return;
+    }
+    onError(extractErrorMessage(commentsQuery.error));
+  }, [commentsQuery.error, onError]);
+
+  useEffect(() => {
+    if (!approvalsQuery.error) {
+      return;
+    }
+    onError(extractErrorMessage(approvalsQuery.error));
+  }, [approvalsQuery.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -386,6 +514,7 @@ export const RepositoryMergeRequestsTab = ({
               <Button
                 type="button"
                 variant={isComposerOpen ? "secondary" : "outline"}
+                disabled={!canCreateMergeRequest}
                 onClick={() => setComposerOpen((current) => !current)}
               >
                 <GitPullRequest className="size-4" />
@@ -396,6 +525,12 @@ export const RepositoryMergeRequestsTab = ({
                 {t("Reload")}
               </Button>
             </div>
+
+            {!canCreateMergeRequest ? (
+              <Alert>
+                <AlertDescription>{t("Your current project role can inspect merge requests, but cannot create them.")}</AlertDescription>
+              </Alert>
+            ) : null}
 
             {isComposerOpen ? (
               <form className="space-y-3 rounded-md border p-3" onSubmit={submitCreateMergeRequest}>
@@ -430,7 +565,7 @@ export const RepositoryMergeRequestsTab = ({
                   />
                 </div>
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isCreating}>
+                  <Button type="submit" disabled={!canCreateMergeRequest || isCreating}>
                     {isCreating ? t("Creating merge request...") : t("Create merge request")}
                   </Button>
                 </div>
@@ -492,17 +627,17 @@ export const RepositoryMergeRequestsTab = ({
                     </Button>
                     {selectedMergeRequest.state === "opened" ? (
                       <>
-                        <Button type="button" size="sm" variant="outline" disabled={isUpdating} onClick={() => void submitUpdateState("closed")}>
+                        <Button type="button" size="sm" variant="outline" disabled={!canWriteMergeRequest || isUpdating} onClick={() => void submitUpdateState("closed")}>
                           {t("Close merge request")}
                         </Button>
-                        <Button type="button" size="sm" disabled={isMerging || isMergeBlocked} onClick={() => void submitMerge()}>
+                        <Button type="button" size="sm" disabled={!canMergeMergeRequest || isMerging || isMergeBlocked} onClick={() => void submitMerge()}>
                           <GitMerge className="size-4" />
                           {isMerging ? t("Merging...") : t("Merge")}
                         </Button>
                       </>
                     ) : null}
                     {selectedMergeRequest.state === "closed" ? (
-                      <Button type="button" size="sm" variant="outline" disabled={isUpdating} onClick={() => void submitUpdateState("opened")}>
+                      <Button type="button" size="sm" variant="outline" disabled={!canWriteMergeRequest || isUpdating} onClick={() => void submitUpdateState("opened")}>
                         {t("Reopen merge request")}
                       </Button>
                     ) : null}
@@ -524,6 +659,7 @@ export const RepositoryMergeRequestsTab = ({
                   assigneeDraftUserID={assigneeDraftUserID}
                   isLoading={participantsQuery.isFetching || usersQuery.isFetching}
                   isUpdating={isUpdatingParticipants}
+                  canEdit={canWriteMergeRequest}
                   t={t}
                   onChangeReviewerDraftUserID={setReviewerDraftUserID}
                   onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
@@ -542,6 +678,32 @@ export const RepositoryMergeRequestsTab = ({
                     void submitSetParticipants("assignee", assignees.map((item) => item.user_id).filter((item) => item !== userID))
                   }
                   onReload={() => void loadParticipants()}
+                />
+
+                <MergeRequestApprovalsPanel
+                  approvals={approvals}
+                  userByID={userByID}
+                  currentUserApproved={currentUserApproved}
+                  isLoading={approvalsQuery.isFetching}
+                  isUpdating={isUpdatingApproval}
+                  canApprove={canWriteMergeRequest && selectedMergeRequest.state === "opened"}
+                  t={t}
+                  onApprove={() => void submitApproval(true)}
+                  onUnapprove={() => void submitApproval(false)}
+                  onReload={() => void loadApprovals()}
+                />
+
+                <MergeRequestCommentsPanel
+                  comments={comments}
+                  userByID={userByID}
+                  newComment={newComment}
+                  isLoading={commentsQuery.isFetching}
+                  isCreating={isCreatingComment}
+                  canComment={canCommentMergeRequest}
+                  t={t}
+                  onChangeNewComment={setNewComment}
+                  onSubmit={submitCreateComment}
+                  onReload={() => void loadComments()}
                 />
 
                 <div>
@@ -617,6 +779,7 @@ const MergeRequestParticipantsPanel = ({
   assigneeDraftUserID,
   isLoading,
   isUpdating,
+  canEdit,
   t,
   onChangeReviewerDraftUserID,
   onChangeAssigneeDraftUserID,
@@ -634,6 +797,7 @@ const MergeRequestParticipantsPanel = ({
   assigneeDraftUserID: string;
   isLoading: boolean;
   isUpdating: boolean;
+  canEdit: boolean;
   t: (text: string) => string;
   onChangeReviewerDraftUserID: (value: string) => void;
   onChangeAssigneeDraftUserID: (value: string) => void;
@@ -666,6 +830,7 @@ const MergeRequestParticipantsPanel = ({
         userByID={userByID}
         draftUserID={reviewerDraftUserID}
         isUpdating={isUpdating}
+        canEdit={canEdit}
         t={t}
         onChangeDraftUserID={onChangeReviewerDraftUserID}
         onAdd={onAddReviewer}
@@ -679,6 +844,7 @@ const MergeRequestParticipantsPanel = ({
         userByID={userByID}
         draftUserID={assigneeDraftUserID}
         isUpdating={isUpdating}
+        canEdit={canEdit}
         t={t}
         onChangeDraftUserID={onChangeAssigneeDraftUserID}
         onAdd={onAddAssignee}
@@ -696,6 +862,7 @@ const ParticipantRoleSection = ({
   userByID,
   draftUserID,
   isUpdating,
+  canEdit,
   t,
   onChangeDraftUserID,
   onAdd,
@@ -708,6 +875,7 @@ const ParticipantRoleSection = ({
   userByID: Map<string, UserView>;
   draftUserID: string;
   isUpdating: boolean;
+  canEdit: boolean;
   t: (text: string) => string;
   onChangeDraftUserID: (value: string) => void;
   onAdd: () => void;
@@ -723,14 +891,21 @@ const ParticipantRoleSection = ({
         {selected.map((item) => (
           <Badge key={`${item.role}-${item.user_id}`} variant="outline" className="gap-2">
             {formatUserLabel(userByID.get(item.user_id), item.user_id)}
-            <button type="button" className="text-muted-foreground hover:text-foreground" disabled={isUpdating} onClick={() => onRemove(item.user_id)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-4 px-1 text-muted-foreground hover:text-foreground"
+              disabled={!canEdit || isUpdating}
+              onClick={() => onRemove(item.user_id)}
+            >
               x
-            </button>
+            </Button>
           </Badge>
         ))}
       </div>
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Select value={draftUserID} onValueChange={onChangeDraftUserID} disabled={isUpdating || availableUsers.length === 0}>
+        <Select value={draftUserID} onValueChange={onChangeDraftUserID} disabled={!canEdit || isUpdating || availableUsers.length === 0}>
           <SelectTrigger>
             <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
           </SelectTrigger>
@@ -742,13 +917,142 @@ const ParticipantRoleSection = ({
             ))}
           </SelectContent>
         </Select>
-        <Button type="button" size="sm" variant="outline" disabled={isUpdating || !draftUserID} onClick={onAdd}>
+        <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdating || !draftUserID} onClick={onAdd}>
           {isUpdating ? t("Saving...") : t("Add")}
         </Button>
       </div>
     </div>
   );
 };
+
+const MergeRequestApprovalsPanel = ({
+  approvals,
+  userByID,
+  currentUserApproved,
+  isLoading,
+  isUpdating,
+  canApprove,
+  t,
+  onApprove,
+  onUnapprove,
+  onReload,
+}: {
+  approvals: RepositoryMergeRequestApprovalView[];
+  userByID: Map<string, UserView>;
+  currentUserApproved: boolean;
+  isLoading: boolean;
+  isUpdating: boolean;
+  canApprove: boolean;
+  t: (text: string) => string;
+  onApprove: () => void;
+  onUnapprove: () => void;
+  onReload: () => void;
+}) => (
+  <div className="rounded-md border p-3">
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <p className="flex items-center gap-2 font-medium">
+          <ThumbsUp className="size-4" />
+          {t("Approvals")}
+        </p>
+        <p className="text-xs text-muted-foreground">{t("Track reviewers who approved this merge request.")}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
+          <RefreshCw className="size-4" />
+          {isLoading ? t("Loading...") : t("Reload")}
+        </Button>
+        {currentUserApproved ? (
+          <Button type="button" size="sm" variant="outline" disabled={isUpdating || !canApprove} onClick={onUnapprove}>
+            {isUpdating ? t("Saving...") : t("Unapprove")}
+          </Button>
+        ) : (
+          <Button type="button" size="sm" disabled={isUpdating || !canApprove} onClick={onApprove}>
+            {isUpdating ? t("Saving...") : t("Approve")}
+          </Button>
+        )}
+      </div>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      {approvals.length === 0 ? <span className="text-xs text-muted-foreground">{t("No approvals yet.")}</span> : null}
+      {approvals.map((approval) => (
+        <Badge key={approval.id || approval.user_id} variant="secondary" className="gap-2">
+          <CheckCircle2 className="size-3" />
+          {formatUserLabel(userByID.get(approval.user_id), approval.user_id)}
+        </Badge>
+      ))}
+    </div>
+  </div>
+);
+
+const MergeRequestCommentsPanel = ({
+  comments,
+  userByID,
+  newComment,
+  isLoading,
+  isCreating,
+  canComment,
+  t,
+  onChangeNewComment,
+  onSubmit,
+  onReload,
+}: {
+  comments: RepositoryMergeRequestCommentView[];
+  userByID: Map<string, UserView>;
+  newComment: string;
+  isLoading: boolean;
+  isCreating: boolean;
+  canComment: boolean;
+  t: (text: string) => string;
+  onChangeNewComment: (value: string) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onReload: () => void;
+}) => (
+  <div className="rounded-md border p-3">
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <p className="flex items-center gap-2 font-medium">
+          <MessageSquare className="size-4" />
+          {t("Discussion")}
+        </p>
+        <p className="text-xs text-muted-foreground">{t("Review conversation for this merge request.")}</p>
+      </div>
+      <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
+        <RefreshCw className="size-4" />
+        {isLoading ? t("Loading...") : t("Reload")}
+      </Button>
+    </div>
+    <div className="space-y-2">
+      {isLoading ? <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading comments...")}</p> : null}
+      {!isLoading && comments.length === 0 ? (
+        <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No comments yet.")}</p>
+      ) : null}
+      {comments.map((comment) => (
+        <div key={comment.id} className="rounded-md border bg-background/60 p-3">
+          <p className="mb-1 text-xs text-muted-foreground">
+            {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
+            {comment.created_at ? ` · ${formatRelativeTime(comment.created_at)}` : ""}
+          </p>
+          <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+        </div>
+      ))}
+    </div>
+    <form className="mt-3 space-y-2" onSubmit={onSubmit}>
+      <Textarea
+        className="min-h-24"
+        value={newComment}
+        placeholder={t("Add a merge request comment")}
+        disabled={!canComment}
+        onChange={(event) => onChangeNewComment(event.target.value)}
+      />
+      <div className="flex justify-end">
+        <Button type="submit" disabled={!canComment || isCreating || !newComment.trim()}>
+          {isCreating ? t("Commenting...") : t("Comment")}
+        </Button>
+      </div>
+    </form>
+  </div>
+);
 
 const BranchSelect = ({
   id,
@@ -917,6 +1221,40 @@ const normalizeParticipantsView = (payload: unknown): RepositoryMergeRequestPart
   };
 };
 
+const normalizeCommentsView = (payload: unknown): RepositoryMergeRequestCommentsView | null => {
+  const raw = isRecord(payload) ? resolveBody(payload) : payload;
+  if (Array.isArray(raw)) {
+    return {
+      merge_request: normalizeMergeRequest({}),
+      comments: raw.filter(isRecord).map(normalizeComment),
+    };
+  }
+  if (!isRecord(raw)) {
+    return null;
+  }
+  return {
+    merge_request: normalizeMergeRequest(raw.merge_request ?? raw.MergeRequest),
+    comments: resolveRecordArray(raw.comments ?? raw.Comments).map(normalizeComment),
+  };
+};
+
+const normalizeApprovalsView = (payload: unknown): RepositoryMergeRequestApprovalsView | null => {
+  const raw = isRecord(payload) ? resolveBody(payload) : payload;
+  if (Array.isArray(raw)) {
+    return {
+      merge_request: normalizeMergeRequest({}),
+      approvals: raw.filter(isRecord).map(normalizeApproval),
+    };
+  }
+  if (!isRecord(raw)) {
+    return null;
+  }
+  return {
+    merge_request: normalizeMergeRequest(raw.merge_request ?? raw.MergeRequest),
+    approvals: resolveRecordArray(raw.approvals ?? raw.Approvals).map(normalizeApproval),
+  };
+};
+
 const normalizeMergeRequest = (rawValue: unknown): RepositoryMergeRequestView => {
   const raw = isRecord(rawValue) ? rawValue : {};
   return {
@@ -939,6 +1277,23 @@ const normalizeParticipant = (raw: RawRecord) => ({
   merge_request_id: normalizeString(raw.merge_request_id ?? raw.MergeRequestID),
   user_id: normalizeString(raw.user_id ?? raw.UserID),
   role: normalizeParticipantRole(raw.role ?? raw.Role),
+  created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
+  updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
+});
+
+const normalizeComment = (raw: RawRecord): RepositoryMergeRequestCommentView => ({
+  id: normalizeString(raw.id ?? raw.ID),
+  merge_request_id: normalizeString(raw.merge_request_id ?? raw.MergeRequestID),
+  author_user_id: normalizeString(raw.author_user_id ?? raw.AuthorUserID),
+  body: normalizeString(raw.body ?? raw.Body ?? raw.content ?? raw.Content),
+  created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
+  updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
+});
+
+const normalizeApproval = (raw: RawRecord): RepositoryMergeRequestApprovalView => ({
+  id: normalizeString(raw.id ?? raw.ID),
+  merge_request_id: normalizeString(raw.merge_request_id ?? raw.MergeRequestID),
+  user_id: normalizeString(raw.user_id ?? raw.UserID),
   created_at: normalizeOptionalString(raw.created_at ?? raw.CreatedAt),
   updated_at: normalizeOptionalString(raw.updated_at ?? raw.UpdatedAt),
 });
@@ -999,6 +1354,9 @@ const normalizeParticipantRole = (value: unknown): RepositoryMergeRequestPartici
 
 const normalizePipelineStatus = (value: unknown) => {
   const normalized = normalizeString(value);
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
   if (normalized === "running" || normalized === "succeeded" || normalized === "failed" || normalized === "cancelled") {
     return normalized;
   }
