@@ -277,6 +277,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
           permissions={repositoryPermissions}
           t={t}
           isDeleting={meta.isDeleting}
+          onError={meta.setActionError}
           onDelete={meta.submitDelete}
         />
       ) : null}

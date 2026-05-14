@@ -328,7 +328,7 @@ func parseCodeOwners(content string) []codeOwnerRule {
 	rules := make([]codeOwnerRule, 0)
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(stripCodeOwnerComment(line))
-		if line == "" {
+		if line == "" || strings.HasPrefix(line, "[") || strings.HasPrefix(line, "!") {
 			continue
 		}
 		fields := strings.Fields(line)
@@ -377,12 +377,18 @@ func (s *Service) changedFiles(ctx context.Context, project projectdomain.Projec
 func matchedCodeOwnerUsernames(rules []codeOwnerRule, files []string) []string {
 	usernames := setx.NewSet[string]()
 	for _, file := range files {
+		var matched *codeOwnerRule
 		for _, rule := range rules {
 			if codeOwnerPatternMatches(rule.Pattern, file) {
-				for _, username := range rule.Usernames {
-					usernames.Add(username)
-				}
+				current := rule
+				matched = &current
 			}
+		}
+		if matched == nil {
+			continue
+		}
+		for _, username := range matched.Usernames {
+			usernames.Add(username)
 		}
 	}
 	return usernames.Values()

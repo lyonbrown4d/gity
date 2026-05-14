@@ -26,6 +26,7 @@ import type {
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime, toTimestamp } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
+import { RepositoryMergeRequestApprovalRulesPanel } from "./repository-merge-request-approval-rules-panel";
 import {
   isRecord,
   normalizeBoolean as normalizeBool,
@@ -481,6 +482,17 @@ export const RepositoryMergeRequestsTab = ({
           <MergeRequestStat label={t("Merged")} value={stats.merged} tone="blue" />
           <MergeRequestStat label={t("Closed")} value={stats.closed} tone="slate" />
         </div>
+
+        <RepositoryMergeRequestApprovalRulesPanel
+          repoId={repoId}
+          branches={branches}
+          defaultBranch={defaultBranch}
+          users={users}
+          permissions={permissions}
+          t={t}
+          onError={onError}
+          onRulesChanged={() => void loadChecks()}
+        />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
           <div className="space-y-3">

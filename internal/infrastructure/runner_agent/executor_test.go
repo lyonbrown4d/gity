@@ -149,6 +149,72 @@ func TestExecuteScriptJobMasksSecrets(t *testing.T) {
 	}
 }
 
+func TestExecuteScriptJobRejectsDisallowedShell(t *testing.T) {
+	t.Parallel()
+
+	payload, err := json.Marshal(runneragent.ScriptPayload{
+		Shell:          "python",
+		Script:         []string{`print("nope")`},
+		TimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	_, err = runneragent.ExecuteScriptJob(context.Background(), runneragent.Config{
+		WorkDir:        t.TempDir(),
+		AllowedShells:  []string{"sh"},
+		LeaseSeconds:   30,
+		MaxOutputBytes: 1024,
+	}, cidomain.ProjectJob{
+		ID:        48,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	})
+	if err == nil || !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("expected disallowed shell error, got %v", err)
+	}
+}
+
+func TestExecuteScriptJobCleansWorkspace(t *testing.T) {
+	t.Parallel()
+
+	script := []string{"echo hello"}
+	if runtime.GOOS == "windows" {
+		script = []string{`Write-Output "hello"`}
+	}
+	payload, err := json.Marshal(runneragent.ScriptPayload{
+		Script:         script,
+		TimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	resultJSON, err := runneragent.ExecuteScriptJob(context.Background(), runneragent.Config{
+		WorkDir:        t.TempDir(),
+		LeaseSeconds:   30,
+		MaxOutputBytes: 1024,
+		CleanWorkspace: true,
+	}, cidomain.ProjectJob{
+		ID:        49,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	})
+	if err != nil {
+		t.Fatalf("execute script job: %v", err)
+	}
+	var result runneragent.ScriptResult
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if _, statErr := os.Stat(result.WorkDir); !os.IsNotExist(statErr) {
+		t.Fatalf("expected workspace to be removed, stat error=%v", statErr)
+	}
+}
+
 func TestExecuteScriptJobDownloadsSourceArchive(t *testing.T) {
 	t.Parallel()
 

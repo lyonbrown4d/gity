@@ -376,6 +376,17 @@ export interface RepositoryRunnerView {
   updated_at?: string | null;
 }
 
+export interface RepositoryProjectMemberView {
+  id: string;
+  project_id: string;
+  user_id: string;
+  username: string;
+  display_name?: string | null;
+  email: string;
+  role: string;
+  source: string;
+}
+
 export interface RepositoryCIVariableView {
   id: string;
   project_id: string;

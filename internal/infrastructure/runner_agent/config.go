@@ -18,10 +18,13 @@ type Config struct {
 	PollInterval   time.Duration
 	LeaseSeconds   int
 	MaxOutputBytes int
+	AllowedShells  []string
+	CleanWorkspace bool
 	Once           bool
 }
 
 func ConfigFromEnv(args []string) (Config, error) {
+	allowedShells := envString("GITY_RUNNER_ALLOWED_SHELLS", strings.Join(defaultAllowedShells(), ","))
 	cfg := Config{
 		ServerURL:      envString("GITY_RUNNER_URL", "http://localhost:8080/v1"),
 		Token:          envString("GITY_RUNNER_TOKEN", ""),
@@ -30,6 +33,7 @@ func ConfigFromEnv(args []string) (Config, error) {
 		PollInterval:   envDuration("GITY_RUNNER_POLL_INTERVAL", time.Second),
 		LeaseSeconds:   envInt("GITY_RUNNER_LEASE_SECONDS", 600),
 		MaxOutputBytes: envInt("GITY_RUNNER_MAX_OUTPUT_BYTES", 65536),
+		CleanWorkspace: envBool("GITY_RUNNER_CLEAN_WORKSPACE", true),
 		Once:           envBool("GITY_RUNNER_ONCE", false),
 	}
 
@@ -41,10 +45,13 @@ func ConfigFromEnv(args []string) (Config, error) {
 	flags.DurationVar(&cfg.PollInterval, "poll-interval", cfg.PollInterval, "job polling interval")
 	flags.IntVar(&cfg.LeaseSeconds, "lease-seconds", cfg.LeaseSeconds, "claim lease in seconds")
 	flags.IntVar(&cfg.MaxOutputBytes, "max-output-bytes", cfg.MaxOutputBytes, "maximum captured job output bytes")
+	flags.StringVar(&allowedShells, "allowed-shells", allowedShells, "comma-separated shell allowlist")
+	flags.BoolVar(&cfg.CleanWorkspace, "clean-workspace", cfg.CleanWorkspace, "delete job workspace after execution")
 	flags.BoolVar(&cfg.Once, "once", cfg.Once, "claim and run at most one job")
 	if err := flags.Parse(args); err != nil {
 		return Config{}, oops.In("runner_agent").Wrapf(err, "parse runner config flags")
 	}
+	cfg.AllowedShells = parseAllowedShells(allowedShells)
 	if strings.TrimSpace(cfg.Token) == "" {
 		return Config{}, oops.In("runner_agent").New("runner token is required")
 	}
@@ -60,7 +67,26 @@ func ConfigFromEnv(args []string) (Config, error) {
 	if cfg.MaxOutputBytes <= 0 {
 		cfg.MaxOutputBytes = 65536
 	}
+	if len(cfg.AllowedShells) == 0 {
+		cfg.AllowedShells = defaultAllowedShells()
+	}
 	return cfg, nil
+}
+
+func parseAllowedShells(value string) []string {
+	parts := strings.Split(value, ",")
+	shells := make([]string, 0, len(parts))
+	for _, part := range parts {
+		shell := normalizeShellName(part)
+		if shell != "" {
+			shells = append(shells, shell)
+		}
+	}
+	return shells
+}
+
+func defaultAllowedShells() []string {
+	return []string{"sh", "bash", "powershell", "pwsh", "cmd"}
 }
 
 func envString(key, fallback string) string {

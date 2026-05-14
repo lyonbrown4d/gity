@@ -90,6 +90,28 @@ func TestMergeRequestCodeOwnersApprovalRule(t *testing.T) {
 	}
 }
 
+func TestMergeRequestCodeOwnersUsesLastMatchingRule(t *testing.T) {
+	t.Parallel()
+
+	fixture := newMergeRequestFixture(t, true)
+	addCodeOwners(t, fixture, "[Core]\n* @alice\n*.txt @bob\n")
+	mrIID := assertCreateMergeRequest(t, fixture, "merge with last matching code owners")
+	testutil.Must(fixture.mergeRequestService.CreateApprovalRule(fixture.ctx, fixture.projectID, mergerequestservice.ApprovalRuleInput{
+		Name:              "Code owners",
+		TargetBranch:      "main",
+		ApprovalsRequired: 1,
+		CodeOwner:         true,
+	}))
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if len(checks.ApprovalRules) != 1 {
+		t.Fatalf("expected one approval rule: %+v", checks)
+	}
+	owners := checks.ApprovalRules[0].EligibleUserIDs
+	if len(owners) != 1 || owners[0] != fixture.reviewerID {
+		t.Fatalf("expected last matching code owner to win: %+v", checks.ApprovalRules[0])
+	}
+}
+
 func addMergeRequestCIConfig(t *testing.T, fixture mergeRequestFixture) gitrepo.Branch {
 	t.Helper()
 

@@ -33,6 +33,9 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	if err != nil {
 		return "", err
 	}
+	if err := validateScriptPayload(cfg, payload); err != nil {
+		return "", err
+	}
 	timeout := scriptTimeout(cfg, payload)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -51,7 +54,14 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	started := time.Now()
 	command, output := prepareScriptCommand(ctx, cfg, job, payload, workDir, started, traceStreamer)
 	err = command.Run()
-	return encodeScriptResult(started, workDir, output, resolveScriptError(ctx, err, timeout, cancelRequested))
+	result, resultErr := encodeScriptResult(started, workDir, output, resolveScriptError(ctx, err, timeout, cancelRequested))
+	if cleanupErr := cleanupScriptWorkspace(cfg, workDir); cleanupErr != nil {
+		if resultErr != nil {
+			return result, errors.Join(resultErr, cleanupErr)
+		}
+		return result, cleanupErr
+	}
+	return result, resultErr
 }
 
 func decodeScriptPayload(job cidomain.ProjectJob) (ScriptPayload, error) {
@@ -75,6 +85,36 @@ func scriptTimeout(cfg Config, payload ScriptPayload) time.Duration {
 		return timeout
 	}
 	return 10 * time.Minute
+}
+
+func validateScriptPayload(cfg Config, payload ScriptPayload) error {
+	if !shellAllowed(cfg, payload.Shell) {
+		return fmt.Errorf("script shell %q is not allowed", strings.TrimSpace(payload.Shell))
+	}
+	return nil
+}
+
+func shellAllowed(cfg Config, shell string) bool {
+	normalized := normalizeShellName(shell)
+	if normalized == "" {
+		return true
+	}
+	allowed := cfg.AllowedShells
+	if len(allowed) == 0 {
+		allowed = defaultAllowedShells()
+	}
+	for _, item := range allowed {
+		if normalizeShellName(item) == normalized {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeShellName(value string) string {
+	normalized := strings.TrimSpace(strings.ToLower(value))
+	normalized = strings.TrimSuffix(normalized, ".exe")
+	return normalized
 }
 
 func startScriptCancellationWatcher(ctx context.Context, cancel context.CancelFunc, checker ScriptCancellationChecker) (chan struct{}, func()) {
@@ -123,6 +163,27 @@ func createScriptWorkspace(cfg Config, job cidomain.ProjectJob) (string, error) 
 		return "", fmt.Errorf("create job workspace: %w", err)
 	}
 	return workDir, nil
+}
+
+func cleanupScriptWorkspace(cfg Config, workDir string) error {
+	if !cfg.CleanWorkspace {
+		return nil
+	}
+	root, err := filepath.Abs(cfg.WorkDir)
+	if err != nil {
+		return fmt.Errorf("resolve runner workspace root: %w", err)
+	}
+	target, err := filepath.Abs(workDir)
+	if err != nil {
+		return fmt.Errorf("resolve job workspace: %w", err)
+	}
+	if target == root || !strings.HasPrefix(target, root+string(os.PathSeparator)) {
+		return fmt.Errorf("refuse to cleanup workspace outside runner root: %s", target)
+	}
+	if err := os.RemoveAll(target); err != nil {
+		return fmt.Errorf("cleanup job workspace: %w", err)
+	}
+	return nil
 }
 
 func prepareScriptCommand(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, started time.Time, traceStreamer ScriptTraceStreamer) (*exec.Cmd, *cappedBuffer) {

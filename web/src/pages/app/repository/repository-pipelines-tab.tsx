@@ -748,6 +748,15 @@ const PipelineJobCard = ({
         {t("Needs")}: {item.needs.join(", ")}
       </p>
     ) : null}
+    {item.tags.length > 0 ? (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {item.tags.map((tag) => (
+          <Badge key={tag} variant="outline">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    ) : null}
     {item.script.length > 0 ? (
       <pre className="mt-2 overflow-auto rounded-md bg-muted p-2 text-xs">{item.script.join("\n")}</pre>
     ) : null}

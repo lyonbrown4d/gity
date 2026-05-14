@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import type { RepositoryRunnerView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import { RepositoryCIVariablesPanel } from "./repository-ci-variables-panel";
 import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeBoolean, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
@@ -249,6 +250,8 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
             {t("Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/{id}/complete, and /runners/jobs/{id}/fail.")}
           </p>
         </div>
+
+        <RepositoryCIVariablesPanel repoId={repoId} permissions={permissions} t={t} onError={onError} />
       </CardContent>
     </Card>
   );

@@ -30,17 +30,15 @@ The old Rust backend has been removed so the repository can move forward on one 
 | `cmd/server` | API server entrypoint |
 | `cmd/migration` | database migration entrypoint |
 | `cmd/worker` | background worker entrypoint |
-| `cmd/serverapp` | reusable server `dix` application composition |
-| `cmd/migrationapp` | reusable migration `dix` application composition |
-| `cmd/workerapp` | reusable worker `dix` application composition |
+| `cmd/runner` | external project runner agent entrypoint |
 | `cmd/standalone` | single-process migration + server + worker entrypoint using `dix` subapps |
 | `internal/config` | runtime settings and config loading |
 | `internal/debug` | build metadata and dix app meta provider |
 | `internal/domain` | domain models and events |
 | `internal/application` | application services and ports |
 | `internal/infrastructure` | auth, db, persistence, storage, logging, worker, and git adapters |
-| `internal/interfaces/http_server` | `httpx` + Fiber server bootstrap and lifecycle |
 | `internal/interfaces/http` | HTTP endpoint modules |
+| `internal/layout` | reusable `dix` application composition for server, worker, and standalone |
 | `web` | frontend app |
 
 ## Quick Start
