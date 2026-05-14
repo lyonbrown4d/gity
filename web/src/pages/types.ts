@@ -183,6 +183,21 @@ export interface RepositoryMergeRequestCheckStatusView {
   status: string;
   blocking_reason?: string | null;
   pipeline?: RepositoryPipelineView | null;
+  required_approvals: number;
+  approval_count: number;
+  approval_rules: RepositoryMergeRequestApprovalRuleCheckView[];
+}
+
+export interface RepositoryMergeRequestApprovalRuleCheckView {
+  rule_id: string;
+  name: string;
+  target_branch: string;
+  approvals_required: number;
+  approval_count: number;
+  eligible_user_ids: string[];
+  code_owner: boolean;
+  satisfied: boolean;
+  blocking_reason?: string | null;
 }
 
 export type RepositoryMergeRequestParticipantRole = "reviewer" | "assignee";
@@ -226,6 +241,16 @@ export interface RepositoryMergeRequestApprovalView {
 export interface RepositoryMergeRequestApprovalsView {
   merge_request: RepositoryMergeRequestView;
   approvals: RepositoryMergeRequestApprovalView[];
+}
+
+export interface RepositoryMergeRequestApprovalRuleView {
+  id: string;
+  project_id: string;
+  name: string;
+  target_branch: string;
+  approvals_required: number;
+  eligible_user_ids: string[];
+  code_owner: boolean;
 }
 
 export type RepositoryJobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
@@ -317,6 +342,7 @@ export interface RepositoryPipelineJobView {
   needs: string[];
   script: string[];
   artifacts: string[];
+  tags: string[];
 }
 
 export interface RepositoryPipelineDetailView {
@@ -346,6 +372,17 @@ export interface RepositoryRunnerView {
   status: "online" | "offline";
   active: boolean;
   last_contact_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryCIVariableView {
+  id: string;
+  project_id: string;
+  key: string;
+  value?: string | null;
+  masked: boolean;
+  protected: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 }

@@ -78,7 +78,7 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	if err != nil {
 		return err
 	}
-	if authErr := authorizeProject(c, authRuntime, project, service); authErr != nil {
+	if _, authErr := authorizeProject(c, authRuntime, project, service); authErr != nil {
 		return authErr
 	}
 
@@ -112,14 +112,15 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime
 	if err != nil {
 		return err
 	}
-	if authErr := authorizeProject(c, authRuntime, project, rpc.service); authErr != nil {
+	principal, authErr := authorizeProject(c, authRuntime, project, rpc.service)
+	if authErr != nil {
 		return authErr
 	}
 
 	updates := ParseReceivePackUpdates(c.Body())
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	if err := executeRPC(c, project, rpc.service, services, transport, updates, &stdout, &stderr); err != nil {
+	if err := executeRPC(c, authRuntime, principal, project, rpc.service, services, transport, updates, &stdout, &stderr); err != nil {
 		logger.Error("git rpc failed", slog.String("project", project.FullPath), slog.String("service", rpc.service), slog.String("error", err.Error()), slog.String("stderr", stderr.String()))
 		return fiber.NewError(http.StatusInternalServerError, "git rpc failed")
 	}
@@ -149,7 +150,7 @@ func parseRPCPath(path string) (rpcPath, bool) {
 	}
 }
 
-func executeRPC(c *fiber.Ctx, project projectView, service string, services *RouteServices, transport *infragittransport.Service, updates []receivePackUpdate, stdout, stderr *bytes.Buffer) error {
+func executeRPC(c *fiber.Ctx, authRuntime *infraauth.Runtime, principal infraauth.Principal, project projectView, service string, services *RouteServices, transport *infragittransport.Service, updates []receivePackUpdate, stdout, stderr *bytes.Buffer) error {
 	switch service {
 	case serviceUploadPack:
 		if err := transport.UploadPack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr); err != nil {
@@ -157,7 +158,7 @@ func executeRPC(c *fiber.Ctx, project projectView, service string, services *Rou
 		}
 		return nil
 	case serviceReceivePack:
-		if err := rejectProtectedBranchUpdates(c.UserContext(), project, services.branchProtectionRepo, updates); err != nil {
+		if err := rejectProtectedBranchUpdates(c.UserContext(), authRuntime, principal, project, services.branchProtectionRepo, updates); err != nil {
 			return err
 		}
 		denyForcePushRefs, err := protectedForcePushRefs(c.UserContext(), project, services.branchProtectionRepo, updates)

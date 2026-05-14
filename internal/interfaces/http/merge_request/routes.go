@@ -55,6 +55,30 @@ type mergeRequestApprovalInput struct {
 	Body          mergeRequestApprovalBody `json:"body"`
 }
 
+type approvalRulesInput struct {
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
+}
+
+type approvalRuleInput struct {
+	ProjectID     int64  `path:"id"`
+	RuleID        int64  `path:"rule_id"`
+	Authorization string `header:"Authorization"`
+}
+
+type createApprovalRuleInput struct {
+	ProjectID     int64            `path:"id"`
+	Authorization string           `header:"Authorization"`
+	Body          approvalRuleBody `json:"body"`
+}
+
+type updateApprovalRuleInput struct {
+	ProjectID     int64                  `path:"id"`
+	RuleID        int64                  `path:"rule_id"`
+	Authorization string                 `header:"Authorization"`
+	Body          updateApprovalRuleBody `json:"body"`
+}
+
 type setParticipantsInput struct {
 	ProjectID     int64            `path:"id"`
 	MergeIID      int64            `path:"merge_iid"`
@@ -94,6 +118,22 @@ type createMergeRequestCommentBody struct {
 
 type mergeRequestApprovalBody struct {
 	UserID int64 `json:"user_id"`
+}
+
+type approvalRuleBody struct {
+	Name              string  `json:"name"`
+	TargetBranch      string  `json:"target_branch"`
+	ApprovalsRequired int     `json:"approvals_required"`
+	EligibleUserIDs   []int64 `json:"eligible_user_ids"`
+	CodeOwner         bool    `json:"code_owner"`
+}
+
+type updateApprovalRuleBody struct {
+	Name              *string  `json:"name"`
+	TargetBranch      *string  `json:"target_branch"`
+	ApprovalsRequired *int     `json:"approvals_required"`
+	EligibleUserIDs   *[]int64 `json:"eligible_user_ids"`
+	CodeOwner         *bool    `json:"code_owner"`
 }
 
 type participantsBody struct {
@@ -155,6 +195,10 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			httpapi.RequireProjectReadRoute[mergeRequestInput, mergeRequestOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[mergeRequestInput, mergeRequestOutput]("Use GET /projects/{id}/merge-requests/{merge_iid}/approvals instead."),
 		),
+		httpapi.Get("/projects/{id}/merge-request-approval-rules", e.listApprovalRules, httpapi.RequireProjectActionRoute[approvalRulesInput, mergeRequestOutput]("require_merge_request_approval_rule_read", authRuntime, projectScope, infraauth.ProjectActionMergeRequestMerge)),
+		httpapi.Post("/projects/{id}/merge-request-approval-rules", e.createApprovalRule, httpapi.RequireProjectActionRoute[createApprovalRuleInput, mergeRequestOutput]("require_merge_request_approval_rule_admin", authRuntime, projectScope, infraauth.ProjectActionMergeRequestMerge)),
+		httpapi.Patch("/projects/{id}/merge-request-approval-rules/{rule_id}", e.updateApprovalRule, httpapi.RequireProjectActionRoute[updateApprovalRuleInput, mergeRequestOutput]("require_merge_request_approval_rule_admin", authRuntime, projectScope, infraauth.ProjectActionMergeRequestMerge)),
+		httpapi.Delete("/projects/{id}/merge-request-approval-rules/{rule_id}", e.deleteApprovalRule, httpapi.RequireProjectActionRoute[approvalRuleInput, mergeRequestOutput]("require_merge_request_approval_rule_admin", authRuntime, projectScope, infraauth.ProjectActionMergeRequestMerge)),
 		httpapi.Post("/projects/{id}/merge-requests", e.createMergeRequest, httpapi.RequireProjectActionRoute[createMergeRequestInput, mergeRequestOutput]("require_merge_request_create", authRuntime, projectScope, infraauth.ProjectActionMergeRequestCreate)),
 		httpapi.Post("/repos/{id}/merge-requests", e.createMergeRequest,
 			httpapi.RequireProjectActionRoute[createMergeRequestInput, mergeRequestOutput]("require_merge_request_create", authRuntime, projectScope, infraauth.ProjectActionMergeRequestCreate),
@@ -251,6 +295,38 @@ func (in mergeRequestApprovalInput) AuthorizationHeader() string {
 }
 
 func (in mergeRequestApprovalInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in approvalRulesInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in approvalRulesInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in approvalRuleInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in approvalRuleInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in createApprovalRuleInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in createApprovalRuleInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in updateApprovalRuleInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in updateApprovalRuleInput) ProjectIDValue() int64 {
 	return in.ProjectID
 }
 

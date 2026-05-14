@@ -30,6 +30,14 @@ type ProjectMergeRequestApprovalRepository interface {
 	DeleteByMergeRequestAndUser(ctx context.Context, mergeRequestID, userID int64) error
 }
 
+type ProjectMergeRequestApprovalRuleRepository interface {
+	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[mergedomain.ProjectMergeRequestApprovalRule], error)
+	GetByProjectAndID(ctx context.Context, projectID, id int64) (mergedomain.ProjectMergeRequestApprovalRule, error)
+	Create(ctx context.Context, input CreateProjectMergeRequestApprovalRuleInput) (mergedomain.ProjectMergeRequestApprovalRule, error)
+	UpdateByID(ctx context.Context, id int64, input UpdateProjectMergeRequestApprovalRuleInput) error
+	DeleteByProjectAndID(ctx context.Context, projectID, id int64) error
+}
+
 type CreateProjectMergeRequestInput struct {
 	ProjectID    int64
 	AuthorUserID int64
@@ -54,4 +62,21 @@ type CreateProjectMergeRequestCommentInput struct {
 type UpsertProjectMergeRequestApprovalInput struct {
 	MergeRequestID int64
 	UserID         int64
+}
+
+type CreateProjectMergeRequestApprovalRuleInput struct {
+	ProjectID         int64
+	Name              string
+	TargetBranch      string
+	ApprovalsRequired int
+	EligibleUserIDs   string
+	CodeOwner         int
+}
+
+type UpdateProjectMergeRequestApprovalRuleInput struct {
+	Name              *string
+	TargetBranch      *string
+	ApprovalsRequired *int
+	EligibleUserIDs   *string
+	CodeOwner         *int
 }

@@ -91,6 +91,22 @@ func (s *Service) ListBranchProtections(ctx context.Context, id int64) ([]Branch
 	}).Values(), nil
 }
 
+func (s *Service) MatchBranchProtection(ctx context.Context, id int64, branchName string) (BranchProtection, bool, error) {
+	project, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return BranchProtection{}, false, apperror.NotFound("project not found", err)
+	}
+	branchName = strings.TrimSpace(branchName)
+	if branchName == "" {
+		branchName = project.DefaultBranch
+	}
+	item, protected, err := s.branchProtectionFor(ctx, id, branchName)
+	if err != nil || !protected {
+		return BranchProtection{}, protected, err
+	}
+	return toBranchProtection(item), true, nil
+}
+
 func (s *Service) UpsertBranchProtection(ctx context.Context, id int64, input BranchProtectionInput) (BranchProtection, error) {
 	if _, err := s.repo.GetByID(ctx, id); err != nil {
 		return BranchProtection{}, apperror.NotFound("project not found", err)

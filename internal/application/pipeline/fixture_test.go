@@ -101,7 +101,7 @@ func setupPipelineEnv(ctx context.Context, t *testing.T, withGit bool) pipelineT
 	pipelineJobRepository := testutil.Must(projectpipelinejobrepo.NewRepository(db))
 	gitRunner, gitRepository := pipelineGitServices(t, withGit)
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, nil, nil, nil)
-	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+	service := pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository, nil)
 	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
 	projectInput := projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}
 	if withGit {

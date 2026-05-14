@@ -41,6 +41,19 @@ func decodeStringSlice(value string) ([]string, error) {
 	return out, nil
 }
 
+func decodeJobTags(payload string) ([]string, error) {
+	if strings.TrimSpace(payload) == "" {
+		return nil, nil
+	}
+	var out struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+		return nil, fmt.Errorf("decode job tags: %w", err)
+	}
+	return out.Tags, nil
+}
+
 func initialRunAfter(stage plandsl.StageSpec) time.Time {
 	if len(stage.Needs) == 0 {
 		return time.Time{}

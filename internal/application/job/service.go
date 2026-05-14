@@ -38,6 +38,8 @@ type CreateInput struct {
 	RunAfter    time.Time `json:"run_after"`
 }
 
+type ClaimMatcher func(cidomain.ProjectJob) (bool, error)
+
 func NewService(
 	logger *slog.Logger,
 	projectRepo storageports.ProjectRepository,
@@ -161,17 +163,43 @@ func (s *Service) RunNext(ctx context.Context, workerID string, lease time.Durat
 }
 
 func (s *Service) ClaimProjectJob(ctx context.Context, projectID int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error) {
+	return s.ClaimProjectJobMatching(ctx, projectID, workerID, lease, func(cidomain.ProjectJob) (bool, error) {
+		return true, nil
+	})
+}
+
+func (s *Service) ClaimProjectJobMatching(ctx context.Context, projectID int64, workerID string, lease time.Duration, matcher ClaimMatcher) (cidomain.ProjectJob, bool, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
 		return cidomain.ProjectJob{}, false, apperror.NotFound("project not found", err)
 	}
 	if _, err := s.RequeueExpiredProjectJobs(ctx); err != nil {
 		return cidomain.ProjectJob{}, false, err
 	}
-	job, claimed, err := s.jobRepo.ClaimNextByProjectIDAndKinds(ctx, projectID, []string{KindScript}, normalizeWorkerID(workerID), lease)
-	if err != nil {
-		return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "worker_id", normalizeWorkerID(workerID)).Wrapf(err, "claim project script job")
+	workerID = normalizeWorkerID(workerID)
+	if matcher == nil {
+		matcher = func(cidomain.ProjectJob) (bool, error) { return true, nil }
 	}
-	return job, claimed, nil
+	candidates, err := s.jobRepo.ListClaimableByProjectIDAndKinds(ctx, projectID, []string{KindScript}, 50)
+	if err != nil {
+		return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "worker_id", workerID).Wrapf(err, "list claimable project script jobs")
+	}
+	for _, candidate := range candidates.Values() {
+		matched, matchErr := matcher(candidate)
+		if matchErr != nil {
+			return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "job_id", candidate.ID, "worker_id", workerID).Wrapf(matchErr, "match claimable project job")
+		}
+		if !matched {
+			continue
+		}
+		job, claimed, claimErr := s.jobRepo.ClaimByID(ctx, candidate.ID, workerID, lease)
+		if claimErr != nil {
+			return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "job_id", candidate.ID, "worker_id", workerID).Wrapf(claimErr, "claim project script job")
+		}
+		if claimed {
+			return job, true, nil
+		}
+	}
+	return cidomain.ProjectJob{}, false, nil
 }
 
 func (s *Service) RequeueExpiredProjectJobs(ctx context.Context) (int64, error) {

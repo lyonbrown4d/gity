@@ -27,6 +27,7 @@ type StageSpec struct {
 	Commands       []CommandSpec `json:"commands"`
 	Script         []string      `json:"script"`
 	Artifacts      []string      `json:"artifacts,omitempty"`
+	Tags           []string      `json:"tags,omitempty"`
 }
 
 type CommandSpec struct {
@@ -100,6 +101,12 @@ func forms() list.List[schema.FormSpec] {
 				},
 				schema.FieldSpec{
 					Name:       "artifacts",
+					Type:       schema.ListType{Elem: schema.TypeString},
+					Default:    []any{},
+					HasDefault: true,
+				},
+				schema.FieldSpec{
+					Name:       "tags",
 					Type:       schema.ListType{Elem: schema.TypeString},
 					Default:    []any{},
 					HasDefault: true,
@@ -214,6 +221,10 @@ func lowerStage(form compiler.HIRForm) (StageSpec, error) {
 	if err != nil {
 		return StageSpec{}, err
 	}
+	tags, err := stringListField(form, "tags")
+	if err != nil {
+		return StageSpec{}, err
+	}
 	commands, err := lowerCommands(form)
 	if err != nil {
 		return StageSpec{}, err
@@ -233,6 +244,7 @@ func lowerStage(form compiler.HIRForm) (StageSpec, error) {
 		Commands:       commands,
 		Script:         script,
 		Artifacts:      artifacts,
+		Tags:           tags,
 	}, nil
 }
 

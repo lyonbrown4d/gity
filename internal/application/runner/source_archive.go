@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
@@ -56,7 +57,7 @@ func (s *Service) loadSourceArchiveJob(ctx context.Context, token string, jobID 
 	if err != nil {
 		return cidomain.ProjectRunner{}, cidomain.ProjectJob{}, oops.In("runner").With("project_id", runner.ProjectID, "runner_id", runner.ID, "job_id", jobID).Wrapf(err, "load project job")
 	}
-	if ownershipErr := ensureRunnerOwnsJob(runner, job); ownershipErr != nil {
+	if ownershipErr := ensureRunnerCanUseJob(runner, job, time.Now().UTC()); ownershipErr != nil {
 		return cidomain.ProjectRunner{}, cidomain.ProjectJob{}, ownershipErr
 	}
 	return runner, job, nil

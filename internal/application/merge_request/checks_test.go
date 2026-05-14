@@ -34,7 +34,60 @@ func TestMergeRequestMergeRequiresProtectedTargetBranchPipeline(t *testing.T) {
 	assertProtectedTargetBranchChecks(t, fixture, mrIID)
 	assertMergeRequestBlocked(t, fixture, mrIID)
 	createFailedPipelineAndMarkSucceeded(t, fixture, sourceBranch.Hash, mrIID)
+	assertMergeRequestBlocked(t, fixture, mrIID)
+	assertApproveMergeRequest(t, fixture, mrIID)
 	assertMergeAfterSuccessfulPipeline(t, fixture, mrIID)
+}
+
+func TestMergeRequestApprovalRuleRequiresEligibleApprover(t *testing.T) {
+	t.Parallel()
+
+	fixture := newMergeRequestFixture(t, true)
+	mrIID := assertCreateMergeRequest(t, fixture, "merge with approval rule")
+	rule := testutil.Must(fixture.mergeRequestService.CreateApprovalRule(fixture.ctx, fixture.projectID, mergerequestservice.ApprovalRuleInput{
+		Name:              "Maintainer review",
+		TargetBranch:      "main",
+		ApprovalsRequired: 1,
+		EligibleUserIDs:   []int64{fixture.reviewerID},
+	}))
+	if rule.ID == 0 || len(rule.EligibleUserIDs) != 1 {
+		t.Fatalf("unexpected approval rule: %+v", rule)
+	}
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if checks.Mergeable || checks.RequiredApprovals != 1 || len(checks.ApprovalRules) != 1 {
+		t.Fatalf("expected approval rule to block merge: %+v", checks)
+	}
+	assertApproveMergeRequest(t, fixture, mrIID)
+	checks = testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if !checks.Mergeable || !checks.ApprovalRules[0].Satisfied {
+		t.Fatalf("expected approval rule to pass: %+v", checks)
+	}
+}
+
+func TestMergeRequestCodeOwnersApprovalRule(t *testing.T) {
+	t.Parallel()
+
+	fixture := newMergeRequestFixture(t, true)
+	addCodeOwners(t, fixture, "* @bob\n")
+	mrIID := assertCreateMergeRequest(t, fixture, "merge with code owners")
+	rule := testutil.Must(fixture.mergeRequestService.CreateApprovalRule(fixture.ctx, fixture.projectID, mergerequestservice.ApprovalRuleInput{
+		Name:              "Code owners",
+		TargetBranch:      "main",
+		ApprovalsRequired: 1,
+		CodeOwner:         true,
+	}))
+	if !rule.CodeOwner {
+		t.Fatalf("expected code owner rule: %+v", rule)
+	}
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if checks.Mergeable || len(checks.ApprovalRules) != 1 || len(checks.ApprovalRules[0].EligibleUserIDs) != 1 {
+		t.Fatalf("expected code owner approval rule to block merge: %+v", checks)
+	}
+	assertApproveMergeRequest(t, fixture, mrIID)
+	checks = testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if !checks.Mergeable || !checks.ApprovalRules[0].Satisfied {
+		t.Fatalf("expected code owner approval rule to pass: %+v", checks)
+	}
 }
 
 func addMergeRequestCIConfig(t *testing.T, fixture mergeRequestFixture) gitrepo.Branch {
@@ -49,6 +102,19 @@ func addMergeRequestCIConfig(t *testing.T, fixture mergeRequestFixture) gitrepo.
 		AuthorEmail: "test@gity.dev",
 	}), "add ci config")
 	return findBranch(fixture.ctx, t, fixture.gitRepository, fixture.projectFullPath+".git", fixture.projectDefaultBranch, "feature")
+}
+
+func addCodeOwners(t *testing.T, fixture mergeRequestFixture, content string) {
+	t.Helper()
+
+	testutil.RequireNoError(t, fixture.runner.CreateFileCommit(fixture.ctx, fixture.projectFullPath+".git", gitexec.CreateFileCommitInput{
+		BranchName:  "main",
+		FilePath:    "CODEOWNERS",
+		Content:     content,
+		Message:     "Add CODEOWNERS",
+		AuthorName:  "Gity Test",
+		AuthorEmail: "test@gity.dev",
+	}), "add CODEOWNERS")
 }
 
 func assertMissingMergeRequestChecks(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
@@ -80,7 +146,7 @@ func assertProtectedTargetBranchChecks(t *testing.T, fixture mergeRequestFixture
 	t.Helper()
 
 	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
-	if !checks.TargetBranchProtected || !checks.RequireMergeRequest || !checks.RequirePipelineSuccess {
+	if !checks.TargetBranchProtected || !checks.RequireMergeRequest || !checks.RequirePipelineSuccess || !checks.RequireApproval || checks.RequiredApprovals != 1 {
 		t.Fatalf("expected protected target branch checks: %+v", checks)
 	}
 	if !checks.PipelineRequired || !checks.Required || checks.Mergeable || checks.Status != "missing" {
@@ -88,10 +154,23 @@ func assertProtectedTargetBranchChecks(t *testing.T, fixture mergeRequestFixture
 	}
 }
 
+func assertApproveMergeRequest(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
+	t.Helper()
+
+	approvals := testutil.Must(fixture.mergeRequestService.Approve(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.ApprovalInput{UserID: fixture.reviewerID}))
+	if len(approvals.Approvals) != 1 {
+		t.Fatalf("expected merge request approval: %+v", approvals)
+	}
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	if checks.ApprovalCount != 1 {
+		t.Fatalf("expected approved checks: %+v", checks)
+	}
+}
+
 func assertMergeRequestBlocked(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
 	t.Helper()
 
-	if _, mergeErr := fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}); mergeErr == nil {
+	if _, mergeErr := fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev", ActorUserID: fixture.ownerID}); mergeErr == nil {
 		t.Fatalf("expected merge to be blocked before pipeline exists")
 	}
 }

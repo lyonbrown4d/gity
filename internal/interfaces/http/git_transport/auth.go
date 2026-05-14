@@ -11,16 +11,16 @@ import (
 	"github.com/samber/oops"
 )
 
-func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, service string) error {
+func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, service string) (infraauth.Principal, error) {
 	if service == serviceUploadPack && strings.TrimSpace(project.Visibility) == "public" {
-		return nil
+		return infraauth.Principal{}, nil
 	}
 	principal, ok, err := authRuntime.AuthenticateHeader(c.UserContext(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
-		return fiber.NewError(http.StatusUnauthorized, "invalid credentials")
+		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
 	}
 	if !ok {
-		return fiber.NewError(http.StatusUnauthorized, "authentication required")
+		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 	allowed := false
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
@@ -31,12 +31,12 @@ func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project proj
 		allowed, err = authRuntime.CanProjectAction(c.UserContext(), principal, scope, infraauth.ProjectActionRepositoryPush)
 	}
 	if err != nil {
-		return fiber.NewError(http.StatusForbidden, "authorization failed")
+		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
 	}
 	if !allowed {
-		return fiber.NewError(http.StatusForbidden, "forbidden")
+		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "forbidden")
 	}
-	return nil
+	return principal, nil
 }
 
 func loadProject(ctx context.Context, repo *projectrepo.Repository, rawRepoPath string) (projectView, error) {

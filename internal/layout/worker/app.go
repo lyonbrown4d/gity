@@ -30,6 +30,7 @@ import (
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
 	projectauditeventrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_branch_protection"
+	projectcivariablerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_ci_variable"
 	projectissuerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue"
 	projectissueassigneerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_assignee"
 	projectissueattachmentrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_attachment"
@@ -40,8 +41,10 @@ import (
 	projectjoblogrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job_log"
 	projectlfslockrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_lfs_lock"
 	projectlfsobjectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_lfs_object"
+	projectmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_member"
 	projectmergerequestrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request"
 	projectmergerequestapprovalrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_approval"
+	projectmergerequestapprovalrulerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_approval_rule"
 	projectmergerequestcommentrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_comment"
 	projectmergerequestparticipantrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_participant"
 	projectpackagerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_package"
@@ -124,6 +127,7 @@ func repositoryRuntimeModule() dix.Module {
 			projectrepo.Module(),
 			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
+			projectcivariablerepo.Module(),
 			projectissuerepo.Module(),
 			projectissueassigneerepo.Module(),
 			projectissuecommentrepo.Module(),
@@ -134,9 +138,11 @@ func repositoryRuntimeModule() dix.Module {
 			projectjobrepo.Module(),
 			projectlfslockrepo.Module(),
 			projectlfsobjectrepo.Module(),
+			projectmemberrepo.Module(),
 			projectmergerequestrepo.Module(),
 			projectmergerequestcommentrepo.Module(),
 			projectmergerequestapprovalrepo.Module(),
+			projectmergerequestapprovalrulerepo.Module(),
 			projectmergerequestparticipantrepo.Module(),
 			projectpackagerepo.Module(),
 			projectpackageversionrepo.Module(),

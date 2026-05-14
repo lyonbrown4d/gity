@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   RepositoryBranchView,
   RepositoryMergeRequestApprovalView,
+  RepositoryMergeRequestApprovalRuleCheckView,
   RepositoryMergeRequestApprovalsView,
   RepositoryMergeRequestCheckStatusView,
   RepositoryMergeRequestCommentView,
@@ -31,6 +32,7 @@ import {
   normalizeNumber,
   normalizeOptionalString,
   normalizeString,
+  normalizeStringArray,
   resolveBody,
   resolveRecordArray,
   type RawRecord,
@@ -766,6 +768,28 @@ const MergeRequestChecksPanel = ({
           <CheckLine label={t("Pipeline status")} value={checks.pipeline?.status ? t(checks.pipeline.status) : t(checks.status)} />
         </div>
       ) : null}
+      {checks?.approval_rules?.length ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">
+            {t("Approval rules")}: {checks.approval_count}/{checks.required_approvals}
+          </p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {checks.approval_rules.map((rule) => (
+              <div key={rule.rule_id || rule.name} className="rounded-md border bg-background/70 px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{rule.name}</span>
+                  <Badge variant={rule.satisfied ? "default" : "outline"}>
+                    {rule.approval_count}/{rule.approvals_required}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-muted-foreground">
+                  {rule.code_owner ? t("CODEOWNERS") : t("Eligible users")} · {rule.target_branch || "*"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -1207,8 +1231,23 @@ const normalizeCheckStatusView = (payload: unknown): RepositoryMergeRequestCheck
     status: normalizeString(raw.status ?? raw.Status),
     blocking_reason: normalizeOptionalString(raw.blocking_reason ?? raw.BlockingReason),
     pipeline: normalizePipeline(raw.pipeline ?? raw.Pipeline),
+    required_approvals: normalizeNumber(raw.required_approvals ?? raw.RequiredApprovals),
+    approval_count: normalizeNumber(raw.approval_count ?? raw.ApprovalCount),
+    approval_rules: resolveRecordArray(raw.approval_rules ?? raw.ApprovalRules).map(normalizeApprovalRuleCheck),
   };
 };
+
+const normalizeApprovalRuleCheck = (raw: RawRecord): RepositoryMergeRequestApprovalRuleCheckView => ({
+  rule_id: normalizeString(raw.rule_id ?? raw.RuleID),
+  name: normalizeString(raw.name ?? raw.Name),
+  target_branch: normalizeString(raw.target_branch ?? raw.TargetBranch),
+  approvals_required: normalizeNumber(raw.approvals_required ?? raw.ApprovalsRequired),
+  approval_count: normalizeNumber(raw.approval_count ?? raw.ApprovalCount),
+  eligible_user_ids: normalizeStringArray(raw.eligible_user_ids ?? raw.EligibleUserIDs),
+  code_owner: normalizeBool(raw.code_owner ?? raw.CodeOwner),
+  satisfied: normalizeBool(raw.satisfied ?? raw.Satisfied),
+  blocking_reason: normalizeOptionalString(raw.blocking_reason ?? raw.BlockingReason),
+});
 
 const normalizeParticipantsView = (payload: unknown): RepositoryMergeRequestParticipantsView | null => {
   const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : null;

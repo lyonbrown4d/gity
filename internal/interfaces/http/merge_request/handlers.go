@@ -64,6 +64,45 @@ func (e *Endpoint) listApprovals(ctx context.Context, in *mergeRequestInput) (*m
 	return &mergeRequestOutput{Body: item}, nil
 }
 
+func (e *Endpoint) listApprovalRules(ctx context.Context, in *approvalRulesInput) (*mergeRequestOutput, error) {
+	item, err := e.service.ListApprovalRules(ctx, in.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) createApprovalRule(ctx context.Context, in *createApprovalRuleInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.ApprovalRuleInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.CreateApprovalRule(ctx, in.ProjectID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) updateApprovalRule(ctx context.Context, in *updateApprovalRuleInput) (*mergeRequestOutput, error) {
+	input, err := mapperx.MapStrict[mergerequestservice.UpdateApprovalRuleInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.UpdateApprovalRule(ctx, in.ProjectID, in.RuleID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: item}, nil
+}
+
+func (e *Endpoint) deleteApprovalRule(ctx context.Context, in *approvalRuleInput) (*mergeRequestOutput, error) {
+	if err := e.service.DeleteApprovalRule(ctx, in.ProjectID, in.RuleID); err != nil {
+		return nil, err
+	}
+	return &mergeRequestOutput{Body: map[string]any{"deleted": true}}, nil
+}
+
 func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
 	input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
 	if err != nil {

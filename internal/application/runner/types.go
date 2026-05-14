@@ -12,6 +12,24 @@ type RegisterInput struct {
 	Tags        string `json:"tags"`
 }
 
+type VariableInput struct {
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	Masked    bool   `json:"masked"`
+	Protected bool   `json:"protected"`
+}
+
+type VariableView struct {
+	ID        int64     `json:"id"`
+	ProjectID int64     `json:"project_id"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value,omitempty"`
+	Masked    bool      `json:"masked"`
+	Protected bool      `json:"protected"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type UploadArtifactInput struct {
 	Name          string `json:"name"`
 	FileName      string `json:"file_name"`

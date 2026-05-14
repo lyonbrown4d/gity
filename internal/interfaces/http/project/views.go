@@ -112,6 +112,30 @@ func (in projectByIDInput) ProjectIDValue() int64 {
 	return in.ID
 }
 
+func (in projectMemberInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectMemberInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
+func (in createProjectMemberInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in createProjectMemberInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
+func (in upsertProjectMemberInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in upsertProjectMemberInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
 func (in deleteProjectInput) AuthorizationHeader() string {
 	return in.Authorization
 }

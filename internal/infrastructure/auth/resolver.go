@@ -10,6 +10,7 @@ import (
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
 	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
+	projectmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_member"
 	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user_token"
 	"github.com/samber/oops"
@@ -50,16 +51,23 @@ const (
 	ProjectActionRunnerAdmin         = "project.runners.admin"
 )
 
+const (
+	ProjectAccessNoOne      = "no_one"
+	ProjectAccessDeveloper  = "developer"
+	ProjectAccessMaintainer = "maintainer"
+	ProjectAccessOwner      = "owner"
+)
+
 type ProjectScope struct {
 	ID             int64
 	OrganizationID int64
 	Visibility     string
 }
 
-func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *organizationmemberrepo.Repository) *authx.Engine {
+func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
 	return authx.NewEngine(
 		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository))),
-		authx.WithAuthorizer(newProjectAuthorizer(memberRepository)),
+		authx.WithAuthorizer(newProjectAuthorizer(memberRepository, projectMemberRepository)),
 	)
 }
 
@@ -77,37 +85,39 @@ func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *user
 	})
 }
 
-func newProjectAuthorizer(memberRepository *organizationmemberrepo.Repository) authx.Authorizer {
+func newProjectAuthorizer(memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) authx.Authorizer {
 	return authx.AuthorizerFunc(func(ctx context.Context, input authx.AuthorizationModel) (authx.Decision, error) {
-		principal, organizationID, visibility, ok := authorizationProjectScope(input)
+		principal, projectID, organizationID, visibility, ok := authorizationProjectScope(input)
 		if !ok {
 			return authx.Decision{Allowed: false, Reason: "invalid_project_scope"}, nil
 		}
-		return authorizeProject(ctx, memberRepository, input.Action, principal, organizationID, visibility), nil
+		return authorizeProject(ctx, memberRepository, projectMemberRepository, input.Action, principal, projectID, organizationID, visibility), nil
 	})
 }
 
-func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64, string, bool) {
+func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64, int64, string, bool) {
 	principal, ok := input.Principal.(Principal)
 	if !ok {
-		return Principal{}, 0, "", false
+		return Principal{}, 0, 0, "", false
 	}
+	projectID, projectIDFound := input.Context.Get("project_id")
 	organizationID, organizationIDFound := input.Context.Get("organization_id")
 	visibility, visibilityFound := input.Context.Get("visibility")
+	projectIDValue, projectIDOK := projectID.(int64)
 	organizationIDValue, organizationIDOK := organizationID.(int64)
 	visibilityValue, visibilityOK := visibility.(string)
-	return principal, organizationIDValue, visibilityValue, organizationIDFound && organizationIDOK && visibilityFound && visibilityOK
+	return principal, projectIDValue, organizationIDValue, visibilityValue, projectIDFound && projectIDOK && organizationIDFound && organizationIDOK && visibilityFound && visibilityOK
 }
 
-func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, action string, principal Principal, organizationID int64, visibility string) authx.Decision {
+func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, action string, principal Principal, projectID, organizationID int64, visibility string) authx.Decision {
 	if principal.IsSuperAdmin {
 		return authx.Decision{Allowed: true, PolicyID: "super_admin"}
 	}
 	switch action {
 	case ProjectActionRead, ProjectActionRepositoryRead, ProjectActionPackageRead, ProjectActionWikiRead:
-		return authorizeProjectRead(ctx, memberRepository, principal, organizationID, visibility)
+		return authorizeProjectRead(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, visibility)
 	case ProjectActionJobRead, ProjectActionRunnerRead:
-		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectReportRoles)
+		return authorizeProjectRole(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, action, projectReportRoles)
 	case ProjectActionWrite,
 		ProjectActionRepositoryPush,
 		ProjectActionIssueWrite,
@@ -116,21 +126,26 @@ func authorizeProject(ctx context.Context, memberRepository *organizationmemberr
 		ProjectActionPackageWrite,
 		ProjectActionWikiWrite,
 		ProjectActionJobWrite:
-		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectWriteRoles)
+		return authorizeProjectRole(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, action, projectWriteRoles)
 	case ProjectActionIssueCreate, ProjectActionIssueComment, ProjectActionMergeRequestComment:
-		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectReportRoles)
+		return authorizeProjectRole(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, action, projectReportRoles)
 	case ProjectActionMergeRequestMerge, ProjectActionRepositoryAdmin, ProjectActionRunnerAdmin:
-		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectMergeRoles)
+		return authorizeProjectRole(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, action, projectMergeRoles)
 	case ProjectActionDelete:
-		return authorizeProjectRole(ctx, memberRepository, principal, organizationID, action, projectOwnerRoles)
+		return authorizeProjectRole(ctx, memberRepository, projectMemberRepository, principal, projectID, organizationID, action, projectOwnerRoles)
 	default:
 		return authx.Decision{Allowed: false, Reason: "deny"}
 	}
 }
 
-func authorizeProjectRead(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64, visibility string) authx.Decision {
+func authorizeProjectRead(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, principal Principal, projectID, organizationID int64, visibility string) authx.Decision {
 	if policyID, ok := projectReadVisibilityPolicies.Get(visibility); ok {
 		return authx.Decision{Allowed: true, PolicyID: policyID}
+	}
+	if projectMemberRepository != nil {
+		if _, err := projectMemberRepository.FindByProjectAndUser(ctx, projectID, principal.UserID); err == nil {
+			return authx.Decision{Allowed: true, PolicyID: "project_member_read"}
+		}
 	}
 	if _, err := memberRepository.FindByOrganizationAndUser(ctx, organizationID, principal.UserID); err == nil {
 		return authx.Decision{Allowed: true, PolicyID: "project_private_read"}
@@ -138,7 +153,14 @@ func authorizeProjectRead(ctx context.Context, memberRepository *organizationmem
 	return authx.Decision{Allowed: false, Reason: "deny"}
 }
 
-func authorizeProjectRole(ctx context.Context, memberRepository *organizationmemberrepo.Repository, principal Principal, organizationID int64, action string, allowedRoles *setx.Set[string]) authx.Decision {
+func authorizeProjectRole(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, principal Principal, projectID, organizationID int64, action string, allowedRoles *setx.Set[string]) authx.Decision {
+	if projectMemberRepository != nil {
+		if member, err := projectMemberRepository.FindByProjectAndUser(ctx, projectID, principal.UserID); err == nil {
+			if allowedRoles.Contains(strings.TrimSpace(member.Role)) {
+				return authx.Decision{Allowed: true, PolicyID: "project_member_" + action}
+			}
+		}
+	}
 	member, err := memberRepository.FindByOrganizationAndUser(ctx, organizationID, principal.UserID)
 	if err != nil {
 		return authx.Decision{Allowed: false, Reason: "deny"}
@@ -209,6 +231,7 @@ func (r *Runtime) CanProjectAction(ctx context.Context, principal Principal, pro
 		Action:    action,
 		Resource:  fmt.Sprintf("project:%d", project.ID),
 		Context: mappingx.NewMapFrom(map[string]any{
+			"project_id":      project.ID,
 			"organization_id": project.OrganizationID,
 			"visibility":      strings.TrimSpace(project.Visibility),
 		}),
@@ -219,4 +242,19 @@ func (r *Runtime) CanProjectAction(ctx context.Context, principal Principal, pro
 			Wrapf(err, "authorize project action")
 	}
 	return decision.Allowed, nil
+}
+
+func (r *Runtime) CanProjectAccessLevel(ctx context.Context, principal Principal, project ProjectScope, accessLevel string) (bool, error) {
+	switch strings.TrimSpace(strings.ToLower(accessLevel)) {
+	case ProjectAccessNoOne:
+		return false, nil
+	case ProjectAccessDeveloper:
+		return r.CanProjectAction(ctx, principal, project, ProjectActionRepositoryPush)
+	case ProjectAccessMaintainer:
+		return r.CanProjectAction(ctx, principal, project, ProjectActionRepositoryAdmin)
+	case ProjectAccessOwner:
+		return r.CanProjectAction(ctx, principal, project, ProjectActionDelete)
+	default:
+		return false, nil
+	}
 }

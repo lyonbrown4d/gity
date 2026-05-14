@@ -8,12 +8,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	projectports "github.com/lyonbrown4d/gity/internal/application/ports"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	projectbranchprotectionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_branch_protection"
 )
 
-func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, updates []receivePackUpdate) error {
+func rejectProtectedBranchUpdates(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, project projectView, repo *projectbranchprotectionrepo.Repository, updates []receivePackUpdate) error {
 	for _, update := range updates {
-		if err := rejectProtectedBranchUpdate(ctx, project, repo, update); err != nil {
+		if err := rejectProtectedBranchUpdate(ctx, authRuntime, principal, project, repo, update); err != nil {
 			return err
 		}
 	}
@@ -37,7 +38,7 @@ func protectedForcePushRefs(ctx context.Context, project projectView, repo *proj
 	return refs, nil
 }
 
-func rejectProtectedBranchUpdate(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, update receivePackUpdate) error {
+func rejectProtectedBranchUpdate(ctx context.Context, authRuntime *infraauth.Runtime, principal infraauth.Principal, project projectView, repo *projectbranchprotectionrepo.Repository, update receivePackUpdate) error {
 	if update.BranchName == "" {
 		return nil
 	}
@@ -53,6 +54,13 @@ func rejectProtectedBranchUpdate(ctx context.Context, project projectView, repo 
 	}
 	if protection.BlocksDirectPush() {
 		return fiber.NewError(http.StatusForbidden, "protected branch cannot be updated: "+update.BranchName)
+	}
+	allowed, err := authRuntime.CanProjectAccessLevel(ctx, principal, infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}, protection.PushAccessLevel)
+	if err != nil {
+		return fiber.NewError(http.StatusForbidden, "protected branch push authorization failed")
+	}
+	if !allowed {
+		return fiber.NewError(http.StatusForbidden, "protected branch push access denied: "+update.BranchName)
 	}
 	return nil
 }

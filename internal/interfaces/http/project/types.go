@@ -12,6 +12,25 @@ type projectByIDInput struct {
 	Authorization string `header:"Authorization"`
 }
 
+type projectMemberInput struct {
+	ID            int64  `path:"id"`
+	UserID        int64  `path:"user_id"`
+	Authorization string `header:"Authorization"`
+}
+
+type createProjectMemberInput struct {
+	ID            int64             `path:"id"`
+	Authorization string            `header:"Authorization"`
+	Body          projectMemberBody `json:"body"`
+}
+
+type upsertProjectMemberInput struct {
+	ID            int64             `path:"id"`
+	UserID        int64             `path:"user_id"`
+	Authorization string            `header:"Authorization"`
+	Body          projectMemberBody `json:"body"`
+}
+
 type deleteProjectInput struct {
 	ID            int64             `path:"id"`
 	Authorization string            `header:"Authorization"`
@@ -95,6 +114,11 @@ type createProjectBody struct {
 
 type deleteProjectBody struct {
 	Confirmation string `json:"confirmation"`
+}
+
+type projectMemberBody struct {
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
 }
 
 type createBranchBody struct {

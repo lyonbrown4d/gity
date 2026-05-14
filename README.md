@@ -183,6 +183,8 @@ UPX compression is enabled for Linux and Windows release binaries. macOS binarie
 
 Production Docker deployment templates live in [docs/production-deployment.md](docs/production-deployment.md). Use `docker-compose.prod.yaml` with `.env.production` for split `migration/server/worker` deployments or standalone single-process deployments.
 
+Local beta smoke validation lives in [docs/beta-smoke.md](docs/beta-smoke.md).
+
 ## Roadmap
 
 Detailed planning lives in [ROADMAP.md](ROADMAP.md).

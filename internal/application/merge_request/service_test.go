@@ -25,6 +25,7 @@ import (
 	projectjobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job"
 	projectmergerequestrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request"
 	projectmergerequestapprovalrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_approval"
+	projectmergerequestapprovalrulerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_approval_rule"
 	projectmergerequestcommentrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_comment"
 	projectmergerequestparticipantrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_merge_request_participant"
 	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
@@ -90,6 +91,7 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	mergeRequestParticipantRepository := testutil.Must(projectmergerequestparticipantrepo.NewRepository(db))
 	mergeRequestCommentRepository := testutil.Must(projectmergerequestcommentrepo.NewRepository(db))
 	mergeRequestApprovalRepository := testutil.Must(projectmergerequestapprovalrepo.NewRepository(db))
+	mergeRequestApprovalRuleRepository := testutil.Must(projectmergerequestapprovalrulerepo.NewRepository(db))
 	pipelineRepository := testutil.Must(projectpipelinerepo.NewRepository(db))
 	pipelineJobRepository := createMRPipelineJobRepository(db, withPipelineService)
 	jobRepository := createMRJobRepository(db, withPipelineService)
@@ -106,8 +108,8 @@ func newMergeRequestFixture(t *testing.T, withPipelineService bool) mergeRequest
 	pipelineSvc := createMRPipelineService(logger, projectRepository, pipelineRepository, pipelineJobRepository, jobRepository, gitRepository)
 	mergeRequestSvc := mergerequestservice.NewServiceWithDependencies(
 		logger,
-		mergerequestservice.NewRepositories(projectRepository, mergeRequestRepository, userRepository, projectBranchProtectionRepository),
-		mergerequestservice.NewCollaborationRepositories(mergeRequestParticipantRepository, mergeRequestCommentRepository, mergeRequestApprovalRepository),
+		mergerequestservice.NewRepositories(projectRepository, mergeRequestRepository, userRepository, organizationMemberRepository, nil, projectBranchProtectionRepository),
+		mergerequestservice.NewCollaborationRepositories(mergeRequestParticipantRepository, mergeRequestCommentRepository, mergeRequestApprovalRepository, mergeRequestApprovalRuleRepository),
 		mergerequestservice.NewGitDependencies(gitRepository, runner),
 		mergerequestservice.NewPipelineDeps(pipelineRepository, pipelineSvc),
 		nil,
@@ -155,7 +157,7 @@ func createMRPipelineService(logger *slog.Logger, projectRepository *projectrepo
 		return nil
 	}
 	jobSvc := jobservice.NewService(logger, projectRepository, jobRepository, nil, nil, nil)
-	return pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository)
+	return pipelineservice.NewService(projectRepository, pipelineRepository, pipelineJobRepository, jobSvc, jobRepository, gitRepository, nil)
 }
 
 func assertCreateMergeRequest(t *testing.T, fixture mergeRequestFixture, title string) int64 {
@@ -201,7 +203,7 @@ func assertMergeRequestCollaboration(t *testing.T, fixture mergeRequestFixture, 
 func assertMergeRequestMerge(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
 	t.Helper()
 
-	merged := testutil.Must(fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev"}))
+	merged := testutil.Must(fixture.mergeRequestService.Merge(fixture.ctx, fixture.projectID, mrIID, mergerequestservice.MergeInput{AuthorName: "Gity Test", AuthorEmail: "test@gity.dev", ActorUserID: fixture.ownerID}))
 	if merged.State != "merged" {
 		t.Fatalf("expected merged state, got %s", merged.State)
 	}

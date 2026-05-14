@@ -104,6 +104,51 @@ func TestExecuteScriptJobStreamsTrace(t *testing.T) {
 	}
 }
 
+func TestExecuteScriptJobMasksSecrets(t *testing.T) {
+	t.Parallel()
+
+	script := []string{`printf "token=super-secret-token\n"`}
+	if runtime.GOOS == "windows" {
+		script = []string{`Write-Output "token=super-secret-token"`}
+	}
+	payload, err := json.Marshal(runneragent.ScriptPayload{
+		Script:         script,
+		MaskedValues:   []string{"super-secret-token"},
+		TimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	streamed := ""
+	resultJSON, err := runneragent.ExecuteScriptJobWithTrace(context.Background(), runneragent.Config{
+		WorkDir:        t.TempDir(),
+		LeaseSeconds:   30,
+		MaxOutputBytes: 1024,
+	}, cidomain.ProjectJob{
+		ID:        47,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	}, nil, func(_ context.Context, output string, _ bool, _ int64) error {
+		streamed += output
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("execute masked script job: %v", err)
+	}
+	var result runneragent.ScriptResult
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	if strings.Contains(result.Output, "super-secret-token") || strings.Contains(streamed, "super-secret-token") {
+		t.Fatalf("secret should be masked: result=%q streamed=%q", result.Output, streamed)
+	}
+	if !strings.Contains(result.Output, "[MASKED]") || !strings.Contains(streamed, "[MASKED]") {
+		t.Fatalf("masked marker missing: result=%q streamed=%q", result.Output, streamed)
+	}
+}
+
 func TestExecuteScriptJobDownloadsSourceArchive(t *testing.T) {
 	t.Parallel()
 

@@ -43,6 +43,32 @@ func (e *Endpoint) requireProjectCreate(ctx context.Context, authorization strin
 	return nil
 }
 
+func (e *Endpoint) requireDirectBranchPush(ctx context.Context, authorization string, projectID int64, branchName string) error {
+	protection, protected, err := e.service.MatchBranchProtection(ctx, projectID, branchName)
+	if err != nil || !protected {
+		return err
+	}
+	principal, err := e.requirePermissionPrincipal(ctx, authorization)
+	if err != nil {
+		return err
+	}
+	item, err := e.service.GetByID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if protection.RequireMergeRequest {
+		return httpx.NewError(http.StatusForbidden, "protected branch requires merge request")
+	}
+	allowed, err := e.authRuntime.CanProjectAccessLevel(ctx, principal, projectAuthScope(item), protection.PushAccessLevel)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return httpx.NewError(http.StatusForbidden, "protected branch push access denied")
+	}
+	return nil
+}
+
 func (e *Endpoint) attachPipelineTrigger(ctx context.Context, body map[string]any, projectID int64, branchName string) {
 	if e.pipelineService == nil {
 		return

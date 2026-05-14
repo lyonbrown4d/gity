@@ -925,6 +925,7 @@ const normalizePipelineJob = (rawValue: unknown): RepositoryPipelineJobView => {
     needs: normalizeStringArray(raw.needs ?? raw.Needs),
     script: normalizeStringArray(raw.script ?? raw.Script),
     artifacts: normalizeStringArray(raw.artifacts ?? raw.Artifacts),
+    tags: normalizeStringArray(raw.tags ?? raw.Tags),
   };
 };
 

@@ -19,6 +19,7 @@ import (
 	"github.com/lyonbrown4d/gity/internal/infrastructure/persistence/core"
 	organizationrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization"
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
+	projectcivariablerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_ci_variable"
 	projectjobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job"
 	projectjoblogrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job_log"
 	projectrunnerrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_runner"
@@ -37,9 +38,12 @@ func TestProjectRunnerFlow(t *testing.T) {
 	fixture.runnerToken = token
 	assertListProjectRunners(t, fixture, runnerID)
 	assertRunnerHeartbeat(t, fixture)
+	assertProjectVariables(t, fixture)
 	assertInternalNoopJob(t, fixture)
 	assertScriptJobLifecycle(t, fixture)
+	assertRunnerTagMatching(t, fixture)
 	assertRetryableJobFailure(t, fixture)
+	assertRunnerLeaseExpiry(t, fixture)
 }
 
 type runnerFixture struct {
@@ -64,10 +68,11 @@ func newRunnerFixture(t *testing.T) runnerFixture {
 	jobRepository := testutil.Must(projectjobrepo.NewRepository(db))
 	logRepository := testutil.Must(projectjoblogrepo.NewRepository(db))
 	runnerRepository := testutil.Must(projectrunnerrepo.NewRepository(db))
+	variableRepository := testutil.Must(projectcivariablerepo.NewRepository(db))
 	repoRoot := filepath.Join(t.TempDir(), "repos")
 	gitRunner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	jobSvc := jobservice.NewService(slog.Default(), projectRepository, jobRepository, logRepository, nil, nil)
-	runnerSvc := runnerservice.NewService(projectRepository, runnerRepository, jobSvc, nil, gitRunner)
+	runnerSvc := runnerservice.NewService(projectRepository, runnerRepository, variableRepository, jobSvc, nil, gitRunner)
 
 	organization := testutil.Must(organizationRepository.Create(ctx, organizationrepo.CreateInput{Name: "Core Team", PathKey: "core-team"}))
 	project := testutil.Must(projectRepository.Create(ctx, projectrepo.CreateInput{OrganizationID: organization.ID, Name: "Gity", PathKey: "gity", Visibility: "private"}, organization))
@@ -157,6 +162,49 @@ func assertScriptJobLifecycle(t *testing.T, fixture runnerFixture) {
 	}
 }
 
+func assertRunnerTagMatching(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	matched := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
+		Kind:    jobservice.KindScript,
+		Payload: `{"script":["echo tagged"],"tags":["go","linux"]}`,
+	}))
+	claim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Minute))
+	if !claim.Claimed || claim.Job.ID != matched.ID {
+		t.Fatalf("expected runner to claim matching tagged job: %+v", claim)
+	}
+	testutil.Must(fixture.runnerService.CompleteJob(fixture.ctx, fixture.runnerToken, matched.ID, `{"ok":true}`))
+
+	unmatched := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{
+		Kind:    jobservice.KindScript,
+		Payload: `{"script":["echo unmatched"],"tags":["windows"]}`,
+	}))
+	claim = testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Minute))
+	if claim.Claimed {
+		t.Fatalf("runner should not claim unmatched tagged job: %+v", claim)
+	}
+	testutil.Must(fixture.jobService.CancelProjectJob(fixture.ctx, fixture.projectID, unmatched.ID))
+}
+
+func assertProjectVariables(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	item := testutil.Must(fixture.runnerService.UpsertProjectVariable(fixture.ctx, fixture.projectID, runnerservice.VariableInput{
+		Key:       "deploy_token",
+		Value:     "super-secret-token",
+		Masked:    true,
+		Protected: true,
+	}))
+	if item.Key != "DEPLOY_TOKEN" || item.Value != "" || !item.Masked || !item.Protected {
+		t.Fatalf("unexpected ci variable view: %+v", item)
+	}
+	items := testutil.Must(fixture.runnerService.ListProjectVariables(fixture.ctx, fixture.projectID))
+	if len(items) != 1 || items[0].Key != "DEPLOY_TOKEN" || items[0].Value != "" {
+		t.Fatalf("unexpected ci variables: %+v", items)
+	}
+	testutil.RequireNoError(t, fixture.runnerService.DeleteProjectVariable(fixture.ctx, fixture.projectID, "DEPLOY_TOKEN"), "delete ci variable")
+}
+
 func assertSourceArchive(t *testing.T, fixture runnerFixture, jobID int64) {
 	t.Helper()
 
@@ -180,6 +228,21 @@ func assertRetryableJobFailure(t *testing.T, fixture runnerFixture) {
 	failed := testutil.Must(fixture.runnerService.FailJob(fixture.ctx, fixture.runnerToken, retryable.ID, "executor failed", "", time.Millisecond))
 	if failed.Status != projectjobrepo.StatusPending || failed.LastError != "executor failed" {
 		t.Fatalf("unexpected retryable failure state: %+v", failed)
+	}
+	testutil.Must(fixture.jobService.CancelProjectJob(fixture.ctx, fixture.projectID, retryable.ID))
+}
+
+func assertRunnerLeaseExpiry(t *testing.T, fixture runnerFixture) {
+	t.Helper()
+
+	created := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Kind: jobservice.KindScript, Payload: `{"script":["echo expired"]}`}))
+	claim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Millisecond))
+	if !claim.Claimed || claim.Job.ID != created.ID {
+		t.Fatalf("unexpected expired lease claim: %+v", claim)
+	}
+	time.Sleep(20 * time.Millisecond)
+	if _, err := fixture.runnerService.AppendTrace(fixture.ctx, fixture.runnerToken, created.ID, runnerservice.AppendTraceInput{Output: "late\n"}); err == nil {
+		t.Fatalf("expected expired runner lease to reject trace append")
 	}
 }
 

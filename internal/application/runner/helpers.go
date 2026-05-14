@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	setx "github.com/arcgolabs/collectionx/set"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
@@ -39,6 +41,19 @@ func ensureRunnerOwnsJob(runner cidomain.ProjectRunner, job cidomain.ProjectJob)
 	expected := runnerWorkerID(runner)
 	if strings.TrimSpace(job.LockedBy) != expected {
 		return apperror.Conflict("project job is not claimed by runner", fmt.Errorf("project job locked_by=%q expected=%q", job.LockedBy, expected))
+	}
+	return nil
+}
+
+func ensureRunnerCanUseJob(runner cidomain.ProjectRunner, job cidomain.ProjectJob, now time.Time) error {
+	if err := ensureRunnerOwnsJob(runner, job); err != nil {
+		return err
+	}
+	if strings.TrimSpace(job.Status) != gitports.ProjectJobStatusRunning {
+		return apperror.Conflict("project job is not running", fmt.Errorf("project job status=%q", job.Status))
+	}
+	if job.LockedUntil.IsZero() || !job.LockedUntil.After(now.UTC()) {
+		return apperror.Conflict("project job lease has expired", fmt.Errorf("project job locked_until=%s", job.LockedUntil.UTC().Format(time.RFC3339Nano)))
 	}
 	return nil
 }
@@ -89,6 +104,49 @@ func effectiveRunnerStatus(item cidomain.ProjectRunner, now time.Time) string {
 
 func runnerWorkerID(item cidomain.ProjectRunner) string {
 	return fmt.Sprintf("runner:%d", item.ID)
+}
+
+func runnerMatchesJob(runner cidomain.ProjectRunner, job cidomain.ProjectJob) (bool, error) {
+	requiredTags, err := scriptJobTags(job.Payload)
+	if err != nil {
+		return false, err
+	}
+	if len(requiredTags) == 0 {
+		return true, nil
+	}
+	runnerTags := tagSet(runner.Tags)
+	for _, tag := range requiredTags {
+		if !runnerTags.Contains(tag) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func scriptJobTags(payload string) ([]string, error) {
+	if strings.TrimSpace(payload) == "" {
+		return nil, nil
+	}
+	var out struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+		return nil, fmt.Errorf("decode script job tags: %w", err)
+	}
+	tags := tagSet(strings.Join(out.Tags, ","))
+	return tags.Values(), nil
+}
+
+func tagSet(value string) *setx.Set[string] {
+	parts := strings.Split(value, ",")
+	tags := setx.NewSetWithCapacity[string](len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(strings.ToLower(part))
+		if trimmed != "" {
+			tags.Add(trimmed)
+		}
+	}
+	return tags
 }
 
 func generateRunnerToken() (string, error) {

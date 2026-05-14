@@ -3,6 +3,7 @@ package runneragent
 import (
 	"bytes"
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ type cappedBuffer struct {
 	ctx           context.Context
 	started       time.Time
 	traceStreamer ScriptTraceStreamer
+	maskedValues  []string
 }
 
 func (b *cappedBuffer) Write(p []byte) (int, error) {
@@ -79,7 +81,7 @@ func (b *cappedBuffer) writeCaptured(p []byte) (int, error) {
 func (b *cappedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.buffer.String()
+	return maskOutput(b.buffer.String(), b.maskedValues)
 }
 
 func (b *cappedBuffer) stream(chunk []byte) error {
@@ -93,8 +95,19 @@ func (b *cappedBuffer) stream(chunk []byte) error {
 	if !b.started.IsZero() {
 		duration = time.Since(b.started).Milliseconds()
 	}
-	if err := b.traceStreamer(b.ctx, string(chunk), b.truncated, duration); err != nil {
+	if err := b.traceStreamer(b.ctx, maskOutput(string(chunk), b.maskedValues), b.truncated, duration); err != nil {
 		return oops.In("runner_agent").With("truncated", b.truncated, "duration_millis", duration).Wrapf(err, "stream job trace")
 	}
 	return nil
+}
+
+func maskOutput(value string, maskedValues []string) string {
+	out := value
+	for _, secret := range maskedValues {
+		secret = strings.TrimSpace(secret)
+		if len(secret) >= 8 {
+			out = strings.ReplaceAll(out, secret, "[MASKED]")
+		}
+	}
+	return out
 }

@@ -36,6 +36,33 @@ func (e *Endpoint) deleteProjectRunner(ctx context.Context, in *projectRunnerInp
 	return &runnerOutput{Body: item}, nil
 }
 
+func (e *Endpoint) listProjectVariables(ctx context.Context, in *projectVariablesInput) (*runnerOutput, error) {
+	items, err := e.service.ListProjectVariables(ctx, in.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: items}, nil
+}
+
+func (e *Endpoint) upsertProjectVariable(ctx context.Context, in *upsertVariableInput) (*runnerOutput, error) {
+	input, err := mapperx.MapStrict[runnerservice.VariableInput](e.mapper, in.Body)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.UpsertProjectVariable(ctx, in.ProjectID, input)
+	if err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: item}, nil
+}
+
+func (e *Endpoint) deleteProjectVariable(ctx context.Context, in *projectVariableInput) (*runnerOutput, error) {
+	if err := e.service.DeleteProjectVariable(ctx, in.ProjectID, in.Key); err != nil {
+		return nil, err
+	}
+	return &runnerOutput{Body: map[string]any{"deleted": true}}, nil
+}
+
 func (e *Endpoint) heartbeat(ctx context.Context, in *runnerTokenInput) (*runnerOutput, error) {
 	item, err := e.service.Heartbeat(ctx, in.Body.Token)
 	if err != nil {

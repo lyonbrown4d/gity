@@ -134,6 +134,7 @@ func prepareScriptCommand(ctx context.Context, cfg Config, job cidomain.ProjectJ
 		ctx:           ctx,
 		started:       started,
 		traceStreamer: traceStreamer,
+		maskedValues:  payload.MaskedValues,
 	}
 	command.Stdout = output
 	command.Stderr = output

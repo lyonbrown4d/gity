@@ -17,6 +17,17 @@ type Service struct {
 	jobService      *jobservice.Service
 	jobRepo         gitports.ProjectJobRepository
 	gitRepo         gitports.GitRepository
+	variableRepo    gitports.ProjectCIVariableRepository
+}
+
+type RuntimeDeps struct {
+	jobRepo      gitports.ProjectJobRepository
+	gitRepo      gitports.GitRepository
+	variableRepo gitports.ProjectCIVariableRepository
+}
+
+func NewRuntimeDeps(jobRepo gitports.ProjectJobRepository, gitRepo gitports.GitRepository, variableRepo gitports.ProjectCIVariableRepository) RuntimeDeps {
+	return RuntimeDeps{jobRepo: jobRepo, gitRepo: gitRepo, variableRepo: variableRepo}
 }
 
 func NewService(
@@ -26,14 +37,26 @@ func NewService(
 	jobService *jobservice.Service,
 	jobRepo gitports.ProjectJobRepository,
 	gitRepo gitports.GitRepository,
+	variableRepo gitports.ProjectCIVariableRepository,
+) *Service {
+	return NewServiceFromDeps(projectRepo, pipelineRepo, pipelineJobRepo, jobService, RuntimeDeps{jobRepo: jobRepo, gitRepo: gitRepo, variableRepo: variableRepo})
+}
+
+func NewServiceFromDeps(
+	projectRepo gitports.ProjectRepository,
+	pipelineRepo gitports.ProjectPipelineRepository,
+	pipelineJobRepo gitports.ProjectPipelineJobRepository,
+	jobService *jobservice.Service,
+	deps RuntimeDeps,
 ) *Service {
 	return &Service{
 		projectRepo:     projectRepo,
 		pipelineRepo:    pipelineRepo,
 		pipelineJobRepo: pipelineJobRepo,
 		jobService:      jobService,
-		jobRepo:         jobRepo,
-		gitRepo:         gitRepo,
+		jobRepo:         deps.jobRepo,
+		gitRepo:         deps.gitRepo,
+		variableRepo:    deps.variableRepo,
 	}
 }
 

@@ -14,6 +14,8 @@ type ScriptPayload struct {
 	Env             map[string]string `json:"env"`
 	Shell           string            `json:"shell"`
 	Artifacts       []string          `json:"artifacts"`
+	Tags            []string          `json:"tags"`
+	MaskedValues    []string          `json:"masked_values"`
 	TimeoutSeconds  int               `json:"timeout_seconds"`
 }
 

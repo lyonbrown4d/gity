@@ -78,6 +78,41 @@ func (e *Endpoint) deleteProject(ctx context.Context, in *deleteProjectInput) (*
 	return &projectOutput{Body: toRepositoryView(item, e.settings)}, nil
 }
 
+func (e *Endpoint) listMembers(ctx context.Context, in *projectByIDInput) (*projectOutput, error) {
+	items, err := e.memberService.ListMembers(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: items}, nil
+}
+
+func (e *Endpoint) createMember(ctx context.Context, in *createProjectMemberInput) (*projectOutput, error) {
+	item, err := e.memberService.UpsertMember(ctx, in.ID, projectservice.MemberInput{UserID: in.Body.UserID, Role: in.Body.Role})
+	if err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: item}, nil
+}
+
+func (e *Endpoint) upsertMember(ctx context.Context, in *upsertProjectMemberInput) (*projectOutput, error) {
+	userID := in.UserID
+	if userID <= 0 {
+		userID = in.Body.UserID
+	}
+	item, err := e.memberService.UpsertMember(ctx, in.ID, projectservice.MemberInput{UserID: userID, Role: in.Body.Role})
+	if err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: item}, nil
+}
+
+func (e *Endpoint) deleteMember(ctx context.Context, in *projectMemberInput) (*projectOutput, error) {
+	if err := e.memberService.DeleteMember(ctx, in.ID, in.UserID); err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: map[string]any{"status": "deleted"}}, nil
+}
+
 func (e *Endpoint) listBranches(ctx context.Context, in *projectByIDInput) (*projectOutput, error) {
 	items, err := e.service.ListBranches(ctx, in.ID)
 	if err != nil {
@@ -90,6 +125,9 @@ func (e *Endpoint) listBranches(ctx context.Context, in *projectByIDInput) (*pro
 }
 
 func (e *Endpoint) createBranch(ctx context.Context, in *createBranchInput) (*projectOutput, error) {
+	if err := e.requireDirectBranchPush(ctx, in.Authorization, in.ID, in.Body.Name); err != nil {
+		return nil, err
+	}
 	item, err := e.service.CreateBranch(ctx, in.ID, in.Body.Name, in.Body.SourceRef)
 	if err != nil {
 		return nil, err
@@ -189,6 +227,9 @@ func (e *Endpoint) searchRepository(ctx context.Context, in *projectRepositorySe
 
 func (e *Endpoint) createFileCommit(ctx context.Context, in *createFileCommitInput) (*projectOutput, error) {
 	branchName := strings.TrimSpace(in.Body.BranchName)
+	if err := e.requireDirectBranchPush(ctx, in.Authorization, in.ID, branchName); err != nil {
+		return nil, err
+	}
 	if err := e.service.CreateFileCommit(ctx, in.ID, buildCreateFileCommitInput(in, branchName)); err != nil {
 		return nil, err
 	}

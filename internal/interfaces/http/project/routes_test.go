@@ -12,9 +12,13 @@ import (
 func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(project.NewEndpoint(nil, config.Settings{}, nil, nil, nil))
+	server.RegisterOnly(project.NewEndpoint(nil, nil, config.Settings{}, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects")
+	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/members")
+	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/members")
+	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/members/{user_id}")
+	assertRoute(t, server, http.MethodDelete, "/api/v1/projects/{id}/members/{user_id}")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branches")
 	assertRoute(t, server, http.MethodDelete, "/api/v1/projects/{id}/repository/branches/{branch_name}")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/repository/branch-protections")
@@ -26,7 +30,7 @@ func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {
 func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(project.NewEndpoint(nil, config.Settings{}, nil, nil, nil))
+	server.RegisterOnly(project.NewEndpoint(nil, nil, config.Settings{}, nil, nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos")
 	assertRoute(t, server, http.MethodGet, "/api/v1/repos/{id}/branches")

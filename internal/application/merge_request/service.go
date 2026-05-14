@@ -3,10 +3,10 @@ package mergerequest
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
+	setx "github.com/arcgolabs/collectionx/set"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
@@ -16,19 +16,22 @@ import (
 )
 
 type Service struct {
-	logger          *slog.Logger
-	projectRepo     gitports.ProjectRepository
-	mergeRepo       gitports.ProjectMergeRequestRepository
-	participantRepo gitports.ProjectMergeRequestParticipantRepository
-	commentRepo     gitports.ProjectMergeRequestCommentRepository
-	approvalRepo    gitports.ProjectMergeRequestApprovalRepository
-	userRepo        gitports.UserRepository
-	branchRepo      gitports.ProjectBranchProtectionRepository
-	gitRepo         gitports.GitRepository
-	gitRunner       gitports.GitRunner
-	pipelineRepo    gitports.ProjectPipelineRepository
-	pipelineSvc     *pipelineservice.Service
-	events          gitports.DomainEventPublisher
+	logger            *slog.Logger
+	projectRepo       gitports.ProjectRepository
+	mergeRepo         gitports.ProjectMergeRequestRepository
+	participantRepo   gitports.ProjectMergeRequestParticipantRepository
+	commentRepo       gitports.ProjectMergeRequestCommentRepository
+	approvalRepo      gitports.ProjectMergeRequestApprovalRepository
+	approvalRuleRepo  gitports.ProjectMergeRequestApprovalRuleRepository
+	userRepo          gitports.UserRepository
+	memberRepo        gitports.OrganizationMemberRepository
+	projectMemberRepo gitports.ProjectMemberRepository
+	branchRepo        gitports.ProjectBranchProtectionRepository
+	gitRepo           gitports.GitRepository
+	gitRunner         gitports.GitRunner
+	pipelineRepo      gitports.ProjectPipelineRepository
+	pipelineSvc       *pipelineservice.Service
+	events            gitports.DomainEventPublisher
 }
 
 type PipelineDeps struct {
@@ -42,16 +45,19 @@ type GitDependencies struct {
 }
 
 type Repositories struct {
-	projectRepo gitports.ProjectRepository
-	mergeRepo   gitports.ProjectMergeRequestRepository
-	userRepo    gitports.UserRepository
-	branchRepo  gitports.ProjectBranchProtectionRepository
+	projectRepo       gitports.ProjectRepository
+	mergeRepo         gitports.ProjectMergeRequestRepository
+	userRepo          gitports.UserRepository
+	memberRepo        gitports.OrganizationMemberRepository
+	projectMemberRepo gitports.ProjectMemberRepository
+	branchRepo        gitports.ProjectBranchProtectionRepository
 }
 
 type CollaborationRepositories struct {
-	participantRepo gitports.ProjectMergeRequestParticipantRepository
-	commentRepo     gitports.ProjectMergeRequestCommentRepository
-	approvalRepo    gitports.ProjectMergeRequestApprovalRepository
+	participantRepo  gitports.ProjectMergeRequestParticipantRepository
+	commentRepo      gitports.ProjectMergeRequestCommentRepository
+	approvalRepo     gitports.ProjectMergeRequestApprovalRepository
+	approvalRuleRepo gitports.ProjectMergeRequestApprovalRuleRepository
 }
 
 type CreateInput struct {
@@ -81,6 +87,11 @@ type CheckStatusView struct {
 	TargetBranchProtected  bool                            `json:"target_branch_protected"`
 	RequireMergeRequest    bool                            `json:"require_merge_request"`
 	RequirePipelineSuccess bool                            `json:"require_pipeline_success"`
+	RequireApproval        bool                            `json:"require_approval"`
+	RequiredApprovals      int                             `json:"required_approvals"`
+	ApprovalCount          int                             `json:"approval_count"`
+	ApprovalRules          []ApprovalRuleCheck             `json:"approval_rules"`
+	MergeAccessLevel       string                          `json:"merge_access_level,omitempty"`
 	PipelineRequired       bool                            `json:"pipeline_required"`
 	Required               bool                            `json:"required"`
 	Mergeable              bool                            `json:"mergeable"`
@@ -98,6 +109,11 @@ type MergeInput struct {
 
 const defaultCIConfigPath = ".gity-ci.plano"
 
+var (
+	projectBranchProtectionDeveloperRoles  = setx.NewSet("developer", "maintainer", "owner")
+	projectBranchProtectionMaintainerRoles = setx.NewSet("maintainer", "owner")
+)
+
 func NewPipelineDeps(pipelineRepo gitports.ProjectPipelineRepository, pipelineSvc *pipelineservice.Service) *PipelineDeps {
 	return &PipelineDeps{pipelineRepo: pipelineRepo, pipelineSvc: pipelineSvc}
 }
@@ -106,18 +122,18 @@ func NewGitDependencies(gitRepo gitports.GitRepository, gitRunner gitports.GitRu
 	return GitDependencies{gitRepo: gitRepo, gitRunner: gitRunner}
 }
 
-func NewRepositories(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, branchRepo gitports.ProjectBranchProtectionRepository) Repositories {
-	return Repositories{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, branchRepo: branchRepo}
+func NewRepositories(projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, memberRepo gitports.OrganizationMemberRepository, projectMemberRepo gitports.ProjectMemberRepository, branchRepo gitports.ProjectBranchProtectionRepository) Repositories {
+	return Repositories{projectRepo: projectRepo, mergeRepo: mergeRepo, userRepo: userRepo, memberRepo: memberRepo, projectMemberRepo: projectMemberRepo, branchRepo: branchRepo}
 }
 
-func NewCollaborationRepositories(participantRepo gitports.ProjectMergeRequestParticipantRepository, commentRepo gitports.ProjectMergeRequestCommentRepository, approvalRepo gitports.ProjectMergeRequestApprovalRepository) CollaborationRepositories {
-	return CollaborationRepositories{participantRepo: participantRepo, commentRepo: commentRepo, approvalRepo: approvalRepo}
+func NewCollaborationRepositories(participantRepo gitports.ProjectMergeRequestParticipantRepository, commentRepo gitports.ProjectMergeRequestCommentRepository, approvalRepo gitports.ProjectMergeRequestApprovalRepository, approvalRuleRepo gitports.ProjectMergeRequestApprovalRuleRepository) CollaborationRepositories {
+	return CollaborationRepositories{participantRepo: participantRepo, commentRepo: commentRepo, approvalRepo: approvalRepo, approvalRuleRepo: approvalRuleRepo}
 }
 
 func NewService(logger *slog.Logger, projectRepo gitports.ProjectRepository, mergeRepo gitports.ProjectMergeRequestRepository, userRepo gitports.UserRepository, gitRepo gitports.GitRepository, gitRunner gitports.GitRunner, pipelineDeps *PipelineDeps) *Service {
 	return NewServiceWithDependencies(
 		logger,
-		NewRepositories(projectRepo, mergeRepo, userRepo, nil),
+		NewRepositories(projectRepo, mergeRepo, userRepo, nil, nil, nil),
 		CollaborationRepositories{},
 		NewGitDependencies(gitRepo, gitRunner),
 		pipelineDeps,
@@ -130,16 +146,19 @@ func NewServiceWithDependencies(logger *slog.Logger, repos Repositories, collabo
 		events = gitports.NoopDomainEventPublisher{}
 	}
 	service := &Service{
-		logger:          logger,
-		projectRepo:     repos.projectRepo,
-		mergeRepo:       repos.mergeRepo,
-		participantRepo: collaboration.participantRepo,
-		commentRepo:     collaboration.commentRepo,
-		approvalRepo:    collaboration.approvalRepo,
-		userRepo:        repos.userRepo,
-		branchRepo:      repos.branchRepo,
-		gitRepo:         git.gitRepo,
-		gitRunner:       git.gitRunner,
+		logger:            logger,
+		projectRepo:       repos.projectRepo,
+		mergeRepo:         repos.mergeRepo,
+		participantRepo:   collaboration.participantRepo,
+		commentRepo:       collaboration.commentRepo,
+		approvalRepo:      collaboration.approvalRepo,
+		approvalRuleRepo:  collaboration.approvalRuleRepo,
+		userRepo:          repos.userRepo,
+		memberRepo:        repos.memberRepo,
+		projectMemberRepo: repos.projectMemberRepo,
+		branchRepo:        repos.branchRepo,
+		gitRepo:           git.gitRepo,
+		gitRunner:         git.gitRunner,
 	}
 	service.events = events
 	if pipelineDeps != nil {
@@ -248,47 +267,4 @@ func (s *Service) GetChecks(ctx context.Context, projectID, mergeIID int64) (Che
 		return CheckStatusView{}, err
 	}
 	return s.evaluateChecks(ctx, project, mr)
-}
-
-func (s *Service) Merge(ctx context.Context, projectID, mergeIID int64, input MergeInput) (mergedomain.ProjectMergeRequest, error) {
-	project, mr, err := s.loadProjectMergeRequest(ctx, projectID, mergeIID)
-	if err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
-	}
-	if mr.State != "opened" {
-		return mergedomain.ProjectMergeRequest{}, apperror.Conflict("merge request is not opened", fmt.Errorf("merge request state: %s", mr.State))
-	}
-	checks, err := s.evaluateChecks(ctx, project, mr)
-	if err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
-	}
-	if checks.Required && !checks.Mergeable {
-		return mergedomain.ProjectMergeRequest{}, apperror.Conflict("merge request pipeline is not successful", errors.New(checks.BlockingReason))
-	}
-	message := strings.TrimSpace(input.Message)
-	if message == "" {
-		message = fmt.Sprintf("Merge branch '%s' into '%s'", mr.SourceBranch, mr.TargetBranch)
-	}
-	err = s.gitRunner.MergeBranches(ctx, project.FullPath+".git", gitports.MergeBranchesInput{
-		TargetBranch: mr.TargetBranch,
-		SourceBranch: mr.SourceBranch,
-		Message:      message,
-		AuthorName:   input.AuthorName,
-		AuthorEmail:  input.AuthorEmail,
-	})
-	if err != nil {
-		return mergedomain.ProjectMergeRequest{}, mapGitExecError(err)
-	}
-	merged := "merged"
-	if updateErr := s.mergeRepo.UpdateByID(ctx, mr.ID, gitports.UpdateProjectMergeRequestInput{State: &merged}); updateErr != nil {
-		return mergedomain.ProjectMergeRequest{}, oops.In("merge_request").With("project_id", projectID, "merge_request_id", mr.ID, "merge_iid", mergeIID).Wrapf(updateErr, "mark merge request merged")
-	}
-	s.triggerTargetBranchPipeline(ctx, project, mr)
-	mergedMR, err := s.loadMergeRequest(ctx, projectID, mergeIID)
-	if err != nil {
-		return mergedomain.ProjectMergeRequest{}, err
-	}
-	s.publishRepositoryChanged(ctx, project, mr.TargetBranch)
-	s.publishEventAsync(ctx, mergedomain.NewProjectMergeRequestMergedEvent(mergedMR, input.ActorUserID))
-	return mergedMR, nil
 }

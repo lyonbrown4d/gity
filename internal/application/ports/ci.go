@@ -35,6 +35,8 @@ type ProjectJobRepository interface {
 	ClaimNextByKinds(ctx context.Context, kinds []string, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
 	ClaimNextByProjectID(ctx context.Context, projectID int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
 	ClaimNextByProjectIDAndKinds(ctx context.Context, projectID int64, kinds []string, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
+	ListClaimableByProjectIDAndKinds(ctx context.Context, projectID int64, kinds []string, limit int) (*collectionx.List[cidomain.ProjectJob], error)
+	ClaimByID(ctx context.Context, id int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error)
 	RequeueExpiredLeases(ctx context.Context, now time.Time) (int64, error)
 	MarkSucceeded(ctx context.Context, id int64, result string) error
 	ScheduleByID(ctx context.Context, id int64, runAfter time.Time) error
@@ -83,6 +85,13 @@ type ProjectRunnerRepository interface {
 	Create(ctx context.Context, input CreateProjectRunnerInput) (cidomain.ProjectRunner, error)
 	MarkHeartbeat(ctx context.Context, id int64) error
 	DeleteByID(ctx context.Context, id int64) error
+}
+
+type ProjectCIVariableRepository interface {
+	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[cidomain.ProjectCIVariable], error)
+	GetByProjectAndKey(ctx context.Context, projectID int64, key string) (cidomain.ProjectCIVariable, error)
+	Upsert(ctx context.Context, input UpsertProjectCIVariableInput) (cidomain.ProjectCIVariable, error)
+	DeleteByProjectAndKey(ctx context.Context, projectID int64, key string) error
 }
 
 type CreateProjectJobInput struct {
@@ -157,4 +166,12 @@ type CreateProjectRunnerInput struct {
 	Description string
 	Tags        string
 	Token       string
+}
+
+type UpsertProjectCIVariableInput struct {
+	ProjectID int64
+	Key       string
+	Value     string
+	Masked    int
+	Protected int
 }

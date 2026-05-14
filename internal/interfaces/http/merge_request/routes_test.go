@@ -16,6 +16,10 @@ func TestEndpointRegistersMergeRequestRoutes(t *testing.T) {
 
 	assertMergeRequestRoutes(t, server, "projects")
 	assertMergeRequestRoutes(t, server, "repos")
+	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/merge-request-approval-rules")
+	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/merge-request-approval-rules")
+	assertRoute(t, server, http.MethodPatch, "/api/v1/projects/{id}/merge-request-approval-rules/{rule_id}")
+	assertRoute(t, server, http.MethodDelete, "/api/v1/projects/{id}/merge-request-approval-rules/{rule_id}")
 }
 
 func assertMergeRequestRoutes(t *testing.T, server httpx.ServerRuntime, scope string) {

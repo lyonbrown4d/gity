@@ -101,6 +101,58 @@ func (r *Repository) ClaimNextByProjectIDAndKinds(ctx context.Context, projectID
 	return r.claimNext(ctx, projectID, kinds, workerID, lease)
 }
 
+func (r *Repository) ListClaimableByProjectIDAndKinds(ctx context.Context, projectID int64, kinds []string, limit int) (*collectionx.List[cidomain.ProjectJob], error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	now := time.Now().UTC()
+	predicates := []querydsl.Predicate{
+		dbschema.ProjectJobSchema.ProjectID.Eq(projectID),
+		dbschema.ProjectJobSchema.Status.Eq(StatusPending),
+		dbschema.ProjectJobSchema.RunAfter.Le(now),
+	}
+	if len(kinds) > 0 {
+		predicates = append(predicates, dbschema.ProjectJobSchema.Kind.In(kinds...))
+	}
+	items, err := dbxrepo.Query(r.base).
+		Where(querydsl.And(predicates...)).
+		OrderBy(dbschema.ProjectJobSchema.RunAfter.Asc(), dbschema.ProjectJobSchema.ID.Asc()).
+		Limit(limit).
+		List(ctx)
+	return persistence.Many(items, err)
+}
+
+func (r *Repository) ClaimByID(ctx context.Context, id int64, workerID string, lease time.Duration) (cidomain.ProjectJob, bool, error) {
+	if lease <= 0 {
+		lease = time.Minute
+	}
+	now := time.Now().UTC()
+	item, err := r.GetByID(ctx, id)
+	if err != nil {
+		return cidomain.ProjectJob{}, false, err
+	}
+	if item.Status != StatusPending || item.RunAfter.After(now) {
+		return cidomain.ProjectJob{}, false, nil
+	}
+	item.Status = StatusRunning
+	item.Attempts++
+	item.LockedBy = strings.TrimSpace(workerID)
+	item.LockedUntil = now.Add(lease)
+	item.StartedAt = now
+	item.UpdatedAt = now
+	if err := r.patchByID(ctx, item.ID,
+		dbschema.ProjectJobSchema.Status.Set(item.Status),
+		dbschema.ProjectJobSchema.Attempts.Set(item.Attempts),
+		dbschema.ProjectJobSchema.LockedBy.Set(item.LockedBy),
+		dbschema.ProjectJobSchema.LockedUntil.Set(item.LockedUntil),
+		dbschema.ProjectJobSchema.StartedAt.Set(item.StartedAt),
+		dbschema.ProjectJobSchema.UpdatedAt.Set(item.UpdatedAt),
+	); err != nil {
+		return cidomain.ProjectJob{}, false, fmt.Errorf("claim project job by id: %w", err)
+	}
+	return item, true, nil
+}
+
 func (r *Repository) RequeueExpiredLeases(ctx context.Context, now time.Time) (int64, error) {
 	if now.IsZero() {
 		now = time.Now().UTC()

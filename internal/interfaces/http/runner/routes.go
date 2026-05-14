@@ -27,10 +27,34 @@ type registerRunnerInput struct {
 	Body          registerRunnerBody `json:"body"`
 }
 
+type projectVariablesInput struct {
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
+}
+
+type projectVariableInput struct {
+	ProjectID     int64  `path:"id"`
+	Key           string `path:"key"`
+	Authorization string `header:"Authorization"`
+}
+
+type upsertVariableInput struct {
+	ProjectID     int64        `path:"id"`
+	Authorization string       `header:"Authorization"`
+	Body          variableBody `json:"body"`
+}
+
 type registerRunnerBody struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Tags        string `json:"tags"`
+}
+
+type variableBody struct {
+	Key       string `json:"key"`
+	Value     string `json:"value"`
+	Masked    bool   `json:"masked"`
+	Protected bool   `json:"protected"`
 }
 
 type runnerTokenInput struct {
@@ -132,6 +156,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			httpapi.RequireProjectActionRoute[projectRunnerInput, runnerOutput]("require_runner_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin),
 			httpapi.DeprecatedRoute[projectRunnerInput, runnerOutput]("Use DELETE /projects/{id}/runners/{runner_id} instead."),
 		),
+		httpapi.Get("/projects/{id}/ci/variables", e.listProjectVariables, httpapi.RequireProjectActionRoute[projectVariablesInput, runnerOutput]("require_ci_variable_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin)),
+		httpapi.Patch("/projects/{id}/ci/variables", e.upsertProjectVariable, httpapi.RequireProjectActionRoute[upsertVariableInput, runnerOutput]("require_ci_variable_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin)),
+		httpapi.Delete("/projects/{id}/ci/variables/{key}", e.deleteProjectVariable, httpapi.RequireProjectActionRoute[projectVariableInput, runnerOutput]("require_ci_variable_admin", authRuntime, projectScope, infraauth.ProjectActionRunnerAdmin)),
 		httpapi.Post("/runners/heartbeat", e.heartbeat),
 		httpapi.Post("/runners/jobs/claim", e.claimJob),
 		httpapi.Post("/runners/jobs/{job_id}/complete", e.completeJob),
@@ -163,5 +190,29 @@ func (in registerRunnerInput) AuthorizationHeader() string {
 }
 
 func (in registerRunnerInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in projectVariablesInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectVariablesInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in projectVariableInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectVariableInput) ProjectIDValue() int64 {
+	return in.ProjectID
+}
+
+func (in upsertVariableInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in upsertVariableInput) ProjectIDValue() int64 {
 	return in.ProjectID
 }

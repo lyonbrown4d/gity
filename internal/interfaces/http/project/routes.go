@@ -12,14 +12,15 @@ import (
 
 type Endpoint struct {
 	service             *projectservice.Service
+	memberService       *projectservice.MemberService
 	settings            config.Settings
 	authRuntime         *infraauth.Runtime
 	pipelineService     *pipelineservice.Service
 	organizationService *organizationservice.Service
 }
 
-func NewEndpoint(service *projectservice.Service, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service, organizationService *organizationservice.Service) *Endpoint {
-	return &Endpoint{service: service, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService, organizationService: organizationService}
+func NewEndpoint(service *projectservice.Service, memberService *projectservice.MemberService, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service, organizationService *organizationservice.Service) *Endpoint {
+	return &Endpoint{service: service, memberService: memberService, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService, organizationService: organizationService}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -47,6 +48,10 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			httpapi.RequireUserRoute[projectByIDInput, projectOutput](e.authRuntime),
 			httpapi.DeprecatedRoute[projectByIDInput, projectOutput]("Use GET /projects/{id}/permissions instead."),
 		),
+		httpapi.Get("/projects/{id}/members", e.listMembers, httpapi.RequireProjectActionRoute[projectByIDInput, projectOutput]("require_project_members_read", e.authRuntime, projectWrite, infraauth.ProjectActionRepositoryRead)),
+		httpapi.Post("/projects/{id}/members", e.createMember, httpapi.RequireProjectActionRoute[createProjectMemberInput, projectOutput]("require_project_members_admin", e.authRuntime, projectWrite, infraauth.ProjectActionRepositoryAdmin)),
+		httpapi.Patch("/projects/{id}/members/{user_id}", e.upsertMember, httpapi.RequireProjectActionRoute[upsertProjectMemberInput, projectOutput]("require_project_members_admin", e.authRuntime, projectWrite, infraauth.ProjectActionRepositoryAdmin)),
+		httpapi.Delete("/projects/{id}/members/{user_id}", e.deleteMember, httpapi.RequireProjectActionRoute[projectMemberInput, projectOutput]("require_project_members_admin", e.authRuntime, projectWrite, infraauth.ProjectActionRepositoryAdmin)),
 		httpapi.Post("/projects", e.createProject, httpapi.RequireUserRoute[createProjectInput, projectOutput](e.authRuntime)),
 		httpapi.Post("/repos", e.createProject,
 			httpapi.RequireUserRoute[createProjectInput, projectOutput](e.authRuntime),

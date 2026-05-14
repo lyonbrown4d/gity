@@ -131,6 +131,10 @@ func (s *Service) listPipelineJobs(ctx context.Context, projectID, pipelineID in
 }
 
 func (s *Service) enqueueStage(ctx context.Context, project projectdomain.Project, pipeline cidomain.ProjectPipeline, stage plandsl.StageSpec, index int, runAfter time.Time) (PipelineJobView, error) {
+	env, maskedValues, err := s.pipelineVariables(ctx, project, pipeline)
+	if err != nil {
+		return PipelineJobView{}, err
+	}
 	payload, err := encodeScriptPayload(scriptJobPayload{
 		PipelineID:      pipeline.ID,
 		PipelineIID:     pipeline.IID,
@@ -143,6 +147,9 @@ func (s *Service) enqueueStage(ctx context.Context, project projectdomain.Projec
 		Needs:           stage.Needs,
 		Script:          stage.Script,
 		Artifacts:       stage.Artifacts,
+		Tags:            stage.Tags,
+		Env:             env,
+		MaskedValues:    maskedValues,
 		TimeoutSeconds:  stage.TimeoutSeconds,
 		ConfigSource:    pipeline.ConfigSource,
 		PipelineJobName: stage.Name,
@@ -193,6 +200,7 @@ func (s *Service) enqueueStage(ctx context.Context, project projectdomain.Projec
 		Needs:       stage.Needs,
 		Script:      stage.Script,
 		Artifacts:   stage.Artifacts,
+		Tags:        stage.Tags,
 	}, nil
 }
 
@@ -213,6 +221,10 @@ func (s *Service) toPipelineJobView(ctx context.Context, item cidomain.ProjectPi
 	if err != nil {
 		return PipelineJobView{}, err
 	}
+	tags, err := decodeJobTags(job.Payload)
+	if err != nil {
+		return PipelineJobView{}, err
+	}
 	return PipelineJobView{
 		PipelineJob: item,
 		ProjectJob:  job,
@@ -220,5 +232,28 @@ func (s *Service) toPipelineJobView(ctx context.Context, item cidomain.ProjectPi
 		Needs:       needs,
 		Script:      script,
 		Artifacts:   artifacts,
+		Tags:        tags,
 	}, nil
+}
+
+func (s *Service) pipelineVariables(ctx context.Context, project projectdomain.Project, pipeline cidomain.ProjectPipeline) (map[string]string, []string, error) {
+	if s.variableRepo == nil {
+		return nil, nil, nil
+	}
+	items, err := s.variableRepo.ListByProjectID(ctx, project.ID)
+	if err != nil {
+		return nil, nil, oops.In("pipeline").With("project_id", project.ID, "pipeline_id", pipeline.ID).Wrapf(err, "list project ci variables")
+	}
+	env := make(map[string]string, items.Len())
+	maskedValues := make([]string, 0, items.Len())
+	for _, item := range items.Values() {
+		if item.IsProtected() && pipeline.RefName != project.DefaultBranch {
+			continue
+		}
+		env[item.Key] = item.Value
+		if item.IsMasked() && item.Value != "" {
+			maskedValues = append(maskedValues, item.Value)
+		}
+	}
+	return env, maskedValues, nil
 }

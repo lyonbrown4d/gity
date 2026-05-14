@@ -32,6 +32,14 @@ type ProjectBranchProtectionRepository interface {
 	Unprotect(ctx context.Context, projectID int64, branchName string) error
 }
 
+type ProjectMemberRepository interface {
+	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[projectdomain.ProjectMember], error)
+	FindByProjectAndUser(ctx context.Context, projectID, userID int64) (projectdomain.ProjectMember, error)
+	Create(ctx context.Context, input CreateProjectMemberInput) (projectdomain.ProjectMember, error)
+	UpdateRoleByID(ctx context.Context, id int64, role string) error
+	DeleteByProjectAndUser(ctx context.Context, projectID, userID int64) error
+}
+
 type CreateProjectInput struct {
 	OrganizationID int64
 	Name           string
@@ -39,6 +47,12 @@ type CreateProjectInput struct {
 	Visibility     string
 	Description    string
 	DefaultBranch  string
+}
+
+type CreateProjectMemberInput struct {
+	ProjectID int64
+	UserID    int64
+	Role      string
 }
 
 type UpsertProjectBranchProtectionInput struct {
