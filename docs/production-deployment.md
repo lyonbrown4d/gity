@@ -2,11 +2,11 @@
 
 The beta release publishes separate Docker images for each runtime:
 
-- `ghcr.io/daiyuang/gity-server`
-- `ghcr.io/daiyuang/gity-migration`
-- `ghcr.io/daiyuang/gity-worker`
-- `ghcr.io/daiyuang/gity-standalone`
-- `ghcr.io/daiyuang/gity-runner`
+- `ghcr.io/lyonbrown4d/gity-server`
+- `ghcr.io/lyonbrown4d/gity-migration`
+- `ghcr.io/lyonbrown4d/gity-worker`
+- `ghcr.io/lyonbrown4d/gity-standalone`
+- `ghcr.io/lyonbrown4d/gity-runner`
 
 ## Split Process Mode
 

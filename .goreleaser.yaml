@@ -93,18 +93,15 @@ archives:
       - README.md
 
 nfpms:
-  - id: gity-linux
-    package_name: gity
+  - &gity_nfpm
+    id: gity-server
+    package_name: gity-server
     ids:
       - gity-server
-      - gity-migration
-      - gity-worker
-      - gity-standalone
-      - gity-runner
     vendor: Gity
     homepage: https://github.com/lyonbrown4d/gity
-    maintainer: DaiYuANg
-    description: Lightweight Git hosting platform.
+    maintainer: lyonbrown4d
+    description: Gity API server.
     bindir: /usr/bin
     dependencies:
       - git
@@ -114,7 +111,44 @@ nfpms:
       - apk
     contents:
       - src: README.md
-        dst: /usr/share/doc/gity/README.md
+        dst: /usr/share/doc/gity-server/README.md
+  - <<: *gity_nfpm
+    id: gity-migration
+    package_name: gity-migration
+    ids:
+      - gity-migration
+    description: Gity database migration command.
+    dependencies: []
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity-migration/README.md
+  - <<: *gity_nfpm
+    id: gity-worker
+    package_name: gity-worker
+    ids:
+      - gity-worker
+    description: Gity background worker.
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity-worker/README.md
+  - <<: *gity_nfpm
+    id: gity-standalone
+    package_name: gity-standalone
+    ids:
+      - gity-standalone
+    description: Gity single-process runtime.
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity-standalone/README.md
+  - <<: *gity_nfpm
+    id: gity-runner
+    package_name: gity-runner
+    ids:
+      - gity-runner
+    description: Gity CI runner agent.
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity-runner/README.md
 
 dockers_v2:
   - &gity_docker
@@ -122,7 +156,7 @@ dockers_v2:
     ids:
       - gity-server
     images:
-      - ghcr.io/daiyuang/gity-server
+      - ghcr.io/lyonbrown4d/gity-server
     tags:
       - "{{ .Version }}"
       - "{{ .Tag }}"
@@ -145,7 +179,7 @@ dockers_v2:
     ids:
       - gity-migration
     images:
-      - ghcr.io/daiyuang/gity-migration
+      - ghcr.io/lyonbrown4d/gity-migration
     build_args:
       BINARY: gity-migration
     labels:
@@ -159,7 +193,7 @@ dockers_v2:
     ids:
       - gity-worker
     images:
-      - ghcr.io/daiyuang/gity-worker
+      - ghcr.io/lyonbrown4d/gity-worker
     build_args:
       BINARY: gity-worker
     labels:
@@ -173,7 +207,7 @@ dockers_v2:
     ids:
       - gity-standalone
     images:
-      - ghcr.io/daiyuang/gity-standalone
+      - ghcr.io/lyonbrown4d/gity-standalone
     build_args:
       BINARY: gity-standalone
     labels:
@@ -187,7 +221,7 @@ dockers_v2:
     ids:
       - gity-runner
     images:
-      - ghcr.io/daiyuang/gity-runner
+      - ghcr.io/lyonbrown4d/gity-runner
     build_args:
       BINARY: gity-runner
     labels:
@@ -215,7 +249,7 @@ changelog:
 
 release:
   github:
-    owner: DaiYuANg
+    owner: lyonbrown4d
     name: gity
   draft: false
   prerelease: auto

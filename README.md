@@ -165,7 +165,7 @@ git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
 git push origin v0.1.0-beta.1
 ```
 
-The release workflow uses GoReleaser to publish GitHub Release artifacts, Linux packages, checksums, and Docker images.
+The release workflow uses GoReleaser to publish GitHub Release artifacts, per-component Linux packages, checksums, and Docker images.
 
 Published binaries:
 
@@ -175,9 +175,9 @@ Published binaries:
 - `gity-standalone`
 - `gity-runner`
 
-GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and Linux `deb`/`rpm`/`apk` packages. Docker images are published to GHCR as `ghcr.io/daiyuang/gity-server`, `ghcr.io/daiyuang/gity-migration`, `ghcr.io/daiyuang/gity-worker`, `ghcr.io/daiyuang/gity-standalone`, and `ghcr.io/daiyuang/gity-runner`.
+GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and per-component Linux `deb`/`rpm`/`apk` packages for `gity-server`, `gity-migration`, `gity-worker`, `gity-standalone`, and `gity-runner`. Docker images are published to GHCR as `ghcr.io/lyonbrown4d/gity-server`, `ghcr.io/lyonbrown4d/gity-migration`, `ghcr.io/lyonbrown4d/gity-worker`, `ghcr.io/lyonbrown4d/gity-standalone`, and `ghcr.io/lyonbrown4d/gity-runner`.
 
-UPX compression is enabled for Linux and Windows release binaries. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
+UPX compression is enabled for Linux and Windows release binaries before archives, packages, and Docker images are assembled. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
 
 Production Docker deployment templates live in [docs/production-deployment.md](docs/production-deployment.md). Use `docker-compose.prod.yaml` with `.env.production` for split `migration/server/worker` deployments or standalone single-process deployments.
 
