@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/config"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/samber/oops"
 )
 

@@ -3,9 +3,9 @@ package wiki
 import (
 	"context"
 
-	wikiservice "github.com/DaiYuANg/gity/internal/application/wiki"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
+	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 func (e *Endpoint) listPages(ctx context.Context, in *wikiPagesInput) (*wikiOutput, error) {

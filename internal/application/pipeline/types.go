@@ -3,8 +3,8 @@ package pipeline
 import (
 	"time"
 
-	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	"github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 type CreatePipelineInput struct {

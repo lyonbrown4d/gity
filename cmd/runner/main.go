@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/DaiYuANg/gity/internal/infrastructure/runner_agent"
 	"github.com/arcgolabs/logx"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/runner_agent"
 	"github.com/samber/oops"
 )
 

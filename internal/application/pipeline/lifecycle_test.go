@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
-	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
-	"github.com/DaiYuANg/gity/internal/testutil"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	projectjobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job"
+	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestProjectPipelineFailureCancelsPendingJobs(t *testing.T) {

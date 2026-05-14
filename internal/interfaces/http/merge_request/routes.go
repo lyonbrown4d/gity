@@ -1,13 +1,13 @@
 package mergerequest
 
 import (
-	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
+	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type mergeRequestInput struct {

@@ -3,9 +3,9 @@ package mergerequest
 import (
 	"context"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
 	setx "github.com/arcgolabs/collectionx/set"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 	"github.com/samber/oops"
 )
 

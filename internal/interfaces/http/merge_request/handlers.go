@@ -3,9 +3,9 @@ package mergerequest
 import (
 	"context"
 
-	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
+	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 func (e *Endpoint) listMergeRequests(ctx context.Context, in *mergeRequestsInput) (*mergeRequestOutput, error) {

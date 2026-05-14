@@ -4,12 +4,12 @@ package migration
 import (
 	"context"
 
-	"github.com/DaiYuANg/gity/internal/config"
-	gitydebug "github.com/DaiYuANg/gity/internal/debug"
-	"github.com/DaiYuANg/gity/internal/infrastructure/database"
-	infralogger "github.com/DaiYuANg/gity/internal/infrastructure/logger"
-	coredb "github.com/DaiYuANg/gity/internal/infrastructure/persistence/core"
 	"github.com/arcgolabs/dix"
+	"github.com/lyonbrown4d/gity/internal/config"
+	gitydebug "github.com/lyonbrown4d/gity/internal/debug"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/database"
+	infralogger "github.com/lyonbrown4d/gity/internal/infrastructure/logger"
+	coredb "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/core"
 	"github.com/samber/oops"
 )
 

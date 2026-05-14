@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/lyonbrown4d/gity/internal/config"
 
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/dialect"

@@ -3,11 +3,11 @@ package lfs
 import (
 	"context"
 
-	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	lfsservice "github.com/lyonbrown4d/gity/internal/application/lfs"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type projectLFSObjectsInput struct {

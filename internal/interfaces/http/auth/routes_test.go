@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	auth "github.com/DaiYuANg/gity/internal/interfaces/http/auth"
 	"github.com/arcgolabs/httpx"
+	auth "github.com/lyonbrown4d/gity/internal/interfaces/http/auth"
 )
 
 func TestEndpointRegistersAuthRoutes(t *testing.T) {

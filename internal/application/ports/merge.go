@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 )
 
 type ProjectMergeRequestRepository interface {

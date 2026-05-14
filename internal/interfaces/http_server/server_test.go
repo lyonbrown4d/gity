@@ -6,11 +6,11 @@ import (
 	nethttp "net/http"
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/config"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_server"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
+	"github.com/lyonbrown4d/gity/internal/config"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_server"
 )
 
 type testEndpoint struct{}

@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"strings"
 
-	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/gofiber/fiber/v2"
+	issueservice "github.com/lyonbrown4d/gity/internal/application/issue"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 	"github.com/samber/oops"
 )
 

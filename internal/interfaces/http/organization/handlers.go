@@ -3,9 +3,9 @@ package organization
 import (
 	"context"
 
-	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
-	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
+	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
 )
 
 func (e *Endpoint) listOrganizations(ctx context.Context, in *organizationsInput) (*organizationOutput, error) {

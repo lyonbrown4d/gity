@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	"github.com/DaiYuANg/gity/internal/config"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	setx "github.com/arcgolabs/collectionx/set"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	"github.com/lyonbrown4d/gity/internal/config"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
 )
 
 func toRepositoryView(item projectdomain.Project, settings config.Settings) repositoryView {

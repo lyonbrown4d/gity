@@ -5,9 +5,9 @@ import (
 	"context"
 	"time"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/arcgolabs/dix"
 	"github.com/arcgolabs/eventx"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 )
 
 func QueryModule() dix.Module {

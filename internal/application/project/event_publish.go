@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	domainevent "github.com/DaiYuANg/gity/internal/domain/event"
+	domainevent "github.com/lyonbrown4d/gity/internal/domain/event"
 	"github.com/samber/oops"
 )
 

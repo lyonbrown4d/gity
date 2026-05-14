@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	plandsl "github.com/DaiYuANg/gity/internal/ci/plan_dsl"
+	plandsl "github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
 )
 
 func TestCompilePipelineDSL(t *testing.T) {

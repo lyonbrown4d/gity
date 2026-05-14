@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
 )
 
 func (e *Endpoint) listProjects(ctx context.Context, in *projectsInput) (*projectOutput, error) {

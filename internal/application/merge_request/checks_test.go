@@ -3,12 +3,12 @@ package mergerequest_test
 import (
 	"testing"
 
-	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
-	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
-	"github.com/DaiYuANg/gity/internal/testutil"
+	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_exec"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
+	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestMergeRequestMergeRequiresSuccessfulPipelineWhenCIConfigExists(t *testing.T) {

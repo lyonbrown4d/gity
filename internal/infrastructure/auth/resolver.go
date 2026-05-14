@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	organizationmemberrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/organization_member"
-	userrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user"
-	usertokenrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/user_token"
 	"github.com/arcgolabs/authx"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
+	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
+	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
+	usertokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user_token"
 	"github.com/samber/oops"
 )
 

@@ -4,7 +4,7 @@ package main
 import (
 	"log"
 
-	"github.com/DaiYuANg/gity/internal/layout/worker"
+	"github.com/lyonbrown4d/gity/internal/layout/worker"
 )
 
 func main() {

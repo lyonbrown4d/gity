@@ -4,7 +4,7 @@ package main
 import (
 	"log"
 
-	serverapp "github.com/DaiYuANg/gity/internal/layout/server"
+	serverapp "github.com/lyonbrown4d/gity/internal/layout/server"
 )
 
 func main() {

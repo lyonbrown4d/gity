@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
 )
 
 type OrganizationRepository interface {

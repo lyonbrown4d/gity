@@ -1,7 +1,7 @@
 // Package project defines project domain models and events.
 package project
 
-import domainevent "github.com/DaiYuANg/gity/internal/domain/event"
+import domainevent "github.com/lyonbrown4d/gity/internal/domain/event"
 
 const (
 	EventProjectCreated                 = "project.created"

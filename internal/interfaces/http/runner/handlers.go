@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	runnerservice "github.com/DaiYuANg/gity/internal/application/runner"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 )
 
 func (e *Endpoint) listProjectRunners(ctx context.Context, in *projectRunnersInput) (*runnerOutput, error) {

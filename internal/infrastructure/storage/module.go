@@ -2,8 +2,8 @@
 package storage
 
 import (
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/arcgolabs/dix"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
 )
 
 func NewObjectStorage(service *Service) storageports.ObjectStorage {

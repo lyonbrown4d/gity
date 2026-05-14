@@ -3,8 +3,8 @@ package pipeline
 import (
 	"context"
 
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 )
 
 func (e *Endpoint) listPipelines(ctx context.Context, in *projectPipelinesInput) (*pipelineOutput, error) {

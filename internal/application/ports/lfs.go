@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	lfsdomain "github.com/lyonbrown4d/gity/internal/domain/lfs"
 )
 
 type ProjectLFSObjectRepository interface {

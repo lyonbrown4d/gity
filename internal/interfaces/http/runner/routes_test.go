@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	runner "github.com/DaiYuANg/gity/internal/interfaces/http/runner"
 	"github.com/arcgolabs/httpx"
+	runner "github.com/lyonbrown4d/gity/internal/interfaces/http/runner"
 )
 
 func TestEndpointRegistersCanonicalRunnerRoutes(t *testing.T) {

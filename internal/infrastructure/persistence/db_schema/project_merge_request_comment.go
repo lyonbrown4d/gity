@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 )
 
 type ProjectMergeRequestCommentSchemaDef struct {

@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	lfsdomain "github.com/lyonbrown4d/gity/internal/domain/lfs"
 )
 
 type ProjectLFSLockSchemaDef struct {

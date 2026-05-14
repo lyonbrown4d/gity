@@ -6,12 +6,12 @@ import (
 	"os"
 	"strings"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	gitsearch "github.com/DaiYuANg/gity/internal/infrastructure/git_search"
 	"github.com/arcgolabs/collectionx/list"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	gitsearch "github.com/lyonbrown4d/gity/internal/infrastructure/git_search"
 	"github.com/samber/oops"
 )
 

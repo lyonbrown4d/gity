@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

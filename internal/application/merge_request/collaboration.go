@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 	"github.com/samber/oops"
 )
 

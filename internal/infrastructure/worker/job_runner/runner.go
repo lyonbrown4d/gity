@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	"github.com/DaiYuANg/gity/internal/config"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/samber/oops"
 )
 

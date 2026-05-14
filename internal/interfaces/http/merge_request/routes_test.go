@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	mergerequest "github.com/DaiYuANg/gity/internal/interfaces/http/merge_request"
 	"github.com/arcgolabs/httpx"
+	mergerequest "github.com/lyonbrown4d/gity/internal/interfaces/http/merge_request"
 )
 
 func TestEndpointRegistersMergeRequestRoutes(t *testing.T) {

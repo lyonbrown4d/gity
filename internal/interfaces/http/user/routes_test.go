@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	user "github.com/DaiYuANg/gity/internal/interfaces/http/user"
 	"github.com/arcgolabs/httpx"
+	user "github.com/lyonbrown4d/gity/internal/interfaces/http/user"
 )
 
 func TestEndpointRegistersUserRoutes(t *testing.T) {

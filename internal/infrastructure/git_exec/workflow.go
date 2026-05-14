@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 	"github.com/samber/oops"
 )
 

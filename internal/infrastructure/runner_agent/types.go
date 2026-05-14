@@ -3,7 +3,7 @@ package runneragent
 import (
 	"context"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 type ScriptPayload struct {

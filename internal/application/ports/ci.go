@@ -5,8 +5,8 @@ import (
 	"context"
 	"time"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 const (

@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/config"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/config"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

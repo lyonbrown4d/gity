@@ -7,11 +7,11 @@ import (
 	"path"
 	"strings"
 
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/bmatcuk/doublestar/v4"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
 

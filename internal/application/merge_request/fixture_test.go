@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
 )
 
 func mergeRequestCIConfig() string {

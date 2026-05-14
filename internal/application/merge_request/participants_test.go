@@ -3,8 +3,8 @@ package mergerequest_test
 import (
 	"testing"
 
-	mergerequestservice "github.com/DaiYuANg/gity/internal/application/merge_request"
-	"github.com/DaiYuANg/gity/internal/testutil"
+	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestMergeRequestParticipantsFlow(t *testing.T) {

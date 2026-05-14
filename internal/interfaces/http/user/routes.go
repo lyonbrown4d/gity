@@ -2,15 +2,15 @@ package user
 
 import (
 	"context"
-	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	setx "github.com/arcgolabs/collectionx/set"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	"strconv"
 	"strings"
 
-	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	userservice "github.com/lyonbrown4d/gity/internal/application/user"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type createUserInput struct {

@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	auditdomain "github.com/DaiYuANg/gity/internal/domain/audit"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	auditdomain "github.com/lyonbrown4d/gity/internal/domain/audit"
 )
 
 type ProjectAuditEventRepository interface {

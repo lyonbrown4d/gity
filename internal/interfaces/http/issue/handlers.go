@@ -3,11 +3,11 @@ package issue
 import (
 	"context"
 
-	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	issueservice "github.com/lyonbrown4d/gity/internal/application/issue"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 func (e *Endpoint) listIssues(ctx context.Context, in *projectIssuesInput) (*issueOutput, error) {

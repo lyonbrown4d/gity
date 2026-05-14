@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	issueports "github.com/DaiYuANg/gity/internal/application/ports"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
 	setx "github.com/arcgolabs/collectionx/set"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	issueports "github.com/lyonbrown4d/gity/internal/application/ports"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
 	"github.com/samber/oops"
 )
 

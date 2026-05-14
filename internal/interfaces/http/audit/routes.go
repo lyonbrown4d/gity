@@ -1,11 +1,11 @@
 package audit
 
 import (
-	auditservice "github.com/DaiYuANg/gity/internal/application/audit"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	auditservice "github.com/lyonbrown4d/gity/internal/application/audit"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type projectAuditEventsInput struct {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"golang.org/x/sys/execabs"
 )
 

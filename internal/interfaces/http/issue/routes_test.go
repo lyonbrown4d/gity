@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	issue "github.com/DaiYuANg/gity/internal/interfaces/http/issue"
 	"github.com/arcgolabs/httpx"
+	issue "github.com/lyonbrown4d/gity/internal/interfaces/http/issue"
 )
 
 func TestEndpointRegistersIssueRoutes(t *testing.T) {

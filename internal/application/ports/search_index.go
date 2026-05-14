@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 )
 
 type CodeSearchIndex interface {

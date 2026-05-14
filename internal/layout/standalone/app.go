@@ -2,11 +2,11 @@
 package standalone
 
 import (
-	gitydebug "github.com/DaiYuANg/gity/internal/debug"
-	migrationapp "github.com/DaiYuANg/gity/internal/layout/migration"
-	serverapp "github.com/DaiYuANg/gity/internal/layout/server"
-	"github.com/DaiYuANg/gity/internal/layout/worker"
 	"github.com/arcgolabs/dix"
+	gitydebug "github.com/lyonbrown4d/gity/internal/debug"
+	migrationapp "github.com/lyonbrown4d/gity/internal/layout/migration"
+	serverapp "github.com/lyonbrown4d/gity/internal/layout/server"
+	"github.com/lyonbrown4d/gity/internal/layout/worker"
 )
 
 func NewStandaloneApp() *dix.App {

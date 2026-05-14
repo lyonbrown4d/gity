@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
 
 func (e *Endpoint) login(ctx context.Context, in *loginInput) (*authOutput, error) {

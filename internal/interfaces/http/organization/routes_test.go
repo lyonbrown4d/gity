@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	organization "github.com/DaiYuANg/gity/internal/interfaces/http/organization"
 	"github.com/arcgolabs/httpx"
+	organization "github.com/lyonbrown4d/gity/internal/interfaces/http/organization"
 )
 
 func TestEndpointRegistersOrganizationRoutes(t *testing.T) {

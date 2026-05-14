@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/config"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/samber/oops"
 	"golang.org/x/sys/execabs"
 )

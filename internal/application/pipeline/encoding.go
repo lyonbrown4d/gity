@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 func encodeScriptPayload(payload scriptJobPayload) (string, error) {

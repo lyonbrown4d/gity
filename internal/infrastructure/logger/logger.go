@@ -4,8 +4,8 @@ package logger
 import (
 	"log/slog"
 
-	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/arcgolabs/logx"
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/samber/oops"
 )
 

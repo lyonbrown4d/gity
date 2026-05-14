@@ -3,14 +3,14 @@ package projectpipelinejob
 import (
 	"context"
 	"fmt"
-	ciports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
-	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	ciports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"strings"
 	"time"
 )

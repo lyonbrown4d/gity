@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	identitydomain "github.com/DaiYuANg/gity/internal/domain/identity"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	identitydomain "github.com/lyonbrown4d/gity/internal/domain/identity"
 )
 
 type UserRepository interface {

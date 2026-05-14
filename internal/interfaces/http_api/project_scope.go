@@ -2,9 +2,9 @@ package httpapi
 
 import (
 	"context"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/arcgolabs/httpx"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"net/http"
 )
 

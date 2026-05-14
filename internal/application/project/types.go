@@ -2,7 +2,7 @@ package project
 
 import "log/slog"
 
-import gitports "github.com/DaiYuANg/gity/internal/application/ports"
+import gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 
 type GitDependencies struct {
 	Runner     gitports.GitRunner

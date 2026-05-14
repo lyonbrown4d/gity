@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	wikidomain "github.com/lyonbrown4d/gity/internal/domain/wiki"
 )
 
 type ProjectWikiPageRepository interface {

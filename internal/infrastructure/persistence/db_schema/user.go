@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 )
 
 type UserSchemaDef struct {

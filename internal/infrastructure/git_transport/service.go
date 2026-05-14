@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_exec"
 	"github.com/samber/oops"
 )
 

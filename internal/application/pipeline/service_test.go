@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	"github.com/DaiYuANg/gity/internal/infrastructure/git_exec"
-	projectjobrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_job"
-	projectpipelinerepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_pipeline"
-	"github.com/DaiYuANg/gity/internal/testutil"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/git_exec"
+	projectjobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_job"
+	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestProjectPipelineFlow(t *testing.T) {

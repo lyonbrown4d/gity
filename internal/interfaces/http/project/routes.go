@@ -1,12 +1,12 @@
 package project
 
 import (
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	"github.com/DaiYuANg/gity/internal/config"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	"github.com/lyonbrown4d/gity/internal/config"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type Endpoint struct {

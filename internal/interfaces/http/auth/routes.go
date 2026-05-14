@@ -3,9 +3,9 @@ package auth
 import (
 	"strconv"
 
-	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	userservice "github.com/lyonbrown4d/gity/internal/application/user"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type loginInput struct {

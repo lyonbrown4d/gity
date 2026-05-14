@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	audit "github.com/DaiYuANg/gity/internal/interfaces/http/audit"
 	"github.com/arcgolabs/httpx"
+	audit "github.com/lyonbrown4d/gity/internal/interfaces/http/audit"
 )
 
 func TestRoutes(t *testing.T) {

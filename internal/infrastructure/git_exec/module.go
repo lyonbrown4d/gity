@@ -2,8 +2,8 @@
 package gitexec
 
 import (
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	"github.com/arcgolabs/dix"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 )
 
 func NewGitRunner(runner *Runner) gitports.GitRunner {

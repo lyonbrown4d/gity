@@ -5,13 +5,13 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/DaiYuANg/gity/internal/config"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/httpx/adapter"
 	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/lyonbrown4d/gity/internal/config"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 	"github.com/samber/oops"
 )
 

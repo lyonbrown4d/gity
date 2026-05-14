@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	lfsports "github.com/DaiYuANg/gity/internal/application/ports"
-	lfsdomain "github.com/DaiYuANg/gity/internal/domain/lfs"
-	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
-	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	lfsports "github.com/lyonbrown4d/gity/internal/application/ports"
+	lfsdomain "github.com/lyonbrown4d/gity/internal/domain/lfs"
+	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 )
 
 type Repository struct {

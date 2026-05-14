@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	projectports "github.com/DaiYuANg/gity/internal/application/ports"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
-	projectbranchprotectionrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_branch_protection"
 	"github.com/gofiber/fiber/v2"
+	projectports "github.com/lyonbrown4d/gity/internal/application/ports"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	projectbranchprotectionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_branch_protection"
 )
 
 func rejectProtectedBranchUpdates(ctx context.Context, project projectView, repo *projectbranchprotectionrepo.Repository, updates []receivePackUpdate) error {

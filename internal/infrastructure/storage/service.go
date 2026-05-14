@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/config"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/samber/oops"
 )
 

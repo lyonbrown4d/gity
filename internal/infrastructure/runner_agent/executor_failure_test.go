@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	runneragent "github.com/DaiYuANg/gity/internal/infrastructure/runner_agent"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	runneragent "github.com/lyonbrown4d/gity/internal/infrastructure/runner_agent"
 )
 
 func TestExecuteScriptJobFailure(t *testing.T) {

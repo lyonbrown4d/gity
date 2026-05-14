@@ -5,7 +5,7 @@ import (
 	"context"
 	"log"
 
-	migrationapp "github.com/DaiYuANg/gity/internal/layout/migration"
+	migrationapp "github.com/lyonbrown4d/gity/internal/layout/migration"
 )
 
 func main() {

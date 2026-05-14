@@ -3,10 +3,10 @@ package pipeline
 import (
 	"context"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
 

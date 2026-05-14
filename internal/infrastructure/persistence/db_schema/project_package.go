@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	packagedomain "github.com/DaiYuANg/gity/internal/domain/package_registry"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	packagedomain "github.com/lyonbrown4d/gity/internal/domain/package_registry"
 )
 
 type ProjectPackageSchemaDef struct {

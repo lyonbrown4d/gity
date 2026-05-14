@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	lfs "github.com/DaiYuANg/gity/internal/interfaces/http/lfs"
 	"github.com/arcgolabs/httpx"
+	lfs "github.com/lyonbrown4d/gity/internal/interfaces/http/lfs"
 )
 
 func TestEndpointRegistersProjectLFSManagementRoutes(t *testing.T) {

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

@@ -3,8 +3,8 @@ package job
 import (
 	"context"
 
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 )
 
 func (e *Endpoint) listProjectJobs(ctx context.Context, in *projectJobsInput) (*jobOutput, error) {

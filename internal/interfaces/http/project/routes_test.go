@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/config"
-	project "github.com/DaiYuANg/gity/internal/interfaces/http/project"
 	"github.com/arcgolabs/httpx"
+	"github.com/lyonbrown4d/gity/internal/config"
+	project "github.com/lyonbrown4d/gity/internal/interfaces/http/project"
 )
 
 func TestEndpointRegistersCanonicalProjectRoutes(t *testing.T) {

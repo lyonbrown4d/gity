@@ -2,7 +2,7 @@ package project_test
 
 import "testing"
 
-import projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+import projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 
 func TestWildcardMatchKeepsBranchNameSemantics(t *testing.T) {
 	tests := []struct {

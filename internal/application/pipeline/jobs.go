@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	"github.com/DaiYuANg/gity/internal/ci/plan_dsl"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	"github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

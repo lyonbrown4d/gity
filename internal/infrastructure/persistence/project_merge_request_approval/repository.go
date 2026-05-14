@@ -5,14 +5,14 @@ import (
 	"errors"
 	"time"
 
-	mergeports "github.com/DaiYuANg/gity/internal/application/ports"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
-	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
-	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	mergeports "github.com/lyonbrown4d/gity/internal/application/ports"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
+	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"github.com/samber/oops"
 )
 

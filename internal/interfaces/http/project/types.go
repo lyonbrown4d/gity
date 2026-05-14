@@ -1,6 +1,6 @@
 package project
 
-import "github.com/DaiYuANg/gity/internal/infrastructure/git_repo"
+import "github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
 
 type createProjectInput struct {
 	Authorization string            `header:"Authorization"`

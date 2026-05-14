@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	domainevent "github.com/DaiYuANg/gity/internal/domain/event"
+	domainevent "github.com/lyonbrown4d/gity/internal/domain/event"
 )
 
 type DomainEventPublisher interface {

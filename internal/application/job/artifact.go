@@ -6,10 +6,10 @@ import (
 	"errors"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

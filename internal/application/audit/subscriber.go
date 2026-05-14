@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strconv"
 
-	auditports "github.com/DaiYuANg/gity/internal/application/ports"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	"github.com/arcgolabs/eventx"
+	auditports "github.com/lyonbrown4d/gity/internal/application/ports"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

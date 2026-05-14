@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	appports "github.com/DaiYuANg/gity/internal/application/ports"
-	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
 	slugx "github.com/gosimple/slug"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	appports "github.com/lyonbrown4d/gity/internal/application/ports"
+	wikidomain "github.com/lyonbrown4d/gity/internal/domain/wiki"
 	"github.com/samber/oops"
 )
 

@@ -3,8 +3,8 @@ package httpapi_test
 import (
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 func TestConfigureRegistersBearerAuthScheme(t *testing.T) {

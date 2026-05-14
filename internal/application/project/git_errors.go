@@ -3,9 +3,9 @@ package project
 import (
 	"errors"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 )
 
 func repositoryPath(project projectdomain.Project) string {

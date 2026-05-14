@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	"github.com/arcgolabs/httpx"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
 
 type AuthorizationInput interface {

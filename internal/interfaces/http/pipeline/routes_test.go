@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	pipeline "github.com/DaiYuANg/gity/internal/interfaces/http/pipeline"
 	"github.com/arcgolabs/httpx"
+	pipeline "github.com/lyonbrown4d/gity/internal/interfaces/http/pipeline"
 )
 
 func TestEndpointRegistersCanonicalPipelineRoutes(t *testing.T) {

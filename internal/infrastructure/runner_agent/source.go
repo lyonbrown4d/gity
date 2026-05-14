@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {

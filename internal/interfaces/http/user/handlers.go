@@ -3,9 +3,9 @@ package user
 import (
 	"context"
 
-	userservice "github.com/DaiYuANg/gity/internal/application/user"
-	identity "github.com/DaiYuANg/gity/internal/domain/identity"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	userservice "github.com/lyonbrown4d/gity/internal/application/user"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 )
 
 func (e *Endpoint) listUsers(ctx context.Context, in *usersInput) (*userOutput, error) {

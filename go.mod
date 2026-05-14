@@ -1,4 +1,4 @@
-module github.com/DaiYuANg/gity
+module github.com/lyonbrown4d/gity
 
 go 1.26.2
 

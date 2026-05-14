@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/config"
-	system "github.com/DaiYuANg/gity/internal/interfaces/http/system"
 	"github.com/arcgolabs/httpx"
+	"github.com/lyonbrown4d/gity/internal/config"
+	system "github.com/lyonbrown4d/gity/internal/interfaces/http/system"
 )
 
 func TestEndpointRegistersSystemRoutes(t *testing.T) {

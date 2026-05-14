@@ -23,7 +23,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/DaiYuANg/gity/internal/debug.VersionOverride={{ .Version }}
+      - -s -w -X github.com/lyonbrown4d/gity/internal/debug.VersionOverride={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
   - <<: *gity_build
     id: gity-migration
@@ -102,7 +102,7 @@ nfpms:
       - gity-standalone
       - gity-runner
     vendor: Gity
-    homepage: https://github.com/DaiYuANg/gity
+    homepage: https://github.com/lyonbrown4d/gity
     maintainer: DaiYuANg
     description: Lightweight Git hosting platform.
     bindir: /usr/bin
@@ -135,7 +135,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-server
       org.opencontainers.image.description: Gity API server
-      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"
     sbom: false
@@ -151,7 +151,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-migration
       org.opencontainers.image.description: Gity database migration command
-      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"
   - <<: *gity_docker
@@ -165,7 +165,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-worker
       org.opencontainers.image.description: Gity background worker
-      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"
   - <<: *gity_docker
@@ -179,7 +179,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-standalone
       org.opencontainers.image.description: Gity single-process runtime
-      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"
   - <<: *gity_docker
@@ -193,7 +193,7 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-runner
       org.opencontainers.image.description: Gity CI runner agent
-      org.opencontainers.image.source: https://github.com/DaiYuANg/gity
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"
 

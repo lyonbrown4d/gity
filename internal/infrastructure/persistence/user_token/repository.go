@@ -3,10 +3,10 @@ package usertoken
 import (
 	"context"
 	"fmt"
-	identityports "github.com/DaiYuANg/gity/internal/application/ports"
-	identity "github.com/DaiYuANg/gity/internal/domain/identity"
-	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
-	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
+	identityports "github.com/lyonbrown4d/gity/internal/application/ports"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
+	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"strings"
 	"time"
 

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	packageregistry "github.com/DaiYuANg/gity/internal/interfaces/http/package_registry"
 	"github.com/arcgolabs/httpx"
+	packageregistry "github.com/lyonbrown4d/gity/internal/interfaces/http/package_registry"
 )
 
 func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {

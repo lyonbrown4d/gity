@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
 	collectionx "github.com/arcgolabs/collectionx/list"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
 )
 
 type ProjectIssueRepository interface {

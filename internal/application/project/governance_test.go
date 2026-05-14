@@ -3,8 +3,8 @@ package project_test
 import (
 	"testing"
 
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	"github.com/DaiYuANg/gity/internal/testutil"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func branchProtected(branches []projectservice.Branch, branchName string) bool {

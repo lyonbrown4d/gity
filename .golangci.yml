@@ -146,21 +146,21 @@ linters:
         - (github.com/samber/oops.OopsErrorBuilder).Wrap(
         - (github.com/samber/oops.OopsErrorBuilder).Wrapf(
         - (github.com/samber/oops.OopsErrorBuilder).Join(
-        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.One(
-        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.Many(
-        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.NormalizeError(
-        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.One[
-        - github.com/DaiYuANg/gity/internal/infrastructure/persistence.Many[
+        - github.com/lyonbrown4d/gity/internal/infrastructure/persistence.One(
+        - github.com/lyonbrown4d/gity/internal/infrastructure/persistence.Many(
+        - github.com/lyonbrown4d/gity/internal/infrastructure/persistence.NormalizeError(
+        - github.com/lyonbrown4d/gity/internal/infrastructure/persistence.One[
+        - github.com/lyonbrown4d/gity/internal/infrastructure/persistence.Many[
         - persistence.One(
         - persistence.Many(
         - persistence.NormalizeError(
         - persistence.One[
         - persistence.Many[
       ignore-package-globs:
-        - github.com/DaiYuANg/gity/internal/application/*
-        - github.com/DaiYuANg/gity/internal/application/**
-        - github.com/DaiYuANg/gity/internal/interfaces/http_api
-        - github.com/DaiYuANg/gity/internal/infrastructure/auth
+        - github.com/lyonbrown4d/gity/internal/application/*
+        - github.com/lyonbrown4d/gity/internal/application/**
+        - github.com/lyonbrown4d/gity/internal/interfaces/http_api
+        - github.com/lyonbrown4d/gity/internal/infrastructure/auth
         - github.com/gofiber/fiber/v2
   exclusions:
     rules:

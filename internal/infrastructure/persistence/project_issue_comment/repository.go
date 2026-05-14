@@ -3,14 +3,14 @@ package projectissuecomment
 import (
 	"context"
 	"fmt"
-	issueports "github.com/DaiYuANg/gity/internal/application/ports"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
-	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
 	dbxrepo "github.com/arcgolabs/dbx/repository"
+	issueports "github.com/lyonbrown4d/gity/internal/application/ports"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
+	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"strings"
 	"time"
 )

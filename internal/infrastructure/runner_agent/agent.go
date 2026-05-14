@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
 

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
 

@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
 	"github.com/samber/oops"
 )
 

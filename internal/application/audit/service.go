@@ -3,9 +3,9 @@ package audit
 import (
 	"context"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	auditports "github.com/DaiYuANg/gity/internal/application/ports"
-	auditdomain "github.com/DaiYuANg/gity/internal/domain/audit"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	auditports "github.com/lyonbrown4d/gity/internal/application/ports"
+	auditdomain "github.com/lyonbrown4d/gity/internal/domain/audit"
 	"github.com/samber/oops"
 )
 

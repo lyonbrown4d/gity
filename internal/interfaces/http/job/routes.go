@@ -3,14 +3,14 @@ package job
 import (
 	"context"
 
-	jobservice "github.com/DaiYuANg/gity/internal/application/job"
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	"github.com/DaiYuANg/gity/internal/infrastructure/mapperx"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/mapper"
+	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
 type projectJobsInput struct {

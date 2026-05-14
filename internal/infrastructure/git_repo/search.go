@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	gitsearch "github.com/DaiYuANg/gity/internal/infrastructure/git_search"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	gitsearch "github.com/lyonbrown4d/gity/internal/infrastructure/git_search"
 	"github.com/samber/oops"
 )
 

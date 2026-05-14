@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 )
 
 type Plan struct {

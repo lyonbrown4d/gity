@@ -9,10 +9,10 @@ import (
 	"log/slog"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	storageports "github.com/DaiYuANg/gity/internal/application/ports"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

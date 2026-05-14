@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	migrationapp "github.com/DaiYuANg/gity/internal/layout/migration"
-	"github.com/DaiYuANg/gity/internal/testutil"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dix"
+	migrationapp "github.com/lyonbrown4d/gity/internal/layout/migration"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestMigrationAppValidate(t *testing.T) {

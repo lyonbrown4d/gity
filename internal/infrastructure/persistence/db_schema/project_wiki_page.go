@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	wikidomain "github.com/DaiYuANg/gity/internal/domain/wiki"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	wikidomain "github.com/lyonbrown4d/gity/internal/domain/wiki"
 )
 
 type ProjectWikiPageSchemaDef struct {

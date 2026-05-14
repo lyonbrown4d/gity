@@ -3,8 +3,8 @@ package project
 import (
 	"context"
 
-	projectservice "github.com/DaiYuANg/gity/internal/application/project"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
+	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
 
 func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (infraauth.ProjectScope, error) {

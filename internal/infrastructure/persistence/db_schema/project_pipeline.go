@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
 
 type ProjectPipelineSchemaDef struct {

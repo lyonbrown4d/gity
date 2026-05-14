@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	serverapp "github.com/DaiYuANg/gity/internal/layout/server"
-	"github.com/DaiYuANg/gity/internal/testutil"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dix"
+	serverapp "github.com/lyonbrown4d/gity/internal/layout/server"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestServerAppValidate(t *testing.T) {

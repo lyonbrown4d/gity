@@ -5,9 +5,9 @@ import (
 	"errors"
 	"log/slog"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 )
 
 func (s *Service) ListTree(ctx context.Context, id int64, refName, treePath string) ([]gitports.TreeEntry, error) {

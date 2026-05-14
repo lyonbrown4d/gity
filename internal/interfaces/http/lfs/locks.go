@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strings"
 
-	lfsservice "github.com/DaiYuANg/gity/internal/application/lfs"
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	"github.com/gofiber/fiber/v2"
+	lfsservice "github.com/lyonbrown4d/gity/internal/application/lfs"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
 )
 
 func handleCreateLock(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, service *lfsservice.Service) error {

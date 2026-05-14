@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	infraauth "github.com/DaiYuANg/gity/internal/infrastructure/auth"
-	projectrepo "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project"
 	"github.com/gofiber/fiber/v2"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
 	"github.com/samber/oops"
 )
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 )
 
 func triggerPushPipelines(ctx context.Context, logger *slog.Logger, service *pipelineservice.Service, project projectView, updates []receivePackUpdate) {

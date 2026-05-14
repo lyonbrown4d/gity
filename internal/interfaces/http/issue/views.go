@@ -3,8 +3,8 @@ package issue
 import (
 	"strconv"
 
-	issueservice "github.com/DaiYuANg/gity/internal/application/issue"
-	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
+	issueservice "github.com/lyonbrown4d/gity/internal/application/issue"
+	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
 )
 
 func toIssueView(item issuedomain.ProjectIssue) issueView {

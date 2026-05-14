@@ -3,8 +3,8 @@ package searchindex
 import (
 	"context"
 
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	"github.com/arcgolabs/eventx"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

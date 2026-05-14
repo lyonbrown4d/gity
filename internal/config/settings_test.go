@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/DaiYuANg/gity/internal/config"
+	"github.com/lyonbrown4d/gity/internal/config"
 )
 
 func TestSettingsEnvironmentOverridesTypedDefaults(t *testing.T) {

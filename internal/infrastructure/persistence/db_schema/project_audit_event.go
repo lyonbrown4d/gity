@@ -3,10 +3,10 @@ package dbschema
 import (
 	"time"
 
-	auditdomain "github.com/DaiYuANg/gity/internal/domain/audit"
 	"github.com/arcgolabs/dbx/column"
 	"github.com/arcgolabs/dbx/idgen"
 	"github.com/arcgolabs/dbx/schema"
+	auditdomain "github.com/lyonbrown4d/gity/internal/domain/audit"
 )
 
 type ProjectAuditEventSchemaDef struct {

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DaiYuANg/gity/internal/layout/worker"
-	"github.com/DaiYuANg/gity/internal/testutil"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dix"
+	"github.com/lyonbrown4d/gity/internal/layout/worker"
+	"github.com/lyonbrown4d/gity/internal/testutil"
 )
 
 func TestWorkerAppValidate(t *testing.T) {

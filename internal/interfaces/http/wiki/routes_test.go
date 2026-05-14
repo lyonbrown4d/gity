@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	wiki "github.com/DaiYuANg/gity/internal/interfaces/http/wiki"
 	"github.com/arcgolabs/httpx"
+	wiki "github.com/lyonbrown4d/gity/internal/interfaces/http/wiki"
 )
 
 func TestEndpointRegistersCanonicalWikiRoutes(t *testing.T) {

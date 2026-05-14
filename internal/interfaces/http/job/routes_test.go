@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	job "github.com/DaiYuANg/gity/internal/interfaces/http/job"
 	"github.com/arcgolabs/httpx"
+	job "github.com/lyonbrown4d/gity/internal/interfaces/http/job"
 )
 
 func TestEndpointRegistersCanonicalJobRoutes(t *testing.T) {

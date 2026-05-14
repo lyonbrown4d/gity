@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	projectdomain "github.com/DaiYuANg/gity/internal/domain/project"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/mapping"
 	enry "github.com/go-enry/go-enry/v2"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
 )
 

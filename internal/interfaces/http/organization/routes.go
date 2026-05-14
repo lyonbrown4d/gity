@@ -1,11 +1,11 @@
 package organization
 
 import (
-	organizationservice "github.com/DaiYuANg/gity/internal/application/organization"
-	organizationdomain "github.com/DaiYuANg/gity/internal/domain/organization"
-	"github.com/DaiYuANg/gity/internal/interfaces/http_api"
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
+	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
+	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 	"strconv"
 	"strings"
 )

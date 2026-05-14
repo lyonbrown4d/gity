@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"strings"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	pipelineservice "github.com/DaiYuANg/gity/internal/application/pipeline"
-	gitports "github.com/DaiYuANg/gity/internal/application/ports"
-	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
-	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
+	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
+	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 	"github.com/samber/oops"
 )
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	gittransport "github.com/DaiYuANg/gity/internal/interfaces/http/git_transport"
+	gittransport "github.com/lyonbrown4d/gity/internal/interfaces/http/git_transport"
 )
 
 func TestParseReceivePackBranchUpdates(t *testing.T) {

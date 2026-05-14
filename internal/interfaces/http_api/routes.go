@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	apperror "github.com/DaiYuANg/gity/internal/application/app_error"
-	"github.com/DaiYuANg/gity/internal/infrastructure/auth"
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/httpx"
+	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
+	"github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
 
 type EndpointRoute interface {
