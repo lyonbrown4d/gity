@@ -94,15 +94,11 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User,
 }
 
 func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (identity.User, error) {
-	if input.Username != nil && strings.TrimSpace(*input.Username) == "" {
-		return identity.User{}, oops.In("user").With("user_id", id).New("username is required")
+	if err := normalizeUpdateInput(id, &input); err != nil {
+		return identity.User{}, err
 	}
-	if input.DisplayName != nil && strings.TrimSpace(*input.DisplayName) == "" {
-		displayName := ""
-		if input.Username != nil {
-			displayName = strings.TrimSpace(*input.Username)
-		}
-		input.DisplayName = &displayName
+	if err := s.ensureSuperAdminUpdateAllowed(ctx, id, input); err != nil {
+		return identity.User{}, err
 	}
 	if err := s.repo.UpdateByID(ctx, id, identityports.UpdateUserInput{
 		Username:     input.Username,
@@ -122,6 +118,9 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 func (s *Service) Delete(ctx context.Context, id int64) error {
 	if id <= 0 {
 		return oops.In("user").With("user_id", id).New("user id is required")
+	}
+	if err := s.ensureNotLastSuperAdmin(ctx, id, "delete user"); err != nil {
+		return err
 	}
 	if err := s.repo.DeleteByID(ctx, id); err != nil {
 		return oops.In("user").With("user_id", id).Wrapf(err, "delete user")
