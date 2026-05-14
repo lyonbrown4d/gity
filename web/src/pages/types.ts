@@ -408,6 +408,40 @@ export interface RepositoryCIVariableView {
   updated_at?: string | null;
 }
 
+export interface RepositoryProjectTokenView {
+  id: string;
+  project_id: string;
+  kind: string;
+  name: string;
+  username: string;
+  scopes: string[];
+  created_by_user_id: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  last_used_at?: string | null;
+  active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreatedRepositoryProjectTokenView {
+  project_token: RepositoryProjectTokenView;
+  token: string;
+}
+
+export interface RepositoryDeployKeyView {
+  id: string;
+  project_id: string;
+  title: string;
+  fingerprint: string;
+  public_key: string;
+  can_push: boolean;
+  created_by_user_id: string;
+  last_used_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export interface RepositoryPackageView {
   id: string;
   project_id: string;

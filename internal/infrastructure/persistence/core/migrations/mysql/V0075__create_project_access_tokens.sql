@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `project_access_tokens` (
+    `id` BIGINT NOT NULL PRIMARY KEY,
+    `project_id` BIGINT NOT NULL,
+    `kind` VARCHAR(64) NOT NULL,
+    `name` VARCHAR(255) NOT NULL,
+    `username` VARCHAR(255) NOT NULL,
+    `token` VARCHAR(255) NOT NULL,
+    `scopes` TEXT NOT NULL,
+    `created_by_user_id` BIGINT NOT NULL,
+    `expires_at` TIMESTAMP(6) NULL,
+    `revoked_at` TIMESTAMP(6) NULL,
+    `last_used_at` TIMESTAMP(6) NULL,
+    `created_at` TIMESTAMP(6) NOT NULL,
+    `updated_at` TIMESTAMP(6) NOT NULL,
+    CONSTRAINT `fk_project_access_tokens_project_id` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_project_access_tokens_created_by` FOREIGN KEY (`created_by_user_id`) REFERENCES `users` (`id`),
+    UNIQUE KEY `ux_project_access_tokens_token` (`token`),
+    KEY `ix_project_access_tokens_project_kind` (`project_id`, `kind`),
+    KEY `ix_project_access_tokens_username` (`username`),
+    KEY `ix_project_access_tokens_created_by` (`created_by_user_id`)
+);

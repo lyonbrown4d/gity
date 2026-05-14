@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 
 	collectionx "github.com/arcgolabs/collectionx/list"
 	identitydomain "github.com/lyonbrown4d/gity/internal/domain/identity"
@@ -23,6 +24,21 @@ type UserAccessTokenRepository interface {
 	DeleteByToken(ctx context.Context, token string) error
 }
 
+type ProjectAccessTokenRepository interface {
+	ListByProjectIDAndKind(ctx context.Context, projectID int64, kind string) (*collectionx.List[identitydomain.ProjectAccessToken], error)
+	GetByID(ctx context.Context, id int64) (identitydomain.ProjectAccessToken, error)
+	GetByToken(ctx context.Context, token string) (identitydomain.ProjectAccessToken, error)
+	Create(ctx context.Context, input CreateProjectAccessTokenInput) (identitydomain.ProjectAccessToken, error)
+	RevokeByID(ctx context.Context, id int64) error
+}
+
+type ProjectDeployKeyRepository interface {
+	ListByProjectID(ctx context.Context, projectID int64) (*collectionx.List[identitydomain.ProjectDeployKey], error)
+	GetByID(ctx context.Context, id int64) (identitydomain.ProjectDeployKey, error)
+	Create(ctx context.Context, input CreateProjectDeployKeyInput) (identitydomain.ProjectDeployKey, error)
+	DeleteByID(ctx context.Context, id int64) error
+}
+
 type CreateUserInput struct {
 	Username     string
 	DisplayName  string
@@ -41,4 +57,24 @@ type CreateUserAccessTokenInput struct {
 	UserID int64
 	Name   string
 	Token  string
+}
+
+type CreateProjectAccessTokenInput struct {
+	ProjectID       int64
+	Kind            string
+	Name            string
+	Username        string
+	Token           string
+	Scopes          string
+	CreatedByUserID int64
+	ExpiresAt       time.Time
+}
+
+type CreateProjectDeployKeyInput struct {
+	ProjectID       int64
+	Title           string
+	Fingerprint     string
+	PublicKey       string
+	CanPush         bool
+	CreatedByUserID int64
 }

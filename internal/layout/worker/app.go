@@ -12,6 +12,7 @@ import (
 	packageregistryservice "github.com/lyonbrown4d/gity/internal/application/package_registry"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	projectcredentialservice "github.com/lyonbrown4d/gity/internal/application/project_credential"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
@@ -28,9 +29,11 @@ import (
 	organizationrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization"
 	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
+	projectaccesstokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_access_token"
 	projectauditeventrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectcivariablerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_ci_variable"
+	projectdeploykeyrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_deploy_key"
 	projectissuerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue"
 	projectissueassigneerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_assignee"
 	projectissueattachmentrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_attachment"
@@ -125,9 +128,11 @@ func repositoryRuntimeModule() dix.Module {
 			organizationrepo.Module(),
 			organizationmemberrepo.Module(),
 			projectrepo.Module(),
+			projectaccesstokenrepo.Module(),
 			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
 			projectcivariablerepo.Module(),
+			projectdeploykeyrepo.Module(),
 			projectissuerepo.Module(),
 			projectissueassigneerepo.Module(),
 			projectissuecommentrepo.Module(),
@@ -181,6 +186,7 @@ func applicationRuntimeModule() dix.Module {
 			auditservice.Module(),
 			organizationservice.Module(),
 			projectservice.Module(),
+			projectcredentialservice.Module(),
 			issueservice.Module(),
 			jobservice.Module(),
 			lfsservice.Module(),

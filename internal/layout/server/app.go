@@ -12,6 +12,7 @@ import (
 	packageregistryservice "github.com/lyonbrown4d/gity/internal/application/package_registry"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	projectcredentialservice "github.com/lyonbrown4d/gity/internal/application/project_credential"
 	releaseservice "github.com/lyonbrown4d/gity/internal/application/release"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
@@ -29,9 +30,11 @@ import (
 	organizationrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization"
 	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
+	projectaccesstokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_access_token"
 	projectauditeventrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_audit_event"
 	projectbranchprotectionrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_branch_protection"
 	projectcivariablerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_ci_variable"
+	projectdeploykeyrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_deploy_key"
 	projectissuerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue"
 	projectissueassigneerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_assignee"
 	projectissueattachmentrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_issue_attachment"
@@ -72,6 +75,7 @@ import (
 	packageregistryendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/package_registry"
 	pipelineendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/pipeline"
 	projectendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/project"
+	projectcredentialendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/project_credential"
 	releaseendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/release"
 	runnerendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/runner"
 	systemendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/system"
@@ -144,9 +148,11 @@ func repositoryRuntimeModule() dix.Module {
 			organizationrepo.Module(),
 			organizationmemberrepo.Module(),
 			projectrepo.Module(),
+			projectaccesstokenrepo.Module(),
 			projectauditeventrepo.Module(),
 			projectbranchprotectionrepo.Module(),
 			projectcivariablerepo.Module(),
+			projectdeploykeyrepo.Module(),
 			projectissuerepo.Module(),
 			projectissueassigneerepo.Module(),
 			projectissuecommentrepo.Module(),
@@ -202,6 +208,7 @@ func applicationRuntimeModule() dix.Module {
 			auditservice.Module(),
 			organizationservice.Module(),
 			projectservice.Module(),
+			projectcredentialservice.Module(),
 			issueservice.Module(),
 			jobservice.Module(),
 			lfsservice.Module(),
@@ -244,6 +251,7 @@ func endpointRuntimeModule() dix.Module {
 			mergerequestendpoint.Module(),
 			packageregistryendpoint.Module(),
 			pipelineendpoint.Module(),
+			projectcredentialendpoint.Module(),
 			releaseendpoint.Module(),
 			runnerendpoint.Module(),
 			wikiendpoint.Module(),

@@ -22,7 +22,15 @@ func (s ProjectAuditEventSchemaDef) AllColumns() *collectionx.List[querydsl.Sele
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectAccessTokenSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectCIVariableSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
+func (s ProjectDeployKeySchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 

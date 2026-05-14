@@ -3,6 +3,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RepositoryView } from "@/pages/types";
+import { RepositoryCredentialsPanel } from "./repository-credentials-panel";
 import { RepositoryMembersPanel } from "./repository-members-panel";
 import type { RepositoryPermissions } from "./repository-permissions";
 
@@ -78,6 +79,13 @@ export const RepositorySettingsTab = ({
       </Card>
 
       <RepositoryMembersPanel
+        repoId={repository.id}
+        permissions={permissions}
+        t={t}
+        onError={onError}
+      />
+
+      <RepositoryCredentialsPanel
         repoId={repository.id}
         permissions={permissions}
         t={t}

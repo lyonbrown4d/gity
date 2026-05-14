@@ -3,13 +3,18 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/arcgolabs/authx"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
+	identityports "github.com/lyonbrown4d/gity/internal/application/ports"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
+	projectaccesstokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_access_token"
 	projectmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_member"
 	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user_token"
@@ -64,24 +69,43 @@ type ProjectScope struct {
 	Visibility     string
 }
 
-func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
+func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
 	return authx.NewEngine(
-		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository))),
+		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository, projectTokenRepository))),
 		authx.WithAuthorizer(newProjectAuthorizer(memberRepository, projectMemberRepository)),
 	)
 }
 
-func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository) authx.AuthenticationProvider {
+func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository) authx.AuthenticationProvider {
 	return authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
 		record, err := tokenRepository.GetByToken(ctx, credential.Token)
-		if err != nil {
+		if err == nil {
+			user, err := userRepository.GetByID(ctx, record.UserID)
+			if err != nil {
+				return authx.AuthenticationResult{}, oops.In("auth").With("user_id", record.UserID).Wrapf(err, "load token user")
+			}
+			return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username, IsSuperAdmin: user.IsSuperAdmin != 0}}, nil
+		}
+		if !errors.Is(err, identityports.ErrNotFound) {
 			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
 		}
-		user, err := userRepository.GetByID(ctx, record.UserID)
-		if err != nil {
-			return authx.AuthenticationResult{}, oops.In("auth").With("user_id", record.UserID).Wrapf(err, "load token user")
+		if projectTokenRepository == nil {
+			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
 		}
-		return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username, IsSuperAdmin: user.IsSuperAdmin != 0}}, nil
+		projectToken, err := projectTokenRepository.GetByToken(ctx, credential.Token)
+		if err != nil {
+			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load project token")
+		}
+		if !projectToken.Active(time.Now().UTC()) {
+			return authx.AuthenticationResult{}, oops.In("auth").With("project_id", projectToken.ProjectID, "token_id", projectToken.ID).New("project token is inactive")
+		}
+		return authx.AuthenticationResult{Principal: Principal{
+			UserID:    projectToken.CreatedByUserID,
+			Username:  projectToken.Username,
+			TokenKind: projectToken.Kind,
+			ProjectID: projectToken.ProjectID,
+			Scopes:    projectToken.Scopes,
+		}}, nil
 	})
 }
 
@@ -112,6 +136,9 @@ func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64
 func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, action string, principal Principal, projectID, organizationID int64, visibility string) authx.Decision {
 	if principal.IsSuperAdmin {
 		return authx.Decision{Allowed: true, PolicyID: "super_admin"}
+	}
+	if principal.ProjectID > 0 {
+		return authorizeProjectToken(action, principal, projectID)
 	}
 	switch action {
 	case ProjectActionRead, ProjectActionRepositoryRead, ProjectActionPackageRead, ProjectActionWikiRead:
@@ -151,6 +178,49 @@ func authorizeProjectRead(ctx context.Context, memberRepository *organizationmem
 		return authx.Decision{Allowed: true, PolicyID: "project_private_read"}
 	}
 	return authx.Decision{Allowed: false, Reason: "deny"}
+}
+
+func authorizeProjectToken(action string, principal Principal, projectID int64) authx.Decision {
+	if principal.ProjectID != projectID {
+		return authx.Decision{Allowed: false, Reason: "project_token_project_mismatch"}
+	}
+	if projectTokenScopeAllows(action, principal.Scopes) {
+		return authx.Decision{Allowed: true, PolicyID: "project_token_" + action}
+	}
+	return authx.Decision{Allowed: false, Reason: "project_token_scope_denied"}
+}
+
+func projectTokenScopeAllows(action, scopes string) bool {
+	scopeSet := tokenScopes(scopes)
+	switch action {
+	case ProjectActionRead, ProjectActionRepositoryRead:
+		return scopeSet.Contains(identity.ProjectTokenScopeReadRepository) || scopeSet.Contains(identity.ProjectTokenScopeWriteRepository) || scopeSet.Contains(identity.ProjectTokenScopeReadAPI) || scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
+	case ProjectActionRepositoryPush:
+		return scopeSet.Contains(identity.ProjectTokenScopeWriteRepository)
+	case ProjectActionPackageRead:
+		return scopeSet.Contains(identity.ProjectTokenScopeReadPackage) || scopeSet.Contains(identity.ProjectTokenScopeWritePackage)
+	case ProjectActionPackageWrite:
+		return scopeSet.Contains(identity.ProjectTokenScopeWritePackage)
+	case ProjectActionIssueCreate, ProjectActionIssueWrite, ProjectActionIssueComment,
+		ProjectActionMergeRequestCreate, ProjectActionMergeRequestWrite, ProjectActionMergeRequestComment,
+		ProjectActionWikiRead, ProjectActionJobRead, ProjectActionRunnerRead:
+		return scopeSet.Contains(identity.ProjectTokenScopeReadAPI) || scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
+	case ProjectActionWrite, ProjectActionWikiWrite, ProjectActionJobWrite:
+		return scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
+	default:
+		return false
+	}
+}
+
+func tokenScopes(value string) *setx.Set[string] {
+	items := setx.NewSet[string]()
+	for _, part := range strings.Split(value, ",") {
+		scope := strings.TrimSpace(strings.ToLower(part))
+		if scope != "" {
+			items.Add(scope)
+		}
+	}
+	return items
 }
 
 func authorizeProjectRole(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, principal Principal, projectID, organizationID int64, action string, allowedRoles *setx.Set[string]) authx.Decision {
