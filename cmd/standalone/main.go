@@ -3,10 +3,12 @@ package main
 
 import (
 	"log"
+
+	"github.com/DaiYuANg/gity/internal/layout/standalone"
 )
 
 func main() {
-	if err := newStandaloneApp().Run(); err != nil {
+	if err := standalone.NewStandaloneApp().Run(); err != nil {
 		log.Fatal(err)
 	}
 }

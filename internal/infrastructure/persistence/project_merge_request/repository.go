@@ -7,6 +7,7 @@ import (
 	mergedomain "github.com/DaiYuANg/gity/internal/domain/merge"
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
+	projectcounter "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_counter"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
@@ -48,16 +49,10 @@ func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int6
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (mergedomain.ProjectMergeRequest, error) {
 	var created mergedomain.ProjectMergeRequest
-	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[mergedomain.ProjectMergeRequest, dbschema.ProjectMergeRequestSchemaDef]) error {
-		nextIID := int64(1)
-		last, err := dbxrepo.Query(repo).
-			Where(dbschema.ProjectMergeRequestSchema.ProjectID.Eq(input.ProjectID)).
-			OrderBy(dbschema.ProjectMergeRequestSchema.IID.Desc()).
-			First(ctx)
-		if err == nil {
-			nextIID = last.IID + 1
-		} else if !persistence.IsNotFound(err) {
-			return oops.In("persistence.merge_request").With("project_id", input.ProjectID).Wrapf(err, "load last merge request")
+	err := r.base.InTx(ctx, nil, func(tx *dbx.Tx, repo *dbxrepo.Base[mergedomain.ProjectMergeRequest, dbschema.ProjectMergeRequestSchemaDef]) error {
+		nextIID, err := projectcounter.Next(ctx, tx, input.ProjectID, projectcounter.CounterMergeRequest)
+		if err != nil {
+			return oops.In("persistence.merge_request").With("project_id", input.ProjectID).Wrapf(err, "allocate merge request iid")
 		}
 		now := time.Now().UTC()
 		item := mergedomain.ProjectMergeRequest{

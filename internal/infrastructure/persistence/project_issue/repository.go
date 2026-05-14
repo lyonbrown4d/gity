@@ -7,6 +7,7 @@ import (
 	issuedomain "github.com/DaiYuANg/gity/internal/domain/issue"
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
+	projectcounter "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_counter"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
@@ -51,15 +52,9 @@ func (r *Repository) GetByProjectAndIID(ctx context.Context, projectID, iid int6
 func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain.ProjectIssue, error) {
 	var created issuedomain.ProjectIssue
 	err := r.base.InTx(ctx, nil, func(tx *dbx.Tx, repo *dbxrepo.Base[issuedomain.ProjectIssue, dbschema.ProjectIssueSchemaDef]) error {
-		nextIID := int64(1)
-		last, err := dbxrepo.Query(repo).
-			Where(dbschema.ProjectIssueSchema.ProjectID.Eq(input.ProjectID)).
-			OrderBy(dbschema.ProjectIssueSchema.IID.Desc()).
-			First(ctx)
-		if err == nil {
-			nextIID = last.IID + 1
-		} else if !persistence.IsNotFound(err) {
-			return oops.In("persistence.project_issue").With("project_id", input.ProjectID).Wrapf(err, "load last project issue")
+		nextIID, err := projectcounter.Next(ctx, tx, input.ProjectID, projectcounter.CounterIssue)
+		if err != nil {
+			return oops.In("persistence.project_issue").With("project_id", input.ProjectID).Wrapf(err, "allocate project issue iid")
 		}
 		state := strings.TrimSpace(input.State)
 		if state == "" {
@@ -80,7 +75,6 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (issuedomain
 			return fmt.Errorf("insert project issue: %w", err)
 		}
 		created = item
-		_ = tx
 		return nil
 	})
 	if err != nil {

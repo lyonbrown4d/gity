@@ -4,11 +4,11 @@ package main
 import (
 	"log"
 
-	workerapp "github.com/DaiYuANg/gity/cmd/workerapp"
+	"github.com/DaiYuANg/gity/internal/layout/worker"
 )
 
 func main() {
-	if err := workerapp.NewApp().Run(); err != nil {
+	if err := worker.NewApp().Run(); err != nil {
 		log.Fatal(err)
 	}
 }

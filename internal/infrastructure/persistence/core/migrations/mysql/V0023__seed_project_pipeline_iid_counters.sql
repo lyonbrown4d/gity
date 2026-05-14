@@ -1,0 +1,1 @@
+INSERT INTO `project_iid_counters` (`project_id`, `counter_name`, `current_value`, `created_at`, `updated_at`) SELECT `project_id`, 'pipeline', MAX(`iid`), UTC_TIMESTAMP(6), UTC_TIMESTAMP(6) FROM `project_pipelines` GROUP BY `project_id` ON DUPLICATE KEY UPDATE `current_value` = GREATEST(`current_value`, VALUES(`current_value`)), `updated_at` = VALUES(`updated_at`);

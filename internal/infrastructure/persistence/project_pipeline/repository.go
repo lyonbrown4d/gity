@@ -7,6 +7,7 @@ import (
 	cidomain "github.com/DaiYuANg/gity/internal/domain/ci"
 	persistence "github.com/DaiYuANg/gity/internal/infrastructure/persistence"
 	dbschema "github.com/DaiYuANg/gity/internal/infrastructure/persistence/db_schema"
+	projectcounter "github.com/DaiYuANg/gity/internal/infrastructure/persistence/project_counter"
 	collectionx "github.com/arcgolabs/collectionx/list"
 	"github.com/arcgolabs/dbx"
 	"github.com/arcgolabs/dbx/querydsl"
@@ -75,10 +76,10 @@ func (r *Repository) GetLatestByProjectRefCommit(ctx context.Context, projectID 
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectPipeline, error) {
 	var created cidomain.ProjectPipeline
-	err := r.base.InTx(ctx, nil, func(_ *dbx.Tx, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef]) error {
-		nextIID, err := nextPipelineIID(ctx, repo, input.ProjectID)
+	err := r.base.InTx(ctx, nil, func(tx *dbx.Tx, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef]) error {
+		nextIID, err := projectcounter.Next(ctx, tx, input.ProjectID, projectcounter.CounterPipeline)
 		if err != nil {
-			return err
+			return oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "allocate pipeline iid")
 		}
 		item := newProjectPipeline(input, nextIID)
 		if err := repo.Create(ctx, &item); err != nil {
@@ -91,20 +92,6 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 		return cidomain.ProjectPipeline{}, oops.In("persistence.pipeline").With("project_id", input.ProjectID).Wrapf(err, "create pipeline")
 	}
 	return created, nil
-}
-
-func nextPipelineIID(ctx context.Context, repo *dbxrepo.Base[cidomain.ProjectPipeline, dbschema.ProjectPipelineSchemaDef], projectID int64) (int64, error) {
-	last, err := dbxrepo.Query(repo).
-		Where(dbschema.ProjectPipelineSchema.ProjectID.Eq(projectID)).
-		OrderBy(dbschema.ProjectPipelineSchema.IID.Desc()).
-		First(ctx)
-	if err == nil {
-		return last.IID + 1, nil
-	}
-	if persistence.IsNotFound(err) {
-		return 1, nil
-	}
-	return 0, oops.In("persistence.pipeline").With("project_id", projectID).Wrapf(err, "load last pipeline")
 }
 
 func newProjectPipeline(input CreateInput, iid int64) cidomain.ProjectPipeline {

@@ -13,6 +13,7 @@ import (
 	postgresDialect "github.com/arcgolabs/dbx/dialect/postgres"
 	sqliteDialect "github.com/arcgolabs/dbx/dialect/sqlite"
 	_ "github.com/go-sql-driver/mysql" // Register the MySQL database driver.
+	_ "github.com/lib/pq"              // Register the PostgreSQL database driver.
 	"github.com/samber/oops"
 	_ "modernc.org/sqlite" // Register the SQLite database driver.
 )
