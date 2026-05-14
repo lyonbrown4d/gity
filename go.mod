@@ -9,12 +9,13 @@ require (
 	github.com/arcgolabs/collectionx/mapping v0.8.0
 	github.com/arcgolabs/collectionx/set v0.8.0
 	github.com/arcgolabs/configx v0.3.2
-	github.com/arcgolabs/dbx v0.1.7
+	github.com/arcgolabs/dbx v0.1.8
+	github.com/arcgolabs/dbx/audit v0.1.0
 	github.com/arcgolabs/dbx/migrate v0.1.2
 	github.com/arcgolabs/dix v0.10.0
 	github.com/arcgolabs/eventx v0.1.2
-	github.com/arcgolabs/httpx v0.1.5
-	github.com/arcgolabs/httpx/adapter/fiber v0.1.5
+	github.com/arcgolabs/httpx v0.1.6
+	github.com/arcgolabs/httpx/adapter/fiber v0.1.6
 	github.com/arcgolabs/logx v0.1.2
 	github.com/arcgolabs/mapper v0.1.2
 	github.com/arcgolabs/plano v0.8.0
@@ -49,7 +50,7 @@ require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
-	github.com/arcgolabs/httpx/adapter/std v0.1.5 // indirect
+	github.com/arcgolabs/httpx/adapter/std v0.1.6 // indirect
 	github.com/arcgolabs/observabilityx v0.4.0 // indirect
 	github.com/arcgolabs/pkg/option v0.0.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect

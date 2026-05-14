@@ -13,6 +13,7 @@ import (
 	identityports "github.com/lyonbrown4d/gity/internal/application/ports"
 	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbaudit "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_audit"
 	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 )
 
@@ -24,7 +25,12 @@ type CreateInput = identityports.CreateProjectDeployKeyInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[identity.ProjectDeployKey](db, dbschema.ProjectDeployKeySchema, dbxrepo.WithKeyNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[identity.ProjectDeployKey](
+			db,
+			dbschema.ProjectDeployKeySchema,
+			dbxrepo.WithKeyNotFoundAsError(true),
+			dbxrepo.WithAuditWriter(dbaudit.ProjectDeployKeyAudit()),
+		),
 	}, nil
 }
 

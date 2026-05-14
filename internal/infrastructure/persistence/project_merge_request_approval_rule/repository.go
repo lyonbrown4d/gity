@@ -14,6 +14,7 @@ import (
 	mergeports "github.com/lyonbrown4d/gity/internal/application/ports"
 	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbaudit "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_audit"
 	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"github.com/samber/oops"
 )
@@ -27,7 +28,12 @@ type UpdateInput = mergeports.UpdateProjectMergeRequestApprovalRuleInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[mergedomain.ProjectMergeRequestApprovalRule](db, dbschema.ProjectMergeRequestApprovalRuleSchema, dbxrepo.WithKeyNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[mergedomain.ProjectMergeRequestApprovalRule](
+			db,
+			dbschema.ProjectMergeRequestApprovalRuleSchema,
+			dbxrepo.WithKeyNotFoundAsError(true),
+			dbxrepo.WithAuditWriter(dbaudit.ProjectMergeRequestApprovalRuleAudit()),
+		),
 	}, nil
 }
 

@@ -36,6 +36,10 @@ func Post[I, O any](path string, handler httpx.TypedHandler[I, O], options ...Ro
 	return Route(httpx.MethodPost, path, handler, options...)
 }
 
+func Put[I, O any](path string, handler httpx.TypedHandler[I, O], options ...RouteOption[I, O]) EndpointRoute {
+	return Route(httpx.MethodPut, path, handler, options...)
+}
+
 func Patch[I, O any](path string, handler httpx.TypedHandler[I, O], options ...RouteOption[I, O]) EndpointRoute {
 	return Route(httpx.MethodPatch, path, handler, options...)
 }

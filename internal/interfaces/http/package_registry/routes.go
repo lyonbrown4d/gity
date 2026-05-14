@@ -111,6 +111,11 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 			httpapi.RequireProjectActionRoute[projectPackagesInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
 			httpapi.DeprecatedRoute[projectPackagesInput, packageOutput]("Use GET /projects/{id}/packages instead."),
 		),
+	)
+
+	e.registerProtocolRoutes(registrar, authRuntime, projectScope)
+
+	httpapi.MustRegisterRoutes(registrar,
 		httpapi.Get("/projects/{id}/packages/{package_id}", getPackage, httpapi.RequireProjectActionRoute[packageInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead)),
 		httpapi.Get("/repos/{id}/packages/{package_id}", getPackage,
 			httpapi.RequireProjectActionRoute[packageInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),

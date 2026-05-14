@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"strings"
+
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
@@ -11,7 +13,6 @@ import (
 	packagedomain "github.com/lyonbrown4d/gity/internal/domain/package_registry"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/samber/oops"
-	"strings"
 )
 
 type Service struct {
@@ -123,8 +124,8 @@ func normalizeUploadFileInput(projectID int64, input UploadFileInput) (normalize
 	packageType := strings.TrimSpace(input.Type)
 	packageName := strings.TrimSpace(input.Name)
 	versionValue := strings.TrimSpace(input.Version)
-	fileName := strings.TrimSpace(input.FileName)
-	filePath := strings.TrimSpace(input.FilePath)
+	fileName := normalizeFileName(input.FileName)
+	filePath := normalizeFilePath(input.FilePath)
 	if packageType == "" || packageName == "" || versionValue == "" || fileName == "" {
 		return normalizedUploadFile{}, oops.In("package_registry").With("project_id", projectID, "type", packageType, "name", packageName, "version", versionValue, "file_name", fileName).New("type, name, version, and file_name are required")
 	}
@@ -198,21 +199,11 @@ func (s *Service) createAndStoreFile(ctx context.Context, project projectdomain.
 }
 
 func (s *Service) GetFileContent(ctx context.Context, projectID, fileID int64) (PackageFileContent, error) {
-	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return PackageFileContent{}, apperror.NotFound("project not found", err)
-	}
-	fileRecord, err := s.fileRepo.GetByID(ctx, fileID)
+	blob, err := s.GetFileBlob(ctx, projectID, fileID)
 	if err != nil {
-		if errors.Is(err, storageports.ErrNotFound) {
-			return PackageFileContent{}, apperror.NotFound("package file not found", err)
-		}
-		return PackageFileContent{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileID).Wrapf(err, "load package file")
+		return PackageFileContent{}, err
 	}
-	content, err := s.storage.Load(ctx, fileRecord.StorageKey)
-	if err != nil {
-		return PackageFileContent{}, apperror.NotFound("package file content not found", err)
-	}
-	return PackageFileContent{File: fileRecord, Content: base64.StdEncoding.EncodeToString(content)}, nil
+	return PackageFileContent{File: blob.File, Content: base64.StdEncoding.EncodeToString(blob.Content)}, nil
 }
 
 func (s *Service) loadPackage(ctx context.Context, projectID, packageID int64) (packagedomain.ProjectPackage, error) {

@@ -13,6 +13,7 @@ import (
 	projectports "github.com/lyonbrown4d/gity/internal/application/ports"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbaudit "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_audit"
 	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 )
 
@@ -24,7 +25,12 @@ type CreateInput = projectports.CreateProjectMemberInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[projectdomain.ProjectMember](db, dbschema.ProjectMemberSchema, dbxrepo.WithKeyNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[projectdomain.ProjectMember](
+			db,
+			dbschema.ProjectMemberSchema,
+			dbxrepo.WithKeyNotFoundAsError(true),
+			dbxrepo.WithAuditWriter(dbaudit.ProjectMemberAudit()),
+		),
 	}, nil
 }
 

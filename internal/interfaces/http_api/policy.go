@@ -3,8 +3,10 @@ package httpapi
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
+	auditx "github.com/arcgolabs/dbx/audit"
 	"github.com/arcgolabs/httpx"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
@@ -52,12 +54,13 @@ func RequireUser[I AuthorizationInput, O any](authRuntime *infraauth.Runtime) ht
 				return nil
 			}
 			return func(ctx context.Context, input *I) (*O, error) {
-				if _, ok, err := authenticateHeader(ctx, authRuntime, authorizationHeader(input)); err != nil {
+				principal, ok, err := authenticateHeader(ctx, authRuntime, authorizationHeader(input))
+				if err != nil {
 					return nil, err
 				} else if !ok {
 					return nil, httpx.NewError(http.StatusUnauthorized, "authentication required")
 				}
-				return next(ctx, input)
+				return next(auditUserRequestContext(ctx, principal), input)
 			}
 		},
 	}
@@ -118,7 +121,7 @@ func authorizeProjectRequest[I ProjectInput, O any](ctx context.Context, input *
 	if err := authorizeProjectAccess(ctx, authRuntime, principal, scope, action); err != nil {
 		return nil, err
 	}
-	return next(ctx, input)
+	return next(auditProjectRequestContext(ctx, principal, scope, action), input)
 }
 
 func resolveProjectScope[I ProjectInput](ctx context.Context, input *I, resolver ProjectScopeResolver) (infraauth.ProjectScope, error) {
@@ -177,4 +180,40 @@ func projectID[I ProjectInput](input *I) int64 {
 		return 0
 	}
 	return (*input).ProjectIDValue()
+}
+
+func auditUserRequestContext(ctx context.Context, principal infraauth.Principal) context.Context {
+	ctx = auditx.WithRevisionScope(ctx)
+	if actor := auditPrincipalLabel(principal); actor != "" {
+		ctx = auditx.WithActor(ctx, actor)
+	}
+	return ctx
+}
+
+func auditProjectRequestContext(ctx context.Context, principal infraauth.Principal, scope infraauth.ProjectScope, action string) context.Context {
+	ctx = auditUserRequestContext(ctx, principal)
+	if scope.ID > 0 {
+		ctx = auditx.WithTenant(ctx, "project:"+strconv.FormatInt(scope.ID, 10))
+	}
+	if strings.TrimSpace(action) != "" {
+		ctx = auditx.WithReason(ctx, action)
+	}
+	if scope.OrganizationID > 0 {
+		ctx = auditx.WithMetadata(ctx, "organization:"+strconv.FormatInt(scope.OrganizationID, 10))
+	}
+	return ctx
+}
+
+func auditPrincipalLabel(principal infraauth.Principal) string {
+	if principal.UserID <= 0 {
+		return ""
+	}
+	parts := []string{"user", strconv.FormatInt(principal.UserID, 10)}
+	if username := strings.TrimSpace(principal.Username); username != "" {
+		parts = append(parts, username)
+	}
+	if tokenKind := strings.TrimSpace(principal.TokenKind); tokenKind != "" {
+		parts = append(parts, tokenKind)
+	}
+	return strings.Join(parts, ":")
 }

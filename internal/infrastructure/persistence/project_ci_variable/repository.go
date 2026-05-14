@@ -14,6 +14,7 @@ import (
 	ciports "github.com/lyonbrown4d/gity/internal/application/ports"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbaudit "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_audit"
 	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"github.com/samber/oops"
 )
@@ -26,7 +27,12 @@ type UpsertInput = ciports.UpsertProjectCIVariableInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[cidomain.ProjectCIVariable](db, dbschema.ProjectCIVariableSchema, dbxrepo.WithKeyNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[cidomain.ProjectCIVariable](
+			db,
+			dbschema.ProjectCIVariableSchema,
+			dbxrepo.WithKeyNotFoundAsError(true),
+			dbxrepo.WithAuditWriter(dbaudit.ProjectCIVariableAudit()),
+		),
 	}, nil
 }
 

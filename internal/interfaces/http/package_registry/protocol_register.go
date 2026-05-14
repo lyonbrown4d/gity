@@ -1,0 +1,61 @@
+package packageregistry
+
+import (
+	"github.com/arcgolabs/httpx"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+)
+
+func (e *Endpoint) registerProtocolRoutes(registrar httpx.Registrar, authRuntime *infraauth.Runtime, projectScope httpapi.ProjectScopeResolver) {
+	httpapi.MustRegisterRoutes(registrar,
+		httpapi.Put("/projects/{id}/packages/generic/{package_name}/{package_version}/{file_name...}", e.uploadGenericPackageFile,
+			httpapi.RequireProjectActionRoute[protocolPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
+			httpapi.Operation[protocolPackageFileInput, packageOutput](httpx.OperationBinaryRequest("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/generic/{package_name}/{package_version}/{file_name...}", e.downloadGenericPackageFile,
+			httpapi.RequireProjectActionRoute[protocolPackageDownloadInput, packageBinaryOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[protocolPackageDownloadInput, packageBinaryOutput](httpx.OperationBinaryResponse("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/nuget/index.json", e.nugetServiceIndex,
+			httpapi.RequireProjectActionRoute[pypiIndexInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+		),
+		httpapi.Put("/projects/{id}/packages/nuget/{package_name}/{package_version}/{file_name...}", e.uploadNuGetPackageFile,
+			httpapi.RequireProjectActionRoute[protocolPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
+			httpapi.Operation[protocolPackageFileInput, packageOutput](httpx.OperationBinaryRequest("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/nuget/{package_name}/{package_version}/{file_name...}", e.downloadNuGetPackageFile,
+			httpapi.RequireProjectActionRoute[protocolPackageDownloadInput, packageBinaryOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[protocolPackageDownloadInput, packageBinaryOutput](httpx.OperationBinaryResponse("application/octet-stream")),
+		),
+		httpapi.Put("/projects/{id}/packages/maven/{file_path...}", e.uploadMavenPackageFile,
+			httpapi.RequireProjectActionRoute[mavenPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
+			httpapi.Operation[mavenPackageFileInput, packageOutput](httpx.OperationBinaryRequest("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/maven/{file_path...}", e.downloadMavenPackageFile,
+			httpapi.RequireProjectActionRoute[mavenPackageDownloadInput, packageBinaryOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[mavenPackageDownloadInput, packageBinaryOutput](httpx.OperationBinaryResponse("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/npm/{package_name...}", e.getNPMPackageMetadata,
+			httpapi.RequireProjectActionRoute[npmPackageInput, packageOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+		),
+		httpapi.Put("/projects/{id}/packages/npm/{package_name...}", e.publishNPMPackage,
+			httpapi.RequireProjectActionRoute[npmPublishInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
+		),
+		httpapi.Get("/projects/{id}/packages/pypi/simple", e.pypiSimpleIndex,
+			httpapi.RequireProjectActionRoute[pypiIndexInput, packageHTMLOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[pypiIndexInput, packageHTMLOutput](httpx.OperationHTMLResponse()),
+		),
+		httpapi.Get("/projects/{id}/packages/pypi/simple/{package_name}", e.pypiSimplePackage,
+			httpapi.RequireProjectActionRoute[pypiPackageInput, packageHTMLOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[pypiPackageInput, packageHTMLOutput](httpx.OperationHTMLResponse()),
+		),
+		httpapi.Put("/projects/{id}/packages/pypi/{package_name}/{package_version}/{file_name...}", e.uploadPyPIPackageFile,
+			httpapi.RequireProjectActionRoute[protocolPackageFileInput, packageOutput]("require_package_write", authRuntime, projectScope, infraauth.ProjectActionPackageWrite),
+			httpapi.Operation[protocolPackageFileInput, packageOutput](httpx.OperationBinaryRequest("application/octet-stream")),
+		),
+		httpapi.Get("/projects/{id}/packages/files/{file_id}/download", e.downloadPackageFile,
+			httpapi.RequireProjectActionRoute[packageFileDownloadInput, packageBinaryOutput]("require_package_read", authRuntime, projectScope, infraauth.ProjectActionPackageRead),
+			httpapi.Operation[packageFileDownloadInput, packageBinaryOutput](httpx.OperationBinaryResponse("application/octet-stream")),
+		),
+	)
+}

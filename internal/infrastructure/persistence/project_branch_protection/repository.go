@@ -10,6 +10,7 @@ import (
 	projectports "github.com/lyonbrown4d/gity/internal/application/ports"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	persistence "github.com/lyonbrown4d/gity/internal/infrastructure/persistence"
+	dbaudit "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_audit"
 	dbschema "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/db_schema"
 	"strings"
 	"time"
@@ -23,7 +24,12 @@ type UpsertInput = projectports.UpsertProjectBranchProtectionInput
 
 func NewRepository(db *dbx.DB) (*Repository, error) {
 	return &Repository{
-		base: dbxrepo.NewWithOptions[projectdomain.ProjectBranchProtection](db, dbschema.ProjectBranchProtectionSchema, dbxrepo.WithKeyNotFoundAsError(true)),
+		base: dbxrepo.NewWithOptions[projectdomain.ProjectBranchProtection](
+			db,
+			dbschema.ProjectBranchProtectionSchema,
+			dbxrepo.WithKeyNotFoundAsError(true),
+			dbxrepo.WithAuditWriter(dbaudit.ProjectBranchProtectionAudit()),
+		),
 	}, nil
 }
 
