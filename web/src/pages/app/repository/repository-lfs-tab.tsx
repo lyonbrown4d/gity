@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Copy, Database, Lock, RefreshCw, Unlock } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,16 +12,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { RepositoryLFSLockView, RepositoryLFSObjectView, RepositoryView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveBody, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryLFSTabProps {
   repoId: string;
   repository: RepositoryView;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
 
-export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryLFSTabProps): JSX.Element => {
+export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }: RepositoryLFSTabProps): JSX.Element => {
   const objectsQuery = useCustom<RawRecord>({
     url: `/projects/${repoId}/lfs/objects`,
     method: "get",
@@ -52,6 +55,7 @@ export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryL
   const totalBytes = objects.reduce((sum, item) => sum + item.byte_size, 0);
   const isLoadingObjects = objectsQuery.isFetching && !objectsQuery.data;
   const isLoadingLocks = locksQuery.isFetching && !locksQuery.data;
+  const canWriteLFS = permissions.canWrite;
   const lfsEndpoint = `${repository.clone_http_url.replace(/\/$/, "")}/info/lfs`;
   const setupCommand = [
     "git lfs install",
@@ -145,6 +149,12 @@ export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryL
           <LFSStat label={t("Locks")} value={locks.length} />
         </div>
 
+        {!canWriteLFS ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect LFS, but cannot manage locks.")}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -209,12 +219,13 @@ export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryL
                     <Input
                       id="lfs-lock-path"
                       value={lockPath}
+                      disabled={!canWriteLFS}
                       onChange={(event) => setLockPath(event.target.value)}
                       placeholder="assets/design.psd"
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button type="submit" disabled={isCreatingLock}>
+                    <Button type="submit" disabled={!canWriteLFS || isCreatingLock}>
                       <Lock className="size-4" />
                       {isCreatingLock ? t("Locking...") : t("Create lock")}
                     </Button>
@@ -245,7 +256,7 @@ export const RepositoryLFSTab = ({ repoId, repository, t, onError }: RepositoryL
                         cancelLabel={t("Cancel")}
                         onConfirm={() => void submitUnlock(item)}
                       >
-                        <Button type="button" size="sm" variant="outline" disabled={isUnlocking}>
+                        <Button type="button" size="sm" variant="outline" disabled={!canWriteLFS || isUnlocking}>
                           <Unlock className="size-4" />
                           {t("Unlock")}
                         </Button>

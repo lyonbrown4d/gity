@@ -22,16 +22,18 @@ type Service struct {
 }
 
 type CreateInput struct {
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Email       string `json:"email"`
+	Username     string `json:"username"`
+	DisplayName  string `json:"display_name"`
+	Email        string `json:"email"`
+	IsSuperAdmin bool   `json:"is_super_admin"`
 }
 
 type UpdateInput struct {
-	Username    *string `json:"username"`
-	DisplayName *string `json:"display_name"`
-	Email       *string `json:"email"`
-	Status      *string `json:"status"`
+	Username     *string `json:"username"`
+	DisplayName  *string `json:"display_name"`
+	Email        *string `json:"email"`
+	Status       *string `json:"status"`
+	IsSuperAdmin *bool   `json:"is_super_admin"`
 }
 
 type CreateTokenInput struct {
@@ -80,9 +82,10 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User,
 		input.DisplayName = input.Username
 	}
 	item, err := s.repo.Create(ctx, identityports.CreateUserInput{
-		Username:    input.Username,
-		DisplayName: input.DisplayName,
-		Email:       input.Email,
+		Username:     input.Username,
+		DisplayName:  input.DisplayName,
+		Email:        input.Email,
+		IsSuperAdmin: input.IsSuperAdmin,
 	})
 	if err != nil {
 		return identity.User{}, oops.In("user").With("username", input.Username, "email", input.Email).Wrapf(err, "create user")
@@ -102,9 +105,10 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 		input.DisplayName = &displayName
 	}
 	if err := s.repo.UpdateByID(ctx, id, identityports.UpdateUserInput{
-		Username:    input.Username,
-		DisplayName: input.DisplayName,
-		Email:       input.Email,
+		Username:     input.Username,
+		DisplayName:  input.DisplayName,
+		Email:        input.Email,
+		IsSuperAdmin: input.IsSuperAdmin,
 	}); err != nil {
 		return identity.User{}, oops.In("user").With("user_id", id).Wrapf(err, "update user")
 	}
@@ -135,16 +139,29 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 		if !errors.Is(err, identityports.ErrNotFound) {
 			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "load login user")
 		}
+		firstUser, firstUserErr := s.isFirstUser(ctx)
+		if firstUserErr != nil {
+			return AuthSession{}, firstUserErr
+		}
 		user, err = s.Create(ctx, CreateInput{
-			Username:    username,
-			DisplayName: username,
-			Email:       username + "@local.gity",
+			Username:     username,
+			DisplayName:  username,
+			Email:        username + "@local.gity",
+			IsSuperAdmin: firstUser,
 		})
 		if err != nil {
 			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "create login user")
 		}
 	}
 	return s.createSession(ctx, user)
+}
+
+func (s *Service) isFirstUser(ctx context.Context) (bool, error) {
+	users, err := s.repo.List(ctx)
+	if err != nil {
+		return false, oops.In("user").Wrapf(err, "check bootstrap user")
+	}
+	return users.Len() == 0, nil
 }
 
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (AuthSession, error) {

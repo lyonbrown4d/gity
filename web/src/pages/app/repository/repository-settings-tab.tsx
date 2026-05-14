@@ -1,10 +1,13 @@
 import { ConfirmAction } from "@/components/common/confirm-action";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RepositoryView } from "@/pages/types";
+import type { RepositoryPermissions } from "./repository-permissions";
 
 interface RepositorySettingsTabProps {
   repository: RepositoryView;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   isDeleting: boolean;
   onDelete: (confirmation: string) => void;
@@ -12,10 +15,13 @@ interface RepositorySettingsTabProps {
 
 export const RepositorySettingsTab = ({
   repository,
+  permissions,
   t,
   isDeleting,
   onDelete,
 }: RepositorySettingsTabProps): JSX.Element => {
+  const canDeleteProject = permissions.projectDelete;
+
   return (
     <Card className="card-enter">
       <CardHeader>
@@ -44,6 +50,11 @@ export const RepositorySettingsTab = ({
           <p className="mt-1 text-xs text-destructive/80">
             {t("Deleting a project is irreversible.")}
           </p>
+          {!canDeleteProject ? (
+            <Alert className="mt-3 bg-background/70">
+              <AlertDescription>{t("Only project owners can delete this project.")}</AlertDescription>
+            </Alert>
+          ) : null}
           <ConfirmAction
             title={t("Delete project \"{name}\"?").replace("{name}", repository.name)}
             description={t("This action cannot be undone.")}
@@ -54,7 +65,7 @@ export const RepositorySettingsTab = ({
             verificationPlaceholder={repository.full_path}
             onConfirm={(verification) => onDelete(verification ?? "")}
           >
-            <Button type="button" variant="destructive" size="sm" className="mt-3" disabled={isDeleting}>
+            <Button type="button" variant="destructive" size="sm" className="mt-3" disabled={!canDeleteProject || isDeleting}>
               {t("Delete")}
             </Button>
           </ConfirmAction>

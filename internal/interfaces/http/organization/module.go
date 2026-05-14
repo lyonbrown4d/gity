@@ -11,7 +11,7 @@ func Module() dix.Module {
 		"endpoint.organization",
 		dix.Description("Organization routes"),
 		dix.Providers(
-			dix.Provider1(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(40))),
+			dix.Provider2(NewEndpoint, dix.Into[httpx.Endpoint](dix.Order(40))),
 		),
 	)
 }

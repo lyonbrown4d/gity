@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Package, Plus, RefreshCw } from "lucide-react";
 import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,17 +19,19 @@ import type {
   RepositoryPackageView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeNumber, normalizeOptionalString, normalizeString, resolveBody, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
 interface RepositoryPackagesTabProps {
   repoId: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
 
 type RawPackage = RawRecord;
 
-export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackagesTabProps): JSX.Element => {
+export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: RepositoryPackagesTabProps): JSX.Element => {
   const dataProvider = useDataProvider();
   const packagesQuery = useCustom<RawPackage[]>({
     url: `/projects/${repoId}/packages`,
@@ -74,6 +77,7 @@ export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackages
   const totalFiles = packageDetail?.versions.reduce((total, item) => total + item.files.length, 0) ?? 0;
   const isLoadingPackages = packagesQuery.isFetching && !packagesQuery.data;
   const isLoadingDetail = packageDetailQuery.isFetching && !packageDetailQuery.data;
+  const canWritePackages = permissions.packageWrite;
 
   const loadPackages = async () => {
     const result = await packagesQuery.refetch();
@@ -223,6 +227,7 @@ export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackages
           <Button
             type="button"
             variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canWritePackages}
             onClick={() => setComposerOpen((current) => !current)}
           >
             <Plus className="size-4" />
@@ -233,6 +238,12 @@ export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackages
             {t("Reload")}
           </Button>
         </div>
+
+        {!canWritePackages ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect packages, but cannot upload them.")}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {isComposerOpen ? (
           <form className="space-y-3 rounded-md border p-3" onSubmit={submitUpload}>
@@ -317,7 +328,7 @@ export const RepositoryPackagesTab = ({ repoId, t, onError }: RepositoryPackages
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={isUploading}>
+              <Button type="submit" disabled={!canWritePackages || isUploading}>
                 {isUploading ? t("Uploading package file...") : t("Upload file")}
               </Button>
             </div>

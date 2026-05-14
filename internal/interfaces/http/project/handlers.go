@@ -9,21 +9,38 @@ import (
 	collectionlist "github.com/arcgolabs/collectionx/list"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
 )
 
 func (e *Endpoint) listProjects(ctx context.Context, in *projectsInput) (*projectOutput, error) {
+	principal, err := e.requirePermissionPrincipal(ctx, in.Authorization)
+	if err != nil {
+		return nil, err
+	}
 	organizationFilter := projectOrganizationFilter(in)
 	items, err := e.service.List(ctx, organizationFilter)
 	if err != nil {
 		return nil, err
 	}
 	idFilter := parseIDFilter(in.IDs)
-	views := collectionlist.FilterMapList(items, func(_ int, item projectdomain.Project) (repositoryView, bool) {
+	projectItems := items.Values()
+	visible := make([]projectdomain.Project, 0, len(projectItems))
+	for i := range projectItems {
+		item := projectItems[i]
 		if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
-			return repositoryView{}, false
+			continue
 		}
-		return toRepositoryView(item, e.settings), true
+		allowed, err := e.authRuntime.CanProjectAction(ctx, principal, projectAuthScope(item), infraauth.ProjectActionRead)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			visible = append(visible, item)
+		}
+	}
+	views := collectionlist.MapList(collectionlist.NewList(visible...), func(_ int, item projectdomain.Project) repositoryView {
+		return toRepositoryView(item, e.settings)
 	}).Values()
 	return &projectOutput{Body: views}, nil
 }

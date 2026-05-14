@@ -73,7 +73,7 @@ func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *user
 		if err != nil {
 			return authx.AuthenticationResult{}, oops.In("auth").With("user_id", record.UserID).Wrapf(err, "load token user")
 		}
-		return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username}}, nil
+		return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username, IsSuperAdmin: user.IsSuperAdmin != 0}}, nil
 	})
 }
 
@@ -100,6 +100,9 @@ func authorizationProjectScope(input authx.AuthorizationModel) (Principal, int64
 }
 
 func authorizeProject(ctx context.Context, memberRepository *organizationmemberrepo.Repository, action string, principal Principal, organizationID int64, visibility string) authx.Decision {
+	if principal.IsSuperAdmin {
+		return authx.Decision{Allowed: true, PolicyID: "super_admin"}
+	}
 	switch action {
 	case ProjectActionRead, ProjectActionRepositoryRead, ProjectActionPackageRead, ProjectActionWikiRead:
 		return authorizeProjectRead(ctx, memberRepository, principal, organizationID, visibility)

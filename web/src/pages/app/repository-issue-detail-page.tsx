@@ -19,6 +19,7 @@ import type {
 import { IssueMarkdownEditor } from "@/pages/app/repository/issue-markdown-editor";
 import { renderIssueMarkdown } from "@/pages/app/repository/issue-markdown";
 import { extractErrorMessage, formatRelativeTime } from "@/pages/app/repository/issues-utils";
+import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
 import {
   isRecord,
   normalizeOptionalString,
@@ -70,6 +71,15 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   const repoId = params.projectId ?? params.repoId ?? "";
   const issueNumber = Number.parseInt(params.issueNumber ?? "", 10);
   const isIssueNumberValid = Number.isFinite(issueNumber) && issueNumber > 0;
+  const permissionsQuery = useCustom<RawRecord>({
+    url: repoId ? `/projects/${repoId}/permissions` : "/projects/0/permissions",
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  });
 
   const issueQuery = useCustom<RepositoryIssueView>({
     url: `/projects/${repoId}/issues/${issueNumber}`,
@@ -130,6 +140,12 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   const isLoadingIssue = issueQuery.isFetching && !issueQuery.data;
   const isLoadingComments = commentsQuery.isFetching && !commentsQuery.data;
   const isLoadingCollaboration = assigneesQuery.isFetching || labelsQuery.isFetching || usersQuery.isFetching;
+  const repositoryPermissions = useMemo(
+    () => buildRepositoryPermissions(null, false, permissionsQuery.data?.data),
+    [permissionsQuery.data?.data],
+  );
+  const canWriteIssue = repositoryPermissions.issueWrite;
+  const canCommentIssue = repositoryPermissions.issueComment;
   const { mutateAsync: updateIssueStatus, isLoading: isUpdatingIssue } = useCustomMutation<RepositoryIssueView>();
   const { mutateAsync: createIssueComment, isLoading: isCreatingComment } = useCustomMutation<RepositoryIssueCommentView>();
   const { mutateAsync: setIssueAssignees, isLoading: isUpdatingAssignees } = useCustomMutation<RawRecord[]>();
@@ -356,7 +372,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
                 <Badge variant={issue.status === "open" ? "default" : "secondary"}>
                   {issue.status === "open" ? t("Open") : t("Closed")}
                 </Badge>
-                <Button type="button" size="sm" variant="outline" disabled={isUpdatingIssue} onClick={() => void toggleIssueStatus()}>
+                <Button type="button" size="sm" variant="outline" disabled={!canWriteIssue || isUpdatingIssue} onClick={() => void toggleIssueStatus()}>
                   {issue.status === "open" ? t("Close issue") : t("Reopen issue")}
                 </Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => navigate(-1)}>
@@ -385,6 +401,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
               isLoading={isLoadingCollaboration}
               isUpdatingAssignees={isUpdatingAssignees}
               isUpdatingLabels={isUpdatingLabels}
+              canEdit={canWriteIssue}
               t={t}
               onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
               onChangeLabelDraftName={setLabelDraftName}
@@ -417,25 +434,31 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
               ))}
             </div>
 
-            <form className="space-y-3 rounded-md border p-3" onSubmit={submitComment}>
-              <p className="text-sm font-medium">{t("Add a comment")}</p>
-              <IssueMarkdownEditor
-                organizationId={organizationId}
-                repoId={repoId}
-                issueId={String(issue.number)}
-                t={t}
-                value={newComment}
-                placeholder={t("Comment with markdown, mention #123, or upload files...")}
-                editorHeight={220}
-                onChange={setNewComment}
-                onError={setActionError}
-              />
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isCreatingComment}>
-                  {isCreatingComment ? t("Commenting...") : t("Comment")}
-                </Button>
-              </div>
-            </form>
+            {canCommentIssue ? (
+              <form className="space-y-3 rounded-md border p-3" onSubmit={submitComment}>
+                <p className="text-sm font-medium">{t("Add a comment")}</p>
+                <IssueMarkdownEditor
+                  organizationId={organizationId}
+                  repoId={repoId}
+                  issueId={String(issue.number)}
+                  t={t}
+                  value={newComment}
+                  placeholder={t("Comment with markdown, mention #123, or upload files...")}
+                  editorHeight={220}
+                  onChange={setNewComment}
+                  onError={setActionError}
+                />
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={isCreatingComment}>
+                    {isCreatingComment ? t("Commenting...") : t("Comment")}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Alert>
+                <AlertDescription>{t("Your current project role can inspect issues, but cannot comment on them.")}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
       ) : null}
@@ -454,6 +477,7 @@ const IssueCollaborationPanel = ({
   isLoading,
   isUpdatingAssignees,
   isUpdatingLabels,
+  canEdit,
   t,
   onChangeAssigneeDraftUserID,
   onChangeLabelDraftName,
@@ -474,6 +498,7 @@ const IssueCollaborationPanel = ({
   isLoading: boolean;
   isUpdatingAssignees: boolean;
   isUpdatingLabels: boolean;
+  canEdit: boolean;
   t: (text: string) => string;
   onChangeAssigneeDraftUserID: (value: string) => void;
   onChangeLabelDraftName: (value: string) => void;
@@ -512,7 +537,7 @@ const IssueCollaborationPanel = ({
                   size="sm"
                   variant="ghost"
                   className="h-4 px-1 text-muted-foreground hover:text-foreground"
-                  disabled={isUpdatingAssignees}
+                  disabled={!canEdit || isUpdatingAssignees}
                   onClick={() => onRemoveAssignee(assignee.user_id)}
                 >
                   x
@@ -524,7 +549,7 @@ const IssueCollaborationPanel = ({
             <Select
               value={assigneeDraftUserID}
               onValueChange={onChangeAssigneeDraftUserID}
-              disabled={isUpdatingAssignees || availableUsers.length === 0}
+              disabled={!canEdit || isUpdatingAssignees || availableUsers.length === 0}
             >
               <SelectTrigger>
                 <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
@@ -537,7 +562,7 @@ const IssueCollaborationPanel = ({
                 ))}
               </SelectContent>
             </Select>
-            <Button type="button" size="sm" variant="outline" disabled={isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
+            <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
               {isUpdatingAssignees ? t("Saving...") : t("Add")}
             </Button>
           </div>
@@ -560,7 +585,7 @@ const IssueCollaborationPanel = ({
                   size="sm"
                   variant="ghost"
                   className="h-4 px-1 text-muted-foreground hover:text-foreground"
-                  disabled={isUpdatingLabels}
+                  disabled={!canEdit || isUpdatingLabels}
                   onClick={() => onRemoveLabel(label.name)}
                 >
                   x
@@ -575,6 +600,7 @@ const IssueCollaborationPanel = ({
                 id="issue-label-name"
                 value={labelDraftName}
                 placeholder={t("Label name")}
+                disabled={!canEdit}
                 onChange={(event) => onChangeLabelDraftName(event.target.value)}
               />
             </div>
@@ -584,10 +610,11 @@ const IssueCollaborationPanel = ({
                 id="issue-label-color"
                 value={labelDraftColor}
                 placeholder="#2563eb"
+                disabled={!canEdit}
                 onChange={(event) => onChangeLabelDraftColor(event.target.value)}
               />
             </div>
-            <Button type="button" size="sm" variant="outline" disabled={isUpdatingLabels || !labelDraftName.trim()} onClick={onAddLabel}>
+            <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingLabels || !labelDraftName.trim()} onClick={onAddLabel}>
               {isUpdatingLabels ? t("Saving...") : t("Add")}
             </Button>
           </div>

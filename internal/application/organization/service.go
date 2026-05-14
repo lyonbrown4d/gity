@@ -15,6 +15,7 @@ import (
 
 var organizationMemberRoles = setx.NewSet("guest", "reporter", "developer", "maintainer", "owner")
 var organizationVisibilities = setx.NewSet("private", "internal", "public")
+var organizationManageRoles = setx.NewSet("owner")
 
 type Service struct {
 	logger     *slog.Logger
@@ -179,6 +180,27 @@ func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]Memb
 	}).Values(), nil
 }
 
+func (s *Service) CanRead(ctx context.Context, item organizationdomain.Organization, userID int64) (bool, error) {
+	switch strings.TrimSpace(strings.ToLower(item.Visibility)) {
+	case "public", "internal":
+		return true, nil
+	}
+	return s.isMember(ctx, item.ID, userID)
+}
+
+func (s *Service) CanManage(ctx context.Context, organizationID, userID int64) (bool, error) {
+	member, err := s.memberRepo.FindByOrganizationAndUser(ctx, organizationID, userID)
+	if err != nil {
+		if errors.Is(err, organizationports.ErrNotFound) {
+			return false, nil
+		}
+		return false, oops.In("organization").
+			With("organization_id", organizationID, "user_id", userID).
+			Wrapf(err, "load organization membership")
+	}
+	return organizationManageRoles.Contains(strings.TrimSpace(member.Role)), nil
+}
+
 func (s *Service) AddMember(ctx context.Context, organizationID int64, input AddMemberInput) (MemberView, error) {
 	if organizationID <= 0 {
 		return MemberView{}, oops.In("organization").With("organization_id", organizationID).New("organization id is required")
@@ -209,6 +231,18 @@ func (s *Service) AddMember(ctx context.Context, organizationID int64, input Add
 		return MemberView{}, oops.In("organization").With("organization_id", organizationID, "user_id", input.UserID, "role", role).Wrapf(err, "create organization member")
 	}
 	return buildMemberView(member, user), nil
+}
+
+func (s *Service) isMember(ctx context.Context, organizationID, userID int64) (bool, error) {
+	if _, err := s.memberRepo.FindByOrganizationAndUser(ctx, organizationID, userID); err != nil {
+		if errors.Is(err, organizationports.ErrNotFound) {
+			return false, nil
+		}
+		return false, oops.In("organization").
+			With("organization_id", organizationID, "user_id", userID).
+			Wrapf(err, "load organization membership")
+	}
+	return true, nil
 }
 
 func normalizeMemberRole(value string) string {

@@ -1,39 +1,47 @@
 package organization
 
 import (
+	"strconv"
+	"strings"
+
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
 	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
 	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
+	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
-	"strconv"
-	"strings"
 )
 
 type createOrganizationInput struct {
-	Body createOrganizationBody `json:"body"`
+	Authorization string                 `header:"Authorization"`
+	Body          createOrganizationBody `json:"body"`
 }
 
 type organizationByIDInput struct {
-	ID int64 `path:"id"`
+	ID            int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type organizationsInput struct {
-	IDs string `query:"ids"`
+	Authorization string `header:"Authorization"`
+	IDs           string `query:"ids"`
 }
 
 type organizationMemberInput struct {
-	ID int64 `path:"id"`
+	ID            int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type addOrganizationMemberInput struct {
-	ID   int64                     `path:"id"`
-	Body addOrganizationMemberBody `json:"body"`
+	ID            int64                     `path:"id"`
+	Authorization string                    `header:"Authorization"`
+	Body          addOrganizationMemberBody `json:"body"`
 }
 
 type updateOrganizationInput struct {
-	ID   int64                  `path:"id"`
-	Body updateOrganizationBody `json:"body"`
+	ID            int64                  `path:"id"`
+	Authorization string                 `header:"Authorization"`
+	Body          updateOrganizationBody `json:"body"`
 }
 
 type organizationOutput struct {
@@ -81,11 +89,12 @@ type organizationMemberView struct {
 }
 
 type Endpoint struct {
-	service *organizationservice.Service
+	service     *organizationservice.Service
+	authRuntime *infraauth.Runtime
 }
 
-func NewEndpoint(service *organizationservice.Service) *Endpoint {
-	return &Endpoint{service: service}
+func NewEndpoint(service *organizationservice.Service, authRuntime *infraauth.Runtime) *Endpoint {
+	return &Endpoint{service: service, authRuntime: authRuntime}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
@@ -94,14 +103,38 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/orgs", e.listOrganizations),
-		httpapi.Get("/orgs/{id}", e.getOrganization),
-		httpapi.Post("/orgs", e.createOrganization),
-		httpapi.Patch("/orgs/{id}", e.updateOrganization),
-		httpapi.Delete("/orgs/{id}", e.deleteOrganization),
-		httpapi.Get("/orgs/{id}/members", e.listMembers),
-		httpapi.Post("/orgs/{id}/members", e.addMember),
+		httpapi.Get("/orgs", e.listOrganizations, httpapi.RequireUserRoute[organizationsInput, organizationOutput](e.authRuntime)),
+		httpapi.Get("/orgs/{id}", e.getOrganization, httpapi.RequireUserRoute[organizationByIDInput, organizationOutput](e.authRuntime)),
+		httpapi.Post("/orgs", e.createOrganization, httpapi.RequireUserRoute[createOrganizationInput, organizationOutput](e.authRuntime)),
+		httpapi.Patch("/orgs/{id}", e.updateOrganization, httpapi.RequireUserRoute[updateOrganizationInput, organizationOutput](e.authRuntime)),
+		httpapi.Delete("/orgs/{id}", e.deleteOrganization, httpapi.RequireUserRoute[organizationByIDInput, organizationOutput](e.authRuntime)),
+		httpapi.Get("/orgs/{id}/members", e.listMembers, httpapi.RequireUserRoute[organizationMemberInput, organizationOutput](e.authRuntime)),
+		httpapi.Post("/orgs/{id}/members", e.addMember, httpapi.RequireUserRoute[addOrganizationMemberInput, organizationOutput](e.authRuntime)),
 	)
+}
+
+func (in createOrganizationInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in organizationByIDInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in organizationsInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in organizationMemberInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in addOrganizationMemberInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in updateOrganizationInput) AuthorizationHeader() string {
+	return in.Authorization
 }
 
 func toOrganizationView(item organizationdomain.Organization) organizationView {

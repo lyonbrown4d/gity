@@ -4,6 +4,7 @@ import (
 	"context"
 
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 )
 
@@ -12,7 +13,11 @@ func (e *Endpoint) projectScope(ctx context.Context, projectID int64) (infraauth
 	if err != nil {
 		return infraauth.ProjectScope{}, err
 	}
-	return infraauth.ProjectScope{ID: item.ID, OrganizationID: item.OrganizationID, Visibility: item.Visibility}, nil
+	return projectAuthScope(item), nil
+}
+
+func projectAuthScope(item projectdomain.Project) infraauth.ProjectScope {
+	return infraauth.ProjectScope{ID: item.ID, OrganizationID: item.OrganizationID, Visibility: item.Visibility}
 }
 
 func (e *Endpoint) attachPipelineTrigger(ctx context.Context, body map[string]any, projectID int64, branchName string) {

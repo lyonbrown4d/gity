@@ -19,6 +19,7 @@ type deleteProjectInput struct {
 }
 
 type projectsInput struct {
+	Authorization  string `header:"Authorization"`
 	OrganizationID int64  `query:"organization_id"`
 	IDs            string `query:"ids"`
 }
@@ -73,6 +74,13 @@ type projectRepositorySearchInput struct {
 
 type projectOutput struct {
 	Body any `json:"body"`
+}
+
+type projectPermissionsView struct {
+	ProjectID    string          `json:"project_id"`
+	UserID       string          `json:"user_id"`
+	Actions      map[string]bool `json:"actions"`
+	Capabilities map[string]bool `json:"capabilities"`
 }
 
 type createProjectBody struct {

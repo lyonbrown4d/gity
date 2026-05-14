@@ -11,7 +11,7 @@ import (
 func TestEndpointRegistersOrganizationRoutes(t *testing.T) {
 	server := httpx.New(httpx.WithBasePath("/api"))
 
-	server.RegisterOnly(organization.NewEndpoint(nil))
+	server.RegisterOnly(organization.NewEndpoint(nil, nil))
 
 	assertRoute(t, server, http.MethodGet, "/api/v1/orgs")
 	assertRoute(t, server, http.MethodPost, "/api/v1/orgs")

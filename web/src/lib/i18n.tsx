@@ -34,6 +34,8 @@ const zhDict: Record<string, string> = {
   "Admin Side": "管理侧",
   "Refine-driven routing and auth flow": "基于 refine 的路由与认证流程",
   "Super Admin": "超级管理员",
+  "Privilege level": "权限级别",
+  "Regular user": "普通用户",
   Logout: "退出登录",
   "User Workspace": "用户工作台",
   Workspace: "工作台",
@@ -333,6 +335,8 @@ const zhDict: Record<string, string> = {
   "Issue title is required": "议题标题不能为空",
   "Your current project role can inspect issues, but cannot create them.":
     "你当前的项目角色可以查看议题，但不能创建议题。",
+  "Your current project role can inspect issues, but cannot comment on them.":
+    "你当前的项目角色可以查看议题，但不能评论。",
   "Comment content is required": "评论内容不能为空",
   "Recent commit activity in this repository.": "该仓库最近的提交活动。",
   "Recent commit activity in this project.": "该项目最近的提交活动。",
@@ -342,6 +346,8 @@ const zhDict: Record<string, string> = {
   "No commits found.": "暂无提交。",
   "Manage repository branches and protections.": "管理仓库分支与保护策略。",
   "Manage project branches and protections.": "管理项目分支与保护策略。",
+  "Your current project role can inspect branches, but cannot change them.":
+    "你当前的项目角色可以查看分支，但不能修改分支。",
   "New branch name": "新分支名称",
   "Create branch": "创建分支",
   "Loading branches...": "分支加载中...",
@@ -366,6 +372,7 @@ const zhDict: Record<string, string> = {
   "No branches found.": "暂无分支。",
   "Repository metadata and danger zone.": "仓库元数据与危险操作。",
   "Project metadata and danger zone.": "项目元数据与危险操作。",
+  "Only project owners can delete this project.": "只有项目所有者可以删除该项目。",
   Audit: "审计",
   Event: "事件",
   Actor: "操作者",
@@ -485,6 +492,8 @@ const zhDict: Record<string, string> = {
   "Adding...": "添加中...",
   Wiki: "\u7ef4\u57fa",
   "Maintain project wiki pages with markdown content.": "\u7ef4\u62a4\u9879\u76ee Wiki \u9875\u9762\u548c Markdown \u5185\u5bb9\u3002",
+  "Your current project role can inspect wiki pages, but cannot edit them.":
+    "你当前的项目角色可以查看 Wiki 页面，但不能编辑。",
   "Wiki pages": "Wiki \u9875\u9762",
   "Selected page": "\u5f53\u524d\u9875\u9762",
   Format: "\u683c\u5f0f",
@@ -533,6 +542,10 @@ const zhDict: Record<string, string> = {
     "\u4f7f\u7528 token \u8c03\u7528 /runners/heartbeat\u3001/runners/jobs/claim\u3001/runners/jobs/{id}/complete \u548c /runners/jobs/{id}/fail\u3002",
   online: "\u5728\u7ebf",
   "Artifact download is not available.": "\u65e0\u6cd5\u4e0b\u8f7d\u4ea7\u7269\u3002",
+  "Your current project role can inspect packages, but cannot upload them.":
+    "你当前的项目角色可以查看包，但不能上传。",
+  "Your current project role can inspect LFS, but cannot manage locks.":
+    "你当前的项目角色可以查看 LFS，但不能管理锁。",
   Logs: "\u65e5\u5fd7",
   Retry: "\u91cd\u8bd5",
   "Job detail": "\u4efb\u52a1\u8be6\u60c5",

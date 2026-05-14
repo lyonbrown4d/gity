@@ -4,10 +4,11 @@ package identity
 import "time"
 
 type User struct {
-	ID          int64     `dbx:"id"`
-	Username    string    `dbx:"username"`
-	DisplayName string    `dbx:"display_name"`
-	Email       string    `dbx:"email"`
-	CreatedAt   time.Time `dbx:"created_at"`
-	UpdatedAt   time.Time `dbx:"updated_at"`
+	ID           int64     `dbx:"id"`
+	Username     string    `dbx:"username"`
+	DisplayName  string    `dbx:"display_name"`
+	Email        string    `dbx:"email"`
+	IsSuperAdmin int       `dbx:"is_super_admin"`
+	CreatedAt    time.Time `dbx:"created_at"`
+	UpdatedAt    time.Time `dbx:"updated_at"`
 }

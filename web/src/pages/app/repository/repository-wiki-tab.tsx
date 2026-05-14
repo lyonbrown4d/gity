@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Edit3, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmAction } from "@/components/common/confirm-action";
@@ -9,18 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { RepositoryWikiPageView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
+import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 import { renderMarkdown } from "./repository-utils";
 
 interface RepositoryWikiTabProps {
   repoId: string;
+  permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
 }
 
 type RawWikiPage = RawRecord;
 
-export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps): JSX.Element => {
+export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: RepositoryWikiTabProps): JSX.Element => {
   const identityQuery = useGetIdentity<{ id?: string | number }>();
   const pagesQuery = useCustom<RawWikiPage[]>({
     url: `/projects/${repoId}/wiki/pages`,
@@ -54,6 +57,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
   const [editorUserId, setEditorUserId] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
   const isLoadingPages = pagesQuery.isFetching && !pagesQuery.data;
+  const canWriteWiki = permissions.wikiWrite;
 
   const loadPages = async () => {
     const result = await pagesQuery.refetch();
@@ -250,6 +254,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
           <Button
             type="button"
             variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canWriteWiki}
             onClick={() => setComposerOpen((current) => !current)}
           >
             <Plus className="size-4" />
@@ -260,6 +265,12 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
             {t("Reload")}
           </Button>
         </div>
+
+        {!canWriteWiki ? (
+          <Alert>
+            <AlertDescription>{t("Your current project role can inspect wiki pages, but cannot edit them.")}</AlertDescription>
+          </Alert>
+        ) : null}
 
         {isComposerOpen ? (
           <form className="space-y-3 rounded-md border p-3" onSubmit={submitCreatePage}>
@@ -305,7 +316,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
               placeholder="# Getting Started"
             />
             <div className="flex justify-end">
-              <Button type="submit" disabled={isCreatingPage}>
+              <Button type="submit" disabled={!canWriteWiki || isCreatingPage}>
                 {isCreatingPage ? t("Creating wiki page...") : t("Create wiki page")}
               </Button>
             </div>
@@ -363,7 +374,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={isDeletingPage}
+                      disabled={!canWriteWiki || isDeletingPage}
                     >
                       <Trash2 className="size-4" />
                       {t("Delete")}
@@ -379,6 +390,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                     <Input
                       id="wiki-draft-title"
                       value={draftTitle}
+                      disabled={!canWriteWiki}
                       onChange={(event) => setDraftTitle(event.target.value)}
                     />
                   </div>
@@ -389,6 +401,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                     <Input
                       id="wiki-editor-id"
                       value={editorUserId}
+                      disabled={!canWriteWiki}
                       onChange={(event) => setEditorUserId(event.target.value)}
                       placeholder="1"
                     />
@@ -404,6 +417,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                     <Textarea
                       className="min-h-80"
                       value={draftContent}
+                      disabled={!canWriteWiki}
                       onChange={(event) => setDraftContent(event.target.value)}
                     />
                   </div>
@@ -420,7 +434,7 @@ export const RepositoryWikiTab = ({ repoId, t, onError }: RepositoryWikiTabProps
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={isUpdatingPage}>
+                  <Button type="submit" disabled={!canWriteWiki || isUpdatingPage}>
                     {isUpdatingPage ? t("Saving wiki page...") : t("Save wiki page")}
                   </Button>
                 </div>

@@ -22,10 +22,12 @@ export function AdminUsersPage(): JSX.Element {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [createRole, setCreateRole] = useState<"user" | "super-admin">("user");
   const [editUsername, setEditUsername] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editStatus, setEditStatus] = useState<"active" | "disabled">("active");
+  const [editRole, setEditRole] = useState<"user" | "super-admin">("user");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const { tableQuery, current, setCurrent, pageSize, setPageSize, pageCount } = useTable<UserView>({
@@ -60,6 +62,7 @@ export function AdminUsersPage(): JSX.Element {
     setUsername("");
     setEmail("");
     setPassword("");
+    setCreateRole("user");
     setCreateModalOpen(false);
   };
 
@@ -69,6 +72,7 @@ export function AdminUsersPage(): JSX.Element {
     setEditEmail("");
     setEditPassword("");
     setEditStatus("active");
+    setEditRole("user");
     setEditModalOpen(false);
   };
 
@@ -78,6 +82,7 @@ export function AdminUsersPage(): JSX.Element {
     setEditEmail(user.email);
     setEditPassword("");
     setEditStatus(user.status.toLowerCase() === "disabled" ? "disabled" : "active");
+    setEditRole(user.is_super_admin ? "super-admin" : "user");
     setEditModalOpen(true);
   };
 
@@ -92,6 +97,7 @@ export function AdminUsersPage(): JSX.Element {
           username,
           email,
           password,
+          is_super_admin: createRole === "super-admin",
         },
       },
       {
@@ -122,6 +128,7 @@ export function AdminUsersPage(): JSX.Element {
           email: editEmail,
           password: editPassword.trim() ? editPassword : undefined,
           status: editStatus,
+          is_super_admin: editRole === "super-admin",
         },
       },
       {
@@ -307,6 +314,21 @@ export function AdminUsersPage(): JSX.Element {
             <Label htmlFor="create-user-password">{t("Password")}</Label>
             <Input id="create-user-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="create-user-role">{t("Privilege level")}</Label>
+            <Select
+              value={createRole}
+              onValueChange={(value) => setCreateRole(value === "super-admin" ? "super-admin" : "user")}
+            >
+              <SelectTrigger id="create-user-role">
+                <SelectValue placeholder={t("Privilege level")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">{t("Regular user")}</SelectItem>
+                <SelectItem value="super-admin">{t("Super Admin")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="outline" onClick={resetCreateForm}>{t("Cancel")}</Button>
             <Button type="submit" disabled={isCreating}>{isCreating ? t("Creating...") : t("Create")}</Button>
@@ -340,6 +362,21 @@ export function AdminUsersPage(): JSX.Element {
               <SelectContent>
                 <SelectItem value="active">{t("active")}</SelectItem>
                 <SelectItem value="disabled">{t("disabled")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-user-role">{t("Privilege level")}</Label>
+            <Select
+              value={editRole}
+              onValueChange={(value) => setEditRole(value === "super-admin" ? "super-admin" : "user")}
+            >
+              <SelectTrigger id="edit-user-role">
+                <SelectValue placeholder={t("Privilege level")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">{t("Regular user")}</SelectItem>
+                <SelectItem value="super-admin">{t("Super Admin")}</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -1,5 +1,5 @@
-import { Suspense, lazy } from "react";
-import { Refine, Authenticated } from "@refinedev/core";
+import { Suspense, lazy, type ReactNode } from "react";
+import { Refine, Authenticated, usePermissions } from "@refinedev/core";
 import routerProvider, {
   CatchAllNavigate,
   DocumentTitleHandler,
@@ -88,7 +88,9 @@ export function App(): JSX.Element {
               <Route
                 element={
                   <Authenticated key="admin-layout" fallback={<Navigate to="/login" replace />}>
-                    <AdminLayout />
+                    <RequireSuperAdmin>
+                      <AdminLayout />
+                    </RequireSuperAdmin>
                   </Authenticated>
                 }
               >
@@ -139,4 +141,21 @@ export function App(): JSX.Element {
       </QueryClientProvider>
     </BrowserRouter>
   );
+}
+
+function RequireSuperAdmin({ children }: { children: ReactNode }): JSX.Element {
+  const { t } = useI18n();
+  const { data: permissions, isLoading } = usePermissions<{ isSuperAdmin?: boolean }>();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">
+        {t("Loading...")}
+      </div>
+    );
+  }
+  if (!permissions?.isSuperAdmin) {
+    return <Navigate to="/app/dashboard" replace />;
+  }
+  return <>{children}</>;
 }

@@ -96,6 +96,10 @@ func toRepositoryBlobView(item gitrepo.Blob) repositoryBlobView {
 	}
 }
 
+func (in projectsInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
 func (in createProjectInput) AuthorizationHeader() string {
 	return in.Authorization
 }

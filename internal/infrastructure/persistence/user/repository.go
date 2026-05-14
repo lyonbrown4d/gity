@@ -53,11 +53,12 @@ func (r *Repository) GetByUsername(ctx context.Context, username string) (identi
 func (r *Repository) Create(ctx context.Context, input CreateInput) (identity.User, error) {
 	now := time.Now().UTC()
 	item := identity.User{
-		Username:    strings.TrimSpace(input.Username),
-		DisplayName: strings.TrimSpace(input.DisplayName),
-		Email:       strings.TrimSpace(input.Email),
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		Username:     strings.TrimSpace(input.Username),
+		DisplayName:  strings.TrimSpace(input.DisplayName),
+		Email:        strings.TrimSpace(input.Email),
+		IsSuperAdmin: boolAsInt(input.IsSuperAdmin),
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 	if err := r.base.Create(ctx, &item); err != nil {
 		return identity.User{}, fmt.Errorf("insert user: %w", err)
@@ -76,11 +77,21 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 	if input.Email != nil {
 		assignments = append(assignments, dbschema.UserSchema.Email.Set(strings.TrimSpace(*input.Email)))
 	}
+	if input.IsSuperAdmin != nil {
+		assignments = append(assignments, dbschema.UserSchema.IsSuperAdmin.Set(boolAsInt(*input.IsSuperAdmin)))
+	}
 	assignments = append(assignments, dbschema.UserSchema.UpdatedAt.Set(time.Now().UTC()))
 	if _, err := dbxrepo.By(r.base, dbschema.UserSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
+}
+
+func boolAsInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {

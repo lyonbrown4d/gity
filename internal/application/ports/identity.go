@@ -24,15 +24,17 @@ type UserAccessTokenRepository interface {
 }
 
 type CreateUserInput struct {
-	Username    string
-	DisplayName string
-	Email       string
+	Username     string
+	DisplayName  string
+	Email        string
+	IsSuperAdmin bool
 }
 
 type UpdateUserInput struct {
-	Username    *string
-	DisplayName *string
-	Email       *string
+	Username     *string
+	DisplayName  *string
+	Email        *string
+	IsSuperAdmin *bool
 }
 
 type CreateUserAccessTokenInput struct {

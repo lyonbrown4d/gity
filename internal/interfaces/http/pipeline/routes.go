@@ -11,7 +11,8 @@ import (
 )
 
 type projectPipelinesInput struct {
-	ProjectID int64 `path:"id"`
+	ProjectID     int64  `path:"id"`
+	Authorization string `header:"Authorization"`
 }
 
 type projectPipelineInput struct {
@@ -65,41 +66,51 @@ func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {
 
 func (e *Endpoint) Register(registrar httpx.Registrar) {
 	authRuntime := e.authRuntime
-	projectWrite := httpapi.ProjectScopeResolverFrom(e.projectService)
+	projectScope := httpapi.ProjectScopeResolverFrom(e.projectService)
+	pipelineRead := httpapi.RequireProjectActionRoute[projectPipelinesInput, pipelineOutput]("require_pipeline_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)
+	pipelineDetailRead := httpapi.RequireProjectActionRoute[projectPipelineInput, pipelineOutput]("require_pipeline_read", authRuntime, projectScope, infraauth.ProjectActionJobRead)
 
 	httpapi.MustRegisterRoutes(registrar,
-		httpapi.Get("/projects/{id}/pipelines", e.listPipelines),
-		httpapi.Get("/repos/{id}/pipelines", e.listPipelines, httpapi.DeprecatedRoute[projectPipelinesInput, pipelineOutput]("Use GET /projects/{id}/pipelines instead.")),
-		httpapi.Post("/projects/{id}/pipelines", e.createPipeline, httpapi.RequireProjectWriteRoute[createPipelineInput, pipelineOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/pipelines", e.listPipelines, pipelineRead),
+		httpapi.Get("/repos/{id}/pipelines", e.listPipelines, pipelineRead, httpapi.DeprecatedRoute[projectPipelinesInput, pipelineOutput]("Use GET /projects/{id}/pipelines instead.")),
+		httpapi.Post("/projects/{id}/pipelines", e.createPipeline, httpapi.RequireProjectWriteRoute[createPipelineInput, pipelineOutput](authRuntime, projectScope)),
 		httpapi.Post("/repos/{id}/pipelines", e.createPipeline,
-			httpapi.RequireProjectWriteRoute[createPipelineInput, pipelineOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectWriteRoute[createPipelineInput, pipelineOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[createPipelineInput, pipelineOutput]("Use POST /projects/{id}/pipelines instead."),
 		),
-		httpapi.Post("/projects/{id}/ci/lint", e.lintPipeline, httpapi.RequireProjectWriteRoute[lintPipelineInput, pipelineOutput](authRuntime, projectWrite)),
+		httpapi.Post("/projects/{id}/ci/lint", e.lintPipeline, httpapi.RequireProjectWriteRoute[lintPipelineInput, pipelineOutput](authRuntime, projectScope)),
 		httpapi.Post("/repos/{id}/ci/lint", e.lintPipeline,
-			httpapi.RequireProjectWriteRoute[lintPipelineInput, pipelineOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectWriteRoute[lintPipelineInput, pipelineOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[lintPipelineInput, pipelineOutput]("Use POST /projects/{id}/ci/lint instead."),
 		),
-		httpapi.Get("/projects/{id}/pipelines/{pipeline_id}", e.getPipeline),
-		httpapi.Get("/repos/{id}/pipelines/{pipeline_id}", e.getPipeline, httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use GET /projects/{id}/pipelines/{pipeline_id} instead.")),
-		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/refresh", e.refreshPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite)),
+		httpapi.Get("/projects/{id}/pipelines/{pipeline_id}", e.getPipeline, pipelineDetailRead),
+		httpapi.Get("/repos/{id}/pipelines/{pipeline_id}", e.getPipeline, pipelineDetailRead, httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use GET /projects/{id}/pipelines/{pipeline_id} instead.")),
+		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/refresh", e.refreshPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope)),
 		httpapi.Post("/repos/{id}/pipelines/{pipeline_id}/refresh", e.refreshPipeline,
-			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use POST /projects/{id}/pipelines/{pipeline_id}/refresh instead."),
 		),
-		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/cancel", e.cancelPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite)),
+		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/cancel", e.cancelPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope)),
 		httpapi.Post("/repos/{id}/pipelines/{pipeline_id}/cancel", e.cancelPipeline,
-			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use POST /projects/{id}/pipelines/{pipeline_id}/cancel instead."),
 		),
-		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/retry", e.retryPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite)),
+		httpapi.Post("/projects/{id}/pipelines/{pipeline_id}/retry", e.retryPipeline, httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope)),
 		httpapi.Post("/repos/{id}/pipelines/{pipeline_id}/retry", e.retryPipeline,
-			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectWrite),
+			httpapi.RequireProjectWriteRoute[projectPipelineInput, pipelineOutput](authRuntime, projectScope),
 			httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use POST /projects/{id}/pipelines/{pipeline_id}/retry instead."),
 		),
-		httpapi.Get("/projects/{id}/pipelines/{pipeline_id}/jobs", e.listPipelineJobs),
-		httpapi.Get("/repos/{id}/pipelines/{pipeline_id}/jobs", e.listPipelineJobs, httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use GET /projects/{id}/pipelines/{pipeline_id}/jobs instead.")),
+		httpapi.Get("/projects/{id}/pipelines/{pipeline_id}/jobs", e.listPipelineJobs, pipelineDetailRead),
+		httpapi.Get("/repos/{id}/pipelines/{pipeline_id}/jobs", e.listPipelineJobs, pipelineDetailRead, httpapi.DeprecatedRoute[projectPipelineInput, pipelineOutput]("Use GET /projects/{id}/pipelines/{pipeline_id}/jobs instead.")),
 	)
+}
+
+func (in projectPipelinesInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in projectPipelinesInput) ProjectIDValue() int64 {
+	return in.ProjectID
 }
 
 func (in projectPipelineInput) AuthorizationHeader() string {

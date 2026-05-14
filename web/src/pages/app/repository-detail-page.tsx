@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { usePermissions } from "@refinedev/core";
+import { useCustom, usePermissions } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
 import type { RepoTab } from "@/pages/app/repository/repository-types";
 import { useRepositoryMetaController } from "@/pages/app/repository/use-repository-meta-controller";
 import { useRepositorySourceController } from "@/pages/app/repository/use-repository-source-controller";
+import type { RawRecord } from "@/pages/app/repository/repository-normalizers";
 
 export const RepositoryDetailPage = (): JSX.Element => {
   const { t } = useI18n();
@@ -35,6 +36,15 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
   const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>();
+  const projectPermissionsQuery = useCustom<RawRecord>({
+    url: repoId ? `/projects/${repoId}/permissions` : "/projects/0/permissions",
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  });
 
   const meta = useRepositoryMetaController({
     organizationId,
@@ -53,8 +63,8 @@ export const RepositoryDetailPage = (): JSX.Element => {
     refreshCommits: meta.loadCommits,
   });
   const repositoryPermissions = useMemo(
-    () => buildRepositoryPermissions(meta.organization?.role, Boolean(permissionsQuery.data?.isSuperAdmin)),
-    [meta.organization?.role, permissionsQuery.data?.isSuperAdmin],
+    () => buildRepositoryPermissions(meta.organization?.role, Boolean(permissionsQuery.data?.isSuperAdmin), projectPermissionsQuery.data?.data),
+    [meta.organization?.role, permissionsQuery.data?.isSuperAdmin, projectPermissionsQuery.data?.data],
   );
 
   useEffect(() => {
@@ -197,6 +207,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "wiki" ? (
         <RepositoryWikiTab
           repoId={repoId}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -205,6 +216,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "packages" ? (
         <RepositoryPackagesTab
           repoId={repoId}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -214,6 +226,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
         <RepositoryLFSTab
           repoId={repoId}
           repository={meta.repository}
+          permissions={repositoryPermissions}
           t={t}
           onError={meta.setActionError}
         />
@@ -249,6 +262,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
           isCreatingBranch={meta.isCreatingBranch}
           isUpdatingBranch={meta.isUpdatingBranch}
           isDeletingBranch={meta.isDeletingBranch}
+          permissions={repositoryPermissions}
           onChangeNewBranchName={meta.setNewBranchName}
           onSubmitCreateBranch={(event) => void meta.submitCreateBranch(event)}
           onToggleBranchProtection={(branch, protect) => void meta.toggleBranchProtection(branch, protect)}
@@ -260,6 +274,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
       {meta.repository && activeTab === "settings" ? (
         <RepositorySettingsTab
           repository={meta.repository}
+          permissions={repositoryPermissions}
           t={t}
           isDeleting={meta.isDeleting}
           onDelete={meta.submitDelete}
