@@ -161,8 +161,8 @@ The product domain target lives in [docs/gitlab-like-domain-model.md](docs/gitla
 GitHub Actions runs CI on `main` and pull requests. A release is created only when a SemVer tag is pushed:
 
 ```bash
-git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
+git tag -a v0.1.0-beta.2 -m "v0.1.0-beta.2"
+git push origin v0.1.0-beta.2
 ```
 
 The release workflow uses GoReleaser to publish GitHub Release artifacts, per-component Linux packages, checksums, and Docker images.

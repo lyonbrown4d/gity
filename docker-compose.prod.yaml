@@ -29,7 +29,7 @@ services:
       - minio_data:/data
 
   migration:
-    image: ghcr.io/lyonbrown4d/gity-migration:${GITY_IMAGE_TAG:-v0.1.0-beta.1}
+    image: ghcr.io/lyonbrown4d/gity-migration:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
     profiles: ["migration"]
     env_file:
       - .env.production
@@ -41,7 +41,7 @@ services:
     restart: "no"
 
   server:
-    image: ghcr.io/lyonbrown4d/gity-server:${GITY_IMAGE_TAG:-v0.1.0-beta.1}
+    image: ghcr.io/lyonbrown4d/gity-server:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
     restart: unless-stopped
     env_file:
       - .env.production
@@ -64,7 +64,7 @@ services:
       retries: 10
 
   worker:
-    image: ghcr.io/lyonbrown4d/gity-worker:${GITY_IMAGE_TAG:-v0.1.0-beta.1}
+    image: ghcr.io/lyonbrown4d/gity-worker:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
     restart: unless-stopped
     env_file:
       - .env.production
@@ -80,7 +80,7 @@ services:
       - search_index:/var/lib/gity/search-index
 
   standalone:
-    image: ghcr.io/lyonbrown4d/gity-standalone:${GITY_IMAGE_TAG:-v0.1.0-beta.1}
+    image: ghcr.io/lyonbrown4d/gity-standalone:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
     profiles: ["standalone"]
     restart: unless-stopped
     env_file:
