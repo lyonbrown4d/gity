@@ -103,7 +103,7 @@ func (runner containerdScriptRunner) run(ctx context.Context, cfg Config, job ci
 }
 
 func (runner firecrackerScriptRunner) run(_ context.Context, _ Config, _ cidomain.ProjectJob, _ ScriptPayload, _ string, _ *cappedBuffer) error {
-	return oops.In("runner_agent").With("runtime", runnerExecutionModeFirecracker, "socket", runner.socket).New("firecracker runner runtime is not implemented yet")
+	return runFirecrackerScriptJob(runner.socket)
 }
 
 func resolveExecutionMode(cfg Config, payload ScriptPayload) string {
