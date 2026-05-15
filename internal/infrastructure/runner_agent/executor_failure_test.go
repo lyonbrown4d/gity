@@ -97,6 +97,15 @@ func TestExecuteScriptJobCancellation(t *testing.T) {
 func TestConfigFromEnvArgs(t *testing.T) {
 	t.Setenv("GITY_RUNNER_TOKEN", "from-env")
 	t.Setenv("GITY_RUNNER_URL", "http://gity.local/v1")
+	t.Setenv("GITY_RUNNER_EXECUTION_MODE", "podman")
+	t.Setenv("GITY_RUNNER_CONTAINER_RUNTIME", "firecracker")
+	t.Setenv("GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT", "unix:///tmp/podman.sock")
+	t.Setenv("GITY_RUNNER_CONTAINER_IMAGE", "alpine:3")
+	t.Setenv("GITY_RUNNER_CONTAINER_NETWORK", "gity")
+	t.Setenv("GITY_RUNNER_CONTAINER_HOST_NETWORK", "true")
+	t.Setenv("GITY_RUNNER_CONTAINER_MEMORY", "1024m")
+	t.Setenv("GITY_RUNNER_CONTAINER_CPUS", "2")
+	t.Setenv("GITY_RUNNER_FIRECRACKER_SOCKET", "/tmp/fc.sock")
 
 	cfg, err := runneragent.ConfigFromEnv([]string{"-token", "from-flag", "-poll-interval", "2s"})
 	if err != nil {
@@ -104,5 +113,42 @@ func TestConfigFromEnvArgs(t *testing.T) {
 	}
 	if cfg.Token != "from-flag" || cfg.ServerURL != "http://gity.local/v1" || cfg.PollInterval != 2*time.Second {
 		t.Fatalf("unexpected config: %+v", cfg)
+	}
+	if cfg.ExecutionMode != "podman" || cfg.ContainerRuntime != "firecracker" {
+		t.Fatalf("unexpected runtime config: %+v", cfg)
+	}
+	if cfg.ContainerRuntimeEndpoint != "unix:///tmp/podman.sock" || cfg.DockerImage != "alpine:3" || cfg.DockerNetwork != "gity" {
+		t.Fatalf("unexpected container config: %+v", cfg)
+	}
+	if !cfg.DockerHostNetwork || cfg.DockerMemoryLimit != "1024m" || cfg.DockerCPUs != "2" || cfg.FirecrackerSocket != "/tmp/fc.sock" {
+		t.Fatalf("unexpected config: %+v", cfg)
+	}
+}
+
+func TestExecuteScriptJobDockerModeMissingImage(t *testing.T) {
+	t.Parallel()
+
+	payload, err := json.Marshal(runneragent.ScriptPayload{
+		ExecutionMode:  "docker",
+		Script:         []string{"echo no-image"},
+		TimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	_, err = runneragent.ExecuteScriptJob(context.Background(), runneragent.Config{
+		WorkDir:        t.TempDir(),
+		LeaseSeconds:   30,
+		MaxOutputBytes: 1024,
+	ExecutionMode:  "docker",
+	}, cidomain.ProjectJob{
+		ID:        77,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	})
+	if err == nil {
+		t.Fatal("expected docker mode to fail when no image is configured")
 	}
 }

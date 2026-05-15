@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,8 +49,12 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	}
 
 	started := time.Now()
-	command, output := prepareScriptCommand(ctx, cfg, job, payload, workDir, started, traceStreamer)
-	err = command.Run()
+	output := newCappedBuffer(ctx, started, traceStreamer, cfg, payload)
+	runner, err := resolveScriptRunner(cfg, payload)
+	if err != nil {
+		return "", err
+	}
+	err = runner.run(ctx, cfg, job, payload, workDir, output)
 	result, resultErr := encodeScriptResult(started, workDir, output, resolveScriptError(ctx, err, timeout, cancelRequested))
 	if cleanupErr := cleanupScriptWorkspace(cfg, workDir); cleanupErr != nil {
 		if resultErr != nil {
@@ -187,20 +190,14 @@ func cleanupScriptWorkspace(cfg Config, workDir string) error {
 	return nil
 }
 
-func prepareScriptCommand(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, started time.Time, traceStreamer ScriptTraceStreamer) (*exec.Cmd, *cappedBuffer) {
-	command := scriptCommand(ctx, payload.Shell, strings.Join(payload.Script, "\n"))
-	command.Dir = workDir
-	command.Env = scriptEnvironment(job, payload)
-	output := &cappedBuffer{
+func newCappedBuffer(ctx context.Context, started time.Time, traceStreamer ScriptTraceStreamer, cfg Config, payload ScriptPayload) *cappedBuffer {
+	return &cappedBuffer{
 		limit:         cfg.MaxOutputBytes,
 		ctx:           ctx,
 		started:       started,
 		traceStreamer: traceStreamer,
 		maskedValues:  payload.MaskedValues,
 	}
-	command.Stdout = output
-	command.Stderr = output
-	return command, output
 }
 
 func scriptEnvironment(job cidomain.ProjectJob, payload ScriptPayload) []string {

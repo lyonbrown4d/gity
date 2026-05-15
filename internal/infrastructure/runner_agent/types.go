@@ -11,6 +11,8 @@ type ScriptPayload struct {
 	RefName         string            `json:"ref_name"`
 	CommitSHA       string            `json:"commit_sha"`
 	Script          []string          `json:"script"`
+	ExecutionMode   string            `json:"execution_mode,omitempty"`
+	Image           string            `json:"image,omitempty"`
 	Env             map[string]string `json:"env"`
 	Shell           string            `json:"shell"`
 	Artifacts       []string          `json:"artifacts"`

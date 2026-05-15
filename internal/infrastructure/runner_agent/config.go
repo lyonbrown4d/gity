@@ -21,20 +21,43 @@ type Config struct {
 	AllowedShells  []string
 	CleanWorkspace bool
 	Once           bool
+
+	ExecutionMode       string
+	ContainerRuntime    string
+	ContainerRuntimeEndpoint string
+	DockerBinary        string
+	DockerImage         string
+	DockerNetwork       string
+	DockerHostNetwork   bool
+	DockerWorkDir       string
+	DockerMemoryLimit   string
+	DockerCPUs          string
+	FirecrackerSocket   string
 }
 
 func ConfigFromEnv(args []string) (Config, error) {
 	allowedShells := envString("GITY_RUNNER_ALLOWED_SHELLS", strings.Join(defaultAllowedShells(), ","))
 	cfg := Config{
-		ServerURL:      envString("GITY_RUNNER_URL", "http://localhost:8080/v1"),
-		Token:          envString("GITY_RUNNER_TOKEN", ""),
-		WorkDir:        envString("GITY_RUNNER_WORKDIR", "./data/runner"),
-		RepoRoot:       envString("GITY_RUNNER_REPO_ROOT", envString("GITY_GIT__REPO_ROOT", envString("GITY_GIT_REPO_ROOT", ""))),
-		PollInterval:   envDuration("GITY_RUNNER_POLL_INTERVAL", time.Second),
-		LeaseSeconds:   envInt("GITY_RUNNER_LEASE_SECONDS", 600),
-		MaxOutputBytes: envInt("GITY_RUNNER_MAX_OUTPUT_BYTES", 65536),
-		CleanWorkspace: envBool("GITY_RUNNER_CLEAN_WORKSPACE", true),
-		Once:           envBool("GITY_RUNNER_ONCE", false),
+		ServerURL:          envString("GITY_RUNNER_URL", "http://localhost:8080/v1"),
+		Token:              envString("GITY_RUNNER_TOKEN", ""),
+		WorkDir:            envString("GITY_RUNNER_WORKDIR", "./data/runner"),
+		RepoRoot:           envString("GITY_RUNNER_REPO_ROOT", envString("GITY_GIT__REPO_ROOT", envString("GITY_GIT_REPO_ROOT", ""))),
+		PollInterval:       envDuration("GITY_RUNNER_POLL_INTERVAL", time.Second),
+		LeaseSeconds:       envInt("GITY_RUNNER_LEASE_SECONDS", 600),
+		MaxOutputBytes:     envInt("GITY_RUNNER_MAX_OUTPUT_BYTES", 65536),
+		CleanWorkspace:     envBool("GITY_RUNNER_CLEAN_WORKSPACE", true),
+		Once:               envBool("GITY_RUNNER_ONCE", false),
+		ExecutionMode:      envString("GITY_RUNNER_EXECUTION_MODE", ""),
+		ContainerRuntime:   envString("GITY_RUNNER_CONTAINER_RUNTIME", runnerExecutionModeDocker),
+		ContainerRuntimeEndpoint: envString("GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT", ""),
+		DockerBinary:       envString("GITY_RUNNER_DOCKER_BINARY", dockerBinaryDefault),
+		DockerImage:        envString("GITY_RUNNER_CONTAINER_IMAGE", envString("GITY_RUNNER_DOCKER_IMAGE", envString("GITY_RUNNER_DOCKER_DEFAULT_IMAGE", ""))),
+		DockerNetwork:      envString("GITY_RUNNER_CONTAINER_NETWORK", envString("GITY_RUNNER_DOCKER_NETWORK", "")),
+		DockerHostNetwork:  envBool("GITY_RUNNER_CONTAINER_HOST_NETWORK", envBool("GITY_RUNNER_DOCKER_HOST_NETWORK", false)),
+		DockerWorkDir:      envString("GITY_RUNNER_CONTAINER_WORKDIR", envString("GITY_RUNNER_DOCKER_WORKDIR", "/workspace")),
+		DockerMemoryLimit:  envString("GITY_RUNNER_CONTAINER_MEMORY", envString("GITY_RUNNER_DOCKER_MEMORY", "")),
+		DockerCPUs:         envString("GITY_RUNNER_CONTAINER_CPUS", envString("GITY_RUNNER_DOCKER_CPUS", "")),
+		FirecrackerSocket:  envString("GITY_RUNNER_FIRECRACKER_SOCKET", ""),
 	}
 
 	flags := flag.NewFlagSet("gity-runner", flag.ContinueOnError)
@@ -48,10 +71,36 @@ func ConfigFromEnv(args []string) (Config, error) {
 	flags.StringVar(&allowedShells, "allowed-shells", allowedShells, "comma-separated shell allowlist")
 	flags.BoolVar(&cfg.CleanWorkspace, "clean-workspace", cfg.CleanWorkspace, "delete job workspace after execution")
 	flags.BoolVar(&cfg.Once, "once", cfg.Once, "claim and run at most one job")
+	flags.StringVar(&cfg.ExecutionMode, "execution-mode", cfg.ExecutionMode, "script execution mode: host, docker, podman, containerd, or firecracker")
+	flags.StringVar(&cfg.ContainerRuntime, "container-runtime", cfg.ContainerRuntime, "default container runtime for script jobs: docker, podman, containerd, or firecracker")
+	flags.StringVar(&cfg.ContainerRuntimeEndpoint, "container-runtime-endpoint", cfg.ContainerRuntimeEndpoint, "container runtime API endpoint")
+	flags.StringVar(&cfg.DockerBinary, "docker-binary", cfg.DockerBinary, "deprecated: runtime API mode is used by default")
+	flags.StringVar(&cfg.DockerBinary, "container-runtime-binary", cfg.DockerBinary, "deprecated: runtime API mode is used by default")
+	flags.StringVar(&cfg.DockerImage, "container-image", cfg.DockerImage, "default container image for script jobs")
+	flags.StringVar(&cfg.DockerNetwork, "container-network", cfg.DockerNetwork, "container network")
+	flags.BoolVar(&cfg.DockerHostNetwork, "container-host-network", cfg.DockerHostNetwork, "run container in host network mode")
+	flags.StringVar(&cfg.DockerWorkDir, "container-workdir", cfg.DockerWorkDir, "working directory inside container")
+	flags.StringVar(&cfg.DockerMemoryLimit, "container-memory", cfg.DockerMemoryLimit, "container memory limit (e.g. 512m)")
+	flags.StringVar(&cfg.DockerCPUs, "container-cpus", cfg.DockerCPUs, "container cpus limit (e.g. 1.5)")
+	flags.StringVar(&cfg.FirecrackerSocket, "firecracker-socket", cfg.FirecrackerSocket, "firecracker socket path (placeholder for future native VM execution)")
+	flags.StringVar(&cfg.DockerImage, "docker-image", cfg.DockerImage, "default docker image for script jobs")
+	flags.StringVar(&cfg.DockerNetwork, "docker-network", cfg.DockerNetwork, "docker container network (deprecated)")
+	flags.BoolVar(&cfg.DockerHostNetwork, "docker-host-network", cfg.DockerHostNetwork, "run docker container in host network mode (deprecated)")
+	flags.StringVar(&cfg.DockerWorkDir, "docker-workdir", cfg.DockerWorkDir, "working directory inside docker container (deprecated)")
+	flags.StringVar(&cfg.DockerMemoryLimit, "docker-memory", cfg.DockerMemoryLimit, "docker memory limit (e.g. 512m)")
+	flags.StringVar(&cfg.DockerCPUs, "docker-cpus", cfg.DockerCPUs, "docker cpus limit (e.g. 1.5)")
 	if err := flags.Parse(args); err != nil {
 		return Config{}, oops.In("runner_agent").Wrapf(err, "parse runner config flags")
 	}
 	cfg.AllowedShells = parseAllowedShells(allowedShells)
+	cfg.ExecutionMode = normalizeExecutionMode(cfg.ExecutionMode)
+	cfg.ContainerRuntime = normalizeExecutionMode(cfg.ContainerRuntime)
+	if !isExecutionModeSupported(cfg.ExecutionMode) {
+		return Config{}, oops.In("runner_agent").New("unsupported runner execution mode")
+	}
+	if !isContainerRuntimeSupported(cfg.ContainerRuntime) {
+		return Config{}, oops.In("runner_agent").New("unsupported runner container runtime")
+	}
 	if strings.TrimSpace(cfg.Token) == "" {
 		return Config{}, oops.In("runner_agent").New("runner token is required")
 	}
@@ -70,8 +119,41 @@ func ConfigFromEnv(args []string) (Config, error) {
 	if len(cfg.AllowedShells) == 0 {
 		cfg.AllowedShells = defaultAllowedShells()
 	}
+	if strings.TrimSpace(cfg.DockerWorkDir) == "" {
+		cfg.DockerWorkDir = "/workspace"
+	}
+	if cfg.ContainerRuntime == "" {
+		cfg.ContainerRuntime = runnerExecutionModeDocker
+	}
 	return cfg, nil
 }
+
+func normalizeExecutionMode(mode string) string {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	switch normalized {
+	case "containered":
+		return runnerExecutionModeContainerd
+	default:
+		return normalized
+	}
+}
+
+func isExecutionModeSupported(mode string) bool {
+	return mode == "" || mode == runnerExecutionModeHost || mode == runnerExecutionModeDocker || mode == runnerExecutionModePodman || mode == runnerExecutionModeContainerd || mode == runnerExecutionModeFirecracker
+}
+
+func isContainerRuntimeSupported(runtime string) bool {
+	return runtime == "" || runtime == runnerExecutionModeDocker || runtime == runnerExecutionModePodman || runtime == runnerExecutionModeContainerd || runtime == runnerExecutionModeFirecracker
+}
+
+const (
+	runnerExecutionModeHost   = "host"
+	runnerExecutionModeDocker = "docker"
+	runnerExecutionModePodman = "podman"
+	runnerExecutionModeContainerd = "containerd"
+	runnerExecutionModeFirecracker = "firecracker"
+	dockerBinaryDefault       = "docker"
+)
 
 func parseAllowedShells(value string) []string {
 	parts := strings.Split(value, ",")
