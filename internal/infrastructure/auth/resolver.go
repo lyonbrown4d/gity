@@ -2,17 +2,12 @@ package auth
 
 import (
 	"context"
-	"encoding/base64"
-	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/arcgolabs/authx"
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
-	identityports "github.com/lyonbrown4d/gity/internal/application/ports"
-	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	organizationmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/organization_member"
 	projectaccesstokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_access_token"
 	projectmemberrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_member"
@@ -74,39 +69,6 @@ func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenre
 		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository, projectTokenRepository))),
 		authx.WithAuthorizer(newProjectAuthorizer(memberRepository, projectMemberRepository)),
 	)
-}
-
-func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository) authx.AuthenticationProvider {
-	return authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
-		record, err := tokenRepository.GetByToken(ctx, credential.Token)
-		if err == nil {
-			user, err := userRepository.GetByID(ctx, record.UserID)
-			if err != nil {
-				return authx.AuthenticationResult{}, oops.In("auth").With("user_id", record.UserID).Wrapf(err, "load token user")
-			}
-			return authx.AuthenticationResult{Principal: Principal{UserID: user.ID, Username: user.Username, IsSuperAdmin: user.IsSuperAdmin != 0}}, nil
-		}
-		if !errors.Is(err, identityports.ErrNotFound) {
-			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
-		}
-		if projectTokenRepository == nil {
-			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load access token")
-		}
-		projectToken, err := projectTokenRepository.GetByToken(ctx, credential.Token)
-		if err != nil {
-			return authx.AuthenticationResult{}, oops.In("auth").Wrapf(err, "load project token")
-		}
-		if !projectToken.Active(time.Now().UTC()) {
-			return authx.AuthenticationResult{}, oops.In("auth").With("project_id", projectToken.ProjectID, "token_id", projectToken.ID).New("project token is inactive")
-		}
-		return authx.AuthenticationResult{Principal: Principal{
-			UserID:    projectToken.CreatedByUserID,
-			Username:  projectToken.Username,
-			TokenKind: projectToken.Kind,
-			ProjectID: projectToken.ProjectID,
-			Scopes:    projectToken.Scopes,
-		}}, nil
-	})
 }
 
 func newProjectAuthorizer(memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) authx.Authorizer {
@@ -190,39 +152,6 @@ func authorizeProjectToken(action string, principal Principal, projectID int64) 
 	return authx.Decision{Allowed: false, Reason: "project_token_scope_denied"}
 }
 
-func projectTokenScopeAllows(action, scopes string) bool {
-	scopeSet := tokenScopes(scopes)
-	switch action {
-	case ProjectActionRead, ProjectActionRepositoryRead:
-		return scopeSet.Contains(identity.ProjectTokenScopeReadRepository) || scopeSet.Contains(identity.ProjectTokenScopeWriteRepository) || scopeSet.Contains(identity.ProjectTokenScopeReadAPI) || scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
-	case ProjectActionRepositoryPush:
-		return scopeSet.Contains(identity.ProjectTokenScopeWriteRepository)
-	case ProjectActionPackageRead:
-		return scopeSet.Contains(identity.ProjectTokenScopeReadPackage) || scopeSet.Contains(identity.ProjectTokenScopeWritePackage)
-	case ProjectActionPackageWrite:
-		return scopeSet.Contains(identity.ProjectTokenScopeWritePackage)
-	case ProjectActionIssueCreate, ProjectActionIssueWrite, ProjectActionIssueComment,
-		ProjectActionMergeRequestCreate, ProjectActionMergeRequestWrite, ProjectActionMergeRequestComment,
-		ProjectActionWikiRead, ProjectActionJobRead, ProjectActionRunnerRead:
-		return scopeSet.Contains(identity.ProjectTokenScopeReadAPI) || scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
-	case ProjectActionWrite, ProjectActionWikiWrite, ProjectActionJobWrite:
-		return scopeSet.Contains(identity.ProjectTokenScopeWriteAPI)
-	default:
-		return false
-	}
-}
-
-func tokenScopes(value string) *setx.Set[string] {
-	items := setx.NewSet[string]()
-	for _, part := range strings.Split(value, ",") {
-		scope := strings.TrimSpace(strings.ToLower(part))
-		if scope != "" {
-			items.Add(scope)
-		}
-	}
-	return items
-}
-
 func authorizeProjectRole(ctx context.Context, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository, principal Principal, projectID, organizationID int64, action string, allowedRoles *setx.Set[string]) authx.Decision {
 	if projectMemberRepository != nil {
 		if member, err := projectMemberRepository.FindByProjectAndUser(ctx, projectID, principal.UserID); err == nil {
@@ -240,31 +169,6 @@ func authorizeProjectRole(ctx context.Context, memberRepository *organizationmem
 		return authx.Decision{Allowed: true, PolicyID: action}
 	}
 	return authx.Decision{Allowed: false, Reason: "deny"}
-}
-
-func tokenFromAuthorizationHeader(value string) (string, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "", false
-	}
-	if strings.HasPrefix(strings.ToLower(value), "bearer ") {
-		token := strings.TrimSpace(value[len("Bearer "):])
-		return token, token != ""
-	}
-	if strings.HasPrefix(strings.ToLower(value), "basic ") {
-		encoded := strings.TrimSpace(value[len("Basic "):])
-		raw, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			return "", false
-		}
-		parts := strings.SplitN(string(raw), ":", 2)
-		if len(parts) != 2 {
-			return "", false
-		}
-		token := strings.TrimSpace(parts[1])
-		return token, token != ""
-	}
-	return "", false
 }
 
 func TokenFromAuthorizationHeader(value string) (string, bool) {

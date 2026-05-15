@@ -1,4 +1,3 @@
-// Package release wires release application services.
 package release
 
 import "github.com/arcgolabs/dix"

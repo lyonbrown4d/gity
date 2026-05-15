@@ -1,4 +1,3 @@
-// Package projectcredential wires project credential application services.
 package projectcredential
 
 import "github.com/arcgolabs/dix"

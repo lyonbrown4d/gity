@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	"golang.org/x/sys/execabs"
 )
 
 func checkoutProjectSource(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, sourceFetcher ScriptSourceFetcher) error {
@@ -42,10 +44,10 @@ func fetchProjectSource(ctx context.Context, job cidomain.ProjectJob, payload Sc
 
 func prepareLocalCheckout(ctx context.Context, repoPath, workDir string) error {
 	if _, err := os.Stat(filepath.Join(workDir, ".git")); err == nil {
-		if err := runGit(ctx, workDir, "fetch", "--all", "--prune"); err != nil {
+		if err := gitFetchAllPrune(ctx, workDir); err != nil {
 			return err
 		}
-	} else if err := runGit(ctx, workDir, "clone", "--no-checkout", repoPath, "."); err != nil {
+	} else if err := gitCloneNoCheckout(ctx, workDir, repoPath); err != nil {
 		return err
 	}
 	return nil
@@ -54,13 +56,48 @@ func prepareLocalCheckout(ctx context.Context, repoPath, workDir string) error {
 func checkoutSourceRevision(ctx context.Context, workDir string, payload ScriptPayload) error {
 	revision := strings.TrimSpace(payload.CommitSHA)
 	if revision != "" {
-		return runGit(ctx, workDir, "checkout", "--detach", revision)
+		return gitCheckoutDetach(ctx, workDir, revision)
 	}
 	refName := strings.TrimSpace(payload.RefName)
 	if refName == "" {
 		return nil
 	}
-	return runGit(ctx, workDir, "checkout", "-B", refName, "origin/"+refName)
+	return gitCheckoutBranch(ctx, workDir, refName)
+}
+
+func gitFetchAllPrune(ctx context.Context, workDir string) error {
+	command := gitCommand(ctx, "fetch", "--all", "--prune")
+	return runGitCommand(command, workDir, "fetch --all --prune")
+}
+
+func gitCloneNoCheckout(ctx context.Context, workDir, repoPath string) error {
+	command := gitCommand(ctx, "clone", "--no-checkout", repoPath, ".")
+	return runGitCommand(command, workDir, "clone --no-checkout")
+}
+
+func gitCheckoutDetach(ctx context.Context, workDir, revision string) error {
+	command := gitCommand(ctx, "checkout", "--detach", revision)
+	return runGitCommand(command, workDir, "checkout --detach")
+}
+
+func gitCheckoutBranch(ctx context.Context, workDir, refName string) error {
+	command := gitCommand(ctx, "checkout", "-B", refName, "origin/"+refName)
+	return runGitCommand(command, workDir, "checkout branch")
+}
+
+func gitCommand(ctx context.Context, args ...string) *exec.Cmd {
+	command := execabs.CommandContext(ctx, "git")
+	command.Args = append(command.Args, args...)
+	return command
+}
+
+func runGitCommand(command *exec.Cmd, dir, operation string) error {
+	command.Dir = dir
+	output, err := command.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("git %s: %w: %s", operation, err, strings.TrimSpace(string(output)))
 }
 
 func resolveLocalBareRepo(repoRoot, projectFullPath string) (string, error) {

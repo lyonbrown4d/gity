@@ -176,14 +176,23 @@ func (s *Service) ClaimProjectJobMatching(ctx context.Context, projectID int64, 
 		return cidomain.ProjectJob{}, false, err
 	}
 	workerID = normalizeWorkerID(workerID)
-	if matcher == nil {
-		matcher = func(cidomain.ProjectJob) (bool, error) { return true, nil }
-	}
 	candidates, err := s.jobRepo.ListClaimableByProjectIDAndKinds(ctx, projectID, []string{KindScript}, 50)
 	if err != nil {
 		return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "worker_id", workerID).Wrapf(err, "list claimable project script jobs")
 	}
-	for _, candidate := range candidates.Values() {
+	return s.claimMatchingCandidate(ctx, projectID, workerID, lease, normalizeClaimMatcher(matcher), candidates.Values())
+}
+
+func normalizeClaimMatcher(matcher ClaimMatcher) ClaimMatcher {
+	if matcher != nil {
+		return matcher
+	}
+	return func(cidomain.ProjectJob) (bool, error) { return true, nil }
+}
+
+func (s *Service) claimMatchingCandidate(ctx context.Context, projectID int64, workerID string, lease time.Duration, matcher ClaimMatcher, candidates []cidomain.ProjectJob) (cidomain.ProjectJob, bool, error) {
+	for index := range candidates {
+		candidate := candidates[index]
 		matched, matchErr := matcher(candidate)
 		if matchErr != nil {
 			return cidomain.ProjectJob{}, false, oops.In("job").With("project_id", projectID, "job_id", candidate.ID, "worker_id", workerID).Wrapf(matchErr, "match claimable project job")

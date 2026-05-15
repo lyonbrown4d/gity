@@ -13,6 +13,7 @@ import (
 	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 type Endpoint struct {
@@ -203,7 +204,11 @@ func parseOptionalTime(value string) (time.Time, error) {
 	if strings.TrimSpace(value) == "" {
 		return time.Time{}, nil
 	}
-	return time.Parse(time.RFC3339, value)
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, oops.In("project_credential").With("value", value).Wrapf(err, "parse expiration time")
+	}
+	return parsed, nil
 }
 
 func formatTime(value time.Time) string {

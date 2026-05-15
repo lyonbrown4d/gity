@@ -13,6 +13,7 @@ import (
 	releasedomain "github.com/lyonbrown4d/gity/internal/domain/release"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 type Endpoint struct {
@@ -113,7 +114,7 @@ func (e *Endpoint) createRelease(ctx context.Context, in *createReleaseInput) (*
 		Description:     in.Body.Description,
 		SourceRef:       in.Body.SourceRef,
 		CreateTag:       in.Body.CreateTag,
-		ReleasedAt:      releasedAt,
+		ReleasedAt:      releasedAt.Pointer(),
 		CreatedByUserID: actorUserID,
 	})
 	if err != nil {
@@ -130,7 +131,7 @@ func (e *Endpoint) updateRelease(ctx context.Context, in *releaseByIDInput) (*re
 	item, err := e.service.UpdateRelease(ctx, in.ProjectID, in.ReleaseID, releaseservice.UpdateReleaseInput{
 		Name:        optionalString(in.Body.Name),
 		Description: optionalString(in.Body.Description),
-		ReleasedAt:  releasedAt,
+		ReleasedAt:  releasedAt.Pointer(),
 	})
 	if err != nil {
 		return nil, err
@@ -160,15 +161,28 @@ func (e *Endpoint) deleteReleaseLink(ctx context.Context, in *releaseLinkInput) 
 	return &releaseOutput{Body: map[string]any{"status": "deleted"}}, nil
 }
 
-func parseOptionalTime(value string) (*time.Time, error) {
+type optionalTime struct {
+	value time.Time
+	ok    bool
+}
+
+func (item optionalTime) Pointer() *time.Time {
+	if !item.ok {
+		return nil
+	}
+	value := item.value
+	return &value
+}
+
+func parseOptionalTime(value string) (optionalTime, error) {
 	if value == "" {
-		return nil, nil
+		return optionalTime{}, nil
 	}
 	parsed, err := time.Parse(time.RFC3339, value)
 	if err != nil {
-		return nil, err
+		return optionalTime{}, oops.In("release").With("value", value).Wrapf(err, "parse release time")
 	}
-	return &parsed, nil
+	return optionalTime{value: parsed, ok: true}, nil
 }
 
 func optionalString(value *string) *string {

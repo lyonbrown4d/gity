@@ -255,49 +255,10 @@ func (e *Endpoint) languages(ctx context.Context, in *projectRepositoryInput) (*
 	}}, nil
 }
 
-func projectOrganizationFilter(in *projectsInput) *int64 {
-	organizationID := in.OrganizationID
-	if organizationID <= 0 {
-		return nil
-	}
-	return &organizationID
-}
-
-func buildCreateProjectInput(in *createProjectInput) projectservice.CreateInput {
-	organizationID := in.Body.OrganizationID
-	return projectservice.CreateInput{
-		OrganizationID: organizationID,
-		Name:           in.Body.Name,
-		PathKey:        firstNonEmpty(in.Body.PathKey, in.Body.Key),
-		Visibility:     in.Body.Visibility,
-		Description:    in.Body.Description,
-		DefaultBranch:  in.Body.DefaultBranch,
-	}
-}
-
 func (e *Endpoint) setBranchProtection(ctx context.Context, in *branchProtectionInput, protected bool) (*projectOutput, error) {
 	item, err := e.service.SetBranchProtection(ctx, in.ID, in.BranchName, protected)
 	if err != nil {
 		return nil, err
 	}
 	return &projectOutput{Body: toRepositoryBranchView(in.ID, item)}, nil
-}
-
-func repositoryRefName(primary, fallback string) string {
-	refName := strings.TrimSpace(primary)
-	if refName == "" {
-		refName = strings.TrimSpace(fallback)
-	}
-	return refName
-}
-
-func buildCreateFileCommitInput(in *createFileCommitInput, branchName string) projectservice.CreateFileCommitInput {
-	return projectservice.CreateFileCommitInput{
-		BranchName:  branchName,
-		Path:        in.Body.Path,
-		Content:     in.Body.Content,
-		Message:     in.Body.Message,
-		AuthorName:  in.Body.AuthorName,
-		AuthorEmail: in.Body.AuthorEmail,
-	}
 }

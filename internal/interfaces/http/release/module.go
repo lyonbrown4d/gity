@@ -1,4 +1,3 @@
-// Package release wires release HTTP endpoints.
 package release
 
 import (

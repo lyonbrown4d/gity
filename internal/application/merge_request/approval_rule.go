@@ -68,7 +68,9 @@ func (s *Service) ListApprovalRules(ctx context.Context, projectID int64) (Appro
 		return ApprovalRulesView{}, oops.In("merge_request").With("project_id", projectID).Wrapf(err, "list merge request approval rules")
 	}
 	views := make([]ApprovalRuleView, 0, items.Len())
-	for _, item := range items.Values() {
+	itemValues := items.Values()
+	for index := range itemValues {
+		item := itemValues[index]
 		view, viewErr := approvalRuleView(item)
 		if viewErr != nil {
 			return ApprovalRulesView{}, viewErr
@@ -111,8 +113,9 @@ func (s *Service) UpdateApprovalRule(ctx context.Context, projectID, ruleID int6
 	if err != nil {
 		return ApprovalRuleView{}, err
 	}
-	if err := s.approvalRuleRepo.UpdateByID(ctx, ruleID, patch); err != nil {
-		return ApprovalRuleView{}, oops.In("merge_request").With("project_id", projectID, "rule_id", ruleID).Wrapf(err, "update merge request approval rule")
+	updateErr := s.approvalRuleRepo.UpdateByID(ctx, ruleID, patch)
+	if updateErr != nil {
+		return ApprovalRuleView{}, oops.In("merge_request").With("project_id", projectID, "rule_id", ruleID).Wrapf(updateErr, "update merge request approval rule")
 	}
 	updated, err := s.approvalRuleRepo.GetByProjectAndID(ctx, projectID, ruleID)
 	if err != nil {
@@ -157,37 +160,68 @@ func (s *Service) normalizeApprovalRuleInput(ctx context.Context, projectID int6
 
 func (s *Service) normalizeUpdateApprovalRuleInput(ctx context.Context, projectID int64, existing mergedomain.ProjectMergeRequestApprovalRule, input UpdateApprovalRuleInput) (gitports.UpdateProjectMergeRequestApprovalRuleInput, error) {
 	patch := gitports.UpdateProjectMergeRequestApprovalRuleInput{}
-	if input.Name != nil {
-		name := strings.TrimSpace(*input.Name)
-		if name == "" {
-			return patch, apperror.BadRequest("approval rule name is required", oops.In("merge_request").With("project_id", projectID, "rule_id", existing.ID).New("approval rule name is required"))
-		}
-		patch.Name = &name
+	if err := setApprovalRuleNamePatch(projectID, existing.ID, input.Name, &patch); err != nil {
+		return patch, err
 	}
-	if input.TargetBranch != nil {
-		targetBranch := strings.TrimSpace(*input.TargetBranch)
-		if targetBranch == "" {
-			targetBranch = "*"
-		}
-		patch.TargetBranch = &targetBranch
+	setApprovalRuleTargetBranchPatch(input.TargetBranch, &patch)
+	setApprovalRuleRequiredPatch(input.ApprovalsRequired, &patch)
+	if err := s.setApprovalRuleEligibleUsersPatch(ctx, projectID, input.EligibleUserIDs, &patch); err != nil {
+		return patch, err
 	}
-	if input.ApprovalsRequired != nil {
-		required := normalizedRequiredApprovals(*input.ApprovalsRequired)
-		patch.ApprovalsRequired = &required
-	}
-	if input.EligibleUserIDs != nil {
-		eligibleUserIDs, err := s.normalizeApprovalRuleUserIDs(ctx, projectID, *input.EligibleUserIDs)
-		if err != nil {
-			return patch, err
-		}
-		encoded := encodeApprovalRuleUserIDs(eligibleUserIDs)
-		patch.EligibleUserIDs = &encoded
-	}
-	if input.CodeOwner != nil {
-		codeOwner := boolInt(*input.CodeOwner)
-		patch.CodeOwner = &codeOwner
-	}
+	setApprovalRuleCodeOwnerPatch(input.CodeOwner, &patch)
 	return patch, nil
+}
+
+func setApprovalRuleNamePatch(projectID, ruleID int64, input *string, patch *gitports.UpdateProjectMergeRequestApprovalRuleInput) error {
+	if input == nil {
+		return nil
+	}
+	name := strings.TrimSpace(*input)
+	if name == "" {
+		return apperror.BadRequest("approval rule name is required", oops.In("merge_request").With("project_id", projectID, "rule_id", ruleID).New("approval rule name is required"))
+	}
+	patch.Name = &name
+	return nil
+}
+
+func setApprovalRuleTargetBranchPatch(input *string, patch *gitports.UpdateProjectMergeRequestApprovalRuleInput) {
+	if input == nil {
+		return
+	}
+	targetBranch := strings.TrimSpace(*input)
+	if targetBranch == "" {
+		targetBranch = "*"
+	}
+	patch.TargetBranch = &targetBranch
+}
+
+func setApprovalRuleRequiredPatch(input *int, patch *gitports.UpdateProjectMergeRequestApprovalRuleInput) {
+	if input == nil {
+		return
+	}
+	required := normalizedRequiredApprovals(*input)
+	patch.ApprovalsRequired = &required
+}
+
+func (s *Service) setApprovalRuleEligibleUsersPatch(ctx context.Context, projectID int64, input *[]int64, patch *gitports.UpdateProjectMergeRequestApprovalRuleInput) error {
+	if input == nil {
+		return nil
+	}
+	eligibleUserIDs, err := s.normalizeApprovalRuleUserIDs(ctx, projectID, *input)
+	if err != nil {
+		return err
+	}
+	encoded := encodeApprovalRuleUserIDs(eligibleUserIDs)
+	patch.EligibleUserIDs = &encoded
+	return nil
+}
+
+func setApprovalRuleCodeOwnerPatch(input *bool, patch *gitports.UpdateProjectMergeRequestApprovalRuleInput) {
+	if input == nil {
+		return
+	}
+	codeOwner := boolInt(*input)
+	patch.CodeOwner = &codeOwner
 }
 
 func (s *Service) normalizeApprovalRuleUserIDs(ctx context.Context, projectID int64, userIDs []int64) ([]int64, error) {
@@ -245,7 +279,7 @@ func decodeApprovalRuleUserIDs(value string) ([]int64, error) {
 	for _, part := range parts {
 		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, oops.In("merge_request").With("value", part).Wrapf(err, "parse approval rule user id")
 		}
 		if id > 0 {
 			ids = append(ids, id)

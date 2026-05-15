@@ -8,12 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
-	"golang.org/x/sys/execabs"
 )
 
 func ExecuteScriptJob(ctx context.Context, cfg Config, job cidomain.ProjectJob) (string, error) {
@@ -33,8 +31,8 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 	if err != nil {
 		return "", err
 	}
-	if err := validateScriptPayload(cfg, payload); err != nil {
-		return "", err
+	if validationErr := validateScriptPayload(cfg, payload); validationErr != nil {
+		return "", validationErr
 	}
 	timeout := scriptTimeout(cfg, payload)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -98,6 +96,9 @@ func shellAllowed(cfg Config, shell string) bool {
 	normalized := normalizeShellName(shell)
 	if normalized == "" {
 		return true
+	}
+	if !supportedScriptShell(normalized) {
+		return false
 	}
 	allowed := cfg.AllowedShells
 	if len(allowed) == 0 {
@@ -260,52 +261,4 @@ func isForcedScriptExit(err error) bool {
 	}
 	message := err.Error()
 	return strings.Contains(message, "script job timed out") || strings.Contains(message, "script job canceled")
-}
-
-func scriptCommand(ctx context.Context, shell, script string) *exec.Cmd {
-	normalized := strings.ToLower(strings.TrimSpace(shell))
-	if normalized == "" {
-		if runtime.GOOS == "windows" {
-			return execabs.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
-		}
-		return execabs.CommandContext(ctx, "/bin/sh", "-lc", script)
-	}
-	switch normalized {
-	case "powershell", "powershell.exe":
-		return execabs.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
-	case "pwsh", "pwsh.exe":
-		return execabs.CommandContext(ctx, "pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
-	case "cmd", "cmd.exe":
-		return execabs.CommandContext(ctx, "cmd.exe", "/C", script)
-	case "bash":
-		return execabs.CommandContext(ctx, "bash", "-lc", script)
-	case "sh":
-		return execabs.CommandContext(ctx, "/bin/sh", "-lc", script)
-	default:
-		if runtime.GOOS == "windows" {
-			return execabs.CommandContext(ctx, shell, "/C", script)
-		}
-		return execabs.CommandContext(ctx, shell, "-lc", script)
-	}
-}
-
-func runGit(ctx context.Context, dir string, args ...string) error {
-	command := execabs.CommandContext(ctx, "git", args...)
-	command.Dir = dir
-	output, err := command.CombinedOutput()
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
-}
-
-func exitCodeFromError(err error) int {
-	if err == nil {
-		return 0
-	}
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
-		return exitError.ExitCode()
-	}
-	return 1
 }
