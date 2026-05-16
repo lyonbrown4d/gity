@@ -18,29 +18,56 @@ Supported values:
 - `containerd`
 - `firecracker`
 
-## Docker / Podman / containerd (implemented)
+## Docker / Podman / containerd
 
-`docker`、`podman`、`containerd` 使用独立的 runner 路径（`dockerScriptRunner`、`podmanScriptRunner`、`containerdScriptRunner`），
-当前共用兼容的 container runtime API 客户端（基于 `github.com/docker/docker`）实现：
+These modes use API-based container runtime clients built on the Docker Go SDK:
 
-- create container via `github.com/docker/docker` client API,
-- ensure image exists and pull when missing,
-- bind mount workspace,
-- capture stdout/stderr via attachment stream.
+- create container from image;
+- pull image when missing;
+- bind-mount workspace;
+- capture stdout/stderr from attach stream.
 
 Runtime endpoint can be set with `GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT`.
 
-## containerd (API mode)
+## containerd
 
-`containerd` 已接入与 `docker`/`podman` 相同的 API 执行链路。
-当前实现会通过 `GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT` 连接对应 containerd socket，
-并以容器创建/运行/等待流程执行脚本。
+`containerd` uses the same API-driven flow as `docker`/`podman`.
 
 Required values:
 
 - `containerd`: `GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT`
 
-## Firecracker (reserved)
+## Firecracker (experimental)
 
-`firecracker` 目前仍为保留状态，保持清晰错误返回，便于后续在独立 VM 层实现中逐步补齐。  
-相关参数：`GITY_RUNNER_FIRECRACKER_SOCKET`
+`firecracker` currently supports runtime reachability checks and validation:
+
+- validate socket config (`GITY_RUNNER_FIRECRACKER_SOCKET`);
+- validate workspace path;
+- probe the Firecracker API by making a Go-native HTTP request over unix socket/TCP.
+
+Execution behavior:
+
+- if the configured endpoint looks like a container runtime socket, the runner falls back to the existing
+  container execution path for now (`container-runtime` compatibility mode) and marks the runtime as `firecracker`;
+- otherwise, job execution returns an explicit "not implemented yet" error indicating full VM orchestration is pending.
+
+Related env:
+
+- `GITY_RUNNER_FIRECRACKER_SOCKET`
+- `GITY_RUNNER_CONTAINER_IMAGE` (used for target job image metadata until execution is added)
+
+## Security and Deployment Notes
+
+- The runner is **trusted-host** by design in this beta release: it executes repository-provided job scripts and has access to the project token used for claiming jobs.
+- Container runtimes provide a process boundary only for jobs that use container mode; host mode and the future Firecracker path do not provide the same degree of isolation yet.
+- Keep container images for CI to the minimum privilege needed, and avoid mounting host paths other than the workspace bind.
+- Masked CI variables are redacted in API responses and logs when possible, but mask coverage is a defense-in-depth aid, not a security boundary by itself.
+- Keep workspace cleanup enabled (`GITY_RUNNER_CLEAN_WORKSPACE=true`) for untrusted scripts to reduce artifact persistence.
+
+## Recommended runtime profile
+
+| Environment | Suggested mode | Why |
+| --- | --- | --- |
+| Local dev or secure lab | `docker` or `podman` | Quick setup, easy local debugging |
+| Shared/self-hosted runner host | `containerd` or `podman` | Better control and explicit socket binding |
+| Public/untrusted jobs (future) | `firecracker` (when implemented) | VM-level isolation target for stronger tenant isolation |

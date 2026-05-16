@@ -2,6 +2,8 @@ package runneragent
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strings"
 	"testing"
@@ -198,6 +200,30 @@ func TestResolveScriptRunnerReturnsDockerAndPodmanRunners(t *testing.T) {
 	}
 }
 
+func TestFirecrackerRuntimeCompatibilityDetection(t *testing.T) {
+	t.Parallel()
+
+	if !isFirecrackerCompatibleWithContainerRuntime("unix:///run/containerd/containerd.sock") {
+		t.Fatalf("expected unix socket to be treated as container runtime compatible")
+	}
+
+	if !isFirecrackerCompatibleWithContainerRuntime("http://containerd.localhost:8080/") {
+		t.Fatalf("expected containerd-hosted http endpoint to be treated as compatible")
+	}
+
+	if isFirecrackerCompatibleWithContainerRuntime("unix:///tmp/fc.sock/control") {
+		t.Fatalf("expected nested socket path to be treated as non-compatible")
+	}
+
+	if isFirecrackerCompatibleWithContainerRuntime("npipe:///var/run/fc") {
+		t.Fatalf("expected npipe endpoint to be treated as non-compatible")
+	}
+
+	if isFirecrackerCompatibleWithContainerRuntime("   ") {
+		t.Fatalf("expected empty socket to be non-compatible")
+	}
+}
+
 func TestScriptRunnerForPodmanWithoutImageReturnsError(t *testing.T) {
 	t.Parallel()
 
@@ -244,6 +270,11 @@ func TestScriptRunnerForDockerOrPodmanWithoutEndpointReturnsError(t *testing.T) 
 func TestScriptRunnerForContainerdAndFirecrackerRunFlow(t *testing.T) {
 	t.Parallel()
 
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
 	runner, err := resolveScriptRunner(Config{
 		ExecutionMode:   "containerd",
 		ContainerRuntime: runnerExecutionModeContainerd,
@@ -261,7 +292,7 @@ func TestScriptRunnerForContainerdAndFirecrackerRunFlow(t *testing.T) {
 		ExecutionMode:   "firecracker",
 		ContainerRuntime: runnerExecutionModeContainerd,
 		DockerImage:      "alpine:3",
-		FirecrackerSocket: "/tmp/fc.sock",
+		FirecrackerSocket: server.URL,
 	}, ScriptPayload{})
 	if err != nil {
 		t.Fatalf("expected firecracker script runner to be returned, got error: %v", err)
@@ -269,7 +300,8 @@ func TestScriptRunnerForContainerdAndFirecrackerRunFlow(t *testing.T) {
 	if _, ok := runner.(firecrackerScriptRunner); !ok {
 		t.Fatalf("expected firecracker script runner, got %T", runner)
 	}
-	err = runner.run(context.Background(), Config{}, cidomain.ProjectJob{}, ScriptPayload{}, "", &cappedBuffer{})
+	workDir := t.TempDir()
+	err = runner.run(context.Background(), Config{DockerImage: "alpine:3"}, cidomain.ProjectJob{}, ScriptPayload{}, workDir, &cappedBuffer{})
 	if err == nil || !strings.Contains(err.Error(), "firecracker runner runtime is not implemented yet") {
 		t.Fatalf("expected firecracker not implemented error, got %v", err)
 	}
