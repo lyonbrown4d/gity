@@ -38,6 +38,7 @@ func TestEndpointRegistersDeprecatedRepoAliases(t *testing.T) {
 	assertRoute(t, server, http.MethodDelete, "/api/v1/repos/{id}/branches/{branch_name}")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/file-commits")
 	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/branches/{branch_name}/protect")
+	assertRoute(t, server, http.MethodPost, "/api/v1/repos/{id}/search/index/refresh")
 }
 
 func assertRoute(t *testing.T, server httpx.ServerRuntime, method, path string) {

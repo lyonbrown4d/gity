@@ -107,5 +107,14 @@ func (e *Endpoint) registerRepositoryRoutes(registrar httpx.Registrar, projectSc
 				infraauth.ProjectActionRepositoryAdmin,
 			),
 		),
+		httpapi.Post("/repos/{id}/search/index/refresh", e.refreshSearchIndex,
+			httpapi.RequireProjectActionRoute[refreshProjectSearchIndexInput, projectOutput](
+				"require_search_index_refresh",
+				e.authRuntime,
+				projectScope,
+				infraauth.ProjectActionRepositoryAdmin,
+			),
+			httpapi.DeprecatedRoute[refreshProjectSearchIndexInput, projectOutput]("Use POST /projects/{id}/search/index/refresh instead."),
+		),
 	)
 }
