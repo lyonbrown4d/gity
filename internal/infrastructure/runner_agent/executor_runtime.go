@@ -102,8 +102,8 @@ func (runner containerdScriptRunner) run(ctx context.Context, cfg Config, job ci
 	return runContainerScriptJob(ctx, cfg, job, payload, imageRef, shellCommand, workDir, runner.endpoint, runtimeClient, output, runnerExecutionModeContainerd)
 }
 
-func (runner firecrackerScriptRunner) run(_ context.Context, _ Config, _ cidomain.ProjectJob, _ ScriptPayload, _ string, _ *cappedBuffer) error {
-	return runFirecrackerScriptJob(runner.socket)
+func (runner firecrackerScriptRunner) run(ctx context.Context, cfg Config, job cidomain.ProjectJob, payload ScriptPayload, workDir string, output *cappedBuffer) error {
+	return runFirecrackerScriptJob(ctx, cfg, job, payload, workDir, output, runner.socket)
 }
 
 func resolveExecutionMode(cfg Config, payload ScriptPayload) string {

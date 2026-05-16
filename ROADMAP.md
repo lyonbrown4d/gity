@@ -162,7 +162,7 @@ High priority:
 
 - Run full backend test suite and frontend build after the current permission/MR/runner work
 - Add beta smoke flow that covers push -> MR -> approval -> merge -> pipeline -> audit
-- Finish runner trusted-host documentation
+- Add and verify runner security notes for trusted-host and execution isolation (container modes vs host mode)
 - Add API docs/examples for project members, approval rules, and CI variables
 
 Medium priority:

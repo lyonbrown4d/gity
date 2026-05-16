@@ -91,6 +91,11 @@ type projectRepositorySearchInput struct {
 	Regex         bool   `query:"regex"`
 }
 
+type refreshProjectSearchIndexInput struct {
+	ID            int64  `path:"id"`
+	Authorization string `header:"Authorization"`
+}
+
 type projectOutput struct {
 	Body any `json:"body"`
 }

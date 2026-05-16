@@ -183,6 +183,12 @@ Production Docker deployment templates live in [docs/production-deployment.md](d
 
 Local beta smoke validation lives in [docs/beta-smoke.md](docs/beta-smoke.md).
 
+Runner runtime modes and security notes are documented in [docs/runner-container-runtime.md](docs/runner-container-runtime.md).
+
 ## Roadmap
 
 Detailed planning lives in [ROADMAP.md](ROADMAP.md).
+
+## API Examples
+
+- API interface examples (project members, MR approval rules, CI variables): [docs/api-examples.md](docs/api-examples.md)

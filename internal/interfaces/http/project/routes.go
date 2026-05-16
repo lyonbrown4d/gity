@@ -7,6 +7,7 @@ import (
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	"github.com/lyonbrown4d/gity/internal/config"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	searchindex "github.com/lyonbrown4d/gity/internal/infrastructure/search_index"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 )
 
@@ -17,10 +18,41 @@ type Endpoint struct {
 	authRuntime         *infraauth.Runtime
 	pipelineService     *pipelineservice.Service
 	organizationService *organizationservice.Service
+	searchIndexService  *searchindex.Service
 }
 
-func NewEndpoint(service *projectservice.Service, memberService *projectservice.MemberService, settings config.Settings, authRuntime *infraauth.Runtime, pipelineService *pipelineservice.Service, organizationService *organizationservice.Service) *Endpoint {
-	return &Endpoint{service: service, memberService: memberService, settings: settings, authRuntime: authRuntime, pipelineService: pipelineService, organizationService: organizationService}
+type projectEndpointRuntime struct {
+	organizationService *organizationservice.Service
+	searchIndexService  *searchindex.Service
+}
+
+func NewEndpoint(
+	service *projectservice.Service,
+	memberService *projectservice.MemberService,
+	settings config.Settings,
+	authRuntime *infraauth.Runtime,
+	pipelineService *pipelineservice.Service,
+	runtime *projectEndpointRuntime,
+) *Endpoint {
+	if runtime == nil {
+		runtime = &projectEndpointRuntime{}
+	}
+	return &Endpoint{
+		service:            service,
+		memberService:      memberService,
+		settings:           settings,
+		authRuntime:        authRuntime,
+		pipelineService:    pipelineService,
+		organizationService: runtime.organizationService,
+		searchIndexService:  runtime.searchIndexService,
+	}
+}
+
+func NewProjectEndpointRuntime(organizationService *organizationservice.Service, searchIndexService *searchindex.Service) *projectEndpointRuntime {
+	return &projectEndpointRuntime{
+		organizationService: organizationService,
+		searchIndexService:  searchIndexService,
+	}
 }
 
 func (e *Endpoint) EndpointSpec() httpx.EndpointSpec {

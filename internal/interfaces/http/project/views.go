@@ -192,6 +192,14 @@ func (in projectRepositorySearchInput) ProjectIDValue() int64 {
 	return in.ID
 }
 
+func (in refreshProjectSearchIndexInput) AuthorizationHeader() string {
+	return in.Authorization
+}
+
+func (in refreshProjectSearchIndexInput) ProjectIDValue() int64 {
+	return in.ID
+}
+
 func parseIDFilter(raw string) *setx.Set[int64] {
 	ids := setx.NewSet[int64]()
 	raw = strings.TrimSpace(raw)

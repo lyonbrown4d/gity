@@ -2,11 +2,13 @@ package project
 
 import (
 	"context"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/httpx"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
@@ -252,6 +254,23 @@ func (e *Endpoint) languages(ctx context.Context, in *projectRepositoryInput) (*
 		AnalyzedAt:   time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		TotalBytes:   analysis.TotalBytes,
 		Languages:    analysis.Languages,
+	}}, nil
+}
+
+func (e *Endpoint) refreshSearchIndex(ctx context.Context, in *refreshProjectSearchIndexInput) (*projectOutput, error) {
+	if e.searchIndexService == nil {
+		return nil, httpx.NewError(http.StatusServiceUnavailable, "search index service is not configured")
+	}
+	item, err := e.service.GetByID(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.searchIndexService.RefreshProject(ctx, item); err != nil {
+		return nil, err
+	}
+	return &projectOutput{Body: map[string]any{
+		"status":    "refreshed",
+		"projectID": in.ID,
 	}}, nil
 }
 

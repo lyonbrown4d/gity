@@ -99,5 +99,13 @@ func (e *Endpoint) registerRepositoryRoutes(registrar httpx.Registrar, projectSc
 		),
 		httpapi.Get("/projects/{id}/languages", e.languages, repositoryRead),
 		httpapi.Get("/repos/{id}/languages", e.languages, repositoryRead, httpapi.DeprecatedRoute[projectRepositoryInput, projectOutput]("Use GET /projects/{id}/languages instead.")),
+		httpapi.Post("/projects/{id}/search/index/refresh", e.refreshSearchIndex,
+			httpapi.RequireProjectActionRoute[refreshProjectSearchIndexInput, projectOutput](
+				"require_search_index_refresh",
+				e.authRuntime,
+				projectScope,
+				infraauth.ProjectActionRepositoryAdmin,
+			),
+		),
 	)
 }

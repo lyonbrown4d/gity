@@ -82,7 +82,7 @@ func ConfigFromEnv(args []string) (Config, error) {
 	flags.StringVar(&cfg.DockerWorkDir, "container-workdir", cfg.DockerWorkDir, "working directory inside container")
 	flags.StringVar(&cfg.DockerMemoryLimit, "container-memory", cfg.DockerMemoryLimit, "container memory limit (e.g. 512m)")
 	flags.StringVar(&cfg.DockerCPUs, "container-cpus", cfg.DockerCPUs, "container cpus limit (e.g. 1.5)")
-	flags.StringVar(&cfg.FirecrackerSocket, "firecracker-socket", cfg.FirecrackerSocket, "firecracker socket path (placeholder for future native VM execution)")
+	flags.StringVar(&cfg.FirecrackerSocket, "firecracker-socket", cfg.FirecrackerSocket, "firecracker runtime socket (unix path or unix/tcp URL)")
 	flags.StringVar(&cfg.DockerImage, "docker-image", cfg.DockerImage, "default docker image for script jobs")
 	flags.StringVar(&cfg.DockerNetwork, "docker-network", cfg.DockerNetwork, "docker container network (deprecated)")
 	flags.BoolVar(&cfg.DockerHostNetwork, "docker-host-network", cfg.DockerHostNetwork, "run docker container in host network mode (deprecated)")
