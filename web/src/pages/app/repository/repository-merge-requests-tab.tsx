@@ -780,6 +780,19 @@ const MergeRequestChecksPanel = ({
           <CheckLine label={t("Pipeline status")} value={checks.pipeline?.status ? t(checks.pipeline.status) : t(checks.status)} />
         </div>
       ) : null}
+      {checks?.blockers?.length ? (
+        <div className="mt-3 rounded-md border bg-background/70 px-3 py-2">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">{t("Blocking reasons")}</p>
+          <div className="space-y-2">
+            {checks.blockers.map((blocker) => (
+              <div key={`${blocker.category}:${blocker.code}:${blocker.message}`} className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
+                <span className="text-muted-foreground">{blocker.message}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {checks?.approval_rules?.length ? (
         <div className="mt-3 space-y-2">
           <p className="text-xs font-medium text-muted-foreground">
@@ -1242,12 +1255,19 @@ const normalizeCheckStatusView = (payload: unknown): RepositoryMergeRequestCheck
     mergeable: normalizeBool(raw.mergeable ?? raw.Mergeable),
     status: normalizeString(raw.status ?? raw.Status),
     blocking_reason: normalizeOptionalString(raw.blocking_reason ?? raw.BlockingReason),
+    blockers: resolveRecordArray(raw.blockers ?? raw.Blockers).map(normalizeCheckBlocker),
     pipeline: normalizePipeline(raw.pipeline ?? raw.Pipeline),
     required_approvals: normalizeNumber(raw.required_approvals ?? raw.RequiredApprovals),
     approval_count: normalizeNumber(raw.approval_count ?? raw.ApprovalCount),
     approval_rules: resolveRecordArray(raw.approval_rules ?? raw.ApprovalRules).map(normalizeApprovalRuleCheck),
   };
 };
+
+const normalizeCheckBlocker = (raw: RawRecord) => ({
+  code: normalizeString(raw.code ?? raw.Code),
+  category: normalizeString(raw.category ?? raw.Category),
+  message: normalizeString(raw.message ?? raw.Message),
+});
 
 const normalizeApprovalRuleCheck = (raw: RawRecord): RepositoryMergeRequestApprovalRuleCheckView => ({
   rule_id: normalizeString(raw.rule_id ?? raw.RuleID),

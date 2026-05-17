@@ -192,10 +192,17 @@ export interface RepositoryMergeRequestCheckStatusView {
   mergeable: boolean;
   status: string;
   blocking_reason?: string | null;
+  blockers: RepositoryMergeRequestCheckBlockerView[];
   pipeline?: RepositoryPipelineView | null;
   required_approvals: number;
   approval_count: number;
   approval_rules: RepositoryMergeRequestApprovalRuleCheckView[];
+}
+
+export interface RepositoryMergeRequestCheckBlockerView {
+  code: string;
+  category: string;
+  message: string;
 }
 
 export interface RepositoryMergeRequestApprovalRuleCheckView {

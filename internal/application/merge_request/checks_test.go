@@ -57,11 +57,33 @@ func TestMergeRequestApprovalRuleRequiresEligibleApprover(t *testing.T) {
 	if checks.Mergeable || checks.RequiredApprovals != 1 || len(checks.ApprovalRules) != 1 {
 		t.Fatalf("expected approval rule to block merge: %+v", checks)
 	}
+	assertMergeCheckBlocker(t, checks.Blockers, "approval_rule_unsatisfied")
 	assertApproveMergeRequest(t, fixture, mrIID)
 	checks = testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
 	if !checks.Mergeable || !checks.ApprovalRules[0].Satisfied {
 		t.Fatalf("expected approval rule to pass: %+v", checks)
 	}
+}
+
+func TestMergeRequestChecksReportAllApprovalBlockers(t *testing.T) {
+	t.Parallel()
+
+	fixture := newMergeRequestFixture(t, true)
+	mrIID := assertCreateMergeRequest(t, fixture, "merge with approval blockers")
+	testutil.Must(fixture.mergeRequestService.CreateApprovalRule(fixture.ctx, fixture.projectID, mergerequestservice.ApprovalRuleInput{
+		Name:              "Maintainer review",
+		TargetBranch:      "main",
+		ApprovalsRequired: 1,
+		EligibleUserIDs:   []int64{fixture.reviewerID},
+	}))
+	testutil.Must(fixture.mergeRequestService.CreateApprovalRule(fixture.ctx, fixture.projectID, mergerequestservice.ApprovalRuleInput{
+		Name:              "Owner review",
+		TargetBranch:      "main",
+		ApprovalsRequired: 1,
+		EligibleUserIDs:   []int64{fixture.ownerID},
+	}))
+	checks := testutil.Must(fixture.mergeRequestService.GetChecks(fixture.ctx, fixture.projectID, mrIID))
+	assertMergeCheckBlockerCount(t, checks.Blockers, "approval_rule_unsatisfied", 2)
 }
 
 func TestMergeRequestCodeOwnersApprovalRule(t *testing.T) {
@@ -146,6 +168,7 @@ func assertMissingMergeRequestChecks(t *testing.T, fixture mergeRequestFixture, 
 	if !checks.PipelineRequired || !checks.Required || checks.Mergeable || checks.Status != "missing" {
 		t.Fatalf("expected missing required checks: %+v", checks)
 	}
+	assertMergeCheckBlocker(t, checks.Blockers, "pipeline_missing")
 }
 
 func requireTargetBranchPipeline(t *testing.T, fixture mergeRequestFixture, branchName string) {
@@ -174,6 +197,8 @@ func assertProtectedTargetBranchChecks(t *testing.T, fixture mergeRequestFixture
 	if !checks.PipelineRequired || !checks.Required || checks.Mergeable || checks.Status != "missing" {
 		t.Fatalf("expected protected target branch missing pipeline checks: %+v", checks)
 	}
+	assertMergeCheckBlocker(t, checks.Blockers, "pipeline_missing")
+	assertMergeCheckBlocker(t, checks.Blockers, "approval_rule_unsatisfied")
 }
 
 func assertApproveMergeRequest(t *testing.T, fixture mergeRequestFixture, mrIID int64) {
@@ -214,6 +239,7 @@ func createFailedPipelineAndMarkSucceeded(t *testing.T, fixture mergeRequestFixt
 	if checks.Mergeable || checks.Status != projectpipelinerepo.StatusFailed || checks.Pipeline == nil {
 		t.Fatalf("expected failed checks: %+v", checks)
 	}
+	assertMergeCheckBlocker(t, checks.Blockers, "pipeline_not_succeeded")
 	testutil.RequireNoError(t, fixture.pipelineRepository.UpdateStatus(fixture.ctx, pipeline, projectpipelinerepo.StatusSucceeded), "mark pipeline succeeded")
 }
 
@@ -229,5 +255,30 @@ func assertTargetBranchPipeline(t *testing.T, fixture mergeRequestFixture) {
 	targetPipeline := testutil.Must(fixture.pipelineRepository.GetLatestByProjectRefCommit(fixture.ctx, fixture.projectID, "main", targetBranch.Hash))
 	if targetPipeline.Source != "push" || targetPipeline.CommitSHA != targetBranch.Hash {
 		t.Fatalf("unexpected target branch pipeline: %+v", targetPipeline)
+	}
+}
+
+func assertMergeCheckBlocker(t *testing.T, blockers []mergerequestservice.CheckBlockerView, code string) {
+	t.Helper()
+
+	for _, blocker := range blockers {
+		if blocker.Code == code {
+			return
+		}
+	}
+	t.Fatalf("expected merge check blocker %q: %+v", code, blockers)
+}
+
+func assertMergeCheckBlockerCount(t *testing.T, blockers []mergerequestservice.CheckBlockerView, code string, expected int) {
+	t.Helper()
+
+	count := 0
+	for _, blocker := range blockers {
+		if blocker.Code == code {
+			count++
+		}
+	}
+	if count != expected {
+		t.Fatalf("expected %d merge check blockers %q: %+v", expected, code, blockers)
 	}
 }

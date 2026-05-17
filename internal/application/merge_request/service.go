@@ -97,7 +97,14 @@ type CheckStatusView struct {
 	Mergeable              bool                            `json:"mergeable"`
 	Status                 string                          `json:"status"`
 	BlockingReason         string                          `json:"blocking_reason,omitempty"`
+	Blockers               []CheckBlockerView              `json:"blockers"`
 	Pipeline               *cidomain.ProjectPipeline       `json:"pipeline,omitempty"`
+}
+
+type CheckBlockerView struct {
+	Code     string `json:"code"`
+	Category string `json:"category"`
+	Message  string `json:"message"`
 }
 
 type MergeInput struct {

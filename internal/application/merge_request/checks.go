@@ -85,14 +85,22 @@ func (s *Service) evaluateRequiredPipeline(ctx context.Context, project projectd
 	view.Mergeable = false
 	if s.pipelineRepo == nil {
 		view.Status = "missing"
-		view.BlockingReason = "pipeline repository is not configured"
+		view = addMergeCheckBlocker(view, CheckBlockerView{
+			Code:     mergeCheckBlockerPipelineRepoMissing,
+			Category: mergeCheckBlockerCategoryPipeline,
+			Message:  "pipeline repository is not configured",
+		})
 		return view, nil
 	}
 	pipeline, err := s.pipelineRepo.GetLatestByProjectRefCommit(ctx, project.ID, branch.Name, branch.Hash)
 	if err != nil {
 		if errors.Is(err, gitports.ErrNotFound) {
 			view.Status = "missing"
-			view.BlockingReason = "required pipeline is missing"
+			view = addMergeCheckBlocker(view, CheckBlockerView{
+				Code:     mergeCheckBlockerPipelineMissing,
+				Category: mergeCheckBlockerCategoryPipeline,
+				Message:  "required pipeline is missing",
+			})
 			return view, nil
 		}
 		return CheckStatusView{}, oops.In("merge_request").With("project_id", project.ID, "merge_request_id", mr.ID, "ref", branch.Name, "commit_sha", branch.Hash).Wrapf(err, "load merge request pipeline")
@@ -101,7 +109,11 @@ func (s *Service) evaluateRequiredPipeline(ctx context.Context, project projectd
 	view.Status = pipeline.Status
 	view.Mergeable = pipeline.Status == gitports.ProjectPipelineStatusSucceeded
 	if !view.Mergeable {
-		view.BlockingReason = "pipeline status is " + pipeline.Status
+		view = addMergeCheckBlocker(view, CheckBlockerView{
+			Code:     mergeCheckBlockerPipelineNotSucceeded,
+			Category: mergeCheckBlockerCategoryPipeline,
+			Message:  "pipeline status is " + pipeline.Status,
+		})
 	}
 	return view, nil
 }
@@ -119,10 +131,19 @@ func (s *Service) evaluateRequiredApprovals(ctx context.Context, project project
 	}
 	view.RequireApproval = true
 	view.Required = true
+	blocked := false
 	for _, check := range checks {
 		if !check.Satisfied {
-			return blockMergeCheck(view, check.BlockingReason), nil
+			blocked = true
+			view = blockMergeCheck(view, CheckBlockerView{
+				Code:     mergeCheckBlockerApprovalRuleUnsatisfied,
+				Category: mergeCheckBlockerCategoryApproval,
+				Message:  check.BlockingReason,
+			})
 		}
+	}
+	if blocked {
+		return view, nil
 	}
 	return passMergeCheck(view), nil
 }
@@ -262,24 +283,4 @@ func (s *Service) changedFiles(ctx context.Context, project projectdomain.Projec
 		}
 	}
 	return files.Values(), nil
-}
-
-func blockMergeCheck(view CheckStatusView, reason string) CheckStatusView {
-	view.Mergeable = false
-	if view.BlockingReason == "" {
-		view.BlockingReason = reason
-		view.Status = "blocked"
-	}
-	return view
-}
-
-func passMergeCheck(view CheckStatusView) CheckStatusView {
-	if view.BlockingReason != "" {
-		return view
-	}
-	view.Mergeable = true
-	if view.Status == "not_required" {
-		view.Status = "passed"
-	}
-	return view
 }
