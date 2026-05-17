@@ -2,6 +2,8 @@
 
 This runbook validates the local sqlite path before cutting a beta tag.
 
+Use this together with [beta-release-checklist.md](beta-release-checklist.md). The checklist covers automated checks and packaging; this runbook covers product smoke behavior.
+
 ## Local Runtime
 
 Use the checked-in example as the configx dotenv source:

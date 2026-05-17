@@ -1,7 +1,9 @@
-package runneragent
+package runneragent_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -9,140 +11,68 @@ import (
 	"testing"
 
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
+	runneragent "github.com/lyonbrown4d/gity/internal/infrastructure/runner_agent"
 )
 
 func TestResolveExecutionMode(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ExecutionMode:    "host",
-		ContainerRuntime: "docker",
+	cases := []struct {
+		name    string
+		cfg     runneragent.Config
+		payload runneragent.ScriptPayload
+		want    string
+	}{
+		{name: "host config", cfg: runneragent.Config{ExecutionMode: "host", ContainerRuntime: "docker"}, want: "host"},
+		{name: "default image", cfg: runneragent.Config{DockerImage: "golang:1.22", ContainerRuntime: "docker"}, want: "docker"},
+		{name: "payload image", payload: runneragent.ScriptPayload{Image: "alpine"}, want: "docker"},
+		{name: "explicit docker", cfg: runneragent.Config{ExecutionMode: "docker", DockerImage: "alpine"}, want: "docker"},
+		{name: "explicit podman", cfg: runneragent.Config{ExecutionMode: "podman", DockerImage: "alpine"}, want: "podman"},
+		{name: "firecracker runtime fallback", cfg: runneragent.Config{ContainerRuntime: "firecracker", DockerImage: "alpine:3"}, want: "firecracker"},
+		{name: "payload override", cfg: runneragent.Config{ExecutionMode: "host", DockerImage: "alpine:3"}, payload: runneragent.ScriptPayload{ExecutionMode: "containerd"}, want: "containerd"},
+		{name: "payload host override", cfg: runneragent.Config{ContainerRuntime: "podman", DockerImage: "alpine:3"}, payload: runneragent.ScriptPayload{ExecutionMode: "host"}, want: "host"},
+		{name: "normalizes case", cfg: runneragent.Config{ExecutionMode: "DOCKER"}, want: "docker"},
 	}
-	hostOnlyPayload := ScriptPayload{}
-	if got := resolveExecutionMode(cfg, hostOnlyPayload); got != runnerExecutionModeHost {
-		t.Fatalf("expected host mode, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "",
-		ContainerRuntime: "docker",
-		DockerImage:      "golang:1.22",
-	}, hostOnlyPayload); got != runnerExecutionModeDocker {
-		t.Fatalf("expected docker mode when default image is configured, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{}, ScriptPayload{Image: "alpine"}); got != runnerExecutionModeDocker {
-		t.Fatalf("expected docker mode when image is set and execution mode not explicitly configured, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "docker",
-		ContainerRuntime: "docker",
-		DockerImage:      "alpine",
-	}, hostOnlyPayload); got != runnerExecutionModeDocker {
-		t.Fatalf("expected explicit docker mode from config, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "podman",
-		ContainerRuntime: "podman",
-		DockerImage:      "alpine",
-	}, hostOnlyPayload); got != runnerExecutionModePodman {
-		t.Fatalf("expected podman mode from config, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "docker",
-		DockerImage:      "",
-	}, ScriptPayload{Image: "alpine"}); got != runnerExecutionModeDocker {
-		t.Fatalf("expected docker mode from explicit config even with payload image, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode: "containered",
-	}, hostOnlyPayload); got != runnerExecutionModeContainerd {
-		t.Fatalf("expected containered alias to be normalized to containerd, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "",
-		ContainerRuntime: runnerExecutionModeFirecracker,
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{}); got != runnerExecutionModeFirecracker {
-		t.Fatalf("expected firecracker when container runtime is firecracker and image is set, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "host",
-		ContainerRuntime: "podman",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{ExecutionMode: "containerd"}); got != runnerExecutionModeContainerd {
-		t.Fatalf("expected payload execution mode to override config execution mode, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "",
-		ContainerRuntime: "podman",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{ExecutionMode: "host"}); got != runnerExecutionModeHost {
-		t.Fatalf("expected payload host mode to override image fallback, got %q", got)
-	}
-
-	if got := resolveExecutionMode(Config{
-		ExecutionMode:    "DOCKER",
-		ContainerRuntime: "docker",
-	}, ScriptPayload{}); got != runnerExecutionModeDocker {
-		t.Fatalf("expected execution mode to be normalized, got %q", got)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertEqual(t, runneragent.ResolveExecutionMode(tc.cfg, tc.payload), tc.want)
+		})
 	}
 }
 
 func TestResolveContainerRuntimeEndpoint(t *testing.T) {
 	t.Parallel()
 
-	if got := resolveContainerRuntimeEndpoint(Config{
-		ContainerRuntimeEndpoint: "unix:///var/run/custom.sock",
-	}, runnerExecutionModeDocker); got != "unix:///var/run/custom.sock" {
-		t.Fatalf("expected global container runtime endpoint override, got %q", got)
+	got := runneragent.ResolveContainerRuntimeEndpoint(
+		runneragent.Config{ContainerRuntimeEndpoint: "unix:///var/run/custom.sock"},
+		"docker",
+	)
+	assertEqual(t, got, "unix:///var/run/custom.sock")
+
+	podmanEndpoint := runneragent.ResolveContainerRuntimeEndpoint(runneragent.Config{ContainerRuntime: "podman"}, "podman")
+	if runtime.GOOS == "linux" && podmanEndpoint == "" {
+		t.Fatalf("expected resolved podman runtime endpoint")
 	}
 
-	if got := resolveContainerRuntimeEndpoint(Config{
-		ContainerRuntime: "podman",
-	}, runnerExecutionModePodman); got == "" {
-		if runtime.GOOS == "linux" {
-			t.Fatalf("expected resolved podman runtime endpoint")
-		}
-		if got != "" {
-			t.Fatalf("expected empty podman runtime endpoint on non-linux")
-		}
-	}
-
-	if got := resolveContainerRuntimeEndpoint(Config{
-		ContainerRuntime: "containerd",
-	}, runnerExecutionModeContainerd); got == "" {
-		if runtime.GOOS == "linux" {
-			t.Fatalf("expected resolved containerd runtime endpoint")
-		}
+	containerdEndpoint := runneragent.ResolveContainerRuntimeEndpoint(runneragent.Config{ContainerRuntime: "containerd"}, "containerd")
+	if runtime.GOOS == "linux" && containerdEndpoint == "" {
+		t.Fatalf("expected resolved containerd runtime endpoint")
 	}
 }
 
 func TestResolveContainerImage(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		DockerImage: "alpine",
-	}
-	if got := resolveContainerImage(cfg, ScriptPayload{}); got != "alpine" {
-		t.Fatalf("expected default image, got %q", got)
-	}
-	if got := resolveContainerImage(cfg, ScriptPayload{Image: "golang:1.22"}); got != "golang:1.22" {
-		t.Fatalf("expected payload image, got %q", got)
-	}
+	cfg := runneragent.Config{DockerImage: "alpine"}
+	assertEqual(t, runneragent.ResolveContainerImage(cfg, runneragent.ScriptPayload{}), "alpine")
+	assertEqual(t, runneragent.ResolveContainerImage(cfg, runneragent.ScriptPayload{Image: "golang:1.22"}), "golang:1.22")
 }
 
 func TestContainerResourceLimits(t *testing.T) {
 	t.Parallel()
 
-	memory, err := parseByteSize("512m")
+	memory, err := runneragent.ParseContainerByteSize("512m")
 	if err != nil {
 		t.Fatalf("parse memory: %v", err)
 	}
@@ -150,7 +80,7 @@ func TestContainerResourceLimits(t *testing.T) {
 		t.Fatalf("unexpected memory value, got %d", memory)
 	}
 
-	nanoCPU, err := parseCPUs("1.5")
+	nanoCPU, err := runneragent.ParseContainerCPUs("1.5")
 	if err != nil {
 		t.Fatalf("parse cpus: %v", err)
 	}
@@ -162,76 +92,65 @@ func TestContainerResourceLimits(t *testing.T) {
 func TestResolveScriptRunnerWithoutImageReturnsError(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolveScriptRunner(Config{
-		ExecutionMode:    "docker",
-		ContainerRuntime: "docker",
-	}, ScriptPayload{})
+	_, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "docker"}, runneragent.ScriptPayload{})
 	if err == nil {
 		t.Fatal("expected error when no docker image is configured")
 	}
 }
 
-func TestResolveScriptRunnerReturnsDockerAndPodmanRunners(t *testing.T) {
+func TestResolveScriptRunnerReturnsContainerRunners(t *testing.T) {
 	t.Parallel()
 
-	dockerRunner, err := resolveScriptRunner(Config{
-		ExecutionMode:    "docker",
-		ContainerRuntime: "docker",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
-	if err != nil {
-		t.Fatalf("resolve docker runner: %v", err)
+	cases := []struct {
+		name string
+		cfg  runneragent.Config
+		want string
+	}{
+		{name: "docker", cfg: runneragent.Config{ExecutionMode: "docker", DockerImage: "alpine:3"}, want: "docker"},
+		{name: "podman", cfg: runneragent.Config{ExecutionMode: "podman", DockerImage: "alpine:3", ContainerRuntimeEndpoint: "unix:///tmp/podman.sock"}, want: "podman"},
+		{name: "containerd", cfg: runneragent.Config{ExecutionMode: "containerd", DockerImage: "alpine:3", ContainerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"}, want: "containerd"},
 	}
-	if _, ok := dockerRunner.(dockerScriptRunner); !ok {
-		t.Fatalf("expected docker script runner, got %T", dockerRunner)
-	}
-
-	podmanRunner, err := resolveScriptRunner(Config{
-		ExecutionMode:    "podman",
-		ContainerRuntime: "podman",
-		ContainerRuntimeEndpoint: "unix:///tmp/podman.sock",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
-	if err != nil {
-		t.Fatalf("resolve podman runner: %v", err)
-	}
-	if _, ok := podmanRunner.(podmanScriptRunner); !ok {
-		t.Fatalf("expected podman script runner, got %T", podmanRunner)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := runneragent.ResolveScriptRunnerKind(tc.cfg, runneragent.ScriptPayload{})
+			if err != nil {
+				t.Fatalf("resolve script runner: %v", err)
+			}
+			assertEqual(t, got, tc.want)
+		})
 	}
 }
 
 func TestFirecrackerRuntimeCompatibilityDetection(t *testing.T) {
 	t.Parallel()
 
-	if !isFirecrackerCompatibleWithContainerRuntime("unix:///run/containerd/containerd.sock") {
-		t.Fatalf("expected unix socket to be treated as container runtime compatible")
+	cases := []struct {
+		socket string
+		want   bool
+	}{
+		{socket: "unix:///run/containerd/containerd.sock", want: true},
+		{socket: "http://containerd.localhost:8080/", want: true},
+		{socket: "unix:///tmp/fc.sock/control", want: false},
+		{socket: "npipe:///var/run/fc", want: false},
+		{socket: "   ", want: false},
 	}
-
-	if !isFirecrackerCompatibleWithContainerRuntime("http://containerd.localhost:8080/") {
-		t.Fatalf("expected containerd-hosted http endpoint to be treated as compatible")
-	}
-
-	if isFirecrackerCompatibleWithContainerRuntime("unix:///tmp/fc.sock/control") {
-		t.Fatalf("expected nested socket path to be treated as non-compatible")
-	}
-
-	if isFirecrackerCompatibleWithContainerRuntime("npipe:///var/run/fc") {
-		t.Fatalf("expected npipe endpoint to be treated as non-compatible")
-	}
-
-	if isFirecrackerCompatibleWithContainerRuntime("   ") {
-		t.Fatalf("expected empty socket to be non-compatible")
+	for _, tc := range cases {
+		got := runneragent.IsFirecrackerCompatibleWithContainerRuntime(tc.socket)
+		if got != tc.want {
+			t.Fatalf("unexpected compatibility for %q: got %v want %v", tc.socket, got, tc.want)
+		}
 	}
 }
 
 func TestScriptRunnerForPodmanWithoutImageReturnsError(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolveScriptRunner(Config{
-		ExecutionMode:    "podman",
-		ContainerRuntime: "podman",
+	_, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{
+		ExecutionMode:            "podman",
+		ContainerRuntime:         "podman",
 		ContainerRuntimeEndpoint: "unix:///tmp/podman.sock",
-	}, ScriptPayload{})
+	}, runneragent.ScriptPayload{})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "no image") {
 		t.Fatalf("expected podman image missing error, got %v", err)
 	}
@@ -240,68 +159,39 @@ func TestScriptRunnerForPodmanWithoutImageReturnsError(t *testing.T) {
 func TestScriptRunnerForDockerOrPodmanWithoutEndpointReturnsError(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolveScriptRunner(Config{
-		ExecutionMode:    "docker",
-		ContainerRuntime: "docker",
-		ContainerRuntimeEndpoint: "",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
+	_, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "docker", DockerImage: "alpine:3"}, runneragent.ScriptPayload{})
 	if err != nil {
 		t.Fatalf("unexpected docker endpoint resolution error: %v", err)
 	}
 
-	_, err = resolveScriptRunner(Config{
-		ExecutionMode:    "podman",
-		ContainerRuntime: "podman",
-		ContainerRuntimeEndpoint: "",
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
-	if err == nil {
-		if runtime.GOOS != "linux" {
-			t.Fatalf("expected podman endpoint required error on non-linux environment")
-		}
-		return
+	_, err = runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "podman", DockerImage: "alpine:3"}, runneragent.ScriptPayload{})
+	if runtime.GOOS == "linux" && err != nil {
+		t.Fatalf("unexpected podman endpoint resolution error on linux: %v", err)
 	}
-	if runtime.GOOS == "linux" {
-		t.Fatalf("unexpected podman endpoint resolution error on linux environment: %v", err)
+	if runtime.GOOS != "linux" && err == nil {
+		t.Fatalf("expected podman endpoint required error on non-linux environment")
 	}
 }
 
 func TestScriptRunnerForContainerdAndFirecrackerRunFlow(t *testing.T) {
 	t.Parallel()
 
+	kind, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{
+		ExecutionMode:            "containerd",
+		ContainerRuntime:         "containerd",
+		DockerImage:              "alpine:3",
+		ContainerRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
+	}, runneragent.ScriptPayload{})
+	if err != nil {
+		t.Fatalf("expected containerd script runner, got error: %v", err)
+	}
+	assertEqual(t, kind, "containerd")
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
-
-	runner, err := resolveScriptRunner(Config{
-		ExecutionMode:   "containerd",
-		ContainerRuntime: runnerExecutionModeContainerd,
-		DockerImage:      "alpine:3",
-		ContainerRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
-	}, ScriptPayload{})
-	if err != nil {
-		t.Fatalf("expected containerd script runner to be returned, got error: %v", err)
-	}
-	if _, ok := runner.(containerdScriptRunner); !ok {
-		t.Fatalf("expected containerd script runner, got %T", runner)
-	}
-
-	runner, err = resolveScriptRunner(Config{
-		ExecutionMode:   "firecracker",
-		ContainerRuntime: runnerExecutionModeContainerd,
-		DockerImage:      "alpine:3",
-		FirecrackerSocket: server.URL,
-	}, ScriptPayload{})
-	if err != nil {
-		t.Fatalf("expected firecracker script runner to be returned, got error: %v", err)
-	}
-	if _, ok := runner.(firecrackerScriptRunner); !ok {
-		t.Fatalf("expected firecracker script runner, got %T", runner)
-	}
-	workDir := t.TempDir()
-	err = runner.run(context.Background(), Config{DockerImage: "alpine:3"}, cidomain.ProjectJob{}, ScriptPayload{}, workDir, &cappedBuffer{})
+	err = runFirecrackerNotImplemented(t, server.URL)
 	if err == nil || !strings.Contains(err.Error(), "firecracker runner runtime is not implemented yet") {
 		t.Fatalf("expected firecracker not implemented error, got %v", err)
 	}
@@ -310,20 +200,15 @@ func TestScriptRunnerForContainerdAndFirecrackerRunFlow(t *testing.T) {
 func TestResolveScriptRunnerMissingContainerdEndpointOrImage(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolveScriptRunner(Config{
-		ExecutionMode:    "containerd",
-		ContainerRuntime: runnerExecutionModeContainerd,
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
+	_, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "containerd", DockerImage: "alpine:3"}, runneragent.ScriptPayload{})
 	if err != nil && !strings.Contains(err.Error(), "container runtime endpoint is required") {
 		t.Fatalf("expected containerd endpoint required error, got %v", err)
 	}
 
-	_, err = resolveScriptRunner(Config{
-		ExecutionMode:    "containerd",
-		ContainerRuntime: runnerExecutionModeContainerd,
+	_, err = runneragent.ResolveScriptRunnerKind(runneragent.Config{
+		ExecutionMode:            "containerd",
 		ContainerRuntimeEndpoint: "unix:///run/containerd/containerd.sock",
-	}, ScriptPayload{})
+	}, runneragent.ScriptPayload{})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "no image") {
 		t.Fatalf("expected containerd image missing error, got %v", err)
 	}
@@ -332,21 +217,50 @@ func TestResolveScriptRunnerMissingContainerdEndpointOrImage(t *testing.T) {
 func TestResolveScriptRunnerMissingFirecrackerSocketOrImage(t *testing.T) {
 	t.Parallel()
 
-	_, err := resolveScriptRunner(Config{
-		ExecutionMode:    "firecracker",
-		ContainerRuntime: runnerExecutionModeFirecracker,
-		DockerImage:      "alpine:3",
-	}, ScriptPayload{})
+	_, err := runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "firecracker", DockerImage: "alpine:3"}, runneragent.ScriptPayload{})
 	if err == nil || !strings.Contains(err.Error(), "firecracker socket is required") {
 		t.Fatalf("expected firecracker socket required error, got %v", err)
 	}
 
-	_, err = resolveScriptRunner(Config{
-		ExecutionMode:    "firecracker",
-		ContainerRuntime: runnerExecutionModeFirecracker,
-		FirecrackerSocket: "/tmp/fc.sock",
-	}, ScriptPayload{})
+	_, err = runneragent.ResolveScriptRunnerKind(runneragent.Config{ExecutionMode: "firecracker", FirecrackerSocket: "/tmp/fc.sock"}, runneragent.ScriptPayload{})
 	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "no image") {
 		t.Fatalf("expected firecracker image missing error, got %v", err)
+	}
+}
+
+func runFirecrackerNotImplemented(t *testing.T, socket string) error {
+	t.Helper()
+
+	payload, err := json.Marshal(runneragent.ScriptPayload{
+		ExecutionMode: "firecracker",
+		Image:         "alpine:3",
+		Script:        []string{"echo ok"},
+	})
+	if err != nil {
+		t.Fatalf("marshal script payload: %v", err)
+	}
+	_, err = runneragent.ExecuteScriptJob(context.Background(), runneragent.Config{
+		WorkDir:           t.TempDir(),
+		LeaseSeconds:      30,
+		MaxOutputBytes:    1024,
+		FirecrackerSocket: socket,
+	}, cidomain.ProjectJob{
+		ID:        42,
+		ProjectID: 7,
+		Kind:      "script",
+		Payload:   string(payload),
+		Attempts:  1,
+	})
+	if err != nil {
+		return fmt.Errorf("execute firecracker script job: %w", err)
+	}
+	return nil
+}
+
+func assertEqual(t *testing.T, got, want string) {
+	t.Helper()
+
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
 	}
 }

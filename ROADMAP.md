@@ -70,8 +70,8 @@ Status: in progress
 
 Scope:
 
-- Full `go test ./...` and frontend build before beta tag
-- Smoke data and local beta smoke script/documentation
+- Full `go test ./...`, frontend build, and release check script before beta tag
+- Smoke data, local beta smoke documentation, and beta release checklist
 - ROADMAP, README, and deployment docs aligned with current binaries and SQL migrations
 - Confirm sqlite local setup, split-process setup, and standalone setup
 - Fix high-signal lint issues without `nolint` escape hatches
@@ -160,7 +160,7 @@ Exit criteria:
 
 High priority:
 
-- Run full backend test suite and frontend build after the current permission/MR/runner work
+- Run `scripts/release-check.ps1` after the current permission/MR/runner work
 - Add beta smoke flow that covers push -> MR -> approval -> merge -> pipeline -> audit
 - Add and verify runner security notes for trusted-host and execution isolation (container modes vs host mode)
 - Add API docs/examples for project members, approval rules, and CI variables

@@ -160,9 +160,21 @@ The product domain target lives in [docs/gitlab-like-domain-model.md](docs/gitla
 
 GitHub Actions runs CI on `main` and pull requests. A release is created only when a SemVer tag is pushed:
 
+Before tagging, run the beta release gate:
+
+```powershell
+.\scripts\release-check.ps1
+```
+
+If GoReleaser or UPX is not installed locally, run the backend and frontend checks locally and let GitHub Actions run the package snapshot:
+
+```powershell
+.\scripts\release-check.ps1 -SkipGoReleaser
+```
+
 ```bash
-git tag -a v0.1.0-beta.2 -m "v0.1.0-beta.2"
-git push origin v0.1.0-beta.2
+git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
+git push origin v0.1.0-beta.1
 ```
 
 The release workflow uses GoReleaser to publish GitHub Release artifacts, per-component Linux packages, checksums, and Docker images.
@@ -182,6 +194,8 @@ UPX compression is enabled for Linux and Windows release binaries before archive
 Production Docker deployment templates live in [docs/production-deployment.md](docs/production-deployment.md). Use `docker-compose.prod.yaml` with `.env.production` for split `migration/server/worker` deployments or standalone single-process deployments.
 
 Local beta smoke validation lives in [docs/beta-smoke.md](docs/beta-smoke.md).
+
+The beta release checklist lives in [docs/beta-release-checklist.md](docs/beta-release-checklist.md).
 
 Runner runtime modes and security notes are documented in [docs/runner-container-runtime.md](docs/runner-container-runtime.md).
 

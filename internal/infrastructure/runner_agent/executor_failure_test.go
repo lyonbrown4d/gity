@@ -111,17 +111,47 @@ func TestConfigFromEnvArgs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config from env args: %v", err)
 	}
-	if cfg.Token != "from-flag" || cfg.ServerURL != "http://gity.local/v1" || cfg.PollInterval != 2*time.Second {
-		t.Fatalf("unexpected config: %+v", cfg)
+	assertRunnerCoreConfig(t, cfg)
+	assertRunnerRuntimeConfig(t, cfg)
+	assertRunnerContainerConfig(t, cfg)
+}
+
+func assertRunnerCoreConfig(t *testing.T, cfg runneragent.Config) {
+	t.Helper()
+
+	if cfg.Token != "from-flag" {
+		t.Fatalf("unexpected token config: %+v", cfg)
 	}
-	if cfg.ExecutionMode != "podman" || cfg.ContainerRuntime != "firecracker" {
-		t.Fatalf("unexpected runtime config: %+v", cfg)
+	if cfg.ServerURL != "http://gity.local/v1" {
+		t.Fatalf("unexpected server URL config: %+v", cfg)
 	}
-	if cfg.ContainerRuntimeEndpoint != "unix:///tmp/podman.sock" || cfg.DockerImage != "alpine:3" || cfg.DockerNetwork != "gity" {
-		t.Fatalf("unexpected container config: %+v", cfg)
+	if cfg.PollInterval != 2*time.Second {
+		t.Fatalf("unexpected poll interval config: %+v", cfg)
+	}
+}
+
+func assertRunnerRuntimeConfig(t *testing.T, cfg runneragent.Config) {
+	t.Helper()
+
+	if cfg.ExecutionMode != "podman" {
+		t.Fatalf("unexpected execution mode config: %+v", cfg)
+	}
+	if cfg.ContainerRuntime != "firecracker" {
+		t.Fatalf("unexpected container runtime config: %+v", cfg)
+	}
+}
+
+func assertRunnerContainerConfig(t *testing.T, cfg runneragent.Config) {
+	t.Helper()
+
+	if cfg.ContainerRuntimeEndpoint != "unix:///tmp/podman.sock" {
+		t.Fatalf("unexpected container endpoint config: %+v", cfg)
+	}
+	if cfg.DockerImage != "alpine:3" || cfg.DockerNetwork != "gity" {
+		t.Fatalf("unexpected container image/network config: %+v", cfg)
 	}
 	if !cfg.DockerHostNetwork || cfg.DockerMemoryLimit != "1024m" || cfg.DockerCPUs != "2" || cfg.FirecrackerSocket != "/tmp/fc.sock" {
-		t.Fatalf("unexpected config: %+v", cfg)
+		t.Fatalf("unexpected container resource config: %+v", cfg)
 	}
 }
 
@@ -140,7 +170,7 @@ func TestExecuteScriptJobDockerModeMissingImage(t *testing.T) {
 		WorkDir:        t.TempDir(),
 		LeaseSeconds:   30,
 		MaxOutputBytes: 1024,
-	ExecutionMode:  "docker",
+		ExecutionMode:  "docker",
 	}, cidomain.ProjectJob{
 		ID:        77,
 		ProjectID: 7,

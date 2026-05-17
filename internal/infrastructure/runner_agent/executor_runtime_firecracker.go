@@ -2,6 +2,7 @@ package runneragent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,7 +21,7 @@ import (
 const (
 	firecrackerNotImplementedMessage   = "firecracker runner runtime is not implemented yet"
 	firecrackerCompatNotSupportedError = "firecracker runner mode is only partially supported through container-runtime compatibility mode"
-	firecrackerReachabilityTimeout   = 5 * time.Second
+	firecrackerReachabilityTimeout     = 5 * time.Second
 )
 
 func runFirecrackerScriptJob(
@@ -48,40 +49,7 @@ func runFirecrackerScriptJob(
 	}
 
 	if isFirecrackerCompatibleWithContainerRuntime(socket) {
-		if runtime.GOOS == "windows" {
-			return oops.In("runner_agent").With(
-				"runtime", runnerExecutionModeFirecracker,
-				"socket", socket,
-			).New(firecrackerCompatNotSupportedError)
-		}
-		command := strings.Join(payload.Script, "\n")
-		shellCommand := containerShellCommand(payload.Shell, command)
-		runtimeClient, err := containerRuntimeClient(cfg, runnerExecutionModeContainerd, socket)
-		if err != nil {
-			return oops.In("runner_agent").With(
-				"runtime", runnerExecutionModeFirecracker,
-				"socket", socket,
-				"image", imageRef,
-			).Wrapf(err, "initialize firecracker container compatibility runtime client")
-		}
-		defer runtimeClient.Close()
-		if err := ensureContainerImage(ctx, runtimeClient, imageRef); err != nil {
-			return err
-		}
-
-		return runContainerScriptJob(
-			ctx,
-			cfg,
-			job,
-			payload,
-			imageRef,
-			shellCommand,
-			workDir,
-			socket,
-			runtimeClient,
-			output,
-			runnerExecutionModeFirecracker,
-		)
+		return runFirecrackerContainerCompat(ctx, cfg, job, payload, workDir, output, socket, imageRef)
 	}
 
 	return oops.In("runner_agent").With(
@@ -92,6 +60,50 @@ func runFirecrackerScriptJob(
 		"attempt", job.Attempts,
 		"image", resolveContainerImage(cfg, payload),
 	).New(firecrackerNotImplementedMessage)
+}
+
+func runFirecrackerContainerCompat(
+	ctx context.Context,
+	cfg Config,
+	job cidomain.ProjectJob,
+	payload ScriptPayload,
+	workDir string,
+	output *cappedBuffer,
+	socket, imageRef string,
+) error {
+	if runtime.GOOS == "windows" {
+		return oops.In("runner_agent").With(
+			"runtime", runnerExecutionModeFirecracker,
+			"socket", socket,
+		).New(firecrackerCompatNotSupportedError)
+	}
+	command := strings.Join(payload.Script, "\n")
+	shellCommand := containerShellCommand(payload.Shell, command)
+	runtimeClient, err := containerRuntimeClient(ctx, cfg, runnerExecutionModeContainerd, socket)
+	if err != nil {
+		return oops.In("runner_agent").With(
+			"runtime", runnerExecutionModeFirecracker,
+			"socket", socket,
+			"image", imageRef,
+		).Wrapf(err, "initialize firecracker container compatibility runtime client")
+	}
+	defer closeRuntimeClient(runtimeClient)
+	if err := ensureContainerImage(ctx, runtimeClient, imageRef); err != nil {
+		return err
+	}
+	return runContainerScriptJob(
+		ctx,
+		cfg,
+		job,
+		payload,
+		imageRef,
+		shellCommand,
+		workDir,
+		socket,
+		runtimeClient,
+		output,
+		runnerExecutionModeFirecracker,
+	)
 }
 
 func isFirecrackerCompatibleWithContainerRuntime(socket string) bool {
@@ -125,7 +137,7 @@ func isFirecrackerCompatibleWithContainerRuntime(socket string) bool {
 func validateFirecrackerWorkspace(workDir string) error {
 	trimmed := strings.TrimSpace(workDir)
 	if trimmed == "" {
-		return fmt.Errorf("firecracker workspace is required")
+		return errors.New("firecracker workspace is required")
 	}
 	absPath, err := filepath.Abs(trimmed)
 	if err != nil {
@@ -150,7 +162,7 @@ func pingFirecracker(ctx context.Context, socket string) error {
 		ctx,
 		http.MethodGet,
 		baseEndpoint,
-		nil,
+		http.NoBody,
 	)
 	if err != nil {
 		return oops.In("runner_agent").With("socket", socket).Wrapf(err, "build firecracker runtime request")
@@ -159,16 +171,23 @@ func pingFirecracker(ctx context.Context, socket string) error {
 	if err != nil {
 		return oops.In("runner_agent").With("socket", socket, "endpoint", baseEndpoint).Wrapf(err, "ping firecracker runtime")
 	}
-	defer response.Body.Close()
-
-	_, _ = io.Copy(io.Discard, response.Body)
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		closeErr := response.Body.Close()
+		if closeErr != nil {
+			return oops.In("runner_agent").With("socket", socket).Wrapf(closeErr, "close firecracker runtime response")
+		}
+		return oops.In("runner_agent").With("socket", socket).Wrapf(err, "read firecracker runtime response")
+	}
+	if err := response.Body.Close(); err != nil {
+		return oops.In("runner_agent").With("socket", socket).Wrapf(err, "close firecracker runtime response")
+	}
 	return nil
 }
 
 func firecrackerHTTPClient(value string) (*http.Client, string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return nil, "", fmt.Errorf("firecracker socket is required")
+		return nil, "", errors.New("firecracker socket is required")
 	}
 	if !strings.Contains(trimmed, "://") {
 		if runtime.GOOS != "linux" {
@@ -199,10 +218,10 @@ func firecrackerHTTPClient(value string) (*http.Client, string, error) {
 
 func firecrackerUnixHTTPClient(path string) (*http.Client, string, error) {
 	if runtime.GOOS != "linux" {
-		return nil, "", fmt.Errorf("unix firecracker sockets are supported on linux only")
+		return nil, "", errors.New("unix firecracker sockets are supported on linux only")
 	}
 	if strings.TrimSpace(path) == "" {
-		return nil, "", fmt.Errorf("firecracker socket path is empty")
+		return nil, "", errors.New("firecracker socket path is empty")
 	}
 	if !filepath.IsAbs(path) {
 		return nil, "", fmt.Errorf("firecracker socket path must be absolute: %q", path)
@@ -228,25 +247,34 @@ func firecrackerUnixHTTPClient(path string) (*http.Client, string, error) {
 
 func validateFirecrackerSocket(socket string) error {
 	if strings.TrimSpace(socket) == "" {
-		return fmt.Errorf("firecracker socket is required")
+		return errors.New("firecracker socket is required")
 	}
 	if runtime.GOOS == "windows" {
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(socket)), "npipe://") {
-			return nil
-		}
-		parsed, err := url.Parse(socket)
-		if err != nil {
-			return fmt.Errorf("invalid firecracker socket URL: %w", err)
-		}
-		if parsed.Host == "" {
-			return fmt.Errorf("windows firecracker socket requires npipe, http, or https endpoint: %q", strings.TrimSpace(socket))
-		}
-		scheme := strings.ToLower(parsed.Scheme)
-		if scheme == "http" || scheme == "https" {
-			return nil
-		}
-		return fmt.Errorf("windows firecracker socket requires npipe, http, or https endpoint: %q", strings.TrimSpace(socket))
+		return validateWindowsFirecrackerSocket(socket)
 	}
+	return validateUnixFirecrackerSocket(socket)
+}
+
+func validateWindowsFirecrackerSocket(socket string) error {
+	trimmed := strings.TrimSpace(socket)
+	if strings.HasPrefix(strings.ToLower(trimmed), "npipe://") {
+		return nil
+	}
+	parsed, err := url.Parse(socket)
+	if err != nil {
+		return fmt.Errorf("invalid firecracker socket URL: %w", err)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("windows firecracker socket requires npipe, http, or https endpoint: %q", trimmed)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if scheme == "http" || scheme == "https" {
+		return nil
+	}
+	return fmt.Errorf("windows firecracker socket requires npipe, http, or https endpoint: %q", trimmed)
+}
+
+func validateUnixFirecrackerSocket(socket string) error {
 	if strings.Contains(socket, "://") {
 		if _, err := url.Parse(socket); err != nil {
 			return fmt.Errorf("invalid firecracker socket URL: %w", err)
@@ -254,7 +282,7 @@ func validateFirecrackerSocket(socket string) error {
 		return nil
 	}
 	if !strings.HasPrefix(socket, "/") {
-		return fmt.Errorf("firecracker socket path must be absolute unix socket path or npipe URL")
+		return errors.New("firecracker socket path must be absolute unix socket path or npipe URL")
 	}
 	return nil
 }

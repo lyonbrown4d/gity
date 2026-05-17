@@ -13,6 +13,7 @@ import (
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listProjects(ctx context.Context, in *projectsInput) (*projectOutput, error) {
@@ -266,7 +267,7 @@ func (e *Endpoint) refreshSearchIndex(ctx context.Context, in *refreshProjectSea
 		return nil, err
 	}
 	if err := e.searchIndexService.RefreshProject(ctx, item); err != nil {
-		return nil, err
+		return nil, oops.In("http_project").With("project_id", in.ID).Wrapf(err, "refresh project search index")
 	}
 	return &projectOutput{Body: map[string]any{
 		"status":    "refreshed",
