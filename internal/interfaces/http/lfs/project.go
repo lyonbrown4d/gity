@@ -5,35 +5,35 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
 	"github.com/samber/oops"
 )
 
-func loadLFSObjectTarget(c *fiber.Ctx, repo *projectrepo.Repository) (projectView, string, error) {
+func loadLFSObjectTarget(c fiber.Ctx, repo *projectrepo.Repository) (projectView, string, error) {
 	path := normalizeRequestPath(c.Path())
 	idx := strings.Index(path, "/info/lfs/objects/")
 	if idx <= 0 {
-		return projectView{}, "", c.Next()
+		return projectView{}, "", nextRoute(c)
 	}
 	repoPath := path[:idx]
 	oid := strings.TrimSpace(path[idx+len("/info/lfs/objects/"):])
 	if oid == "" {
 		return projectView{}, "", fiber.ErrNotFound
 	}
-	project, err := loadProject(c.UserContext(), repo, repoPath)
+	project, err := loadProject(c.Context(), repo, repoPath)
 	if err != nil {
 		return projectView{}, "", err
 	}
 	return project, oid, nil
 }
 
-func loadLFSUnlockTarget(c *fiber.Ctx, repo *projectrepo.Repository) (projectView, string, error) {
+func loadLFSUnlockTarget(c fiber.Ctx, repo *projectrepo.Repository) (projectView, string, error) {
 	path := normalizeRequestPath(c.Path())
 	idx := strings.Index(path, "/info/lfs/locks/")
 	if idx <= 0 || !strings.HasSuffix(path, "/unlock") {
-		return projectView{}, "", c.Next()
+		return projectView{}, "", nextRoute(c)
 	}
 	repoPath := path[:idx]
 	lockID := strings.TrimSuffix(path[idx+len("/info/lfs/locks/"):], "/unlock")
@@ -41,20 +41,20 @@ func loadLFSUnlockTarget(c *fiber.Ctx, repo *projectrepo.Repository) (projectVie
 	if lockID == "" {
 		return projectView{}, "", fiber.ErrNotFound
 	}
-	project, err := loadProject(c.UserContext(), repo, repoPath)
+	project, err := loadProject(c.Context(), repo, repoPath)
 	if err != nil {
 		return projectView{}, "", err
 	}
 	return project, lockID, nil
 }
 
-func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, operation string) error {
+func authorizeLFSOperation(c fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, operation string) error {
 	readOperation := strings.EqualFold(strings.TrimSpace(operation), "download")
 	if readOperation && strings.TrimSpace(project.Visibility) == "public" {
 		return nil
 	}
 
-	principal, ok, err := authRuntime.AuthenticateHeader(c.UserContext(), c.Get(fiber.HeaderAuthorization))
+	principal, ok, err := authRuntime.AuthenticateHeader(c.Context(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
 		return fiber.NewError(http.StatusUnauthorized, "invalid credentials")
 	}
@@ -65,9 +65,9 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	var allowed bool
 	if readOperation {
-		allowed, err = authRuntime.CanReadProject(c.UserContext(), principal, scope)
+		allowed, err = authRuntime.CanReadProject(c.Context(), principal, scope)
 	} else {
-		allowed, err = authRuntime.CanWriteProject(c.UserContext(), principal, scope)
+		allowed, err = authRuntime.CanWriteProject(c.Context(), principal, scope)
 	}
 	if err != nil {
 		return fiber.NewError(http.StatusForbidden, "authorization failed")
@@ -78,8 +78,8 @@ func authorizeLFSOperation(c *fiber.Ctx, authRuntime *infraauth.Runtime, project
 	return nil
 }
 
-func requireProjectWritePrincipal(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView) (infraauth.Principal, error) {
-	principal, ok, err := authRuntime.AuthenticateHeader(c.UserContext(), c.Get(fiber.HeaderAuthorization))
+func requireProjectWritePrincipal(c fiber.Ctx, authRuntime *infraauth.Runtime, project projectView) (infraauth.Principal, error) {
+	principal, ok, err := authRuntime.AuthenticateHeader(c.Context(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
 		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
 	}
@@ -87,7 +87,7 @@ func requireProjectWritePrincipal(c *fiber.Ctx, authRuntime *infraauth.Runtime, 
 		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
 	}
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
-	allowed, err := authRuntime.CanWriteProject(c.UserContext(), principal, scope)
+	allowed, err := authRuntime.CanWriteProject(c.Context(), principal, scope)
 	if err != nil {
 		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
 	}

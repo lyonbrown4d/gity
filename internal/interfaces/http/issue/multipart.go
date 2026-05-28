@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	issueservice "github.com/lyonbrown4d/gity/internal/application/issue"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
@@ -35,7 +35,7 @@ func (r multipartRoutes) register(prefix string) {
 	r.app.Get(prefix+"/:id/issues/:issue_iid/attachments/:attachment_id/raw", r.getAttachmentRaw)
 }
 
-func (r multipartRoutes) uploadAttachment(c *fiber.Ctx) error {
+func (r multipartRoutes) uploadAttachment(c fiber.Ctx) error {
 	projectID, err := parseRequiredPathID(c, "id", "project")
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func (r multipartRoutes) uploadAttachment(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(http.StatusBadRequest, "invalid issue_id")
 	}
-	uploadedByUserID, err := httpapi.ActorUserID(c.UserContext(), r.authRuntime, c.Get(fiber.HeaderAuthorization), 0)
+	uploadedByUserID, err := httpapi.ActorUserID(c.Context(), r.authRuntime, c.Get(fiber.HeaderAuthorization), 0)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (r multipartRoutes) uploadAttachment(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	uploaded, err := r.service.UploadAttachment(c.UserContext(), projectID, issueservice.AttachmentUploadInput{
+	uploaded, err := r.service.UploadAttachment(c.Context(), projectID, issueservice.AttachmentUploadInput{
 		UploadedByUserID: uploadedByUserID,
 		IssueIID:         issueIID,
 		FileName:         fileHeader.Filename,
@@ -62,10 +62,10 @@ func (r multipartRoutes) uploadAttachment(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.Status(http.StatusCreated).JSON(toIssueAttachmentUploadView(projectID, issueIID, uploaded))
+	return sendJSON(c, http.StatusCreated, toIssueAttachmentUploadView(projectID, issueIID, uploaded))
 }
 
-func (r multipartRoutes) getDraftAttachmentRaw(c *fiber.Ctx) error {
+func (r multipartRoutes) getDraftAttachmentRaw(c fiber.Ctx) error {
 	projectID, err := parseRequiredPathID(c, "id", "project")
 	if err != nil {
 		return err
@@ -74,26 +74,26 @@ func (r multipartRoutes) getDraftAttachmentRaw(c *fiber.Ctx) error {
 	if strings.TrimSpace(objectKey) == "" {
 		return fiber.NewError(http.StatusBadRequest, "object_key is required")
 	}
-	raw, err := r.service.GetDraftAttachmentRaw(c.UserContext(), projectID, objectKey)
+	raw, err := r.service.GetDraftAttachmentRaw(c.Context(), projectID, objectKey)
 	if err != nil {
 		return err
 	}
 	return sendRawAttachment(c, raw)
 }
 
-func (r multipartRoutes) getAttachmentRaw(c *fiber.Ctx) error {
+func (r multipartRoutes) getAttachmentRaw(c fiber.Ctx) error {
 	projectID, issueIID, attachmentID, err := parseAttachmentPathIDs(c)
 	if err != nil {
 		return err
 	}
-	raw, err := r.service.GetAttachmentRaw(c.UserContext(), projectID, issueIID, attachmentID)
+	raw, err := r.service.GetAttachmentRaw(c.Context(), projectID, issueIID, attachmentID)
 	if err != nil {
 		return err
 	}
 	return sendRawAttachment(c, raw)
 }
 
-func readUploadFile(c *fiber.Ctx) (*multipart.FileHeader, []byte, error) {
+func readUploadFile(c fiber.Ctx) (*multipart.FileHeader, []byte, error) {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		return nil, nil, fiber.NewError(http.StatusBadRequest, "file is required")
@@ -113,7 +113,7 @@ func readUploadFile(c *fiber.Ctx) (*multipart.FileHeader, []byte, error) {
 	return fileHeader, content, nil
 }
 
-func parseAttachmentPathIDs(c *fiber.Ctx) (int64, int64, int64, error) {
+func parseAttachmentPathIDs(c fiber.Ctx) (int64, int64, int64, error) {
 	projectID, err := parseRequiredPathID(c, "id", "project")
 	if err != nil {
 		return 0, 0, 0, err
@@ -129,7 +129,7 @@ func parseAttachmentPathIDs(c *fiber.Ctx) (int64, int64, int64, error) {
 	return projectID, issueIID, attachmentID, nil
 }
 
-func parseRequiredPathID(c *fiber.Ctx, paramName, label string) (int64, error) {
+func parseRequiredPathID(c fiber.Ctx, paramName, label string) (int64, error) {
 	id, err := strconv.ParseInt(c.Params(paramName), 10, 64)
 	if err != nil || id <= 0 {
 		return 0, fiber.NewError(http.StatusBadRequest, "invalid "+label+" id")
@@ -178,7 +178,7 @@ func buildAttachmentMarkdown(fileName, contentType, downloadURL string) string {
 	return fmt.Sprintf("[%s](%s)", escapedName, downloadURL)
 }
 
-func sendRawAttachment(c *fiber.Ctx, raw issueservice.AttachmentRawContent) error {
+func sendRawAttachment(c fiber.Ctx, raw issueservice.AttachmentRawContent) error {
 	contentType := strings.TrimSpace(raw.ContentType)
 	if contentType == "" {
 		contentType = "application/octet-stream"
@@ -187,5 +187,19 @@ func sendRawAttachment(c *fiber.Ctx, raw issueservice.AttachmentRawContent) erro
 	if strings.TrimSpace(raw.FileName) != "" {
 		c.Set(fiber.HeaderContentDisposition, mime.FormatMediaType("inline", map[string]string{"filename": raw.FileName}))
 	}
-	return c.Send(raw.Content)
+	return sendBytes(c, raw.Content)
+}
+
+func sendJSON(c fiber.Ctx, status int, body any) error {
+	if err := c.Status(status).JSON(body); err != nil {
+		return oops.In("http.issue").With("op", "json", "status", status).Wrapf(err, "fiber json")
+	}
+	return nil
+}
+
+func sendBytes(c fiber.Ctx, content []byte) error {
+	if err := c.Send(content); err != nil {
+		return oops.In("http.issue").With("op", "send").Wrapf(err, "fiber send")
+	}
+	return nil
 }

@@ -1,10 +1,11 @@
 package lfs
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/samber/oops"
 )
 
@@ -40,4 +41,32 @@ func isLFSPath(path, method string) bool {
 	default:
 		return false
 	}
+}
+
+func nextRoute(c fiber.Ctx) error {
+	if err := c.Next(); err != nil {
+		return oops.In("http.lfs").With("op", "next").Wrapf(err, "fiber next")
+	}
+	return nil
+}
+
+func sendJSON(c fiber.Ctx, status int, body any) error {
+	if err := c.Status(status).JSON(body); err != nil {
+		return oops.In("http.lfs").With("op", "json", "status", status).Wrapf(err, "fiber json")
+	}
+	return nil
+}
+
+func sendStatus(c fiber.Ctx, status int) error {
+	if err := c.SendStatus(status); err != nil {
+		return oops.In("http.lfs").With("op", "status", "status", status).Wrapf(err, "fiber send status")
+	}
+	return nil
+}
+
+func sendBytes(c fiber.Ctx, content []byte) error {
+	if err := c.Send(content); err != nil {
+		return oops.In("http.lfs").With("op", "send", "status", http.StatusOK).Wrapf(err, "fiber send")
+	}
+	return nil
 }

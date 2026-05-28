@@ -8,7 +8,7 @@ import (
 
 	mappingx "github.com/arcgolabs/collectionx/mapping"
 	setx "github.com/arcgolabs/collectionx/set"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	gitports "github.com/lyonbrown4d/gity/internal/application/ports"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
@@ -49,9 +49,9 @@ func NewRouteServices(branchProtectionRepo *projectbranchprotectionrepo.Reposito
 }
 
 func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service, services *RouteServices) {
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		if !isGitProtocolPath(c.Path(), c.Method()) {
-			return c.Next()
+			return nextRoute(c)
 		}
 		switch c.Method() {
 		case fiber.MethodGet:
@@ -59,22 +59,22 @@ func RegisterRoutes(app *fiber.App, logger *slog.Logger, authRuntime *infraauth.
 		case fiber.MethodPost:
 			return handleRPC(c, logger, authRuntime, repo, services, transport)
 		default:
-			return c.Next()
+			return nextRoute(c)
 		}
 	})
 }
 
-func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service) error {
+func handleInfoRefs(c fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, transport *infragittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	if !strings.HasSuffix(path, "/info/refs") {
-		return c.Next()
+		return nextRoute(c)
 	}
 	service := strings.TrimSpace(c.Query("service"))
 	if !supportedGitServices.Contains(service) {
 		return fiber.NewError(http.StatusBadRequest, "unsupported git service")
 	}
 	repoPath := strings.TrimSuffix(path, "/info/refs")
-	project, err := loadProject(c.UserContext(), repo, repoPath)
+	project, err := loadProject(c.Context(), repo, repoPath)
 	if err != nil {
 		return err
 	}
@@ -86,9 +86,9 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	var stderr bytes.Buffer
 	switch service {
 	case serviceUploadPack:
-		err = transport.AdvertiseUploadPack(c.UserContext(), project.FullPath+".git", &stdout, &stderr)
+		err = transport.AdvertiseUploadPack(c.Context(), project.FullPath+".git", &stdout, &stderr)
 	case serviceReceivePack:
-		err = transport.AdvertiseReceivePack(c.UserContext(), project.FullPath+".git", &stdout, &stderr)
+		err = transport.AdvertiseReceivePack(c.Context(), project.FullPath+".git", &stdout, &stderr)
 	}
 	if err != nil {
 		logger.Error("git advertise failed", slog.String("project", project.FullPath), slog.String("service", service), slog.String("error", err.Error()), slog.String("stderr", stderr.String()))
@@ -99,16 +99,16 @@ func handleInfoRefs(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Ru
 	body := append([]byte(pktLine("# service="+service+"\n")+"0000"), stdout.Bytes()...)
 	c.Set(fiber.HeaderContentType, contentType)
 	c.Set(fiber.HeaderCacheControl, "no-cache")
-	return c.Send(body)
+	return sendBytes(c, body, "send advertisement")
 }
 
-func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *infragittransport.Service) error {
+func handleRPC(c fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime, repo *projectrepo.Repository, services *RouteServices, transport *infragittransport.Service) error {
 	path := strings.Trim(strings.ReplaceAll(c.Path(), "\\", "/"), "/")
 	rpc, ok := parseRPCPath(path)
 	if !ok {
-		return c.Next()
+		return nextRoute(c)
 	}
-	project, err := loadProject(c.UserContext(), repo, rpc.repoPath)
+	project, err := loadProject(c.Context(), repo, rpc.repoPath)
 	if err != nil {
 		return err
 	}
@@ -128,15 +128,29 @@ func handleRPC(c *fiber.Ctx, logger *slog.Logger, authRuntime *infraauth.Runtime
 	c.Set(fiber.HeaderContentType, contentType)
 	c.Set(fiber.HeaderCacheControl, "no-cache")
 	if rpc.service == serviceReceivePack {
-		triggerPushPipelines(c.UserContext(), logger, services.pipelineService, project, updates)
-		publishRepositoryChanges(c.UserContext(), logger, services.events, project, updates)
+		triggerPushPipelines(c.Context(), logger, services.pipelineService, project, updates)
+		publishRepositoryChanges(c.Context(), logger, services.events, project, updates)
 	}
-	return c.Send(stdout.Bytes())
+	return sendBytes(c, stdout.Bytes(), "send rpc response")
 }
 
 type rpcPath struct {
 	service  string
 	repoPath string
+}
+
+func nextRoute(c fiber.Ctx) error {
+	if err := c.Next(); err != nil {
+		return oops.In("http.git_transport").With("op", "next").Wrapf(err, "fiber next")
+	}
+	return nil
+}
+
+func sendBytes(c fiber.Ctx, body []byte, op string) error {
+	if err := c.Send(body); err != nil {
+		return oops.In("http.git_transport").With("op", op).Wrapf(err, "fiber send")
+	}
+	return nil
 }
 
 func parseRPCPath(path string) (rpcPath, bool) {
@@ -150,22 +164,22 @@ func parseRPCPath(path string) (rpcPath, bool) {
 	}
 }
 
-func executeRPC(c *fiber.Ctx, authRuntime *infraauth.Runtime, principal infraauth.Principal, project projectView, service string, services *RouteServices, transport *infragittransport.Service, updates []receivePackUpdate, stdout, stderr *bytes.Buffer) error {
+func executeRPC(c fiber.Ctx, authRuntime *infraauth.Runtime, principal infraauth.Principal, project projectView, service string, services *RouteServices, transport *infragittransport.Service, updates []receivePackUpdate, stdout, stderr *bytes.Buffer) error {
 	switch service {
 	case serviceUploadPack:
-		if err := transport.UploadPack(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr); err != nil {
+		if err := transport.UploadPack(c.Context(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr); err != nil {
 			return oops.In("http.git_transport").With("project", project.FullPath, "service", service).Wrapf(err, "execute upload-pack")
 		}
 		return nil
 	case serviceReceivePack:
-		if err := rejectProtectedBranchUpdates(c.UserContext(), authRuntime, principal, project, services.branchProtectionRepo, updates); err != nil {
+		if err := rejectProtectedBranchUpdates(c.Context(), authRuntime, principal, project, services.branchProtectionRepo, updates); err != nil {
 			return err
 		}
-		denyForcePushRefs, err := protectedForcePushRefs(c.UserContext(), project, services.branchProtectionRepo, updates)
+		denyForcePushRefs, err := protectedForcePushRefs(c.Context(), project, services.branchProtectionRepo, updates)
 		if err != nil {
 			return err
 		}
-		if err := transport.ReceivePackWithOptions(c.UserContext(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr, infragittransport.ReceivePackOptions{DenyForcePushRefs: denyForcePushRefs}); err != nil {
+		if err := transport.ReceivePackWithOptions(c.Context(), project.FullPath+".git", bytes.NewReader(c.Body()), stdout, stderr, infragittransport.ReceivePackOptions{DenyForcePushRefs: denyForcePushRefs}); err != nil {
 			return oops.In("http.git_transport").With("project", project.FullPath, "service", service).Wrapf(err, "execute receive-pack")
 		}
 		return nil

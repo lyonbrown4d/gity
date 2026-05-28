@@ -9,7 +9,7 @@ import (
 	"github.com/arcgolabs/httpx"
 	"github.com/arcgolabs/httpx/adapter"
 	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 	"github.com/samber/oops"

@@ -5,17 +5,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	projectrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project"
 	"github.com/samber/oops"
 )
 
-func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, service string) (infraauth.Principal, error) {
+func authorizeProject(c fiber.Ctx, authRuntime *infraauth.Runtime, project projectView, service string) (infraauth.Principal, error) {
 	if service == serviceUploadPack && strings.TrimSpace(project.Visibility) == "public" {
 		return infraauth.Principal{}, nil
 	}
-	principal, ok, err := authRuntime.AuthenticateHeader(c.UserContext(), c.Get(fiber.HeaderAuthorization))
+	principal, ok, err := authRuntime.AuthenticateHeader(c.Context(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
 		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
 	}
@@ -26,9 +26,9 @@ func authorizeProject(c *fiber.Ctx, authRuntime *infraauth.Runtime, project proj
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
 	switch service {
 	case serviceUploadPack:
-		allowed, err = authRuntime.CanProjectAction(c.UserContext(), principal, scope, infraauth.ProjectActionRepositoryRead)
+		allowed, err = authRuntime.CanProjectAction(c.Context(), principal, scope, infraauth.ProjectActionRepositoryRead)
 	case serviceReceivePack:
-		allowed, err = authRuntime.CanProjectAction(c.UserContext(), principal, scope, infraauth.ProjectActionRepositoryPush)
+		allowed, err = authRuntime.CanProjectAction(c.Context(), principal, scope, infraauth.ProjectActionRepositoryPush)
 	}
 	if err != nil {
 		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "authorization failed")
