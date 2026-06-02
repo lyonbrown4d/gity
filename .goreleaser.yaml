@@ -30,6 +30,10 @@ builds:
     main: ./cmd/migration
     binary: gity-migration
   - <<: *gity_build
+    id: gity-search-index
+    main: ./cmd/search-index
+    binary: gity-search-index
+  - <<: *gity_build
     id: gity-worker
     main: ./cmd/worker
     binary: gity-worker
@@ -47,6 +51,7 @@ upx:
     ids:
       - gity-server
       - gity-migration
+      - gity-search-index
       - gity-worker
       - gity-standalone
       - gity-runner
@@ -61,6 +66,7 @@ upx:
     ids:
       - gity-server
       - gity-migration
+      - gity-search-index
       - gity-worker
       - gity-standalone
       - gity-runner
@@ -76,6 +82,7 @@ archives:
     ids:
       - gity-server
       - gity-migration
+      - gity-search-index
       - gity-worker
       - gity-standalone
       - gity-runner
@@ -122,6 +129,16 @@ nfpms:
     contents:
       - src: README.md
         dst: /usr/share/doc/gity-migration/README.md
+  - <<: *gity_nfpm
+    id: gity-search-index
+    package_name: gity-search-index
+    ids:
+      - gity-search-index
+    description: Gity code search index rebuild command.
+    dependencies: []
+    contents:
+      - src: README.md
+        dst: /usr/share/doc/gity-search-index/README.md
   - <<: *gity_nfpm
     id: gity-worker
     package_name: gity-worker
@@ -185,6 +202,20 @@ dockers_v2:
     labels:
       org.opencontainers.image.title: gity-migration
       org.opencontainers.image.description: Gity database migration command
+      org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+  - <<: *gity_docker
+    id: gity-search-index
+    ids:
+      - gity-search-index
+    images:
+      - ghcr.io/lyonbrown4d/gity-search-index
+    build_args:
+      BINARY: gity-search-index
+    labels:
+      org.opencontainers.image.title: gity-search-index
+      org.opencontainers.image.description: Gity code search index rebuild command
       org.opencontainers.image.source: https://github.com/lyonbrown4d/gity
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.version: "{{ .Version }}"

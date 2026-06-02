@@ -29,6 +29,7 @@ The old Rust backend has been removed so the repository can move forward on one 
 | --- | --- |
 | `cmd/server` | API server entrypoint |
 | `cmd/migration` | database migration entrypoint |
+| `cmd/search-index` | offline repository code search index rebuild utility |
 | `cmd/worker` | background worker entrypoint |
 | `cmd/runner` | external project runner agent entrypoint |
 | `cmd/standalone` | single-process migration + server + worker entrypoint using `dix` subapps |
@@ -72,6 +73,13 @@ For local single-process usage, `cmd/standalone` runs migration first and then s
 
 ```bash
 go run ./cmd/standalone
+```
+
+After initial data load or bulk repository imports, refresh code search indexes with:
+
+```bash
+go run ./cmd/search-index
+go run ./cmd/search-index --project-id 123
 ```
 
 ### 4. Run the backend
@@ -183,11 +191,12 @@ Published binaries:
 
 - `gity-server`
 - `gity-migration`
+- `gity-search-index`
 - `gity-worker`
 - `gity-standalone`
 - `gity-runner`
 
-GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and per-component Linux `deb`/`rpm`/`apk` packages for `gity-server`, `gity-migration`, `gity-worker`, `gity-standalone`, and `gity-runner`. Docker images are published to GHCR as `ghcr.io/lyonbrown4d/gity-server`, `ghcr.io/lyonbrown4d/gity-migration`, `ghcr.io/lyonbrown4d/gity-worker`, `ghcr.io/lyonbrown4d/gity-standalone`, and `ghcr.io/lyonbrown4d/gity-runner`.
+GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and per-component Linux `deb`/`rpm`/`apk` packages for `gity-server`, `gity-migration`, `gity-search-index`, `gity-worker`, `gity-standalone`, and `gity-runner`. Docker images are published to GHCR as `ghcr.io/lyonbrown4d/gity-server`, `ghcr.io/lyonbrown4d/gity-migration`, `ghcr.io/lyonbrown4d/gity-search-index`, `ghcr.io/lyonbrown4d/gity-worker`, `ghcr.io/lyonbrown4d/gity-standalone`, and `ghcr.io/lyonbrown4d/gity-runner`.
 
 UPX compression is enabled for Linux and Windows release binaries before archives, packages, and Docker images are assembled. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
 

@@ -18,7 +18,7 @@ Gity is a lightweight GitLab-like Git hosting platform:
 
 Available now:
 
-- Split binaries: `gity-server`, `gity-migration`, `gity-worker`, `gity-standalone`, `gity-runner`
+- Split binaries: `gity-server`, `gity-migration`, `gity-search-index`, `gity-worker`, `gity-standalone`, `gity-runner`
 - Standalone mode runs migration, server, and worker in one process through `dix` subapps
 - SQL migrations for sqlite, postgres, and mysql dialect folders
 - User, organization, organization member, project, and project member models
@@ -170,7 +170,7 @@ Medium priority:
 - Improve CODEOWNERS parser coverage for escaped spaces and richer pattern edge cases
 - Add frontend affordances for explaining why a merge is blocked
 - Add package registry protocol-specific smoke tests
-- Add search index rebuild command
+- Search index rebuild command: ✅ added (`cmd/search-index`)
 
 Deferred:
 

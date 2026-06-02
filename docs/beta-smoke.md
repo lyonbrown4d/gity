@@ -12,6 +12,7 @@ Use the checked-in example as the configx dotenv source:
 cp .env.example .env
 go run ./cmd/migration
 go run ./cmd/server
+go run ./cmd/search-index
 ```
 
 For a single-process local run, use standalone instead. It runs migration first and then starts server and worker subapps:

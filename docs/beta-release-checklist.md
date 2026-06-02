@@ -84,7 +84,7 @@ GitHub Actions publishes:
 - GitHub Release artifacts
 - checksums
 - Linux `deb`, `rpm`, and `apk` packages for each binary
-- GHCR Docker images for `server`, `migration`, `worker`, `standalone`, and `runner`
+- GHCR Docker images for `server`, `migration`, `search-index`, `worker`, `standalone`, and `runner`
 
 The release workflow installs UPX and compresses Linux and Windows binaries before packaging.
 
