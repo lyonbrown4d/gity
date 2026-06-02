@@ -174,6 +174,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
 
       {meta.repository && activeTab === "merge-requests" ? (
         <RepositoryMergeRequestsTab
+          organizationId={organizationId}
           repoId={repoId}
           branches={meta.branches}
           defaultBranch={meta.repository.default_branch}

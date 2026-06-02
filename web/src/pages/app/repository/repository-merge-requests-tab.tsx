@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, GitMerge, GitPullRequest, MessageSquare, RefreshCw, Search, ShieldCheck, ThumbsUp, UserRound, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
+import { Link } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
 } from "./repository-normalizers";
 
 interface RepositoryMergeRequestsTabProps {
+  organizationId: string;
   repoId: string;
   branches: RepositoryBranchView[];
   defaultBranch: string;
@@ -50,6 +52,7 @@ interface RepositoryMergeRequestsTabProps {
 }
 
 export const RepositoryMergeRequestsTab = ({
+  organizationId,
   repoId,
   branches,
   defaultBranch,
@@ -483,16 +486,18 @@ export const RepositoryMergeRequestsTab = ({
           <MergeRequestStat label={t("Closed")} value={stats.closed} tone="slate" />
         </div>
 
-        <RepositoryMergeRequestApprovalRulesPanel
-          repoId={repoId}
-          branches={branches}
-          defaultBranch={defaultBranch}
-          users={users}
-          permissions={permissions}
-          t={t}
-          onError={onError}
-          onRulesChanged={() => void loadChecks()}
-        />
+        <div id="merge-request-approval-rules-panel">
+          <RepositoryMergeRequestApprovalRulesPanel
+            repoId={repoId}
+            branches={branches}
+            defaultBranch={defaultBranch}
+            users={users}
+            permissions={permissions}
+            t={t}
+            onError={onError}
+            onRulesChanged={() => void loadChecks()}
+          />
+        </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
           <div className="space-y-3">
@@ -662,7 +667,14 @@ export const RepositoryMergeRequestsTab = ({
                   <p className="rounded-md border bg-muted/20 px-3 py-2 text-sm">{selectedMergeRequest.description}</p>
                 ) : null}
 
-                <MergeRequestChecksPanel checks={checksView} isLoading={checksQuery.isFetching} t={t} onReload={() => void loadChecks()} />
+                <MergeRequestChecksPanel
+                  organizationId={organizationId}
+                  repoId={repoId}
+                  checks={checksView}
+                  isLoading={checksQuery.isFetching}
+                  t={t}
+                  onReload={() => void loadChecks()}
+                />
 
                 <MergeRequestParticipantsPanel
                   reviewers={reviewers}
@@ -740,16 +752,99 @@ export const RepositoryMergeRequestsTab = ({
 };
 
 const MergeRequestChecksPanel = ({
+  organizationId,
+  repoId,
   checks,
   isLoading,
   t,
   onReload,
 }: {
+  organizationId: string;
+  repoId: string;
   checks: RepositoryMergeRequestCheckStatusView | null;
   isLoading: boolean;
   t: (text: string) => string;
   onReload: () => void;
 }) => {
+  const getRepoTabPath = (tab: string) => (
+    `/app/projects/${encodeURIComponent(organizationId)}/${encodeURIComponent(repoId)}?tab=${encodeURIComponent(tab)}`
+  );
+  const renderBlockerHint = (code: string, message: string) => {
+    const commonDetails = [message];
+    switch (code) {
+      case "approval_rule_unsatisfied":
+        return {
+          title: t("Approval requirements are not met"),
+          details: [
+            ...commonDetails,
+            t("Have a required reviewer approve this merge request."),
+            t("Or adjust approval rules for the target branch."),
+          ],
+          action: {
+            label: t("Review approval rules"),
+            href: "#merge-request-approval-rules-panel",
+          },
+        };
+      case "pipeline_repository_missing":
+        return {
+          title: t("Pipeline service is not configured"),
+          details: [
+            ...commonDetails,
+            t("Enable/attach CI runtime for this repository."),
+            t("Create a CI config file in the source branch to trigger pipeline generation."),
+          ],
+          action: {
+            label: t("Open code to add CI config"),
+            href: getRepoTabPath("code"),
+          },
+        };
+      case "pipeline_missing":
+        return {
+          title: t("Pipeline not found"),
+          details: [
+            ...commonDetails,
+            t("Push a new commit or fix CI config to trigger a new pipeline."),
+            t("Check the pipeline tab for queued or recent pipeline runs."),
+          ],
+          action: {
+            label: t("Open pipelines"),
+            href: getRepoTabPath("pipelines"),
+          },
+        };
+      case "pipeline_not_succeeded":
+        return {
+          title: t("Pipeline did not succeed"),
+          details: [
+            ...commonDetails,
+            t("Fix pipeline failures and rerun the failed pipeline."),
+            t("Open pipeline logs from the Pipelines tab."),
+          ],
+          action: {
+            label: t("Open pipelines"),
+            href: getRepoTabPath("pipelines"),
+          },
+        };
+      default:
+        return {
+          title: t("Policy check blocked"),
+          details: commonDetails,
+        };
+    }
+  };
+  const renderBlockerAction = (href: string, label: string) => {
+    if (href.startsWith("#")) {
+      return (
+        <a href={href} className="text-xs text-primary underline-offset-4 hover:underline">
+          {label}
+        </a>
+      );
+    }
+    return (
+      <Link to={href} className="text-xs text-primary underline-offset-4 hover:underline">
+        {label}
+      </Link>
+    );
+  };
   const meta = checks ? checkStatusMeta(checks) : { label: "Not loaded", className: "border-slate-500/30 bg-slate-500/5", Icon: Clock3 };
   const Icon = meta.Icon;
   return (
@@ -784,12 +879,30 @@ const MergeRequestChecksPanel = ({
         <div className="mt-3 rounded-md border bg-background/70 px-3 py-2">
           <p className="mb-2 text-xs font-medium text-muted-foreground">{t("Blocking reasons")}</p>
           <div className="space-y-2">
-            {checks.blockers.map((blocker) => (
-              <div key={`${blocker.category}:${blocker.code}:${blocker.message}`} className="flex flex-wrap items-center gap-2 text-xs">
-                <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
-                <span className="text-muted-foreground">{blocker.message}</span>
-              </div>
-            ))}
+            {checks.blockers.map((blocker) => {
+              const blockerHint = renderBlockerHint(blocker.code, blocker.message);
+              return (
+                <div
+                  key={`${blocker.category}:${blocker.code}:${blocker.message}`}
+                  className="space-y-1 rounded-md border px-2 py-1.5"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
+                    <span className="text-xs font-medium">{blockerHint.title}</span>
+                  </div>
+                  <ul className="ml-6 list-disc text-muted-foreground text-xs">
+                    {blockerHint.details.map((item, index) => (
+                      <li key={`${item}:${index}`}>{item}</li>
+                    ))}
+                  </ul>
+                  {blockerHint.action ? (
+                    <div className="mt-1">
+                      {renderBlockerAction(blockerHint.action.href, blockerHint.action.label)}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
