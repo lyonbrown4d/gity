@@ -2,7 +2,8 @@
 param(
     [switch]$SkipGoLint,
     [switch]$SkipGoReleaser,
-    [switch]$SkipFrontendInstall
+    [switch]$SkipFrontendInstall,
+    [switch]$SkipBetaSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,3 +88,14 @@ Invoke-Step "GoReleaser config" {
 Invoke-Step "GoReleaser snapshot packages" {
     Invoke-Native "goreleaser" @("release", "--snapshot", "--clean", "--skip=publish,docker")
 }
+
+if ($SkipBetaSmoke) {
+    Write-Host "==> Skipping beta smoke checklist (manual run required)"
+    Write-Host "Use .\docs\beta-smoke.md to complete the end-to-end smoke after release checks."
+    exit 0
+}
+
+Write-Host "==> Beta smoke checklist"
+Write-Host "Release checks succeeded. Complete the remaining end-to-end verification from:"
+Write-Host ".\docs\beta-smoke.md"
+Write-Host "Before tagging, confirm all smoke steps are completed."

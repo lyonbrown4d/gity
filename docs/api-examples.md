@@ -38,7 +38,6 @@ curl -X PATCH "http://localhost:8080/api/v1/projects/100/members/2001" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "user_id": 2001,
     "role": "maintainer"
   }'
 ```
@@ -82,6 +81,7 @@ curl -X DELETE "http://localhost:8080/api/v1/projects/100/members/2001" \
 > Permission baseline:
 > - Read: repository read action
 > - Write: repository admin action
+> - Member scope: `project` entry in response means source explicitly managed by this project.
 
 ## Merge Request Approval Rules
 
@@ -106,6 +106,8 @@ curl -X POST "http://localhost:8080/api/v1/projects/100/merge-request-approval-r
     "code_owner": false
   }'
 ```
+
+`target_branch` defaults to `*` if omitted.
 
 ### Update rule
 
@@ -160,6 +162,7 @@ curl -X DELETE "http://localhost:8080/api/v1/projects/100/merge-request-approval
 > Permission baseline:
 > - Read: merge request merge action on project
 > - Write: merge request approval rule admin action
+> - Target branch can be explicit branch name (`main`) or wildcard (`*`).
 
 ## Project CI Variables
 
@@ -181,6 +184,20 @@ curl -X PATCH "http://localhost:8080/api/v1/projects/100/ci/variables" \
     "value": "release-2026-05-16",
     "masked": false,
     "protected": true
+  }'
+```
+
+Masked variable:
+
+```bash
+curl -X PATCH "http://localhost:8080/api/v1/projects/100/ci/variables" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "TOKEN",
+    "value": "replace-me-very-long-value",
+    "masked": true,
+    "protected": false
   }'
 ```
 
@@ -227,6 +244,7 @@ curl -X DELETE "http://localhost:8080/api/v1/projects/100/ci/variables/BUILD_TAG
 
 > Permission baseline:
 > - CI variable list/upsert/delete requires runner admin action
+> - A masked variable never returns `value` in list responses.
 
 ## Runner token endpoints
 

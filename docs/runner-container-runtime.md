@@ -64,6 +64,27 @@ Related env:
 - Masked CI variables are redacted in API responses and logs when possible, but mask coverage is a defense-in-depth aid, not a security boundary by itself.
 - Keep workspace cleanup enabled (`GITY_RUNNER_CLEAN_WORKSPACE=true`) for untrusted scripts to reduce artifact persistence.
 
+## Security Boundary Matrix
+
+| Execution mode | Isolation boundary | Typical risk control |
+| --- | --- | --- |
+| `host` | none | do not assign untrusted projects to `host`; isolate with runner token scoping |
+| `docker` | container namespace + cgroups + seccomp profile | restrict image allowlist, remove bind mounts, use read-only rootfs when possible |
+| `podman` | container namespace + sandbox policy | prefer user namespace, drop extra capabilities |
+| `containerd` | container namespace + runtime hooks | configure strict socket ACLs and workload user mapping |
+| `firecracker` | VM boundary (experimental) | strongest tenant separation target; currently not feature-complete |
+
+## Security Hardening Checklist
+
+Before allowing untrusted workloads:
+
+- Enforce runner tags by scope so projects can only claim jobs from intended runner groups.
+- Use scoped runner tokens and short job lease windows.
+- Keep `GITY_RUNNER_CLEAN_WORKSPACE=true`.
+- Require workspace scratch space on node-local storage, not shared mounts.
+- Enforce shell allowlist and deny unknown shells by default.
+- Record critical runner lifecycle events (claim, trace, artifact upload, completion) into audit stream.
+
 ## Recommended runtime profile
 
 | Environment | Suggested mode | Why |

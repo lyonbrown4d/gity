@@ -18,6 +18,7 @@ The script runs:
 - `pnpm -C web build`
 - `goreleaser check`
 - `goreleaser release --snapshot --clean --skip=publish,docker`
+- Optional manual beta smoke checklist review from [beta-smoke.md](beta-smoke.md)
 
 Local prerequisites for the full script:
 
@@ -38,6 +39,22 @@ If golangci-lint is not installed locally, GitHub Actions still runs lint on pus
 ```powershell
 .\scripts\release-check.ps1 -SkipGoLint -SkipGoReleaser
 ```
+
+## Beta Gate Checklist (Roadmap Items 1-4)
+
+Before any beta tag:
+
+- [ ] Run `.\\scripts\\release-check.ps1 -SkipBetaSmoke` locally and confirm script exit code `0`.
+- [ ] Complete all steps in [beta-smoke.md](beta-smoke.md), including:
+  - protected branch write policy
+  - MR create -> approval -> merge
+  - pipeline lifecycle and traces
+  - audit event verification
+- [ ] Confirm runner runtime assumptions and security notes are documented in [docs/runner-container-runtime.md](docs/runner-container-runtime.md).
+- [ ] Confirm API usage examples for:
+  - [ ] `project members` lifecycle
+  - [ ] `merge-request approval rules`
+  - [ ] `CI variables` (masked behavior)
 
 ## Smoke Verification
 
