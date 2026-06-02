@@ -4,6 +4,7 @@ The beta release publishes separate Docker images for each runtime:
 
 - `ghcr.io/lyonbrown4d/gity-server`
 - `ghcr.io/lyonbrown4d/gity-migration`
+- `ghcr.io/lyonbrown4d/gity-search-index`
 - `ghcr.io/lyonbrown4d/gity-worker`
 - `ghcr.io/lyonbrown4d/gity-standalone`
 - `ghcr.io/lyonbrown4d/gity-runner`
@@ -34,6 +35,21 @@ docker compose --env-file .env.production -f docker-compose.prod.yaml --profile 
 ## Storage
 
 The production template uses MySQL for metadata, MinIO/S3 for attachments, packages, LFS objects, and artifacts, and Docker volumes for Git repositories and search indexes.
+
+## Search Index Maintenance
+
+For large bulk imports, run the standalone image or `gity-search-index` job with your
+runtime configuration:
+
+```bash
+docker run --rm \
+  --env-file .env.production \
+  -v repo_data:/var/lib/gity/repos \
+  -v search_index:/var/lib/gity/search-index \
+  ghcr.io/lyonbrown4d/gity-search-index:latest
+```
+
+The image accepts the same `--project-id` and `--all` flags as local usage.
 
 For external S3-compatible storage, change:
 
