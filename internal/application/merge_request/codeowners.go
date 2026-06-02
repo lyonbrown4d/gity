@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"unicode"
 
 	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/bmatcuk/doublestar/v4"
@@ -116,7 +117,7 @@ func parseCodeOwnerLine(line string) (codeOwnerRule, bool) {
 	if line == "" || strings.HasPrefix(line, "[") || strings.HasPrefix(line, "!") {
 		return codeOwnerRule{}, false
 	}
-	fields := strings.Fields(line)
+	fields := splitCodeOwnerFields(line)
 	if len(fields) < 2 {
 		return codeOwnerRule{}, false
 	}
@@ -139,11 +140,86 @@ func codeOwnerUsernames(owners []string) []string {
 }
 
 func stripCodeOwnerComment(line string) string {
-	before, _, ok := strings.Cut(line, "#")
-	if ok {
-		return before
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return line
 	}
-	return line
+	var output strings.Builder
+	escaped := false
+	prevWasSpaceOrStart := true
+
+	for _, r := range line {
+		if escaped {
+			output.WriteRune('\\')
+			output.WriteRune(r)
+			prevWasSpaceOrStart = false
+			escaped = false
+			continue
+		}
+
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+
+		if r == '#' && prevWasSpaceOrStart {
+			return output.String()
+		}
+
+		output.WriteRune(r)
+		prevWasSpaceOrStart = unicode.IsSpace(r)
+	}
+
+	if escaped {
+		output.WriteRune('\\')
+	}
+
+	return output.String()
+}
+
+func splitCodeOwnerFields(line string) []string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil
+	}
+
+	fields := make([]string, 0)
+	var field strings.Builder
+	escaped := false
+
+	flush := func() {
+		if field.Len() > 0 {
+			fields = append(fields, field.String())
+			field.Reset()
+		}
+	}
+
+	for _, r := range line {
+		if escaped {
+			field.WriteRune(r)
+			escaped = false
+			continue
+		}
+
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+
+		if unicode.IsSpace(r) {
+			flush()
+			continue
+		}
+
+		field.WriteRune(r)
+	}
+
+	if escaped {
+		field.WriteRune('\\')
+	}
+
+	flush()
+	return fields
 }
 
 func matchedCodeOwnerUsernames(rules []codeOwnerRule, files []string) []string {
