@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
@@ -10,6 +11,7 @@ import (
 	"github.com/arcgolabs/httpx/adapter"
 	httpxfiber "github.com/arcgolabs/httpx/adapter/fiber"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
 	"github.com/samber/oops"
@@ -28,6 +30,13 @@ func NewFiberApp() *fiber.App {
 }
 
 func NewServer(app *fiber.App, settings config.Settings, logger *slog.Logger, endpoints *collectionlist.List[httpx.Endpoint]) (httpx.ServerRuntime, error) {
+	if strings.EqualFold(settings.App.Environment, "development") {
+		app.Use(cors.New(cors.Config{
+			AllowOrigins: []string{"*"},
+			AllowHeaders: []string{"*"},
+		}))
+	}
+
 	adapterRuntime := httpxfiber.New(app, adapter.HumaOptions{
 		Title:       settings.App.Name,
 		Version:     "0.1.0",

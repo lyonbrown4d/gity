@@ -4,6 +4,9 @@ package database
 import (
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/lyonbrown4d/gity/internal/config"
 
@@ -22,6 +25,11 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 	if settings.Database.DSN == "" {
 		logger.Warn("database dsn is empty; database runtime disabled")
 		return nil, oops.In("database").New("database dsn is required")
+	}
+	if settings.Database.Driver == "sqlite" {
+		if err := ensureSQLiteDatabaseDir(settings.Database.DSN); err != nil {
+			return nil, oops.In("database").Wrapf(err, "prepare sqlite database directory")
+		}
 	}
 
 	dbDialect, err := resolveDialect(settings.Database.Driver)
@@ -46,6 +54,30 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		return nil, fmt.Errorf("open dbx database: %w", err)
 	}
 	return db, nil
+}
+
+func ensureSQLiteDatabaseDir(dsn string) error {
+	const sqlitePrefix = "file:"
+	if !strings.HasPrefix(dsn, sqlitePrefix) {
+		return nil
+	}
+	trimmed := strings.TrimPrefix(dsn, sqlitePrefix)
+	if trimmed == "" || trimmed == ":memory:" || strings.HasPrefix(trimmed, ":memory:") {
+		return nil
+	}
+
+	dbPath := strings.Split(trimmed, "?")[0]
+	if strings.HasPrefix(dbPath, "//") {
+		dbPath = strings.TrimPrefix(dbPath, "//")
+	}
+	if dbPath == "" || dbPath == ":memory:" || strings.HasPrefix(dbPath, "/") && strings.Count(dbPath, "/") == 1 {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(filepath.Clean(dbPath)), 0o755); err != nil {
+		return oops.In("database").Wrapf(err, "create sqlite data directory")
+	}
+	return nil
 }
 
 func resolveDialect(driver string) (dialect.Dialect, error) {

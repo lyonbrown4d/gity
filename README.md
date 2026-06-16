@@ -96,6 +96,11 @@ Current backend defaults:
 - OpenAPI: `http://localhost:8080/openapi.json`
 - Database: local sqlite file from `GITY_DATABASE__DSN`
 
+If you run into `curl ...:8080` connection-refused immediately after seeing `server started`, check `GITY_HTTP__ADDRESS`:
+
+- For local host execution, `127.0.0.1:8080` is fine.
+- For containerized or cross-shell execution, prefer `:8080` so the process binds all interfaces.
+
 ### 5. Run the frontend
 
 ```bash
