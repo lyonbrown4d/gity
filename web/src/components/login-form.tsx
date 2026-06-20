@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ProductCodePanel, ProductEyebrow, ProductFeatureList } from "@/components/ui/product";
+import { ProductCodePanel, ProductFeatureList } from "@/components/ui/product";
 
 interface LoginFormProps extends React.ComponentProps<"div"> {
   onLoginSubmit: (credentials: { username: string; password: string }) => void;
@@ -38,16 +38,15 @@ export function LoginForm({
             }}
           >
             <div className="flex flex-col gap-7">
-              <div className="space-y-4">
-                <ProductEyebrow>Gity control plane</ProductEyebrow>
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-semibold tracking-[-0.04em] md:text-4xl">{t("Welcome back")}</h1>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
+                  <h1 className="text-3xl font-semibold md:text-4xl">{t("Welcome back")}</h1>
                   <p className="text-balance text-sm leading-6 text-muted-foreground">
                     {t("Sign in to manage projects and organizations.")}
                   </p>
                 </div>
               </div>
-              <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/55 p-3 text-xs text-muted-foreground">
+              <div className="grid gap-3 rounded-lg border border-border/70 bg-background/70 p-3 text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <LockKeyhole className="size-4 text-primary" />
                   <span>{t("Refine-driven routing and auth flow")}</span>
@@ -92,11 +91,11 @@ export function LoginForm({
           </form>
           <div className="relative hidden min-h-[620px] overflow-hidden bg-foreground text-background lg:block">
             <div className="absolute inset-0 opacity-45 gity-soft-grid" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,hsl(var(--primary)/0.55),transparent_18rem),radial-gradient(circle_at_76%_78%,hsl(var(--chart-3)/0.45),transparent_20rem)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,hsl(var(--primary)/0.34),transparent_42%)]" />
             <div className="relative flex h-full flex-col justify-between p-10">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-11 items-center justify-center rounded-2xl bg-background text-foreground">
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-background text-foreground">
                     <ArrowRightLeft className="size-5" />
                   </div>
                   <div>
@@ -104,15 +103,15 @@ export function LoginForm({
                     <p className="text-xs text-background/60">GitLab-like workspace</p>
                   </div>
                 </div>
-                <div className="rounded-full border border-background/20 px-3 py-1 text-xs text-background/70">
+                <div className="rounded-md border border-background/20 px-3 py-1 text-xs text-background/70">
                   same-stack backend
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="max-w-md space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-background/55">Project OS</p>
-                  <h2 className="text-5xl font-semibold tracking-[-0.06em]">
+              <div className="flex flex-col gap-6">
+                <div className="flex max-w-md flex-col gap-3">
+                  <p className="text-xs font-semibold uppercase text-background/55">Project OS</p>
+                  <h2 className="text-4xl font-semibold leading-tight">
                     Ship code, review changes, run pipelines.
                   </h2>
                   <p className="text-sm leading-6 text-background/65">

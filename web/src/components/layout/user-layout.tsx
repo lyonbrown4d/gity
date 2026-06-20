@@ -34,6 +34,9 @@ export function UserLayout(): JSX.Element {
 
   return (
     <SidebarProvider className="gity-shell">
+      <a href="#main-content" className="skip-link">
+        {t("Skip to main content")}
+      </a>
       <AppSidebar
         user={{
           name: identity?.name ?? t("Unknown User"),
@@ -61,9 +64,9 @@ export function UserLayout(): JSX.Element {
           </div>
           <ViewControls compact />
         </header>
-        <div className="flex flex-1 flex-col gap-5 p-4 pt-4 md:p-6 page-enter">
+        <main id="main-content" className="flex flex-1 flex-col gap-5 p-4 pt-4 md:p-6 page-enter">
           <Outlet />
-        </div>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

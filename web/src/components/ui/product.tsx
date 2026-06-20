@@ -29,9 +29,9 @@ export function ProductHero({
     <Card className={cn("gity-hero", className)}>
       <CardHeader className={cn("relative z-10", children ? "pb-4" : undefined)}>
         <div className="grid gap-6 lg:grid-cols-[1.45fr_0.85fr] lg:items-end">
-          <div className="max-w-3xl space-y-5">
+          <div className="flex max-w-3xl flex-col gap-5">
             {eyebrow ? <ProductEyebrow>{eyebrow}</ProductEyebrow> : null}
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <CardTitle className="gity-hero-title">{title}</CardTitle>
               {description ? (
                 <CardDescription className="max-w-2xl text-sm leading-6">{description}</CardDescription>
@@ -53,7 +53,7 @@ export function ProductHero({
 
 export function ProductEyebrow({ children, className }: { children: ReactNode; className?: string }): JSX.Element {
   return (
-    <div className={cn("inline-flex items-center gap-2 rounded-full border bg-background/65 px-3 py-1 text-xs font-semibold text-muted-foreground", className)}>
+    <div className={cn("inline-flex items-center gap-2 rounded-md border bg-background/80 px-3 py-1 text-xs font-semibold text-muted-foreground", className)}>
       <StatusDot />
       {children}
     </div>
@@ -82,9 +82,9 @@ export function ProductMetricCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-2 text-4xl font-semibold tracking-[-0.05em]">{value}</p>
+          <p className="mt-2 text-3xl font-semibold">{value}</p>
         </div>
-        <div className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-5" />
         </div>
       </div>
@@ -103,7 +103,7 @@ export function ProductFeatureList({
   return (
     <div className={cn("grid gap-3", className)}>
       {items.map((item, index) => (
-        <div key={index} className="flex items-center gap-3 rounded-2xl border border-background/15 bg-background/10 p-3 backdrop-blur">
+        <div key={index} className="flex items-center gap-3 rounded-lg border border-background/15 bg-background/10 p-3 backdrop-blur">
           <item.icon className="size-4 text-primary" />
           <span className="text-sm text-background/80">{item.text}</span>
         </div>

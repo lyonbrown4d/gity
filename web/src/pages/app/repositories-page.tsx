@@ -147,22 +147,22 @@ export function AppRepositoriesPage(): JSX.Element {
   };
 
   return (
-    <div className="space-y-4 page-enter">
+    <div className="flex flex-col gap-4 page-enter">
       <ProductHero
         className="card-enter"
         eyebrow={t("Workspace")}
         title={t("My Projects")}
         description={t("Create, clone, and manage projects in your organizations.")}
         aside={(
-            <Button type="button" onClick={openCreateModal} className="h-10 action-pop">
-              <Plus className="size-4" />
-              {t("New Project")}
-            </Button>
+          <Button type="button" onClick={openCreateModal} className="h-10 action-pop">
+            <Plus className="size-4" />
+            {t("New Project")}
+          </Button>
         )}
         contentClassName="space-y-4"
       >
           <div className="grid gap-3 md:grid-cols-[220px_1fr] md:items-end">
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="organization-select">{t("Organization")}</Label>
               <Select value={selectedOrg} onValueChange={setSelectedOrg}>
                 <SelectTrigger id="organization-select">
@@ -214,7 +214,7 @@ export function AppRepositoriesPage(): JSX.Element {
           {isLoading ? <p className="text-sm text-muted-foreground">{t("Loading projects...")}</p> : null}
 
           {repos.map((repo) => (
-            <div key={repo.id} className="group space-y-4 rounded-2xl border border-border/70 bg-background/55 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-background/75 hover:shadow-[0_22px_70px_-55px_hsl(var(--foreground)/0.65)]">
+            <div key={repo.id} className="group flex flex-col gap-4 rounded-lg border border-border/80 bg-background p-4 transition-colors duration-200 hover:border-primary/30 hover:bg-muted/35">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0 space-y-1">
                   <p className="truncate font-medium">
@@ -240,7 +240,7 @@ export function AppRepositoriesPage(): JSX.Element {
                 <Badge variant="secondary">{repo.visibility}</Badge>
               </div>
 
-              <div className="rounded-2xl border bg-muted/40 px-3 py-2">
+              <div className="rounded-lg border bg-muted/40 px-3 py-2">
                 <p className="truncate text-xs text-muted-foreground">{t("Clone URL")}</p>
                 <p className="break-all font-mono text-xs">{repo.clone_http_url}</p>
               </div>
@@ -301,7 +301,7 @@ export function AppRepositoriesPage(): JSX.Element {
 
       <Modal open={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} title={t("Create Project")}>
         <form className="grid gap-3 md:grid-cols-2" onSubmit={submitCreate}>
-          <div className="space-y-2 md:col-span-2">
+          <div className="flex flex-col gap-2 md:col-span-2">
             <Label htmlFor="repo-owner">{t("Owner")}</Label>
             <Select value={createOwnerOrg} onValueChange={setCreateOwnerOrg} required>
               <SelectTrigger id="repo-owner">
@@ -316,7 +316,7 @@ export function AppRepositoriesPage(): JSX.Element {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-key">{t("Project key")}</Label>
             <Input
               id="repo-key"
@@ -326,7 +326,7 @@ export function AppRepositoriesPage(): JSX.Element {
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-name">{t("Project name")}</Label>
             <Input
               id="repo-name"
@@ -336,7 +336,7 @@ export function AppRepositoriesPage(): JSX.Element {
               required
             />
           </div>
-          <div className="space-y-2 md:col-span-2">
+          <div className="flex flex-col gap-2 md:col-span-2">
             <Label htmlFor="repo-description">{t("Description")}</Label>
             <Input
               id="repo-description"
@@ -345,7 +345,7 @@ export function AppRepositoriesPage(): JSX.Element {
               onChange={(event) => setDescription(event.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-default-branch">{t("Default branch")}</Label>
             <Input
               id="repo-default-branch"
@@ -354,7 +354,7 @@ export function AppRepositoriesPage(): JSX.Element {
               onChange={(event) => setDefaultBranch(event.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-visibility">{t("Visibility")}</Label>
             <Select value={visibility} onValueChange={setVisibility}>
               <SelectTrigger id="repo-visibility">
@@ -367,7 +367,7 @@ export function AppRepositoriesPage(): JSX.Element {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-gitignore">{t("Add .gitignore")}</Label>
             <Select value={gitignoreTemplate} onValueChange={setGitignoreTemplate}>
               <SelectTrigger id="repo-gitignore">
@@ -383,7 +383,7 @@ export function AppRepositoriesPage(): JSX.Element {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="repo-license">{t("Add license")}</Label>
             <Select value={licenseTemplate} onValueChange={setLicenseTemplate}>
               <SelectTrigger id="repo-license">

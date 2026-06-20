@@ -90,9 +90,9 @@ export const RepositoryDetailPage = (): JSX.Element => {
   };
 
   return (
-    <div className="space-y-4 page-enter">
+    <div className="flex flex-col gap-4 page-enter">
       <div className="text-sm text-muted-foreground">
-        <Link to="/app/projects" className="underline underline-offset-4">
+        <Link to="/app/projects" className="font-medium text-foreground underline-offset-4 hover:underline">
           {t("My Projects")}
         </Link>
       </div>

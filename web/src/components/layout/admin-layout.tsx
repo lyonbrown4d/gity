@@ -23,15 +23,18 @@ export function AdminLayout(): JSX.Element {
     : adminMenus;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_10%_0%,hsl(35_58%_90%),transparent_40%),radial-gradient(circle_at_100%_100%,hsl(160_22%_90%),transparent_35%)]">
+    <div className="min-h-screen bg-background">
+      <a href="#admin-main-content" className="skip-link">
+        {t("Skip to main content")}
+      </a>
       <div className="mx-auto flex min-h-screen max-w-[1400px]">
-        <aside className="w-72 border-r bg-background/90 backdrop-blur">
+        <aside className="hidden w-72 border-r bg-sidebar text-sidebar-foreground lg:block">
           <div className="p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t("Refine Admin")}</p>
+            <p className="text-xs font-semibold uppercase text-sidebar-foreground/65">{t("Refine Admin")}</p>
             <h1 className="mt-2 text-2xl font-semibold">{t("Gity Console")}</h1>
           </div>
           <Separator />
-          <nav className="space-y-1 p-4">
+          <nav className="flex flex-col gap-1 p-4">
             {menuItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -40,7 +43,7 @@ export function AdminLayout(): JSX.Element {
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    isActive ? "bg-primary text-primary-foreground" : "hover:bg-accent",
+                    isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   )
                 }
               >
@@ -50,13 +53,23 @@ export function AdminLayout(): JSX.Element {
             ))}
           </nav>
         </aside>
-        <main className="flex-1">
-          <header className="flex items-center justify-between border-b bg-background/80 px-8 py-4 backdrop-blur">
+        <main id="admin-main-content" className="flex-1">
+          <header className="flex flex-col gap-4 border-b bg-background/85 px-4 py-4 backdrop-blur md:px-8 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t("Admin Side")}</p>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">{t("Admin Side")}</p>
               <p className="text-sm text-muted-foreground">{t("Refine-driven routing and auth flow")}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <nav className="flex gap-2 overflow-x-auto lg:hidden">
+              {menuItems.map((item) => (
+                <Button key={item.to} variant="outline" size="sm" asChild>
+                  <NavLink to={item.to} end={item.to === "/admin"}>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </NavLink>
+                </Button>
+              ))}
+            </nav>
+            <div className="flex flex-wrap items-center gap-3">
               <ViewControls compact />
               <div className="flex items-center gap-2 rounded-md border px-3 py-2">
                 <UserCircle2 className="h-4 w-4 text-muted-foreground" />
@@ -74,7 +87,7 @@ export function AdminLayout(): JSX.Element {
               </Button>
             </div>
           </header>
-          <div className="p-8 page-enter">
+          <div className="p-4 md:p-8 page-enter">
             <Outlet />
           </div>
         </main>

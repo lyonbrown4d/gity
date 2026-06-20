@@ -4,74 +4,74 @@
 
 @layer base {
   :root {
-    --background: 40 37% 96%;
-    --foreground: 220 38% 9%;
-    --card: 42 44% 98%;
-    --card-foreground: 220 38% 9%;
-    --popover: 42 44% 98%;
-    --popover-foreground: 220 38% 9%;
-    --primary: 155 62% 21%;
-    --primary-foreground: 42 52% 96%;
-    --secondary: 38 42% 88%;
-    --secondary-foreground: 220 32% 13%;
-    --muted: 39 30% 90%;
-    --muted-foreground: 220 13% 39%;
-    --accent: 172 42% 88%;
-    --accent-foreground: 178 50% 14%;
+    --background: 210 20% 98%;
+    --foreground: 222 35% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 35% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 35% 10%;
+    --primary: 214 74% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 24% 92%;
+    --secondary-foreground: 222 35% 12%;
+    --muted: 214 22% 94%;
+    --muted-foreground: 218 13% 38%;
+    --accent: 197 38% 91%;
+    --accent-foreground: 203 63% 19%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 37 22% 78%;
-    --input: 37 22% 78%;
-    --ring: 158 78% 31%;
-    --chart-1: 155 62% 35%;
-    --chart-2: 190 71% 35%;
-    --chart-3: 36 95% 53%;
-    --chart-4: 17 82% 58%;
-    --chart-5: 222 35% 24%;
-    --radius: 0.95rem;
-    --sidebar-background: 220 34% 12%;
-    --sidebar-foreground: 42 42% 92%;
-    --sidebar-primary: 158 70% 43%;
-    --sidebar-primary-foreground: 220 38% 9%;
-    --sidebar-accent: 219 28% 19%;
-    --sidebar-accent-foreground: 42 42% 94%;
-    --sidebar-border: 218 23% 24%;
-    --sidebar-ring: 158 70% 43%;
+    --border: 214 20% 84%;
+    --input: 214 20% 84%;
+    --ring: 214 74% 32%;
+    --chart-1: 214 74% 38%;
+    --chart-2: 160 65% 35%;
+    --chart-3: 37 92% 50%;
+    --chart-4: 0 72% 52%;
+    --chart-5: 222 30% 32%;
+    --radius: 0.5rem;
+    --sidebar-background: 222 26% 10%;
+    --sidebar-foreground: 214 32% 92%;
+    --sidebar-primary: 160 70% 42%;
+    --sidebar-primary-foreground: 222 35% 10%;
+    --sidebar-accent: 222 22% 16%;
+    --sidebar-accent-foreground: 214 32% 96%;
+    --sidebar-border: 222 18% 22%;
+    --sidebar-ring: 160 70% 42%;
   }
 
   .dark {
-    --background: 220 38% 7%;
-    --foreground: 42 38% 94%;
-    --card: 220 31% 10%;
-    --card-foreground: 42 38% 94%;
-    --popover: 220 31% 10%;
-    --popover-foreground: 42 38% 94%;
-    --primary: 38 96% 62%;
-    --primary-foreground: 220 38% 7%;
-    --secondary: 219 27% 16%;
-    --secondary-foreground: 42 38% 94%;
-    --muted: 219 24% 15%;
-    --muted-foreground: 218 13% 70%;
-    --accent: 176 43% 17%;
-    --accent-foreground: 172 67% 86%;
+    --background: 222 30% 7%;
+    --foreground: 214 32% 94%;
+    --card: 222 24% 10%;
+    --card-foreground: 214 32% 94%;
+    --popover: 222 24% 10%;
+    --popover-foreground: 214 32% 94%;
+    --primary: 207 90% 66%;
+    --primary-foreground: 222 30% 7%;
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 214 32% 94%;
+    --muted: 222 18% 15%;
+    --muted-foreground: 216 14% 70%;
+    --accent: 197 42% 18%;
+    --accent-foreground: 197 80% 86%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 219 20% 23%;
-    --input: 219 20% 23%;
-    --ring: 38 96% 62%;
-    --chart-1: 38 96% 62%;
-    --chart-2: 169 74% 45%;
-    --chart-3: 199 84% 58%;
-    --chart-4: 17 82% 58%;
-    --chart-5: 258 61% 72%;
-    --sidebar-background: 220 39% 7%;
-    --sidebar-foreground: 42 38% 94%;
-    --sidebar-primary: 38 96% 62%;
-    --sidebar-primary-foreground: 220 38% 7%;
-    --sidebar-accent: 219 27% 16%;
-    --sidebar-accent-foreground: 42 38% 94%;
-    --sidebar-border: 219 20% 23%;
-    --sidebar-ring: 38 96% 62%;
+    --border: 222 18% 24%;
+    --input: 222 18% 24%;
+    --ring: 207 90% 66%;
+    --chart-1: 207 90% 66%;
+    --chart-2: 160 70% 45%;
+    --chart-3: 37 92% 58%;
+    --chart-4: 0 72% 62%;
+    --chart-5: 214 32% 74%;
+    --sidebar-background: 222 30% 7%;
+    --sidebar-foreground: 214 32% 94%;
+    --sidebar-primary: 207 90% 66%;
+    --sidebar-primary-foreground: 222 30% 7%;
+    --sidebar-accent: 222 20% 15%;
+    --sidebar-accent-foreground: 214 32% 94%;
+    --sidebar-border: 222 18% 24%;
+    --sidebar-ring: 207 90% 66%;
   }
 }
 
@@ -84,20 +84,16 @@
     @apply bg-background text-foreground;
     min-height: 100vh;
     overflow-x: hidden;
-    font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", "Aptos", "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
     background:
-      radial-gradient(circle at 12% 0%, hsl(158 70% 82% / 0.42), transparent 30rem),
-      radial-gradient(circle at 86% 8%, hsl(37 96% 72% / 0.36), transparent 28rem),
-      radial-gradient(circle at 50% 100%, hsl(195 65% 82% / 0.28), transparent 30rem),
+      linear-gradient(180deg, hsl(214 38% 96% / 0.9), hsl(var(--background)) 18rem),
       hsl(var(--background));
     transition: background-color 240ms ease, color 240ms ease;
   }
 
   .dark body {
     background:
-      radial-gradient(circle at 12% 0%, hsl(168 76% 32% / 0.22), transparent 30rem),
-      radial-gradient(circle at 86% 8%, hsl(38 96% 52% / 0.18), transparent 28rem),
-      radial-gradient(circle at 50% 100%, hsl(199 88% 34% / 0.16), transparent 30rem),
+      linear-gradient(180deg, hsl(222 24% 11% / 0.9), hsl(var(--background)) 18rem),
       hsl(var(--background));
   }
 
@@ -127,12 +123,11 @@
   }
 
   .card-enter {
-    @apply animate-in fade-in slide-in-from-bottom-1 duration-300 transition-transform duration-200 ease-out;
+    @apply animate-in fade-in slide-in-from-bottom-1 duration-300 transition-colors ease-out;
   }
 
   .card-enter:hover {
-    @apply shadow-md;
-    transform: translateY(-2px);
+    @apply border-primary/30 shadow-sm;
   }
 
   .gity-shell {
@@ -140,11 +135,11 @@
   }
 
   .gity-panel {
-    @apply rounded-2xl border border-border/70 bg-card/85 shadow-[0_24px_90px_-60px_hsl(var(--foreground)/0.55)] backdrop-blur-xl;
+    @apply rounded-lg border border-border/80 bg-card shadow-sm;
   }
 
   .gity-hero {
-    @apply relative overflow-hidden rounded-[1.75rem] border border-border/70 bg-card/80 shadow-[0_35px_120px_-70px_hsl(var(--foreground)/0.7)] backdrop-blur-xl;
+    @apply relative overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm;
   }
 
   .gity-hero::before {
@@ -152,26 +147,23 @@
     inset: 0;
     pointer-events: none;
     content: "";
-    background:
-      linear-gradient(120deg, hsl(var(--primary) / 0.12), transparent 34%),
-      radial-gradient(circle at 88% 12%, hsl(var(--chart-3) / 0.25), transparent 22rem),
-      radial-gradient(circle at 8% 88%, hsl(var(--chart-2) / 0.14), transparent 20rem);
+    background: linear-gradient(90deg, hsl(var(--primary) / 0.08), transparent 48%);
   }
 
   .gity-eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground;
+    @apply text-xs font-semibold uppercase text-muted-foreground;
   }
 
   .gity-hero-title {
-    @apply text-3xl font-semibold tracking-[-0.04em] text-foreground md:text-5xl;
+    @apply text-3xl font-semibold text-foreground md:text-4xl;
   }
 
   .gity-metric-card {
-    @apply rounded-2xl border border-border/70 bg-card/75 p-5 shadow-[0_20px_70px_-55px_hsl(var(--foreground)/0.55)] backdrop-blur-xl transition-transform duration-300 hover:-translate-y-1;
+    @apply rounded-lg border border-border/80 bg-card p-4 shadow-sm transition-colors duration-200;
   }
 
   .gity-code-panel {
-    @apply rounded-2xl border border-border/70 bg-foreground p-4 font-mono text-xs text-background shadow-[0_28px_90px_-60px_hsl(var(--foreground)/0.8)];
+    @apply rounded-lg border border-border/70 bg-foreground p-4 font-mono text-xs text-background shadow-sm;
   }
 
   .gity-dot {
@@ -186,7 +178,11 @@
   }
 
   .action-pop {
-    @apply transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98];
+    @apply cursor-pointer transition-colors duration-200;
+  }
+
+  .skip-link {
+    @apply fixed left-3 top-3 z-50 -translate-y-16 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-transform focus:translate-y-0;
   }
 
   .markdown-body {
