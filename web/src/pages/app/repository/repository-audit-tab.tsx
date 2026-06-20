@@ -38,13 +38,13 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
   });
 
   const events = useMemo(
-    () => resolveAuditEvents(auditQuery.data?.data).map(normalizeAuditEvent),
-    [auditQuery.data?.data],
+    () => resolveAuditEvents(auditQuery.result.data).map(normalizeAuditEvent),
+    [auditQuery.result.data],
   );
-  const isLoading = auditQuery.isFetching && !auditQuery.data;
+  const isLoading = auditQuery.query.isFetching && !auditQuery.query.data;
 
   const loadEvents = async () => {
-    const result = await auditQuery.refetch();
+    const result = await auditQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -53,11 +53,11 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
   };
 
   useEffect(() => {
-    if (!auditQuery.error) {
+    if (!auditQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(auditQuery.error));
-  }, [auditQuery.error, onError]);
+    onError(extractErrorMessage(auditQuery.query.error));
+  }, [auditQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">

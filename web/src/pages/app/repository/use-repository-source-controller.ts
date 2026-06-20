@@ -34,7 +34,7 @@ export const useRepositorySourceController = ({
   refreshCommits,
 }: UseRepositorySourceControllerArgs) => {
   const dataProvider = useDataProvider();
-  const { mutateAsync: createFileCommit, isLoading: isCreatingFile } = useCustomMutation();
+  const { mutateAsync: createFileCommit, mutation: { isPending: isCreatingFile } } = useCustomMutation();
   const [codeBranch, setCodeBranch] = useState("");
   const [treeNodes, setTreeNodes] = useState<RepositoryTreeNode[]>([]);
   const [selectedBlob, setSelectedBlob] = useState<RepositoryBlobView | null>(null);

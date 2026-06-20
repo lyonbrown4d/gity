@@ -89,7 +89,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       refetchOnWindowFocus: false,
     },
   });
-  const issue = issueQuery.data?.data ?? null;
+  const issue = issueQuery.result.data ?? null;
   const commentsQuery = useCustom<RepositoryIssueCommentView[]>({
     url: issue?.number ? `/projects/${repoId}/issues/${issue.number}/comments` : `/projects/${repoId}/issues/0/comments`,
     method: "get",
@@ -123,33 +123,33 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       refetchOnWindowFocus: false,
     },
   });
-  const comments = commentsQuery.data?.data ?? [];
+  const comments = commentsQuery.result.data ?? [];
   const assignees = useMemo(
-    () => resolveIssueAssignees(assigneesQuery.data?.data).map(normalizeIssueAssignee),
-    [assigneesQuery.data?.data],
+    () => resolveIssueAssignees(assigneesQuery.result.data).map(normalizeIssueAssignee),
+    [assigneesQuery.result.data],
   );
   const labels = useMemo(
-    () => resolveIssueLabels(labelsQuery.data?.data).map(normalizeIssueLabel),
-    [labelsQuery.data?.data],
+    () => resolveIssueLabels(labelsQuery.result.data).map(normalizeIssueLabel),
+    [labelsQuery.result.data],
   );
-  const users = usersQuery.data?.data ?? [];
+  const users = usersQuery.result.data ?? [];
   const userByID = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
     [users],
   );
-  const isLoadingIssue = issueQuery.isFetching && !issueQuery.data;
-  const isLoadingComments = commentsQuery.isFetching && !commentsQuery.data;
-  const isLoadingCollaboration = assigneesQuery.isFetching || labelsQuery.isFetching || usersQuery.isFetching;
+  const isLoadingIssue = issueQuery.query.isFetching && !issueQuery.query.data;
+  const isLoadingComments = commentsQuery.query.isFetching && !commentsQuery.query.data;
+  const isLoadingCollaboration = assigneesQuery.query.isFetching || labelsQuery.query.isFetching || usersQuery.query.isFetching;
   const repositoryPermissions = useMemo(
-    () => buildRepositoryPermissions(null, false, permissionsQuery.data?.data),
-    [permissionsQuery.data?.data],
+    () => buildRepositoryPermissions(null, false, permissionsQuery.result.data),
+    [permissionsQuery.result.data],
   );
   const canWriteIssue = repositoryPermissions.issueWrite;
   const canCommentIssue = repositoryPermissions.issueComment;
-  const { mutateAsync: updateIssueStatus, isLoading: isUpdatingIssue } = useCustomMutation<RepositoryIssueView>();
-  const { mutateAsync: createIssueComment, isLoading: isCreatingComment } = useCustomMutation<RepositoryIssueCommentView>();
-  const { mutateAsync: setIssueAssignees, isLoading: isUpdatingAssignees } = useCustomMutation<RawRecord[]>();
-  const { mutateAsync: setIssueLabels, isLoading: isUpdatingLabels } = useCustomMutation<RawRecord[]>();
+  const { mutateAsync: updateIssueStatus, mutation: { isPending: isUpdatingIssue } } = useCustomMutation<RepositoryIssueView>();
+  const { mutateAsync: createIssueComment, mutation: { isPending: isCreatingComment } } = useCustomMutation<RepositoryIssueCommentView>();
+  const { mutateAsync: setIssueAssignees, mutation: { isPending: isUpdatingAssignees } } = useCustomMutation<RawRecord[]>();
+  const { mutateAsync: setIssueLabels, mutation: { isPending: isUpdatingLabels } } = useCustomMutation<RawRecord[]>();
   const [newComment, setNewComment] = useState("");
   const [assigneeDraftUserID, setAssigneeDraftUserID] = useState("");
   const [labelDraftName, setLabelDraftName] = useState("");
@@ -161,7 +161,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       setActionError(t("Invalid issue number"));
       return;
     }
-    const result = await issueQuery.refetch();
+    const result = await issueQuery.query.refetch();
     if (result.error) {
       setActionError(extractErrorMessage(result.error));
       return;
@@ -173,7 +173,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
     if (!issue?.number) {
       return;
     }
-    const result = await commentsQuery.refetch();
+    const result = await commentsQuery.query.refetch();
     if (result.error) {
       setActionError(extractErrorMessage(result.error));
       return;
@@ -185,7 +185,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
     if (!issue?.number) {
       return;
     }
-    const [assigneeResult, labelResult] = await Promise.all([assigneesQuery.refetch(), labelsQuery.refetch()]);
+    const [assigneeResult, labelResult] = await Promise.all([assigneesQuery.query.refetch(), labelsQuery.query.refetch()]);
     const error = assigneeResult.error ?? labelResult.error;
     if (error) {
       setActionError(extractErrorMessage(error));
@@ -305,32 +305,32 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   }, [repoId, issueNumber, isIssueNumberValid, t]);
 
   useEffect(() => {
-    if (!issueQuery.error) {
+    if (!issueQuery.query.error) {
       return;
     }
-    setActionError(extractErrorMessage(issueQuery.error));
-  }, [issueQuery.error]);
+    setActionError(extractErrorMessage(issueQuery.query.error));
+  }, [issueQuery.query.error]);
 
   useEffect(() => {
-    if (!commentsQuery.error) {
+    if (!commentsQuery.query.error) {
       return;
     }
-    setActionError(extractErrorMessage(commentsQuery.error));
-  }, [commentsQuery.error]);
+    setActionError(extractErrorMessage(commentsQuery.query.error));
+  }, [commentsQuery.query.error]);
 
   useEffect(() => {
-    if (!assigneesQuery.error) {
+    if (!assigneesQuery.query.error) {
       return;
     }
-    setActionError(extractErrorMessage(assigneesQuery.error));
-  }, [assigneesQuery.error]);
+    setActionError(extractErrorMessage(assigneesQuery.query.error));
+  }, [assigneesQuery.query.error]);
 
   useEffect(() => {
-    if (!labelsQuery.error) {
+    if (!labelsQuery.query.error) {
       return;
     }
-    setActionError(extractErrorMessage(labelsQuery.error));
-  }, [labelsQuery.error]);
+    setActionError(extractErrorMessage(labelsQuery.query.error));
+  }, [labelsQuery.query.error]);
 
   return (
     <div className="space-y-4 page-enter">

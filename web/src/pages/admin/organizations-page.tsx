@@ -30,16 +30,16 @@ export function AdminOrganizationsPage(): JSX.Element {
   const [memberUserId, setMemberUserId] = useState("");
   const [memberRole, setMemberRole] = useState("member");
 
-  const { mutate: createOrganization, isLoading: isCreatingOrg } = useCreate<OrganizationView>();
-  const { mutate: updateOrganization, isLoading: isUpdatingOrg } = useUpdate<OrganizationView>();
-  const { mutate: deleteOrganization, isLoading: isDeletingOrg } = useDelete<OrganizationView>();
-  const { mutate: addOrganizationMember, isLoading: isAddingMember } =
+  const { mutate: createOrganization, mutation: { isPending: isCreatingOrg } } = useCreate<OrganizationView>();
+  const { mutate: updateOrganization, mutation: { isPending: isUpdatingOrg } } = useUpdate<OrganizationView>();
+  const { mutate: deleteOrganization, mutation: { isPending: isDeletingOrg } } = useDelete<OrganizationView>();
+  const { mutate: addOrganizationMember, mutation: { isPending: isAddingMember } } =
     useCreate<OrganizationMemberView>();
 
   const orgQuery = useList<OrganizationView>({
     resource: "organizations",
   });
-  const orgs = orgQuery.data?.data ?? [];
+  const orgs = orgQuery.result.data ?? [];
 
   useEffect(() => {
     if (!selectedOrg && orgs[0]) {
@@ -61,7 +61,7 @@ export function AdminOrganizationsPage(): JSX.Element {
       enabled: Boolean(selectedOrg),
     },
   });
-  const members = membersQuery.data?.data ?? [];
+  const members = membersQuery.result.data ?? [];
 
   const reposQuery = useList<RepositoryView>({
     resource: "projects",
@@ -72,16 +72,16 @@ export function AdminOrganizationsPage(): JSX.Element {
       enabled: Boolean(selectedOrg),
     },
   });
-  const repos = reposQuery.data?.data ?? [];
+  const repos = reposQuery.result.data ?? [];
 
-  const isLoading = orgQuery.isLoading || membersQuery.isLoading || reposQuery.isLoading;
+  const isLoading = orgQuery.query.isLoading || membersQuery.query.isLoading || reposQuery.query.isLoading;
   const errorMessage = actionError
-    ?? (orgQuery.error instanceof Error
-      ? orgQuery.error.message
-      : membersQuery.error instanceof Error
-        ? membersQuery.error.message
-        : reposQuery.error instanceof Error
-          ? reposQuery.error.message
+    ?? (orgQuery.query.error instanceof Error
+      ? orgQuery.query.error.message
+      : membersQuery.query.error instanceof Error
+        ? membersQuery.query.error.message
+        : reposQuery.query.error instanceof Error
+          ? reposQuery.query.error.message
           : null);
 
   const closeCreateModal = () => {
@@ -126,7 +126,7 @@ export function AdminOrganizationsPage(): JSX.Element {
       {
         onSuccess: async (result) => {
           closeCreateModal();
-          await orgQuery.refetch();
+          await orgQuery.query.refetch();
           if (result.data?.id) {
             setSelectedOrg(String(result.data.id));
           }
@@ -158,7 +158,7 @@ export function AdminOrganizationsPage(): JSX.Element {
       {
         onSuccess: async () => {
           closeEditModal();
-          await orgQuery.refetch();
+          await orgQuery.query.refetch();
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to update organization"));
@@ -180,11 +180,11 @@ export function AdminOrganizationsPage(): JSX.Element {
       },
       {
         onSuccess: async () => {
-          const refreshed = await orgQuery.refetch();
+          const refreshed = await orgQuery.query.refetch();
           const next = refreshed.data?.data.find((org) => org.id !== selectedOrgModel.id);
           setSelectedOrg(next?.id ?? "");
-          await membersQuery.refetch();
-          await reposQuery.refetch();
+          await membersQuery.query.refetch();
+          await reposQuery.query.refetch();
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to delete organization"));
@@ -213,7 +213,7 @@ export function AdminOrganizationsPage(): JSX.Element {
       {
         onSuccess: async () => {
           closeMemberModal();
-          await membersQuery.refetch();
+          await membersQuery.query.refetch();
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to add member"));

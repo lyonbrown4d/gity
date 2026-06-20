@@ -40,7 +40,7 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync, isLoading } = useCustomMutation<RawRecord>();
+  const { mutateAsync, mutation: { isPending: isLoading } } = useCustomMutation<RawRecord>();
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isLinkComposerOpen, setLinkComposerOpen] = useState(false);
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null);
@@ -54,12 +54,12 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   const [linkType, setLinkType] = useState("package");
 
   const releases = useMemo(
-    () => resolveReleaseList(releasesQuery.data?.data).map(normalizeReleaseDetail),
-    [releasesQuery.data?.data],
+    () => resolveReleaseList(releasesQuery.result.data).map(normalizeReleaseDetail),
+    [releasesQuery.result.data],
   );
   const tags = useMemo(
-    () => resolveTagList(tagsQuery.data?.data).map(normalizeTag),
-    [tagsQuery.data?.data],
+    () => resolveTagList(tagsQuery.result.data).map(normalizeTag),
+    [tagsQuery.result.data],
   );
   const selectedRelease = useMemo(
     () => releases.find((item) => item.release.id === selectedReleaseId) ?? releases[0] ?? null,
@@ -67,11 +67,11 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   );
   const linkCount = releases.reduce((total, item) => total + item.links.length, 0);
   const canAdminReleases = permissions.repositoryAdmin;
-  const isLoadingReleases = releasesQuery.isFetching && !releasesQuery.data;
-  const isLoadingTags = tagsQuery.isFetching && !tagsQuery.data;
+  const isLoadingReleases = releasesQuery.query.isFetching && !releasesQuery.query.data;
+  const isLoadingTags = tagsQuery.query.isFetching && !tagsQuery.query.data;
 
   const reload = async () => {
-    const [releaseResult, tagResult] = await Promise.all([releasesQuery.refetch(), tagsQuery.refetch()]);
+    const [releaseResult, tagResult] = await Promise.all([releasesQuery.query.refetch(), tagsQuery.query.refetch()]);
     const error = releaseResult.error ?? tagResult.error;
     onError(error ? extractErrorMessage(error) : null);
   };
@@ -179,11 +179,11 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   };
 
   useEffect(() => {
-    if (!releasesQuery.error && !tagsQuery.error) {
+    if (!releasesQuery.query.error && !tagsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(releasesQuery.error ?? tagsQuery.error));
-  }, [onError, releasesQuery.error, tagsQuery.error]);
+    onError(extractErrorMessage(releasesQuery.query.error ?? tagsQuery.query.error));
+  }, [onError, releasesQuery.query.error, tagsQuery.query.error]);
 
   useEffect(() => {
     if (selectedReleaseId && releases.some((item) => item.release.id === selectedReleaseId)) {

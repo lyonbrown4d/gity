@@ -93,13 +93,13 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: cancelPipeline, isLoading: isCancelling } = useCustomMutation<RawRecord>();
-  const { mutateAsync: retryPipeline, isLoading: isRetrying } = useCustomMutation<RawRecord>();
-  const { mutateAsync: refreshPipeline, isLoading: isRefreshingPipeline } = useCustomMutation<RawRecord>();
-  const { mutateAsync: createPipeline, isLoading: isCreatingPipeline } = useCustomMutation<RawRecord>();
-  const { mutateAsync: lintPipeline, isLoading: isLintingPipeline } = useCustomMutation<RawRecord>();
-  const { mutateAsync: cancelJob, isLoading: isCancellingJob } = useCustomMutation<RawRecord>();
-  const { mutateAsync: retryJob, isLoading: isRetryingJob } = useCustomMutation<RawRecord>();
+  const { mutateAsync: cancelPipeline, mutation: { isPending: isCancelling } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: retryPipeline, mutation: { isPending: isRetrying } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: refreshPipeline, mutation: { isPending: isRefreshingPipeline } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createPipeline, mutation: { isPending: isCreatingPipeline } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: lintPipeline, mutation: { isPending: isLintingPipeline } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: cancelJob, mutation: { isPending: isCancellingJob } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: retryJob, mutation: { isPending: isRetryingJob } } = useCustomMutation<RawRecord>();
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [pipelineSource, setPipelineSource] = useState("web");
   const [pipelineRefName, setPipelineRefName] = useState(defaultBranch || "main");
@@ -111,16 +111,16 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
   const canMutateJobs = permissions.jobWrite;
 
   const pipelines = useMemo(
-    () => resolvePipelineList(pipelinesQuery.data?.data).map(normalizePipeline).sort((a, b) => b.iid - a.iid),
-    [pipelinesQuery.data?.data],
+    () => resolvePipelineList(pipelinesQuery.result.data).map(normalizePipeline).sort((a, b) => b.iid - a.iid),
+    [pipelinesQuery.result.data],
   );
   const selectedPipeline = useMemo(
     () => pipelines.find((item) => item.id === selectedPipelineID) ?? pipelines[0] ?? null,
     [pipelines, selectedPipelineID],
   );
   const detail = useMemo(
-    () => normalizePipelineDetail(detailQuery.data?.data),
-    [detailQuery.data?.data],
+    () => normalizePipelineDetail(detailQuery.result.data),
+    [detailQuery.result.data],
   );
   const visibleDetail = detail?.pipeline.id === selectedPipelineID ? detail : null;
   const pipelineJobs = visibleDetail?.jobs ?? emptyPipelineJobs;
@@ -130,12 +130,12 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
     [pipelineJobs, selectedJobID],
   );
   const trace = useMemo(
-    () => normalizeJobTrace(traceQuery.data?.data),
-    [traceQuery.data?.data],
+    () => normalizeJobTrace(traceQuery.result.data),
+    [traceQuery.result.data],
   );
   const artifacts = useMemo(
-    () => resolveArtifactList(artifactsQuery.data?.data).map(normalizeArtifact),
-    [artifactsQuery.data?.data],
+    () => resolveArtifactList(artifactsQuery.result.data).map(normalizeArtifact),
+    [artifactsQuery.result.data],
   );
   const stats = useMemo(
     () => ({
@@ -146,10 +146,10 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
     }),
     [pipelines],
   );
-  const isLoadingPipelines = pipelinesQuery.isFetching && !pipelinesQuery.data;
+  const isLoadingPipelines = pipelinesQuery.query.isFetching && !pipelinesQuery.query.data;
 
   const loadPipelines = async () => {
-    const result = await pipelinesQuery.refetch();
+    const result = await pipelinesQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -161,7 +161,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
     if (!selectedPipelineID) {
       return;
     }
-    const result = await detailQuery.refetch();
+    const result = await detailQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -173,7 +173,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
     if (!selectedJobID) {
       return;
     }
-    const [traceResult, artifactsResult] = await Promise.all([traceQuery.refetch(), artifactsQuery.refetch()]);
+    const [traceResult, artifactsResult] = await Promise.all([traceQuery.query.refetch(), artifactsQuery.query.refetch()]);
     if (traceResult.error) {
       onError(extractErrorMessage(traceResult.error));
       return;
@@ -392,18 +392,18 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
   }, [pipelineJobs, selectedJobID]);
 
   useEffect(() => {
-    if (!pipelinesQuery.error) {
+    if (!pipelinesQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(pipelinesQuery.error));
-  }, [pipelinesQuery.error, onError]);
+    onError(extractErrorMessage(pipelinesQuery.query.error));
+  }, [pipelinesQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!detailQuery.error) {
+    if (!detailQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(detailQuery.error));
-  }, [detailQuery.error, onError]);
+    onError(extractErrorMessage(detailQuery.query.error));
+  }, [detailQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -623,10 +623,10 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t("Pipeline jobs")}</p>
-                  {detailQuery.isFetching ? (
+                  {detailQuery.query.isFetching ? (
                     <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading jobs...")}</p>
                   ) : null}
-                  {!detailQuery.isFetching && pipelineJobs.length === 0 ? (
+                  {!detailQuery.query.isFetching && pipelineJobs.length === 0 ? (
                     <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No pipeline jobs found.")}</p>
                   ) : null}
                   {pipelineJobs.map((job) => (
@@ -650,8 +650,8 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                     item={selectedJob}
                     trace={trace}
                     artifacts={artifacts}
-                    loadingTrace={traceQuery.isFetching}
-                    loadingArtifacts={artifactsQuery.isFetching}
+                    loadingTrace={traceQuery.query.isFetching}
+                    loadingArtifacts={artifactsQuery.query.isFetching}
                     t={t}
                     onReload={() => void loadJobDetail()}
                     onDownloadArtifact={(artifact) => void downloadArtifact(artifact)}

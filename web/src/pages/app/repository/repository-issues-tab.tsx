@@ -44,8 +44,8 @@ export const RepositoryIssuesTab = ({
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: createIssue, isLoading: isCreatingIssue } = useCustomMutation<RepositoryIssueView>();
-  const issues = issuesQuery.data?.data ?? [];
+  const { mutateAsync: createIssue, mutation: { isPending: isCreatingIssue } } = useCustomMutation<RepositoryIssueView>();
+  const issues = issuesQuery.result.data ?? [];
   const [issueStatusFilter, setIssueStatusFilter] = useState<"open" | "closed" | "all">("open");
   const [issueSearchQuery, setIssueSearchQuery] = useState("");
   const [issueSort, setIssueSort] = useState<IssueSortMode>("updated_desc");
@@ -66,12 +66,12 @@ export const RepositoryIssuesTab = ({
     () => filterAndSortIssues(issues, issueStatusFilter, issueSearchQuery, issueSort),
     [issues, issueStatusFilter, issueSearchQuery, issueSort],
   );
-  const isLoadingIssues = issuesQuery.isFetching && !issuesQuery.data;
+  const isLoadingIssues = issuesQuery.query.isFetching && !issuesQuery.query.data;
   const { mutateAsync: setIssueAssignees } = useCustomMutation<RepositoryIssueView>();
   const canCreateIssue = permissions.issueCreate;
 
   const loadIssues = async () => {
-    const result = await issuesQuery.refetch();
+    const result = await issuesQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -126,11 +126,11 @@ export const RepositoryIssuesTab = ({
   }, [repoId, onError]);
 
   useEffect(() => {
-    if (!issuesQuery.error) {
+    if (!issuesQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(issuesQuery.error));
-  }, [issuesQuery.error, onError]);
+    onError(extractErrorMessage(issuesQuery.query.error));
+  }, [issuesQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">

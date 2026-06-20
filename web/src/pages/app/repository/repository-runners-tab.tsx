@@ -32,22 +32,22 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: registerRunner, isLoading: isRegistering } = useCustomMutation<RawRunner>();
-  const { mutateAsync: deleteRunner, isLoading: isDeleting } = useCustomMutation<RawRunner>();
+  const { mutateAsync: registerRunner, mutation: { isPending: isRegistering } } = useCustomMutation<RawRunner>();
+  const { mutateAsync: deleteRunner, mutation: { isPending: isDeleting } } = useCustomMutation<RawRunner>();
   const runners = useMemo(
-    () => resolveRunnerList(runnersQuery.data?.data).map(normalizeRunner),
-    [runnersQuery.data?.data],
+    () => resolveRunnerList(runnersQuery.result.data).map(normalizeRunner),
+    [runnersQuery.result.data],
   );
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("linux,go");
   const [lastToken, setLastToken] = useState<string | null>(null);
-  const isLoadingRunners = runnersQuery.isFetching && !runnersQuery.data;
+  const isLoadingRunners = runnersQuery.query.isFetching && !runnersQuery.query.data;
   const canAdminRunners = permissions.runnerAdmin;
 
   const loadRunners = async () => {
-    const result = await runnersQuery.refetch();
+    const result = await runnersQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -108,11 +108,11 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
   }, [repoId, onError]);
 
   useEffect(() => {
-    if (!runnersQuery.error) {
+    if (!runnersQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(runnersQuery.error));
-  }, [runnersQuery.error, onError]);
+    onError(extractErrorMessage(runnersQuery.query.error));
+  }, [runnersQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">

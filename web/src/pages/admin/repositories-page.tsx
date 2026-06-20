@@ -15,12 +15,12 @@ export function AdminRepositoriesPage(): JSX.Element {
   const [selectedOrg, setSelectedOrg] = useState<string>("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
+  const { mutate: deleteRepository, mutation: { isPending: isDeleting } } = useDelete<RepositoryView>();
 
   const orgQuery = useList<OrganizationView>({
     resource: "organizations",
   });
-  const orgs = orgQuery.data?.data ?? [];
+  const orgs = orgQuery.result.data ?? [];
 
   useEffect(() => {
     if (!selectedOrg && orgs[0]) {
@@ -37,18 +37,18 @@ export function AdminRepositoriesPage(): JSX.Element {
       enabled: Boolean(selectedOrg),
     },
   });
-  const repos = repoQuery.data?.data ?? [];
+  const repos = repoQuery.result.data ?? [];
 
   const selectedOrgName = useMemo(
     () => orgs.find((item) => item.id === selectedOrg)?.name ?? t("N/A"),
     [orgs, selectedOrg, t],
   );
-  const isLoading = orgQuery.isLoading || repoQuery.isLoading;
+  const isLoading = orgQuery.query.isLoading || repoQuery.query.isLoading;
   const errorMessage = actionError
-    ?? (orgQuery.error instanceof Error
-      ? orgQuery.error.message
-      : repoQuery.error instanceof Error
-        ? repoQuery.error.message
+    ?? (orgQuery.query.error instanceof Error
+      ? orgQuery.query.error.message
+      : repoQuery.query.error instanceof Error
+        ? repoQuery.query.error.message
         : null);
 
   const submitDelete = (repo: RepositoryView, confirmation: string) => {
@@ -61,7 +61,7 @@ export function AdminRepositoriesPage(): JSX.Element {
       },
       {
         onSuccess: async () => {
-          await repoQuery.refetch();
+          await repoQuery.query.refetch();
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to delete project"));

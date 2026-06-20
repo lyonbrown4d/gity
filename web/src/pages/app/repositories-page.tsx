@@ -29,13 +29,13 @@ export function AppRepositoriesPage(): JSX.Element {
   const [licenseTemplate, setLicenseTemplate] = useState("none");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { mutate: createRepository, isLoading: isCreating } = useCreate<RepositoryView>();
-  const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
+  const { mutate: createRepository, mutation: { isPending: isCreating } } = useCreate<RepositoryView>();
+  const { mutate: deleteRepository, mutation: { isPending: isDeleting } } = useDelete<RepositoryView>();
 
   const orgQuery = useList<OrganizationView>({
     resource: "organizations",
   });
-  const orgs = orgQuery.data?.data ?? [];
+  const orgs = orgQuery.result.data ?? [];
 
   useEffect(() => {
     if (!selectedOrg && orgs[0]) {
@@ -59,14 +59,14 @@ export function AppRepositoriesPage(): JSX.Element {
     },
   });
 
-  const repos = repoQuery.data?.data ?? [];
+  const repos = repoQuery.result.data ?? [];
   const errorMessage = actionError
-    ?? (orgQuery.error instanceof Error
-      ? orgQuery.error.message
-      : repoQuery.error instanceof Error
-        ? repoQuery.error.message
+    ?? (orgQuery.query.error instanceof Error
+      ? orgQuery.query.error.message
+      : repoQuery.query.error instanceof Error
+        ? repoQuery.query.error.message
         : null);
-  const isLoading = orgQuery.isLoading || repoQuery.isLoading;
+  const isLoading = orgQuery.query.isLoading || repoQuery.query.isLoading;
 
   const submitCreate = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -104,7 +104,7 @@ export function AppRepositoriesPage(): JSX.Element {
           }
           setCreateModalOpen(false);
           if (!ownerChanged) {
-            await repoQuery.refetch();
+            await repoQuery.query.refetch();
           }
         },
         onError: (error) => {
@@ -124,7 +124,7 @@ export function AppRepositoriesPage(): JSX.Element {
       },
       {
         onSuccess: async () => {
-          await repoQuery.refetch();
+          await repoQuery.query.refetch();
         },
         onError: (error) => {
           setActionError(error instanceof Error ? error.message : t("Failed to delete project"));

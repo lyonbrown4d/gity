@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 export function AdminLayout(): JSX.Element {
   const { t } = useI18n();
   const { mutate: logout } = useLogout();
-  const { data: identity } = useGetIdentity<{ name?: string; isSuperAdmin?: boolean }>();
-  const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>();
+  const { data: identity } = useGetIdentity<{ name?: string; isSuperAdmin?: boolean }>({});
+  const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>({});
   const adminMenus = [
     { to: "/admin", label: t("Overview"), icon: Shield },
     { to: "/admin/orgs", label: t("Organizations"), icon: Building2 },

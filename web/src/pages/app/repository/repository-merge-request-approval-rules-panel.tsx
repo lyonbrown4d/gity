@@ -42,9 +42,9 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: createRule, isLoading: isCreating } = useCustomMutation<RawRecord>();
-  const { mutateAsync: updateRule, isLoading: isUpdating } = useCustomMutation<RawRecord>();
-  const { mutateAsync: deleteRule, isLoading: isDeleting } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createRule, mutation: { isPending: isCreating } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: updateRule, mutation: { isPending: isUpdating } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: deleteRule, mutation: { isPending: isDeleting } } = useCustomMutation<RawRecord>();
   const [editingRuleID, setEditingRuleID] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [targetBranch, setTargetBranch] = useState(defaultBranch || "*");
@@ -53,8 +53,8 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
   const [draftUserID, setDraftUserID] = useState("");
   const [codeOwner, setCodeOwner] = useState(false);
   const rules = useMemo(
-    () => resolveApprovalRules(rulesQuery.data?.data).map(normalizeApprovalRule),
-    [rulesQuery.data?.data],
+    () => resolveApprovalRules(rulesQuery.result.data).map(normalizeApprovalRule),
+    [rulesQuery.result.data],
   );
   const userByID = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
   const availableUsers = users.filter((user) => !eligibleUserIDs.includes(user.id));
@@ -62,7 +62,7 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
   const isBusy = isCreating || isUpdating || isDeleting;
 
   const reload = async () => {
-    const result = await rulesQuery.refetch();
+    const result = await rulesQuery.query.refetch();
     onError(result.error ? extractErrorMessage(result.error) : null);
     onRulesChanged?.();
   };
@@ -142,10 +142,10 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
   };
 
   useEffect(() => {
-    if (rulesQuery.error) {
-      onError(extractErrorMessage(rulesQuery.error));
+    if (rulesQuery.query.error) {
+      onError(extractErrorMessage(rulesQuery.query.error));
     }
-  }, [rulesQuery.error, onError]);
+  }, [rulesQuery.query.error, onError]);
 
   return (
     <div className="rounded-md border p-3">
@@ -281,7 +281,7 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
       </form>
 
       <div className="mt-3 space-y-2 rounded-md border p-2">
-        {rulesQuery.isFetching && !rulesQuery.data ? (
+        {rulesQuery.query.isFetching && !rulesQuery.query.data ? (
           <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading approval rules...")}</p>
         ) : null}
         {rules.length === 0 ? (

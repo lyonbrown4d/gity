@@ -30,11 +30,11 @@ export function AdminUsersPage(): JSX.Element {
   const [editRole, setEditRole] = useState<"user" | "super-admin">("user");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { tableQuery, current, setCurrent, pageSize, setPageSize, pageCount } = useTable<UserView>({
+  const { tableQuery, currentPage, setCurrentPage, pageSize, setPageSize, pageCount } = useTable<UserView>({
     resource: "users",
     pagination: {
       mode: "server",
-      current: 1,
+      currentPage: 1,
       pageSize: 20,
     },
     sorters: { mode: "off" },
@@ -46,9 +46,9 @@ export function AdminUsersPage(): JSX.Element {
   const isLoading = tableQuery.isLoading;
   const error = tableQuery.error;
 
-  const { mutate: createUser, isLoading: isCreating } = useCreate<UserView>();
-  const { mutate: updateUser, isLoading: isUpdating } = useUpdate<UserView>();
-  const { mutate: deleteUser, isLoading: isDeleting } = useDelete<UserView>();
+  const { mutate: createUser, mutation: { isPending: isCreating } } = useCreate<UserView>();
+  const { mutate: updateUser, mutation: { isPending: isUpdating } } = useUpdate<UserView>();
+  const { mutate: deleteUser, mutation: { isPending: isDeleting } } = useDelete<UserView>();
 
   const visibleStats = useMemo(() => {
     const superAdminCount = users.filter((user) => user.is_super_admin).length;
@@ -162,14 +162,14 @@ export function AdminUsersPage(): JSX.Element {
   };
 
   const handlePrevPage = () => {
-    if (current > 1) {
-      setCurrent((previous) => Math.max(1, previous - 1));
+    if (currentPage > 1) {
+      setCurrentPage((previous) => Math.max(1, previous - 1));
     }
   };
 
   const handleNextPage = () => {
-    if (current < pageCount) {
-      setCurrent((previous) => Math.min(pageCount, previous + 1));
+    if (currentPage < pageCount) {
+      setCurrentPage((previous) => Math.min(pageCount, previous + 1));
     }
   };
 
@@ -275,7 +275,7 @@ export function AdminUsersPage(): JSX.Element {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              {t("Page")} {current} / {Math.max(pageCount, 1)}
+              {t("Page")} {currentPage} / {Math.max(pageCount, 1)}
             </div>
             <div className="flex items-center gap-2">
               <Label htmlFor="users-page-size" className="text-xs">{t("Page size")}</Label>
@@ -289,10 +289,10 @@ export function AdminUsersPage(): JSX.Element {
                   ))}
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" size="sm" onClick={handlePrevPage} disabled={current <= 1}>
+              <Button type="button" variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage <= 1}>
                 {t("Prev")}
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleNextPage} disabled={current >= pageCount}>
+              <Button type="button" variant="outline" size="sm" onClick={handleNextPage} disabled={currentPage >= pageCount}>
                 {t("Next")}
               </Button>
             </div>

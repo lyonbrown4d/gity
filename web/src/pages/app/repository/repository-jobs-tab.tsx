@@ -33,8 +33,8 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: enqueueJob, isLoading: isEnqueueing } = useCustomMutation<RawProjectJob>();
-  const { mutateAsync: cancelJob, isLoading: isCancelling } = useCustomMutation<RawProjectJob>();
+  const { mutateAsync: enqueueJob, mutation: { isPending: isEnqueueing } } = useCustomMutation<RawProjectJob>();
+  const { mutateAsync: cancelJob, mutation: { isPending: isCancelling } } = useCustomMutation<RawProjectJob>();
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [kind, setKind] = useState("noop");
   const [payload, setPayload] = useState("");
@@ -42,8 +42,8 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
   const canMutateJobs = permissions.jobWrite;
 
   const jobs = useMemo(
-    () => resolveJobList(jobsQuery.data?.data).map(normalizeJob),
-    [jobsQuery.data?.data],
+    () => resolveJobList(jobsQuery.result.data).map(normalizeJob),
+    [jobsQuery.result.data],
   );
   const stats = useMemo(
     () => ({
@@ -54,10 +54,10 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
     }),
     [jobs],
   );
-  const isLoadingJobs = jobsQuery.isFetching && !jobsQuery.data;
+  const isLoadingJobs = jobsQuery.query.isFetching && !jobsQuery.query.data;
 
   const loadJobs = async () => {
-    const result = await jobsQuery.refetch();
+    const result = await jobsQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -117,11 +117,11 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
   }, [repoId, onError]);
 
   useEffect(() => {
-    if (!jobsQuery.error) {
+    if (!jobsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(jobsQuery.error));
-  }, [jobsQuery.error, onError]);
+    onError(extractErrorMessage(jobsQuery.query.error));
+  }, [jobsQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">

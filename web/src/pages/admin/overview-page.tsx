@@ -11,7 +11,7 @@ export function AdminOverviewPage(): JSX.Element {
   const orgQuery = useList<OrganizationView>({
     resource: "organizations",
   });
-  const orgs = orgQuery.data?.data ?? [];
+  const orgs = orgQuery.result.data ?? [];
   const primaryOrgId = orgs[0]?.id;
 
   const repoQuery = useList<RepositoryView>({
@@ -23,12 +23,12 @@ export function AdminOverviewPage(): JSX.Element {
       enabled: Boolean(primaryOrgId),
     },
   });
-  const repos = repoQuery.data?.data ?? [];
-  const isLoading = orgQuery.isLoading || repoQuery.isLoading;
-  const errorMessage = orgQuery.error instanceof Error
-    ? orgQuery.error.message
-    : repoQuery.error instanceof Error
-      ? repoQuery.error.message
+  const repos = repoQuery.result.data ?? [];
+  const isLoading = orgQuery.query.isLoading || repoQuery.query.isLoading;
+  const errorMessage = orgQuery.query.error instanceof Error
+    ? orgQuery.query.error.message
+    : repoQuery.query.error instanceof Error
+      ? repoQuery.query.error.message
       : null;
 
   return (

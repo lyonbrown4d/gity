@@ -50,7 +50,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: uploadPackageFile, isLoading: isUploading } = useCustomMutation<RawPackage>();
+  const { mutateAsync: uploadPackageFile, mutation: { isPending: isUploading } } = useCustomMutation<RawPackage>();
   const [isDownloading, setDownloading] = useState(false);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [packageType, setPackageType] = useState("generic");
@@ -63,24 +63,24 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   const [fileContentBase64, setFileContentBase64] = useState("");
 
   const packages = useMemo(
-    () => resolvePackageList(packagesQuery.data?.data).map(normalizePackage),
-    [packagesQuery.data?.data],
+    () => resolvePackageList(packagesQuery.result.data).map(normalizePackage),
+    [packagesQuery.result.data],
   );
   const selectedPackage = useMemo(
     () => packages.find((item) => item.id === selectedPackageId) ?? packages[0] ?? null,
     [packages, selectedPackageId],
   );
   const packageDetail = useMemo(
-    () => normalizePackageDetail(packageDetailQuery.data?.data),
-    [packageDetailQuery.data?.data],
+    () => normalizePackageDetail(packageDetailQuery.result.data),
+    [packageDetailQuery.result.data],
   );
   const totalFiles = packageDetail?.versions.reduce((total, item) => total + item.files.length, 0) ?? 0;
-  const isLoadingPackages = packagesQuery.isFetching && !packagesQuery.data;
-  const isLoadingDetail = packageDetailQuery.isFetching && !packageDetailQuery.data;
+  const isLoadingPackages = packagesQuery.query.isFetching && !packagesQuery.query.data;
+  const isLoadingDetail = packageDetailQuery.query.isFetching && !packageDetailQuery.query.data;
   const canWritePackages = permissions.packageWrite;
 
   const loadPackages = async () => {
-    const result = await packagesQuery.refetch();
+    const result = await packagesQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -89,7 +89,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   };
 
   const loadSelectedPackage = async () => {
-    const result = await packageDetailQuery.refetch();
+    const result = await packageDetailQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -187,18 +187,18 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   }, [repoId, onError]);
 
   useEffect(() => {
-    if (!packagesQuery.error) {
+    if (!packagesQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(packagesQuery.error));
-  }, [packagesQuery.error, onError]);
+    onError(extractErrorMessage(packagesQuery.query.error));
+  }, [packagesQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!packageDetailQuery.error) {
+    if (!packageDetailQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(packageDetailQuery.error));
-  }, [packageDetailQuery.error, onError]);
+    onError(extractErrorMessage(packageDetailQuery.query.error));
+  }, [packageDetailQuery.query.error, onError]);
 
   useEffect(() => {
     if (packages.length === 0) {

@@ -23,17 +23,17 @@ export function AppDashboardPage(): JSX.Element {
     resource: "my-projects",
   });
 
-  const user = userQuery.data?.data ?? null;
-  const orgs = orgQuery.data?.data ?? [];
-  const repos = repoQuery.data?.data ?? [];
+  const user = userQuery.result ?? null;
+  const orgs = orgQuery.result.data ?? [];
+  const repos = repoQuery.result.data ?? [];
   const recentRepos = repos.slice(0, 5);
-  const isLoading = userQuery.isLoading || orgQuery.isLoading || repoQuery.isLoading;
-  const errorMessage = userQuery.error instanceof Error
-    ? userQuery.error.message
-    : orgQuery.error instanceof Error
-      ? orgQuery.error.message
-      : repoQuery.error instanceof Error
-        ? repoQuery.error.message
+  const isLoading = userQuery.query.isLoading || orgQuery.query.isLoading || repoQuery.query.isLoading;
+  const errorMessage = userQuery.query.error instanceof Error
+    ? userQuery.query.error.message
+    : orgQuery.query.error instanceof Error
+      ? orgQuery.query.error.message
+      : repoQuery.query.error instanceof Error
+        ? repoQuery.query.error.message
         : null;
   const roleLabel = user?.is_super_admin ? t("Super Admin") : t("User");
 

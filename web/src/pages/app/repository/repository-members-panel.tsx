@@ -39,18 +39,18 @@ export const RepositoryMembersPanel = ({ repoId, permissions, t, onError }: Repo
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: addMember, isLoading: isAdding } = useCustomMutation<RawRecord>();
-  const { mutateAsync: updateMember, isLoading: isUpdating } = useCustomMutation<RawRecord>();
-  const { mutateAsync: deleteMember, isLoading: isDeleting } = useCustomMutation<RawRecord>();
+  const { mutateAsync: addMember, mutation: { isPending: isAdding } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: updateMember, mutation: { isPending: isUpdating } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: deleteMember, mutation: { isPending: isDeleting } } = useCustomMutation<RawRecord>();
   const [selectedUserID, setSelectedUserID] = useState("");
   const [selectedRole, setSelectedRole] = useState("developer");
   const members = useMemo(
-    () => resolveProjectMembers(membersQuery.data?.data).map(normalizeProjectMember),
-    [membersQuery.data?.data],
+    () => resolveProjectMembers(membersQuery.result.data).map(normalizeProjectMember),
+    [membersQuery.result.data],
   );
   const users = useMemo(
-    () => resolveUsers(usersQuery.data?.data).map(normalizeUser),
-    [usersQuery.data?.data],
+    () => resolveUsers(usersQuery.result.data).map(normalizeUser),
+    [usersQuery.result.data],
   );
   const memberUserIDs = useMemo(() => new Set(members.map((member) => member.user_id)), [members]);
   const availableUsers = users.filter((user) => !memberUserIDs.has(user.id));
@@ -58,7 +58,7 @@ export const RepositoryMembersPanel = ({ repoId, permissions, t, onError }: Repo
   const isBusy = isAdding || isUpdating || isDeleting;
 
   const reload = async () => {
-    const [membersResult, usersResult] = await Promise.all([membersQuery.refetch(), usersQuery.refetch()]);
+    const [membersResult, usersResult] = await Promise.all([membersQuery.query.refetch(), usersQuery.query.refetch()]);
     const error = membersResult.error ?? usersResult.error;
     onError(error ? extractErrorMessage(error) : null);
   };
@@ -119,11 +119,11 @@ export const RepositoryMembersPanel = ({ repoId, permissions, t, onError }: Repo
   };
 
   useEffect(() => {
-    const error = membersQuery.error ?? usersQuery.error;
+    const error = membersQuery.query.error ?? usersQuery.query.error;
     if (error) {
       onError(extractErrorMessage(error));
     }
-  }, [membersQuery.error, usersQuery.error, onError]);
+  }, [membersQuery.query.error, usersQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -178,7 +178,7 @@ export const RepositoryMembersPanel = ({ repoId, permissions, t, onError }: Repo
         </div>
 
         <div className="space-y-2 rounded-md border p-2">
-          {membersQuery.isFetching && !membersQuery.data ? (
+          {membersQuery.query.isFetching && !membersQuery.query.data ? (
             <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading project members...")}</p>
           ) : null}
           {members.length === 0 ? (

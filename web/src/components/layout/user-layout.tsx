@@ -24,8 +24,8 @@ export function UserLayout(): JSX.Element {
   const { t } = useI18n();
   const location = useLocation();
   const { mutate: logout } = useLogout();
-  const { data: identity } = useGetIdentity<{ name?: string; email?: string; isSuperAdmin?: boolean }>();
-  const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>();
+  const { data: identity } = useGetIdentity<{ name?: string; email?: string; isSuperAdmin?: boolean }>({});
+  const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>({});
   const currentTitle = t(
     location.pathname.startsWith("/app/projects/") || location.pathname.startsWith("/app/repositories/")
       ? "Project"

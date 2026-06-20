@@ -21,8 +21,8 @@ export function AppProfilePage(): JSX.Element {
     resource: "profile",
     id: "me",
   });
-  const user = profileQuery.data?.data ?? null;
-  const { mutate: updateProfile, isLoading: isUpdating } = useUpdate<UserView>();
+  const user = profileQuery.result ?? null;
+  const { mutate: updateProfile, mutation: { isPending: isUpdating } } = useUpdate<UserView>();
 
   useEffect(() => {
     if (!user) {
@@ -32,7 +32,7 @@ export function AppProfilePage(): JSX.Element {
     setEmail(user.email);
   }, [user]);
 
-  const loadError = profileQuery.error instanceof Error ? profileQuery.error.message : null;
+  const loadError = profileQuery.query.error instanceof Error ? profileQuery.query.error.message : null;
 
   return (
     <div className="space-y-4 page-enter">
@@ -79,7 +79,7 @@ export function AppProfilePage(): JSX.Element {
                   onSuccess: () => {
                     setPassword("");
                     setMessage(t("Profile updated."));
-                    void profileQuery.refetch();
+                    void profileQuery.query.refetch();
                   },
                   onError: (e) => {
                     setError(e instanceof Error ? e.message : t("Update failed"));
@@ -114,7 +114,7 @@ export function AppProfilePage(): JSX.Element {
               />
             </div>
             <div className="md:col-span-2 flex items-center gap-2">
-              <Button type="submit" disabled={isUpdating || profileQuery.isLoading}>
+              <Button type="submit" disabled={isUpdating || profileQuery.query.isLoading}>
                 {isUpdating ? `${t("Save")}...` : t("Save Changes")}
               </Button>
             </div>

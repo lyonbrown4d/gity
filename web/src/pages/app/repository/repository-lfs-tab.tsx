@@ -40,21 +40,21 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: createLock, isLoading: isCreatingLock } = useCustomMutation<RawRecord>();
-  const { mutateAsync: unlockLock, isLoading: isUnlocking } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createLock, mutation: { isPending: isCreatingLock } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: unlockLock, mutation: { isPending: isUnlocking } } = useCustomMutation<RawRecord>();
   const [lockPath, setLockPath] = useState("");
   const [isCopied, setCopied] = useState(false);
   const objects = useMemo(
-    () => resolveObjectList(objectsQuery.data?.data).map(normalizeLFSObject),
-    [objectsQuery.data?.data],
+    () => resolveObjectList(objectsQuery.result.data).map(normalizeLFSObject),
+    [objectsQuery.result.data],
   );
   const locks = useMemo(
-    () => resolveLockList(locksQuery.data?.data).map(normalizeLFSLock),
-    [locksQuery.data?.data],
+    () => resolveLockList(locksQuery.result.data).map(normalizeLFSLock),
+    [locksQuery.result.data],
   );
   const totalBytes = objects.reduce((sum, item) => sum + item.byte_size, 0);
-  const isLoadingObjects = objectsQuery.isFetching && !objectsQuery.data;
-  const isLoadingLocks = locksQuery.isFetching && !locksQuery.data;
+  const isLoadingObjects = objectsQuery.query.isFetching && !objectsQuery.query.data;
+  const isLoadingLocks = locksQuery.query.isFetching && !locksQuery.query.data;
   const canWriteLFS = permissions.canWrite;
   const lfsEndpoint = `${repository.clone_http_url.replace(/\/$/, "")}/info/lfs`;
   const setupCommand = [
@@ -66,7 +66,7 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
   ].join("\n");
 
   const reload = async () => {
-    const [objectsResult, locksResult] = await Promise.all([objectsQuery.refetch(), locksQuery.refetch()]);
+    const [objectsResult, locksResult] = await Promise.all([objectsQuery.query.refetch(), locksQuery.query.refetch()]);
     const error = objectsResult.error ?? locksResult.error;
     if (error) {
       onError(extractErrorMessage(error));
@@ -129,12 +129,12 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
   }, [repoId, onError]);
 
   useEffect(() => {
-    const error = objectsQuery.error ?? locksQuery.error;
+    const error = objectsQuery.query.error ?? locksQuery.query.error;
     if (!error) {
       return;
     }
     onError(extractErrorMessage(error));
-  }, [objectsQuery.error, locksQuery.error, onError]);
+  }, [objectsQuery.query.error, locksQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">

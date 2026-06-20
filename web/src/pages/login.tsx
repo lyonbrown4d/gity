@@ -9,7 +9,7 @@ import { LoginForm } from "@/components/login-form";
 export function LoginPage(): JSX.Element {
   const { t } = useI18n();
   const tokens = getTokens();
-  const { mutate: login, isLoading } = useLogin();
+  const { mutate: login, isPending: isLoading } = useLogin();
   const [error, setError] = useState<string | null>(null);
 
   if (tokens) {

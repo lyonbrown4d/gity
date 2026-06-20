@@ -27,10 +27,10 @@ export const useRepositoryMetaController = ({
   const [newBranchName, setNewBranchName] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { mutate: deleteRepository, isLoading: isDeleting } = useDelete<RepositoryView>();
-  const { mutateAsync: createBranch, isLoading: isCreatingBranch } = useCustomMutation();
-  const { mutateAsync: patchBranchProtection, isLoading: isUpdatingBranch } = useCustomMutation();
-  const { mutateAsync: deleteBranch, isLoading: isDeletingBranch } = useCustomMutation();
+  const { mutate: deleteRepository, mutation: { isPending: isDeleting } } = useDelete<RepositoryView>();
+  const { mutateAsync: createBranch, mutation: { isPending: isCreatingBranch } } = useCustomMutation();
+  const { mutateAsync: patchBranchProtection, mutation: { isPending: isUpdatingBranch } } = useCustomMutation();
+  const { mutateAsync: deleteBranch, mutation: { isPending: isDeletingBranch } } = useCustomMutation();
 
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const repoQuery = useList<RepositoryView>({
@@ -63,18 +63,18 @@ export const useRepositoryMetaController = ({
   });
 
   const organization = useMemo(
-    () => (orgQuery.data?.data ?? []).find((item) => item.id === organizationId),
-    [orgQuery.data?.data, organizationId],
+    () => (orgQuery.result.data ?? []).find((item) => item.id === organizationId),
+    [orgQuery.result.data, organizationId],
   );
   const repository = useMemo(
-    () => (repoQuery.data?.data ?? []).find((item) => item.id === repoId) ?? null,
-    [repoQuery.data?.data, repoId],
+    () => (repoQuery.result.data ?? []).find((item) => item.id === repoId) ?? null,
+    [repoQuery.result.data, repoId],
   );
-  const branches = branchesQuery.data?.data ?? [];
-  const commits = commitsQuery.data?.data ?? [];
+  const branches = branchesQuery.result.data ?? [];
+  const commits = commitsQuery.result.data ?? [];
 
   const loadBranches = async (): Promise<void> => {
-    const result = await branchesQuery.refetch();
+    const result = await branchesQuery.query.refetch();
     if (result.error) {
       setActionError(extractErrorMessage(result.error));
       return;
@@ -83,7 +83,7 @@ export const useRepositoryMetaController = ({
   };
 
   const loadCommits = async (): Promise<void> => {
-    const result = await commitsQuery.refetch();
+    const result = await commitsQuery.query.refetch();
     if (result.error) {
       setActionError(extractErrorMessage(result.error));
       return;
@@ -187,8 +187,8 @@ export const useRepositoryMetaController = ({
     );
   };
 
-  const isLoading = orgQuery.isLoading || repoQuery.isLoading;
-  const queryError = orgQuery.error ?? repoQuery.error ?? branchesQuery.error ?? commitsQuery.error;
+  const isLoading = orgQuery.query.isLoading || repoQuery.query.isLoading;
+  const queryError = orgQuery.query.error ?? repoQuery.query.error ?? branchesQuery.query.error ?? commitsQuery.query.error;
   const errorMessage = actionError ?? (queryError ? extractErrorMessage(queryError) : null);
 
   return {
@@ -201,8 +201,8 @@ export const useRepositoryMetaController = ({
     commits,
     branchFilter,
     newBranchName,
-    isLoadingBranches: branchesQuery.isFetching,
-    isLoadingCommits: commitsQuery.isFetching,
+    isLoadingBranches: branchesQuery.query.isFetching,
+    isLoadingCommits: commitsQuery.query.isFetching,
     isUpdatingBranch,
     isCreatingBranch,
     isDeletingBranch,

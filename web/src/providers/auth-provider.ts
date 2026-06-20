@@ -1,4 +1,4 @@
-import type { AuthBindings } from "@refinedev/core";
+import type { AuthProvider } from "@refinedev/core";
 import { clearTokens, getTokens } from "@/lib/auth-store";
 import { apiRequest, login, logout } from "@/lib/api";
 import { translateForCurrentLocale } from "@/lib/i18n";
@@ -11,7 +11,7 @@ interface CurrentUser {
   is_super_admin: boolean;
 }
 
-export const authProvider: AuthBindings = {
+export const authProvider: AuthProvider = {
   login: async ({ username, password }) => {
     try {
       await login({ username, password });

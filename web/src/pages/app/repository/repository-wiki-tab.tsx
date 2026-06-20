@@ -24,7 +24,7 @@ interface RepositoryWikiTabProps {
 type RawWikiPage = RawRecord;
 
 export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: RepositoryWikiTabProps): JSX.Element => {
-  const identityQuery = useGetIdentity<{ id?: string | number }>();
+  const identityQuery = useGetIdentity<{ id?: string | number }>({});
   const pagesQuery = useCustom<RawWikiPage[]>({
     url: `/projects/${repoId}/wiki/pages`,
     method: "get",
@@ -33,14 +33,14 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: createWikiPage, isLoading: isCreatingPage } = useCustomMutation<RawWikiPage>();
-  const { mutateAsync: updateWikiPage, isLoading: isUpdatingPage } = useCustomMutation<RawWikiPage>();
-  const { mutateAsync: deleteWikiPage, isLoading: isDeletingPage } = useCustomMutation<RawWikiPage>();
+  const { mutateAsync: createWikiPage, mutation: { isPending: isCreatingPage } } = useCustomMutation<RawWikiPage>();
+  const { mutateAsync: updateWikiPage, mutation: { isPending: isUpdatingPage } } = useCustomMutation<RawWikiPage>();
+  const { mutateAsync: deleteWikiPage, mutation: { isPending: isDeletingPage } } = useCustomMutation<RawWikiPage>();
 
   const currentUserId = normalizeString(identityQuery.data?.id);
   const pages = useMemo(
-    () => resolveWikiList(pagesQuery.data?.data).map(normalizeWikiPage),
-    [pagesQuery.data?.data],
+    () => resolveWikiList(pagesQuery.result.data).map(normalizeWikiPage),
+    [pagesQuery.result.data],
   );
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const selectedPage = useMemo(
@@ -56,11 +56,11 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
   const [draftContent, setDraftContent] = useState("");
   const [editorUserId, setEditorUserId] = useState("");
   const [previewHtml, setPreviewHtml] = useState("");
-  const isLoadingPages = pagesQuery.isFetching && !pagesQuery.data;
+  const isLoadingPages = pagesQuery.query.isFetching && !pagesQuery.query.data;
   const canWriteWiki = permissions.wikiWrite;
 
   const loadPages = async () => {
-    const result = await pagesQuery.refetch();
+    const result = await pagesQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -165,11 +165,11 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
   }, [repoId, onError]);
 
   useEffect(() => {
-    if (!pagesQuery.error) {
+    if (!pagesQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(pagesQuery.error));
-  }, [pagesQuery.error, onError]);
+    onError(extractErrorMessage(pagesQuery.query.error));
+  }, [pagesQuery.query.error, onError]);
 
   useEffect(() => {
     if (!currentUserId) {

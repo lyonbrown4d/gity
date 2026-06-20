@@ -28,21 +28,21 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: upsertVariable, isLoading: isSaving } = useCustomMutation<RawRecord>();
-  const { mutateAsync: deleteVariable, isLoading: isDeleting } = useCustomMutation<RawRecord>();
+  const { mutateAsync: upsertVariable, mutation: { isPending: isSaving } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: deleteVariable, mutation: { isPending: isDeleting } } = useCustomMutation<RawRecord>();
   const [key, setKey] = useState("");
   const [value, setValue] = useState("");
   const [masked, setMasked] = useState(true);
   const [protectedVariable, setProtectedVariable] = useState(false);
   const variables = useMemo(
-    () => resolveVariables(variablesQuery.data?.data).map(normalizeVariable),
-    [variablesQuery.data?.data],
+    () => resolveVariables(variablesQuery.result.data).map(normalizeVariable),
+    [variablesQuery.result.data],
   );
   const canAdminVariables = permissions.runnerAdmin;
   const isBusy = isSaving || isDeleting;
 
   const reload = async () => {
-    const result = await variablesQuery.refetch();
+    const result = await variablesQuery.query.refetch();
     onError(result.error ? extractErrorMessage(result.error) : null);
   };
 
@@ -94,10 +94,10 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
   };
 
   useEffect(() => {
-    if (variablesQuery.error) {
-      onError(extractErrorMessage(variablesQuery.error));
+    if (variablesQuery.query.error) {
+      onError(extractErrorMessage(variablesQuery.query.error));
     }
-  }, [variablesQuery.error, onError]);
+  }, [variablesQuery.query.error, onError]);
 
   return (
     <div className="space-y-4 rounded-md border p-3">
@@ -158,7 +158,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
       </form>
 
       <div className="space-y-2 rounded-md border p-2">
-        {variablesQuery.isFetching && !variablesQuery.data ? (
+        {variablesQuery.query.isFetching && !variablesQuery.query.data ? (
           <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading CI variables...")}</p>
         ) : null}
         {variables.length === 0 ? (

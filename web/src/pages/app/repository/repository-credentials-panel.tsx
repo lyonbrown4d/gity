@@ -61,10 +61,10 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
       refetchOnWindowFocus: false,
     },
   });
-  const { mutateAsync: createToken, isLoading: isCreatingToken } = useCustomMutation<RawRecord>();
-  const { mutateAsync: revokeToken, isLoading: isRevokingToken } = useCustomMutation<RawRecord>();
-  const { mutateAsync: createKey, isLoading: isCreatingKey } = useCustomMutation<RawRecord>();
-  const { mutateAsync: deleteKey, isLoading: isDeletingKey } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createToken, mutation: { isPending: isCreatingToken } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: revokeToken, mutation: { isPending: isRevokingToken } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createKey, mutation: { isPending: isCreatingKey } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: deleteKey, mutation: { isPending: isDeletingKey } } = useCustomMutation<RawRecord>();
   const [accessTokenName, setAccessTokenName] = useState("");
   const [accessTokenScopesValue, setAccessTokenScopesValue] = useState<string[]>(["read_repository"]);
   const [accessTokenExpiresAt, setAccessTokenExpiresAt] = useState("");
@@ -79,20 +79,20 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
   const canAdminCredentials = permissions.repositoryAdmin;
   const isBusy = isCreatingToken || isRevokingToken || isCreatingKey || isDeletingKey;
   const accessTokens = useMemo(
-    () => resolveCredentialRecords(accessTokensQuery.data?.data).map(normalizeProjectToken),
-    [accessTokensQuery.data?.data],
+    () => resolveCredentialRecords(accessTokensQuery.result.data).map(normalizeProjectToken),
+    [accessTokensQuery.result.data],
   );
   const deployTokens = useMemo(
-    () => resolveCredentialRecords(deployTokensQuery.data?.data).map(normalizeProjectToken),
-    [deployTokensQuery.data?.data],
+    () => resolveCredentialRecords(deployTokensQuery.result.data).map(normalizeProjectToken),
+    [deployTokensQuery.result.data],
   );
   const deployKeys = useMemo(
-    () => resolveCredentialRecords(deployKeysQuery.data?.data).map(normalizeDeployKey),
-    [deployKeysQuery.data?.data],
+    () => resolveCredentialRecords(deployKeysQuery.result.data).map(normalizeDeployKey),
+    [deployKeysQuery.result.data],
   );
 
   const reload = async () => {
-    const results = await Promise.all([accessTokensQuery.refetch(), deployTokensQuery.refetch(), deployKeysQuery.refetch()]);
+    const results = await Promise.all([accessTokensQuery.query.refetch(), deployTokensQuery.query.refetch(), deployKeysQuery.query.refetch()]);
     const error = results.find((result) => result.error)?.error;
     onError(error ? extractErrorMessage(error) : null);
   };
@@ -233,11 +233,11 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
   };
 
   useEffect(() => {
-    const error = accessTokensQuery.error ?? deployTokensQuery.error ?? deployKeysQuery.error;
+    const error = accessTokensQuery.query.error ?? deployTokensQuery.query.error ?? deployKeysQuery.query.error;
     if (error) {
       onError(extractErrorMessage(error));
     }
-  }, [accessTokensQuery.error, deployTokensQuery.error, deployKeysQuery.error, onError]);
+  }, [accessTokensQuery.query.error, deployTokensQuery.query.error, deployKeysQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -293,7 +293,7 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
           <TokenList
             tokens={accessTokens}
             emptyText={t("No project access tokens yet.")}
-            isLoading={accessTokensQuery.isFetching && !accessTokensQuery.data}
+            isLoading={accessTokensQuery.query.isFetching && !accessTokensQuery.query.data}
             disabled={!canAdminCredentials || isBusy}
             t={t}
             onRevoke={(token) => void submitRevokeToken(token, "access")}
@@ -322,7 +322,7 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
           <TokenList
             tokens={deployTokens}
             emptyText={t("No deploy tokens yet.")}
-            isLoading={deployTokensQuery.isFetching && !deployTokensQuery.data}
+            isLoading={deployTokensQuery.query.isFetching && !deployTokensQuery.query.data}
             disabled={!canAdminCredentials || isBusy}
             t={t}
             onRevoke={(token) => void submitRevokeToken(token, "deploy")}
@@ -357,7 +357,7 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
           <DeployKeyList
             keys={deployKeys}
             emptyText={t("No deploy keys yet.")}
-            isLoading={deployKeysQuery.isFetching && !deployKeysQuery.data}
+            isLoading={deployKeysQuery.query.isFetching && !deployKeysQuery.query.data}
             disabled={!canAdminCredentials || isBusy}
             t={t}
             onDelete={(key) => void submitDeleteDeployKey(key)}

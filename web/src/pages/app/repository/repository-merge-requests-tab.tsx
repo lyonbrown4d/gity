@@ -118,13 +118,13 @@ export const RepositoryMergeRequestsTab = ({
       refetchOnWindowFocus: false,
     },
   });
-  const identityQuery = useGetIdentity<{ id?: string | number }>();
-  const { mutateAsync: createMergeRequest, isLoading: isCreating } = useCustomMutation<RawRecord>();
-  const { mutateAsync: updateMergeRequest, isLoading: isUpdating } = useCustomMutation<RawRecord>();
-  const { mutateAsync: mergeMergeRequest, isLoading: isMerging } = useCustomMutation<RawRecord>();
-  const { mutateAsync: setMergeRequestParticipants, isLoading: isUpdatingParticipants } = useCustomMutation<RawRecord>();
-  const { mutateAsync: createMergeRequestComment, isLoading: isCreatingComment } = useCustomMutation<RawRecord>();
-  const { mutateAsync: approveMergeRequest, isLoading: isUpdatingApproval } = useCustomMutation<RawRecord>();
+  const identityQuery = useGetIdentity<{ id?: string | number }>({});
+  const { mutateAsync: createMergeRequest, mutation: { isPending: isCreating } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: updateMergeRequest, mutation: { isPending: isUpdating } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: mergeMergeRequest, mutation: { isPending: isMerging } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: setMergeRequestParticipants, mutation: { isPending: isUpdatingParticipants } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: createMergeRequestComment, mutation: { isPending: isCreatingComment } } = useCustomMutation<RawRecord>();
+  const { mutateAsync: approveMergeRequest, mutation: { isPending: isUpdatingApproval } } = useCustomMutation<RawRecord>();
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [stateFilter, setStateFilter] = useState<RepositoryMergeRequestState | "all">("opened");
   const [searchQuery, setSearchQuery] = useState("");
@@ -137,8 +137,8 @@ export const RepositoryMergeRequestsTab = ({
   const [newComment, setNewComment] = useState("");
 
   const mergeRequests = useMemo(
-    () => resolveMergeRequestList(mergeRequestsQuery.data?.data).map(normalizeMergeRequest),
-    [mergeRequestsQuery.data?.data],
+    () => resolveMergeRequestList(mergeRequestsQuery.result.data).map(normalizeMergeRequest),
+    [mergeRequestsQuery.result.data],
   );
   const selectedMergeRequest = useMemo(
     () => mergeRequests.find((item) => item.iid === selectedIID) ?? mergeRequests[0] ?? null,
@@ -157,28 +157,28 @@ export const RepositoryMergeRequestsTab = ({
     [mergeRequests],
   );
   const diffView = useMemo(
-    () => normalizeDiffView(diffQuery.data?.data),
-    [diffQuery.data?.data],
+    () => normalizeDiffView(diffQuery.result.data),
+    [diffQuery.result.data],
   );
   const checksView = useMemo(
-    () => normalizeCheckStatusView(checksQuery.data?.data),
-    [checksQuery.data?.data],
+    () => normalizeCheckStatusView(checksQuery.result.data),
+    [checksQuery.result.data],
   );
   const participantsView = useMemo(
-    () => normalizeParticipantsView(participantsQuery.data?.data),
-    [participantsQuery.data?.data],
+    () => normalizeParticipantsView(participantsQuery.result.data),
+    [participantsQuery.result.data],
   );
   const commentsView = useMemo(
-    () => normalizeCommentsView(commentsQuery.data?.data),
-    [commentsQuery.data?.data],
+    () => normalizeCommentsView(commentsQuery.result.data),
+    [commentsQuery.result.data],
   );
   const approvalsView = useMemo(
-    () => normalizeApprovalsView(approvalsQuery.data?.data),
-    [approvalsQuery.data?.data],
+    () => normalizeApprovalsView(approvalsQuery.result.data),
+    [approvalsQuery.result.data],
   );
   const users = useMemo(
-    () => resolveUserList(usersQuery.data?.data).map(normalizeUser),
-    [usersQuery.data?.data],
+    () => resolveUserList(usersQuery.result.data).map(normalizeUser),
+    [usersQuery.result.data],
   );
   const userByID = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
@@ -198,14 +198,14 @@ export const RepositoryMergeRequestsTab = ({
   const currentUserID = identityQuery.data?.id === undefined ? "" : String(identityQuery.data.id);
   const currentUserApproved = Boolean(currentUserID && approvals.some((item) => item.user_id === currentUserID));
   const isMergeBlocked = Boolean(checksView?.required && !checksView.mergeable);
-  const isLoadingMergeRequests = mergeRequestsQuery.isFetching && !mergeRequestsQuery.data;
+  const isLoadingMergeRequests = mergeRequestsQuery.query.isFetching && !mergeRequestsQuery.query.data;
   const canCreateMergeRequest = permissions.mergeRequestCreate;
   const canWriteMergeRequest = permissions.mergeRequestWrite;
   const canCommentMergeRequest = permissions.mergeRequestComment;
   const canMergeMergeRequest = permissions.mergeRequestMerge;
 
   const loadMergeRequests = async () => {
-    const result = await mergeRequestsQuery.refetch();
+    const result = await mergeRequestsQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -217,7 +217,7 @@ export const RepositoryMergeRequestsTab = ({
     if (!selectedIID) {
       return;
     }
-    const result = await diffQuery.refetch();
+    const result = await diffQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -229,7 +229,7 @@ export const RepositoryMergeRequestsTab = ({
     if (!selectedIID) {
       return;
     }
-    const result = await checksQuery.refetch();
+    const result = await checksQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -241,7 +241,7 @@ export const RepositoryMergeRequestsTab = ({
     if (!selectedIID) {
       return;
     }
-    const result = await participantsQuery.refetch();
+    const result = await participantsQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -253,7 +253,7 @@ export const RepositoryMergeRequestsTab = ({
     if (!selectedIID) {
       return;
     }
-    const result = await commentsQuery.refetch();
+    const result = await commentsQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -265,7 +265,7 @@ export const RepositoryMergeRequestsTab = ({
     if (!selectedIID) {
       return;
     }
-    const result = await approvalsQuery.refetch();
+    const result = await approvalsQuery.query.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -432,46 +432,46 @@ export const RepositoryMergeRequestsTab = ({
   }, [selectedIID]);
 
   useEffect(() => {
-    if (!mergeRequestsQuery.error) {
+    if (!mergeRequestsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(mergeRequestsQuery.error));
-  }, [mergeRequestsQuery.error, onError]);
+    onError(extractErrorMessage(mergeRequestsQuery.query.error));
+  }, [mergeRequestsQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!diffQuery.error) {
+    if (!diffQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(diffQuery.error));
-  }, [diffQuery.error, onError]);
+    onError(extractErrorMessage(diffQuery.query.error));
+  }, [diffQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!checksQuery.error) {
+    if (!checksQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(checksQuery.error));
-  }, [checksQuery.error, onError]);
+    onError(extractErrorMessage(checksQuery.query.error));
+  }, [checksQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!participantsQuery.error) {
+    if (!participantsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(participantsQuery.error));
-  }, [participantsQuery.error, onError]);
+    onError(extractErrorMessage(participantsQuery.query.error));
+  }, [participantsQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!commentsQuery.error) {
+    if (!commentsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(commentsQuery.error));
-  }, [commentsQuery.error, onError]);
+    onError(extractErrorMessage(commentsQuery.query.error));
+  }, [commentsQuery.query.error, onError]);
 
   useEffect(() => {
-    if (!approvalsQuery.error) {
+    if (!approvalsQuery.query.error) {
       return;
     }
-    onError(extractErrorMessage(approvalsQuery.error));
-  }, [approvalsQuery.error, onError]);
+    onError(extractErrorMessage(approvalsQuery.query.error));
+  }, [approvalsQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -671,7 +671,7 @@ export const RepositoryMergeRequestsTab = ({
                   organizationId={organizationId}
                   repoId={repoId}
                   checks={checksView}
-                  isLoading={checksQuery.isFetching}
+                  isLoading={checksQuery.query.isFetching}
                   t={t}
                   onReload={() => void loadChecks()}
                 />
@@ -683,7 +683,7 @@ export const RepositoryMergeRequestsTab = ({
                   userByID={userByID}
                   reviewerDraftUserID={reviewerDraftUserID}
                   assigneeDraftUserID={assigneeDraftUserID}
-                  isLoading={participantsQuery.isFetching || usersQuery.isFetching}
+                  isLoading={participantsQuery.query.isFetching || usersQuery.query.isFetching}
                   isUpdating={isUpdatingParticipants}
                   canEdit={canWriteMergeRequest}
                   t={t}
@@ -710,7 +710,7 @@ export const RepositoryMergeRequestsTab = ({
                   approvals={approvals}
                   userByID={userByID}
                   currentUserApproved={currentUserApproved}
-                  isLoading={approvalsQuery.isFetching}
+                  isLoading={approvalsQuery.query.isFetching}
                   isUpdating={isUpdatingApproval}
                   canApprove={canWriteMergeRequest && selectedMergeRequest.state === "opened"}
                   t={t}
@@ -723,7 +723,7 @@ export const RepositoryMergeRequestsTab = ({
                   comments={comments}
                   userByID={userByID}
                   newComment={newComment}
-                  isLoading={commentsQuery.isFetching}
+                  isLoading={commentsQuery.query.isFetching}
                   isCreating={isCreatingComment}
                   canComment={canCommentMergeRequest}
                   t={t}
@@ -734,7 +734,7 @@ export const RepositoryMergeRequestsTab = ({
 
                 <div>
                   <p className="mb-2 text-sm font-medium">{t("Diff")}</p>
-                  {diffQuery.isFetching ? (
+                  {diffQuery.query.isFetching ? (
                     <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading diff...")}</p>
                   ) : (
                     <pre className="max-h-[620px] overflow-auto rounded-md border bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100">

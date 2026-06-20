@@ -5,7 +5,7 @@ import routerProvider, {
   DocumentTitleHandler,
   NavigateToResource,
   UnsavedChangesNotifier,
-} from "@refinedev/react-router-v6";
+} from "@refinedev/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
@@ -145,7 +145,7 @@ export function App(): JSX.Element {
 
 function RequireSuperAdmin({ children }: { children: ReactNode }): JSX.Element {
   const { t } = useI18n();
-  const { data: permissions, isLoading } = usePermissions<{ isSuperAdmin?: boolean }>();
+  const { data: permissions, isLoading } = usePermissions<{ isSuperAdmin?: boolean }>({});
 
   if (isLoading) {
     return (

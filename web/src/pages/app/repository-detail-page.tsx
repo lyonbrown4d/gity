@@ -36,7 +36,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
-  const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>();
+  const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>({});
   const projectPermissionsQuery = useCustom<RawRecord>({
     url: repoId ? `/projects/${repoId}/permissions` : "/projects/0/permissions",
     method: "get",
@@ -64,8 +64,8 @@ export const RepositoryDetailPage = (): JSX.Element => {
     refreshCommits: meta.loadCommits,
   });
   const repositoryPermissions = useMemo(
-    () => buildRepositoryPermissions(meta.organization?.role, Boolean(permissionsQuery.data?.isSuperAdmin), projectPermissionsQuery.data?.data),
-    [meta.organization?.role, permissionsQuery.data?.isSuperAdmin, projectPermissionsQuery.data?.data],
+    () => buildRepositoryPermissions(meta.organization?.role, Boolean(permissionsQuery.data?.isSuperAdmin), projectPermissionsQuery.result.data),
+    [meta.organization?.role, permissionsQuery.data?.isSuperAdmin, projectPermissionsQuery.result.data],
   );
 
   useEffect(() => {
