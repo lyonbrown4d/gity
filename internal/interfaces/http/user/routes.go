@@ -2,15 +2,12 @@ package user
 
 import (
 	"context"
-	"strconv"
-	"strings"
-
-	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"strconv"
 )
 
 type createUserInput struct {
@@ -167,19 +164,4 @@ func toUserView(item identity.User) userView {
 		Status:       "active",
 		IsSuperAdmin: item.IsSuperAdmin != 0,
 	}
-}
-
-func parseIDFilter(raw string) *setx.Set[int64] {
-	ids := setx.NewSet[int64]()
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ids
-	}
-	for part := range strings.SplitSeq(raw, ",") {
-		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
-		if err == nil && id > 0 {
-			ids.Add(id)
-		}
-	}
-	return ids
 }

@@ -13,6 +13,7 @@ import (
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
+	httpshared "github.com/lyonbrown4d/gity/internal/interfaces/http/shared"
 	"github.com/samber/oops"
 )
 
@@ -26,7 +27,7 @@ func (e *Endpoint) listProjects(ctx context.Context, in *projectsInput) (*projec
 	if err != nil {
 		return nil, err
 	}
-	idFilter := parseIDFilter(in.IDs)
+	idFilter := httpshared.ParseIDFilter(in.IDs)
 	projectItems := items.Values()
 	visible := make([]projectdomain.Project, 0, len(projectItems))
 	for i := range projectItems {

@@ -8,6 +8,7 @@ import (
 	"github.com/arcgolabs/httpx"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
+	httpshared "github.com/lyonbrown4d/gity/internal/interfaces/http/shared"
 )
 
 func (e *Endpoint) listUsers(ctx context.Context, in *usersInput) (*userOutput, error) {
@@ -15,7 +16,7 @@ func (e *Endpoint) listUsers(ctx context.Context, in *usersInput) (*userOutput, 
 	if err != nil {
 		return nil, err
 	}
-	idFilter := parseIDFilter(in.IDs)
+	idFilter := httpshared.ParseIDFilter(in.IDs)
 	views := collectionlist.FilterMapList(items, func(_ int, item identity.User) (userView, bool) {
 		if idFilter.Len() > 0 && !idFilter.Contains(item.ID) {
 			return userView{}, false

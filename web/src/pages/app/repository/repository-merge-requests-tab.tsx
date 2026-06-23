@@ -26,6 +26,7 @@ import type {
   UserView,
 } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime, toTimestamp } from "./issues-utils";
+import { formatUserLabel, uniqueStrings } from "./repository-user-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
 import { RepositoryMergeRequestApprovalRulesPanel } from "./repository-merge-request-approval-rules-panel";
 import {
@@ -1290,17 +1291,9 @@ const checkStatusMeta = (checks: RepositoryMergeRequestCheckStatusView) => {
   return { label: "Blocked", className: "border-red-500/30 bg-red-500/5", Icon: XCircle };
 };
 
-const formatUserLabel = (user: UserView | undefined, fallbackID: string): string => {
-  if (!user) {
-    return `#${fallbackID}`;
-  }
-  const displayName = user.display_name?.trim();
-  return displayName ? `${displayName} (@${user.username})` : `@${user.username}`;
-};
 
 const shortText = (value: string, length = 8): string => (value.length > length ? value.slice(0, length) : value);
 
-const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 
 const filterMergeRequests = (
   items: RepositoryMergeRequestView[],
@@ -1546,3 +1539,5 @@ const normalizePipelineStatus = (value: unknown) => {
   }
   return "pending";
 };
+
+

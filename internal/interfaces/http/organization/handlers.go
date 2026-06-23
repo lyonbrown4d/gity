@@ -9,6 +9,7 @@ import (
 	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
 	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
+	httpshared "github.com/lyonbrown4d/gity/internal/interfaces/http/shared"
 )
 
 func (e *Endpoint) listOrganizations(ctx context.Context, in *organizationsInput) (*organizationOutput, error) {
@@ -20,7 +21,7 @@ func (e *Endpoint) listOrganizations(ctx context.Context, in *organizationsInput
 	if err != nil {
 		return nil, err
 	}
-	idFilter := parseIDFilter(in.IDs)
+	idFilter := httpshared.ParseIDFilter(in.IDs)
 	organizationItems := items.Values()
 	visible := make([]organizationdomain.Organization, 0, len(organizationItems))
 	for i := range organizationItems {
@@ -178,7 +179,7 @@ func (e *Endpoint) requireOrganizationManage(ctx context.Context, authorization 
 func buildCreateOrganizationInput(in *createOrganizationInput) organizationservice.CreateInput {
 	return organizationservice.CreateInput{
 		Name:        in.Body.Name,
-		PathKey:     firstNonEmpty(in.Body.PathKey, in.Body.Key),
+		PathKey:     httpshared.FirstNonEmpty(in.Body.PathKey, in.Body.Key),
 		OwnerUserID: in.Body.OwnerUserID,
 		Description: in.Body.Description,
 		Visibility:  in.Body.Visibility,

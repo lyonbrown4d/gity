@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryBranchView, RepositoryMergeRequestApprovalRuleView, UserView } from "@/pages/types";
 import { extractErrorMessage } from "./issues-utils";
+import { formatUserLabel } from "./repository-user-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeBoolean, normalizeNumber, normalizeString, normalizeStringArray, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
@@ -348,10 +349,5 @@ const normalizeApprovalRule = (raw: RawRecord): RepositoryMergeRequestApprovalRu
   code_owner: normalizeBoolean(raw.code_owner ?? raw.CodeOwner),
 });
 
-const formatUserLabel = (user: UserView | undefined, fallbackID: string): string => {
-  if (!user) {
-    return `#${fallbackID}`;
-  }
-  const displayName = user.display_name?.trim();
-  return displayName ? `${displayName} (@${user.username})` : `@${user.username}`;
-};
+
+

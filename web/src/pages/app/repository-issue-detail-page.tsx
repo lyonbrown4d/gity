@@ -19,6 +19,7 @@ import type {
 import { IssueMarkdownEditor } from "@/pages/app/repository/issue-markdown-editor";
 import { renderIssueMarkdown } from "@/pages/app/repository/issue-markdown";
 import { extractErrorMessage, formatRelativeTime } from "@/pages/app/repository/issues-utils";
+import { formatUserLabel, uniqueStrings } from "@/pages/app/repository/repository-user-utils";
 import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
 import {
   isRecord,
@@ -655,15 +656,7 @@ const normalizeIssueLabel = (raw: RawRecord): RepositoryIssueLabelView => ({
   updated_at: normalizeString(raw.updated_at ?? raw.UpdatedAt),
 });
 
-const formatUserLabel = (user: UserView | undefined, fallbackID: string): string => {
-  if (!user) {
-    return `#${fallbackID}`;
-  }
-  const displayName = user.display_name?.trim();
-  return displayName ? `${displayName} (@${user.username})` : `@${user.username}`;
-};
 
-const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter((value) => value.trim().length > 0)));
 
 const uniqueByName = (labels: Array<{ name: string; color: string }>): Array<{ name: string; color: string }> => {
   const seen = new Set<string>();
@@ -678,3 +671,5 @@ const uniqueByName = (labels: Array<{ name: string; color: string }>): Array<{ n
   }
   return items;
 };
+
+

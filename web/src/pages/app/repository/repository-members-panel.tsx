@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { RepositoryProjectMemberView, UserView } from "@/pages/types";
 import { extractErrorMessage } from "./issues-utils";
+import { formatUserLabel } from "./repository-user-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeOptionalString, normalizeString, resolveRecordArray, type RawRecord } from "./repository-normalizers";
 
@@ -279,7 +280,5 @@ const normalizeUser = (raw: RawRecord): UserView => ({
   is_super_admin: false,
 });
 
-const formatUserLabel = (user: UserView): string => {
-  const displayName = user.display_name?.trim();
-  return displayName ? `${displayName} (@${user.username})` : `@${user.username}`;
-};
+
+

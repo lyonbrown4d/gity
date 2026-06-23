@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
+	httpshared "github.com/lyonbrown4d/gity/internal/interfaces/http/shared"
 )
 
 func projectOrganizationFilter(in *projectsInput) *int64 {
@@ -19,7 +20,7 @@ func buildCreateProjectInput(in *createProjectInput) projectservice.CreateInput 
 	return projectservice.CreateInput{
 		OrganizationID: organizationID,
 		Name:           in.Body.Name,
-		PathKey:        firstNonEmpty(in.Body.PathKey, in.Body.Key),
+		PathKey:        httpshared.FirstNonEmpty(in.Body.PathKey, in.Body.Key),
 		Visibility:     in.Body.Visibility,
 		Description:    in.Body.Description,
 		DefaultBranch:  in.Body.DefaultBranch,

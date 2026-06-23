@@ -1,15 +1,13 @@
 package project
 
 import (
-	"strconv"
-	"strings"
-	"time"
-
-	setx "github.com/arcgolabs/collectionx/set"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	"github.com/lyonbrown4d/gity/internal/config"
 	projectdomain "github.com/lyonbrown4d/gity/internal/domain/project"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/git_repo"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func toRepositoryView(item projectdomain.Project, settings config.Settings) repositoryView {
@@ -198,28 +196,4 @@ func (in refreshProjectSearchIndexInput) AuthorizationHeader() string {
 
 func (in refreshProjectSearchIndexInput) ProjectIDValue() int64 {
 	return in.ID
-}
-
-func parseIDFilter(raw string) *setx.Set[int64] {
-	ids := setx.NewSet[int64]()
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ids
-	}
-	for part := range strings.SplitSeq(raw, ",") {
-		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
-		if err == nil && id > 0 {
-			ids.Add(id)
-		}
-	}
-	return ids
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

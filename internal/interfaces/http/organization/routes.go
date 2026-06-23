@@ -1,15 +1,12 @@
 package organization
 
 import (
-	"strconv"
-	"strings"
-
-	setx "github.com/arcgolabs/collectionx/set"
 	"github.com/arcgolabs/httpx"
 	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
 	organizationdomain "github.com/lyonbrown4d/gity/internal/domain/organization"
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"strconv"
 )
 
 type createOrganizationInput struct {
@@ -157,28 +154,4 @@ func toOrganizationMemberView(organizationID int64, item organizationservice.Mem
 		Email:          item.Email,
 		Role:           item.Role,
 	}
-}
-
-func parseIDFilter(raw string) *setx.Set[int64] {
-	ids := setx.NewSet[int64]()
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ids
-	}
-	for part := range strings.SplitSeq(raw, ",") {
-		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
-		if err == nil && id > 0 {
-			ids.Add(id)
-		}
-	}
-	return ids
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
