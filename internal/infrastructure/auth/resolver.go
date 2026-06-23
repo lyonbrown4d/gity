@@ -64,7 +64,7 @@ type ProjectScope struct {
 	Visibility     string
 }
 
-func newEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
+func NewEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
 	return authx.NewEngine(
 		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository, projectTokenRepository))),
 		authx.WithAuthorizer(newProjectAuthorizer(memberRepository, projectMemberRepository)),
