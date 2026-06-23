@@ -17,22 +17,34 @@ const (
 )
 
 type Agent struct {
-	cfg    Config
-	client *Client
-	logger *slog.Logger
+	cfg            Config
+	client         RunnerClient
+	scriptExecutor ScriptExecutor
+	logger         *slog.Logger
 }
 
 func New(cfg Config, logger *slog.Logger) *Agent {
+	return NewAgentWithDependencies(cfg, logger, NewAgentDependencies(cfg))
+}
+
+func NewAgentWithDependencies(cfg Config, logger *slog.Logger, deps AgentDependencies) *Agent {
+	if deps.Client == nil {
+		deps.Client = NewClientFromConfig(cfg)
+	}
+	if deps.ScriptExecutor == nil {
+		deps.ScriptExecutor = ScriptExecutorFunc(ExecuteScriptJobWithSource)
+	}
 	return &Agent{
-		cfg:    cfg,
-		client: NewClient(cfg.ServerURL, cfg.Token),
-		logger: logger,
+		cfg:            cfg,
+		client:         deps.Client,
+		scriptExecutor: deps.ScriptExecutor,
+		logger:         logger,
 	}
 }
 
 func (a *Agent) Run(ctx context.Context) error {
 	if err := a.client.Heartbeat(ctx); err != nil {
-		return err
+		return oops.In("runner_agent").Wrapf(err, "send runner heartbeat")
 	}
 	a.logger.Info("runner agent started", slog.String("server", a.cfg.ServerURL), slog.String("workdir", a.cfg.WorkDir))
 	ticker := time.NewTicker(a.cfg.PollInterval)
@@ -73,7 +85,7 @@ func (a *Agent) executeClaimedJob(ctx context.Context, job cidomain.ProjectJob) 
 
 func (a *Agent) executeScriptJob(ctx context.Context, job cidomain.ProjectJob) error {
 	callbacks := a.scriptCallbacks(job)
-	result, err := ExecuteScriptJobWithSource(ctx, a.cfg, job, callbacks.checker, callbacks.trace, callbacks.source)
+	result, err := a.scriptExecutor.ExecuteScriptJob(ctx, a.cfg, job, callbacks.checker, callbacks.trace, callbacks.source)
 	artifactErr := a.uploadArtifacts(ctx, job, result)
 	if err != nil {
 		return a.reportScriptFailure(ctx, job, result, err, artifactErr)
