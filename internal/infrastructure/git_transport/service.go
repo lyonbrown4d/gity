@@ -17,8 +17,20 @@ type Service struct {
 	runner *gitexec.Runner
 }
 
+type Dependencies struct {
+	Runner *gitexec.Runner
+}
+
+func NewDependencies(runner *gitexec.Runner) Dependencies {
+	return Dependencies{Runner: runner}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{runner: dependencies.Runner}
+}
+
 func NewService(runner *gitexec.Runner) *Service {
-	return &Service{runner: runner}
+	return NewServiceWithDependencies(NewDependencies(runner))
 }
 
 func (s *Service) UploadPack(ctx context.Context, repoPath string, stdin io.Reader, stdout, stderr io.Writer) error {

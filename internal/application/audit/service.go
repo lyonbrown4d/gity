@@ -14,8 +14,21 @@ type Service struct {
 	projectRepo auditports.ProjectRepository
 }
 
+type Dependencies struct {
+	Repo        auditports.ProjectAuditEventRepository
+	ProjectRepo auditports.ProjectRepository
+}
+
+func NewDependencies(repo auditports.ProjectAuditEventRepository, projectRepo auditports.ProjectRepository) Dependencies {
+	return Dependencies{Repo: repo, ProjectRepo: projectRepo}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{repo: dependencies.Repo, projectRepo: dependencies.ProjectRepo}
+}
+
 func NewService(repo auditports.ProjectAuditEventRepository, projectRepo auditports.ProjectRepository) *Service {
-	return &Service{repo: repo, projectRepo: projectRepo}
+	return NewServiceWithDependencies(NewDependencies(repo, projectRepo))
 }
 
 func (s *Service) ListProjectEvents(ctx context.Context, projectID int64, limit int) ([]auditdomain.ProjectAuditEvent, error) {

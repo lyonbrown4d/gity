@@ -38,7 +38,7 @@ var projectTokenActionScopes = map[string][]string{
 	ProjectActionJobWrite:            {identity.ProjectTokenScopeWriteAPI},
 }
 
-func newTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository) authx.AuthenticationProvider {
+func NewTokenProvider(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository) authx.AuthenticationProvider {
 	return authx.NewAuthenticationProviderFunc[TokenCredential](func(ctx context.Context, credential TokenCredential) (authx.AuthenticationResult, error) {
 		result, found, err := authenticateUserToken(ctx, credential.Token, userRepository, tokenRepository)
 		if err != nil || found {

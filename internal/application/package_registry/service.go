@@ -58,8 +58,24 @@ type normalizedUploadFile struct {
 	Content     []byte
 }
 
+type Dependencies struct {
+	ProjectRepo storageports.ProjectRepository
+	PackageRepo storageports.ProjectPackageRepository
+	VersionRepo storageports.ProjectPackageVersionRepository
+	FileRepo    storageports.ProjectPackageFileRepository
+	Storage     storageports.ObjectStorage
+}
+
+func NewDependencies(projectRepo storageports.ProjectRepository, packageRepo storageports.ProjectPackageRepository, versionRepo storageports.ProjectPackageVersionRepository, fileRepo storageports.ProjectPackageFileRepository, storage storageports.ObjectStorage) Dependencies {
+	return Dependencies{ProjectRepo: projectRepo, PackageRepo: packageRepo, VersionRepo: versionRepo, FileRepo: fileRepo, Storage: storage}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{projectRepo: dependencies.ProjectRepo, packageRepo: dependencies.PackageRepo, versionRepo: dependencies.VersionRepo, fileRepo: dependencies.FileRepo, storage: dependencies.Storage}
+}
+
 func NewService(projectRepo storageports.ProjectRepository, packageRepo storageports.ProjectPackageRepository, versionRepo storageports.ProjectPackageVersionRepository, fileRepo storageports.ProjectPackageFileRepository, storage storageports.ObjectStorage) *Service {
-	return &Service{projectRepo: projectRepo, packageRepo: packageRepo, versionRepo: versionRepo, fileRepo: fileRepo, storage: storage}
+	return NewServiceWithDependencies(NewDependencies(projectRepo, packageRepo, versionRepo, fileRepo, storage))
 }
 
 func (s *Service) ListPackages(ctx context.Context, projectID int64) ([]packagedomain.ProjectPackage, error) {

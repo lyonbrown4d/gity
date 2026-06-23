@@ -28,12 +28,30 @@ type Service struct {
 	mu          sync.Mutex
 }
 
+type Dependencies struct {
+	logger      *slog.Logger
+	settings    config.Settings
+	projectRepo gitports.ProjectRepository
+}
+
+func NewDependencies(
+	logger *slog.Logger,
+	settings config.Settings,
+	projectRepo gitports.ProjectRepository,
+) Dependencies {
+	return Dependencies{logger: logger, settings: settings, projectRepo: projectRepo}
+}
+
 func NewService(logger *slog.Logger, settings config.Settings, projectRepo gitports.ProjectRepository) *Service {
+	return NewServiceWithDependencies(NewDependencies(logger, settings, projectRepo))
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
 	return &Service{
-		logger:      logger,
-		settings:    settings.Search,
-		repoRoot:    settings.Git.RepoRoot,
-		projectRepo: projectRepo,
+		logger:      dependencies.logger,
+		settings:    dependencies.settings.Search,
+		repoRoot:    dependencies.settings.Git.RepoRoot,
+		projectRepo: dependencies.projectRepo,
 	}
 }
 

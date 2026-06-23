@@ -8,7 +8,8 @@ func Module() dix.Module {
 		"service.lfs",
 		dix.Description("Git LFS application services"),
 		dix.Providers(
-			dix.Provider5(NewService),
+			dix.Provider5(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 		),
 	)
 }

@@ -63,8 +63,24 @@ type DownloadObject struct {
 	Content []byte
 }
 
+type Dependencies struct {
+	ProjectRepo storageports.ProjectRepository
+	ObjectRepo  storageports.ProjectLFSObjectRepository
+	LockRepo    storageports.ProjectLFSLockRepository
+	UserRepo    storageports.UserRepository
+	Storage     storageports.ObjectStorage
+}
+
+func NewDependencies(projectRepo storageports.ProjectRepository, objectRepo storageports.ProjectLFSObjectRepository, lockRepo storageports.ProjectLFSLockRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) Dependencies {
+	return Dependencies{ProjectRepo: projectRepo, ObjectRepo: objectRepo, LockRepo: lockRepo, UserRepo: userRepo, Storage: storage}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{projectRepo: dependencies.ProjectRepo, objectRepo: dependencies.ObjectRepo, lockRepo: dependencies.LockRepo, userRepo: dependencies.UserRepo, storage: dependencies.Storage}
+}
+
 func NewService(projectRepo storageports.ProjectRepository, objectRepo storageports.ProjectLFSObjectRepository, lockRepo storageports.ProjectLFSLockRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
-	return &Service{projectRepo: projectRepo, objectRepo: objectRepo, lockRepo: lockRepo, userRepo: userRepo, storage: storage}
+	return NewServiceWithDependencies(NewDependencies(projectRepo, objectRepo, lockRepo, userRepo, storage))
 }
 
 func (s *Service) PrepareBatch(ctx context.Context, projectID int64, request BatchRequest, baseURL, repoHTTPPath string) (BatchResponse, error) {

@@ -57,8 +57,22 @@ type CreateDeployKeyInput struct {
 	CreatedByUserID int64
 }
 
+type Dependencies struct {
+	ProjectRepo identityports.ProjectRepository
+	TokenRepo   identityports.ProjectAccessTokenRepository
+	KeyRepo     identityports.ProjectDeployKeyRepository
+}
+
+func NewDependencies(projectRepo identityports.ProjectRepository, tokenRepo identityports.ProjectAccessTokenRepository, keyRepo identityports.ProjectDeployKeyRepository) Dependencies {
+	return Dependencies{ProjectRepo: projectRepo, TokenRepo: tokenRepo, KeyRepo: keyRepo}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{projectRepo: dependencies.ProjectRepo, tokenRepo: dependencies.TokenRepo, keyRepo: dependencies.KeyRepo}
+}
+
 func NewService(projectRepo identityports.ProjectRepository, tokenRepo identityports.ProjectAccessTokenRepository, keyRepo identityports.ProjectDeployKeyRepository) *Service {
-	return &Service{projectRepo: projectRepo, tokenRepo: tokenRepo, keyRepo: keyRepo}
+	return NewServiceWithDependencies(NewDependencies(projectRepo, tokenRepo, keyRepo))
 }
 
 func (s *Service) ListProjectAccessTokens(ctx context.Context, projectID int64) ([]identity.ProjectAccessToken, error) {

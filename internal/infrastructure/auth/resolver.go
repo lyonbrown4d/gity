@@ -66,12 +66,12 @@ type ProjectScope struct {
 
 func NewEngine(userRepository *userrepo.Repository, tokenRepository *usertokenrepo.Repository, projectTokenRepository *projectaccesstokenrepo.Repository, memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) *authx.Engine {
 	return authx.NewEngine(
-		authx.WithAuthenticationManager(authx.NewProviderManager(newTokenProvider(userRepository, tokenRepository, projectTokenRepository))),
-		authx.WithAuthorizer(newProjectAuthorizer(memberRepository, projectMemberRepository)),
+		authx.WithAuthenticationManager(authx.NewProviderManager(NewTokenProvider(userRepository, tokenRepository, projectTokenRepository))),
+		authx.WithAuthorizer(NewProjectAuthorizer(memberRepository, projectMemberRepository)),
 	)
 }
 
-func newProjectAuthorizer(memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) authx.Authorizer {
+func NewProjectAuthorizer(memberRepository *organizationmemberrepo.Repository, projectMemberRepository *projectmemberrepo.Repository) authx.Authorizer {
 	return authx.AuthorizerFunc(func(ctx context.Context, input authx.AuthorizationModel) (authx.Decision, error) {
 		principal, projectID, organizationID, visibility, ok := authorizationProjectScope(input)
 		if !ok {

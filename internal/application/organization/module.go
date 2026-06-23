@@ -8,7 +8,8 @@ func Module() dix.Module {
 		"service.organization",
 		dix.Description("Organization application services"),
 		dix.Providers(
-			dix.Provider4(NewService),
+			dix.Provider4(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 		),
 	)
 }

@@ -24,8 +24,25 @@ type Service struct {
 	gitRunner    gitports.GitRunner
 }
 
+type Dependencies struct {
+	ProjectRepo  gitports.ProjectRepository
+	RunnerRepo   gitports.ProjectRunnerRepository
+	VariableRepo gitports.ProjectCIVariableRepository
+	JobService   *jobservice.Service
+	PipelineSvc  *pipelineservice.Service
+	GitRunner    gitports.GitRunner
+}
+
+func NewDependencies(projectRepo gitports.ProjectRepository, runnerRepo gitports.ProjectRunnerRepository, variableRepo gitports.ProjectCIVariableRepository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner gitports.GitRunner) Dependencies {
+	return Dependencies{ProjectRepo: projectRepo, RunnerRepo: runnerRepo, VariableRepo: variableRepo, JobService: jobService, PipelineSvc: pipelineSvc, GitRunner: gitRunner}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{projectRepo: dependencies.ProjectRepo, runnerRepo: dependencies.RunnerRepo, variableRepo: dependencies.VariableRepo, jobService: dependencies.JobService, pipelineSvc: dependencies.PipelineSvc, gitRunner: dependencies.GitRunner}
+}
+
 func NewService(projectRepo gitports.ProjectRepository, runnerRepo gitports.ProjectRunnerRepository, variableRepo gitports.ProjectCIVariableRepository, jobService *jobservice.Service, pipelineSvc *pipelineservice.Service, gitRunner gitports.GitRunner) *Service {
-	return &Service{projectRepo: projectRepo, runnerRepo: runnerRepo, variableRepo: variableRepo, jobService: jobService, pipelineSvc: pipelineSvc, gitRunner: gitRunner}
+	return NewServiceWithDependencies(NewDependencies(projectRepo, runnerRepo, variableRepo, jobService, pipelineSvc, gitRunner))
 }
 
 func (s *Service) ListProjectRunners(ctx context.Context, projectID int64) ([]RunnerView, error) {

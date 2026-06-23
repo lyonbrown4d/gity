@@ -8,7 +8,8 @@ func Module() dix.Module {
 		"infrastructure.gittransport",
 		dix.Description("Git transport services"),
 		dix.Providers(
-			dix.Provider1(NewService),
+			dix.Provider1(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 		),
 	)
 }

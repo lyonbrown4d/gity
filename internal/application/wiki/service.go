@@ -32,8 +32,26 @@ type UpdatePageInput struct {
 	EditorUserID int64   `json:"editor_user_id"`
 }
 
+type Dependencies struct {
+	ProjectRepo appports.ProjectRepository
+	PageRepo    appports.ProjectWikiPageRepository
+	UserRepo    appports.UserRepository
+}
+
+func NewDependencies(projectRepo appports.ProjectRepository, pageRepo appports.ProjectWikiPageRepository, userRepo appports.UserRepository) Dependencies {
+	return Dependencies{ProjectRepo: projectRepo, PageRepo: pageRepo, UserRepo: userRepo}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{
+		projectRepo: dependencies.ProjectRepo,
+		pageRepo:    dependencies.PageRepo,
+		userRepo:    dependencies.UserRepo,
+	}
+}
+
 func NewService(projectRepo appports.ProjectRepository, pageRepo appports.ProjectWikiPageRepository, userRepo appports.UserRepository) *Service {
-	return &Service{projectRepo: projectRepo, pageRepo: pageRepo, userRepo: userRepo}
+	return NewServiceWithDependencies(NewDependencies(projectRepo, pageRepo, userRepo))
 }
 
 func (s *Service) ListPages(ctx context.Context, projectID int64) ([]wikidomain.ProjectWikiPage, error) {

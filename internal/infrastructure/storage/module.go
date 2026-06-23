@@ -15,7 +15,8 @@ func Module() dix.Module {
 		"infrastructure.storage",
 		dix.Description("Attachment storage runtime"),
 		dix.Providers(
-			dix.ProviderErr1(NewService),
+			dix.Provider1(NewDependencies),
+			dix.ProviderErr1(NewServiceWithDependencies),
 			dix.Provider1(NewObjectStorage),
 		),
 	)

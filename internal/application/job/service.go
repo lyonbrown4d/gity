@@ -40,6 +40,30 @@ type CreateInput struct {
 
 type ClaimMatcher func(cidomain.ProjectJob) (bool, error)
 
+type Dependencies struct {
+	Logger       *slog.Logger
+	ProjectRepo  storageports.ProjectRepository
+	JobRepo      storageports.ProjectJobRepository
+	LogRepo      storageports.ProjectJobLogRepository
+	ArtifactRepo storageports.ProjectJobArtifactRepository
+	Storage      storageports.ObjectStorage
+}
+
+func NewDependencies(
+	logger *slog.Logger,
+	projectRepo storageports.ProjectRepository,
+	jobRepo storageports.ProjectJobRepository,
+	logRepo storageports.ProjectJobLogRepository,
+	artifactRepo storageports.ProjectJobArtifactRepository,
+	storage storageports.ObjectStorage,
+) Dependencies {
+	return Dependencies{Logger: logger, ProjectRepo: projectRepo, JobRepo: jobRepo, LogRepo: logRepo, ArtifactRepo: artifactRepo, Storage: storage}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{logger: dependencies.Logger, projectRepo: dependencies.ProjectRepo, jobRepo: dependencies.JobRepo, logRepo: dependencies.LogRepo, artifactRepo: dependencies.ArtifactRepo, storage: dependencies.Storage}
+}
+
 func NewService(
 	logger *slog.Logger,
 	projectRepo storageports.ProjectRepository,
@@ -48,7 +72,7 @@ func NewService(
 	artifactRepo storageports.ProjectJobArtifactRepository,
 	storage storageports.ObjectStorage,
 ) *Service {
-	return &Service{logger: logger, projectRepo: projectRepo, jobRepo: jobRepo, logRepo: logRepo, artifactRepo: artifactRepo, storage: storage}
+	return NewServiceWithDependencies(NewDependencies(logger, projectRepo, jobRepo, logRepo, artifactRepo, storage))
 }
 
 func (s *Service) ListProjectJobs(ctx context.Context, projectID int64) ([]cidomain.ProjectJob, error) {

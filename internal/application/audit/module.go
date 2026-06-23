@@ -14,7 +14,8 @@ func Module() dix.Module {
 		"service.audit",
 		dix.Description("Audit event consumers"),
 		dix.Providers(
-			dix.Provider2(NewService),
+			dix.Provider2(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 			dix.Provider2(NewSubscriber),
 		),
 		dix.Hooks(

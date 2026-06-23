@@ -46,8 +46,26 @@ type AuthSession struct {
 	RefreshToken identity.UserAccessToken
 }
 
+type Dependencies struct {
+	Logger    *slog.Logger
+	Repo      identityports.UserRepository
+	TokenRepo identityports.UserAccessTokenRepository
+}
+
+func NewDependencies(logger *slog.Logger, repo identityports.UserRepository, tokenRepo identityports.UserAccessTokenRepository) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, TokenRepo: tokenRepo}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{
+		logger:    dependencies.Logger,
+		repo:      dependencies.Repo,
+		tokenRepo: dependencies.TokenRepo,
+	}
+}
+
 func NewService(logger *slog.Logger, repo identityports.UserRepository, tokenRepo identityports.UserAccessTokenRepository) *Service {
-	return &Service{logger: logger, repo: repo, tokenRepo: tokenRepo}
+	return NewServiceWithDependencies(NewDependencies(logger, repo, tokenRepo))
 }
 
 func (s *Service) List(ctx context.Context) (*collectionx.List[identity.User], error) {

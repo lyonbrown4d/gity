@@ -54,8 +54,23 @@ type MemberView struct {
 	Role        string `json:"role"`
 }
 
+type Dependencies struct {
+	Logger     *slog.Logger
+	Repo       organizationports.OrganizationRepository
+	MemberRepo organizationports.OrganizationMemberRepository
+	UserRepo   organizationports.UserRepository
+}
+
+func NewDependencies(logger *slog.Logger, repo organizationports.OrganizationRepository, memberRepo organizationports.OrganizationMemberRepository, userRepo organizationports.UserRepository) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, MemberRepo: memberRepo, UserRepo: userRepo}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{logger: dependencies.Logger, repo: dependencies.Repo, memberRepo: dependencies.MemberRepo, userRepo: dependencies.UserRepo}
+}
+
 func NewService(logger *slog.Logger, repo organizationports.OrganizationRepository, memberRepo organizationports.OrganizationMemberRepository, userRepo organizationports.UserRepository) *Service {
-	return &Service{logger: logger, repo: repo, memberRepo: memberRepo, userRepo: userRepo}
+	return NewServiceWithDependencies(NewDependencies(logger, repo, memberRepo, userRepo))
 }
 
 func (s *Service) List(ctx context.Context) (*collectionx.List[organizationdomain.Organization], error) {

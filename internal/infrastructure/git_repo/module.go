@@ -15,7 +15,8 @@ func Module() dix.Module {
 		"infrastructure.gitrepo",
 		dix.Description("go-git repository read services"),
 		dix.Providers(
-			dix.Provider1(NewService),
+			dix.Provider1(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 			dix.Provider1(NewGitRepository),
 		),
 	)

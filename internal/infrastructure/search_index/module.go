@@ -15,7 +15,8 @@ func QueryModule() dix.Module {
 		"infrastructure.searchindex.query",
 		dix.Description("Bleve repository search index query adapter"),
 		dix.Providers(
-			dix.Provider3(NewService, dix.Eager()),
+			dix.Provider3(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies, dix.Eager()),
 			dix.Provider1(NewCodeSearchIndex, dix.Eager()),
 		),
 	)
@@ -26,7 +27,8 @@ func Module() dix.Module {
 		"infrastructure.searchindex",
 		dix.Description("Bleve repository search index refresher"),
 		dix.Providers(
-			dix.Provider3(NewService, dix.Eager()),
+			dix.Provider3(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies, dix.Eager()),
 			dix.Provider1(NewCodeSearchIndex, dix.Eager()),
 			dix.Provider1(NewSubscriber),
 		),

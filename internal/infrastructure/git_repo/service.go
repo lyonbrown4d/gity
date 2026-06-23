@@ -42,8 +42,20 @@ type LanguageStat = gitports.LanguageStat
 type LanguageAnalysis = gitports.LanguageAnalysis
 type SearchParams = gitports.SearchParams
 
+type Dependencies struct {
+	Settings config.Settings
+}
+
+func NewDependencies(settings config.Settings) Dependencies {
+	return Dependencies{Settings: settings}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{repoRoot: dependencies.Settings.Git.RepoRoot}
+}
+
 func NewService(settings config.Settings) *Service {
-	return &Service{repoRoot: settings.Git.RepoRoot}
+	return NewServiceWithDependencies(NewDependencies(settings))
 }
 
 func (s *Service) ListBranches(ctx context.Context, repoPath, defaultBranch string) ([]Branch, error) {

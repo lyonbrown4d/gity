@@ -8,8 +8,9 @@ func Module() dix.Module {
 		"service.pipeline",
 		dix.Description("Project pipeline application services"),
 		dix.Providers(
-			dix.Provider3(NewRuntimeDeps),
-			dix.Provider5(NewServiceFromDeps),
+			dix.Provider4(NewDependencies),
+			dix.Provider3(NewRuntimeDependencies),
+			dix.Provider2(NewServiceWithDependencies),
 		),
 	)
 }

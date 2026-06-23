@@ -15,8 +15,25 @@ import (
 	"github.com/samber/oops"
 )
 
+type Dependencies struct {
+	Logger        *slog.Logger
+	ProjectRepo   gitports.ProjectRepository
+	ReleaseRepo   gitports.ProjectReleaseRepository
+	LinkRepo      gitports.ProjectReleaseLinkRepository
+	GitRepository gitports.GitRepository
+	GitRunner     gitports.GitRunner
+}
+
+func NewDependencies(logger *slog.Logger, projectRepo gitports.ProjectRepository, releaseRepo gitports.ProjectReleaseRepository, linkRepo gitports.ProjectReleaseLinkRepository, gitRepository gitports.GitRepository, gitRunner gitports.GitRunner) Dependencies {
+	return Dependencies{Logger: logger, ProjectRepo: projectRepo, ReleaseRepo: releaseRepo, LinkRepo: linkRepo, GitRepository: gitRepository, GitRunner: gitRunner}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) *Service {
+	return &Service{logger: dependencies.Logger, projectRepo: dependencies.ProjectRepo, releaseRepo: dependencies.ReleaseRepo, linkRepo: dependencies.LinkRepo, gitRepository: dependencies.GitRepository, gitRunner: dependencies.GitRunner}
+}
+
 func NewService(logger *slog.Logger, projectRepo gitports.ProjectRepository, releaseRepo gitports.ProjectReleaseRepository, linkRepo gitports.ProjectReleaseLinkRepository, gitRepository gitports.GitRepository, gitRunner gitports.GitRunner) *Service {
-	return &Service{logger: logger, projectRepo: projectRepo, releaseRepo: releaseRepo, linkRepo: linkRepo, gitRepository: gitRepository, gitRunner: gitRunner}
+	return NewServiceWithDependencies(NewDependencies(logger, projectRepo, releaseRepo, linkRepo, gitRepository, gitRunner))
 }
 
 func (s *Service) ListTags(ctx context.Context, projectID int64) ([]gitports.Tag, error) {

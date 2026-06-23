@@ -8,7 +8,8 @@ func Module() dix.Module {
 		"service.packageregistry",
 		dix.Description("Package registry application services"),
 		dix.Providers(
-			dix.Provider5(NewService),
+			dix.Provider5(NewDependencies),
+			dix.Provider1(NewServiceWithDependencies),
 		),
 	)
 }

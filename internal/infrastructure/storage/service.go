@@ -28,6 +28,18 @@ type Service struct {
 	backend backend
 }
 
+type Dependencies struct {
+	settings config.Settings
+}
+
+func NewDependencies(settings config.Settings) Dependencies {
+	return Dependencies{settings: settings}
+}
+
+func NewServiceWithDependencies(dependencies Dependencies) (*Service, error) {
+	return NewService(dependencies.settings)
+}
+
 func NewService(settings config.Settings) (*Service, error) {
 	driver := strings.TrimSpace(strings.ToLower(settings.Storage.Driver))
 	if driver == "" {

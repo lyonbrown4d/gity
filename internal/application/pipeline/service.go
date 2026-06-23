@@ -20,14 +20,35 @@ type Service struct {
 	variableRepo    gitports.ProjectCIVariableRepository
 }
 
-type RuntimeDeps struct {
+type Dependencies struct {
+	projectRepo     gitports.ProjectRepository
+	pipelineRepo    gitports.ProjectPipelineRepository
+	pipelineJobRepo gitports.ProjectPipelineJobRepository
+	jobService      *jobservice.Service
+}
+
+type RuntimeDependencies struct {
 	jobRepo      gitports.ProjectJobRepository
 	gitRepo      gitports.GitRepository
 	variableRepo gitports.ProjectCIVariableRepository
 }
 
-func NewRuntimeDeps(jobRepo gitports.ProjectJobRepository, gitRepo gitports.GitRepository, variableRepo gitports.ProjectCIVariableRepository) RuntimeDeps {
-	return RuntimeDeps{jobRepo: jobRepo, gitRepo: gitRepo, variableRepo: variableRepo}
+func NewDependencies(
+	projectRepo gitports.ProjectRepository,
+	pipelineRepo gitports.ProjectPipelineRepository,
+	pipelineJobRepo gitports.ProjectPipelineJobRepository,
+	jobService *jobservice.Service,
+) Dependencies {
+	return Dependencies{
+		projectRepo:     projectRepo,
+		pipelineRepo:    pipelineRepo,
+		pipelineJobRepo: pipelineJobRepo,
+		jobService:      jobService,
+	}
+}
+
+func NewRuntimeDependencies(jobRepo gitports.ProjectJobRepository, gitRepo gitports.GitRepository, variableRepo gitports.ProjectCIVariableRepository) RuntimeDependencies {
+	return RuntimeDependencies{jobRepo: jobRepo, gitRepo: gitRepo, variableRepo: variableRepo}
 }
 
 func NewService(
@@ -39,24 +60,18 @@ func NewService(
 	gitRepo gitports.GitRepository,
 	variableRepo gitports.ProjectCIVariableRepository,
 ) *Service {
-	return NewServiceFromDeps(projectRepo, pipelineRepo, pipelineJobRepo, jobService, RuntimeDeps{jobRepo: jobRepo, gitRepo: gitRepo, variableRepo: variableRepo})
+	return NewServiceWithDependencies(NewDependencies(projectRepo, pipelineRepo, pipelineJobRepo, jobService), NewRuntimeDependencies(jobRepo, gitRepo, variableRepo))
 }
 
-func NewServiceFromDeps(
-	projectRepo gitports.ProjectRepository,
-	pipelineRepo gitports.ProjectPipelineRepository,
-	pipelineJobRepo gitports.ProjectPipelineJobRepository,
-	jobService *jobservice.Service,
-	deps RuntimeDeps,
-) *Service {
+func NewServiceWithDependencies(dependencies Dependencies, runtimeDependencies RuntimeDependencies) *Service {
 	return &Service{
-		projectRepo:     projectRepo,
-		pipelineRepo:    pipelineRepo,
-		pipelineJobRepo: pipelineJobRepo,
-		jobService:      jobService,
-		jobRepo:         deps.jobRepo,
-		gitRepo:         deps.gitRepo,
-		variableRepo:    deps.variableRepo,
+		projectRepo:     dependencies.projectRepo,
+		pipelineRepo:    dependencies.pipelineRepo,
+		pipelineJobRepo: dependencies.pipelineJobRepo,
+		jobService:      dependencies.jobService,
+		jobRepo:         runtimeDependencies.jobRepo,
+		gitRepo:         runtimeDependencies.gitRepo,
+		variableRepo:    runtimeDependencies.variableRepo,
 	}
 }
 
