@@ -1,15 +1,17 @@
-package mergerequest
+package mergerequest_test
 
 import (
 	"reflect"
 	"testing"
+
+	mergerequest "github.com/lyonbrown4d/gity/internal/application/merge_request"
 )
 
 func TestStripCodeOwnerCommentSupportsEscapedHash(t *testing.T) {
 	t.Parallel()
 
 	line := `docs/\#notes.md @alice # trailing comment`
-	got := stripCodeOwnerComment(line)
+	got := mergerequest.StripCodeOwnerComment(line)
 	if got != `docs/\#notes.md @alice ` {
 		t.Fatalf("unexpected comment-stripped line: %q", got)
 	}
@@ -19,7 +21,7 @@ func TestStripCodeOwnerCommentPreservesPathWithHashtagWithoutLeadingSpace(t *tes
 	t.Parallel()
 
 	line := `docs/#notes.md @alice`
-	got := stripCodeOwnerComment(line)
+	got := mergerequest.StripCodeOwnerComment(line)
 	if got != line {
 		t.Fatalf("unexpected comment-stripped line: %q", got)
 	}
@@ -28,7 +30,7 @@ func TestStripCodeOwnerCommentPreservesPathWithHashtagWithoutLeadingSpace(t *tes
 func TestSplitCodeOwnerFieldsSupportsEscapedSpace(t *testing.T) {
 	t.Parallel()
 
-	fields := splitCodeOwnerFields(`src/my\ file.txt @alice @bob`)
+	fields := mergerequest.SplitCodeOwnerFields(`src/my\ file.txt @alice @bob`)
 	expected := []string{"src/my file.txt", "@alice", "@bob"}
 	if !reflect.DeepEqual(fields, expected) {
 		t.Fatalf("split fields mismatch: %#v", fields)
@@ -38,7 +40,7 @@ func TestSplitCodeOwnerFieldsSupportsEscapedSpace(t *testing.T) {
 func TestParseCodeOwnerLineWithEscapedSpaceAndComment(t *testing.T) {
 	t.Parallel()
 
-	rule, ok := parseCodeOwnerLine(`src/my\ file.txt @alice # comment`)
+	rule, ok := mergerequest.ParseCodeOwnerLine(`src/my\ file.txt @alice # comment`)
 	if !ok {
 		t.Fatal("expected parse success")
 	}
@@ -54,7 +56,7 @@ func TestParseCodeOwnerLineSkipsSectionAndNegatedPattern(t *testing.T) {
 	t.Parallel()
 
 	for _, line := range []string{"[team]", "!"} {
-		if _, ok := parseCodeOwnerLine(line); ok {
+		if _, ok := mergerequest.ParseCodeOwnerLine(line); ok {
 			t.Fatalf("expected line %q to be skipped", line)
 		}
 	}

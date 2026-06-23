@@ -1,6 +1,7 @@
+// Package auth provides infrastructure authentication helpers.
 package auth
 
-// Package auth contains infrastructure authentication helpers.
+// TokenCredential represents a token-based credential value.
 type TokenCredential struct {
 	Token string
 }

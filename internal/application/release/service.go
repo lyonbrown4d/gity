@@ -1,4 +1,3 @@
-// Package release implements project release and tag management.
 package release
 
 import (

@@ -28,35 +28,16 @@ type Service struct {
 	backend backend
 }
 
-type Dependencies struct {
-	settings config.Settings
-}
-
-func NewDependencies(settings config.Settings) Dependencies {
-	return Dependencies{settings: settings}
-}
-
-func NewServiceWithDependencies(dependencies Dependencies) (*Service, error) {
-	return NewService(dependencies.settings)
+func NewServiceWithBackend(backend backend) *Service {
+	return &Service{backend: backend}
 }
 
 func NewService(settings config.Settings) (*Service, error) {
-	driver := strings.TrimSpace(strings.ToLower(settings.Storage.Driver))
-	if driver == "" {
-		driver = "local"
+	backend, err := NewBackend(settings)
+	if err != nil {
+		return nil, err
 	}
-	switch driver {
-	case "local":
-		return &Service{backend: &localBackend{root: settings.Storage.Root}}, nil
-	case "s3":
-		client, err := newS3Backend(settings)
-		if err != nil {
-			return nil, oops.In("storage").With("driver", driver).Wrapf(err, "create storage backend")
-		}
-		return &Service{backend: client}, nil
-	default:
-		return nil, oops.In("storage").With("driver", driver).New("unsupported storage driver")
-	}
+	return NewServiceWithBackend(backend), nil
 }
 
 func (s *Service) SaveObject(ctx context.Context, key string, content []byte, contentType string) error {

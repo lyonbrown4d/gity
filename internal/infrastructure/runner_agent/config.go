@@ -25,7 +25,6 @@ type Config struct {
 	ExecutionMode            string
 	ContainerRuntime         string
 	ContainerRuntimeEndpoint string
-	DockerBinary             string
 	DockerImage              string
 	DockerNetwork            string
 	DockerHostNetwork        bool
@@ -63,7 +62,6 @@ func defaultConfigFromEnv() Config {
 		ExecutionMode:            envString("GITY_RUNNER_EXECUTION_MODE", ""),
 		ContainerRuntime:         envString("GITY_RUNNER_CONTAINER_RUNTIME", runnerExecutionModeDocker),
 		ContainerRuntimeEndpoint: envString("GITY_RUNNER_CONTAINER_RUNTIME_ENDPOINT", ""),
-		DockerBinary:             envString("GITY_RUNNER_DOCKER_BINARY", dockerBinaryDefault),
 		DockerImage:              envString("GITY_RUNNER_CONTAINER_IMAGE", envString("GITY_RUNNER_DOCKER_IMAGE", envString("GITY_RUNNER_DOCKER_DEFAULT_IMAGE", ""))),
 		DockerNetwork:            envString("GITY_RUNNER_CONTAINER_NETWORK", envString("GITY_RUNNER_DOCKER_NETWORK", "")),
 		DockerHostNetwork:        envBool("GITY_RUNNER_CONTAINER_HOST_NETWORK", envBool("GITY_RUNNER_DOCKER_HOST_NETWORK", false)),
@@ -102,8 +100,6 @@ func bindRunnerFlags(flags *flag.FlagSet, cfg *Config, allowedShells *string) {
 		"default container runtime for script jobs: docker, podman, containerd, or firecracker",
 	)
 	flags.StringVar(&cfg.ContainerRuntimeEndpoint, "container-runtime-endpoint", cfg.ContainerRuntimeEndpoint, "container runtime API endpoint")
-	flags.StringVar(&cfg.DockerBinary, "docker-binary", cfg.DockerBinary, "deprecated: runtime API mode is used by default")
-	flags.StringVar(&cfg.DockerBinary, "container-runtime-binary", cfg.DockerBinary, "deprecated: runtime API mode is used by default")
 	flags.StringVar(&cfg.DockerImage, "container-image", cfg.DockerImage, "default container image for script jobs")
 	flags.StringVar(&cfg.DockerNetwork, "container-network", cfg.DockerNetwork, "container network")
 	flags.BoolVar(&cfg.DockerHostNetwork, "container-host-network", cfg.DockerHostNetwork, "run container in host network mode")
@@ -177,7 +173,6 @@ const (
 	runnerExecutionModePodman      = "podman"
 	runnerExecutionModeContainerd  = "containerd"
 	runnerExecutionModeFirecracker = "firecracker"
-	dockerBinaryDefault            = "docker"
 )
 
 func parseAllowedShells(value string) []string {

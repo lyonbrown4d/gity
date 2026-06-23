@@ -61,23 +61,29 @@ func ensureSQLiteDatabaseDir(dsn string) error {
 	if !strings.HasPrefix(dsn, sqlitePrefix) {
 		return nil
 	}
-	trimmed := strings.TrimPrefix(dsn, sqlitePrefix)
-	if trimmed == "" || trimmed == ":memory:" || strings.HasPrefix(trimmed, ":memory:") {
+	trimmed, _ := strings.CutPrefix(dsn, sqlitePrefix)
+	if isSQLiteMemoryDSN(trimmed) {
 		return nil
 	}
 
 	dbPath := strings.Split(trimmed, "?")[0]
-	if strings.HasPrefix(dbPath, "//") {
-		dbPath = strings.TrimPrefix(dbPath, "//")
-	}
-	if dbPath == "" || dbPath == ":memory:" || strings.HasPrefix(dbPath, "/") && strings.Count(dbPath, "/") == 1 {
+	dbPath, _ = strings.CutPrefix(dbPath, "//")
+	if dbPath == "" || isSQLiteRootPath(dbPath) {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(filepath.Clean(dbPath)), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filepath.Clean(dbPath)), 0o750); err != nil {
 		return oops.In("database").Wrapf(err, "create sqlite data directory")
 	}
 	return nil
+}
+
+func isSQLiteMemoryDSN(dsn string) bool {
+	return dsn == "" || dsn == ":memory:" || strings.HasPrefix(dsn, ":memory:")
+}
+
+func isSQLiteRootPath(dbPath string) bool {
+	return dbPath == ":memory:" || (strings.HasPrefix(dbPath, "/") && strings.Count(dbPath, "/") == 1)
 }
 
 func resolveDialect(driver string) (dialect.Dialect, error) {

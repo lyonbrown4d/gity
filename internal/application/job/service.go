@@ -8,72 +8,11 @@ import (
 	"strings"
 	"time"
 
-	setx "github.com/arcgolabs/collectionx/set"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	"github.com/samber/oops"
 )
-
-const (
-	KindNoop   = "noop"
-	KindScript = "script"
-)
-
-var supportedKinds = setx.NewSet(KindNoop, KindScript)
-
-type Service struct {
-	logger       *slog.Logger
-	projectRepo  storageports.ProjectRepository
-	jobRepo      storageports.ProjectJobRepository
-	logRepo      storageports.ProjectJobLogRepository
-	artifactRepo storageports.ProjectJobArtifactRepository
-	storage      storageports.ObjectStorage
-}
-
-type CreateInput struct {
-	Kind        string    `json:"kind"`
-	Payload     string    `json:"payload"`
-	MaxAttempts int       `json:"max_attempts"`
-	RunAfter    time.Time `json:"run_after"`
-}
-
-type ClaimMatcher func(cidomain.ProjectJob) (bool, error)
-
-type Dependencies struct {
-	Logger       *slog.Logger
-	ProjectRepo  storageports.ProjectRepository
-	JobRepo      storageports.ProjectJobRepository
-	LogRepo      storageports.ProjectJobLogRepository
-	ArtifactRepo storageports.ProjectJobArtifactRepository
-	Storage      storageports.ObjectStorage
-}
-
-func NewDependencies(
-	logger *slog.Logger,
-	projectRepo storageports.ProjectRepository,
-	jobRepo storageports.ProjectJobRepository,
-	logRepo storageports.ProjectJobLogRepository,
-	artifactRepo storageports.ProjectJobArtifactRepository,
-	storage storageports.ObjectStorage,
-) Dependencies {
-	return Dependencies{Logger: logger, ProjectRepo: projectRepo, JobRepo: jobRepo, LogRepo: logRepo, ArtifactRepo: artifactRepo, Storage: storage}
-}
-
-func NewServiceWithDependencies(dependencies Dependencies) *Service {
-	return &Service{logger: dependencies.Logger, projectRepo: dependencies.ProjectRepo, jobRepo: dependencies.JobRepo, logRepo: dependencies.LogRepo, artifactRepo: dependencies.ArtifactRepo, storage: dependencies.Storage}
-}
-
-func NewService(
-	logger *slog.Logger,
-	projectRepo storageports.ProjectRepository,
-	jobRepo storageports.ProjectJobRepository,
-	logRepo storageports.ProjectJobLogRepository,
-	artifactRepo storageports.ProjectJobArtifactRepository,
-	storage storageports.ObjectStorage,
-) *Service {
-	return NewServiceWithDependencies(NewDependencies(logger, projectRepo, jobRepo, logRepo, artifactRepo, storage))
-}
 
 func (s *Service) ListProjectJobs(ctx context.Context, projectID int64) ([]cidomain.ProjectJob, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
@@ -295,23 +234,4 @@ func (s *Service) execute(ctx context.Context, item cidomain.ProjectJob) (string
 	default:
 		return "", oops.In("job").With("project_id", item.ProjectID, "job_id", item.ID, "kind", item.Kind).New("unsupported project job kind")
 	}
-}
-
-func retryDelay(attempts int) time.Duration {
-	if attempts <= 0 {
-		return 5 * time.Second
-	}
-	delay := time.Duration(attempts*5) * time.Second
-	if delay > time.Minute {
-		return time.Minute
-	}
-	return delay
-}
-
-func normalizeWorkerID(workerID string) string {
-	trimmed := strings.TrimSpace(workerID)
-	if trimmed == "" {
-		return "worker"
-	}
-	return trimmed
 }

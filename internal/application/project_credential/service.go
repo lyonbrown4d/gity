@@ -1,4 +1,3 @@
-// Package projectcredential implements project access token, deploy token and deploy key use cases.
 package projectcredential
 
 import (

@@ -78,20 +78,6 @@ export const resolveBoolean = (meta: MetaLike, key: string): boolean | undefined
   return undefined;
 };
 
-export const resolveLimit = (pagination: unknown, fallback = 100): number => {
-  const record = asRecord(pagination);
-  if (!record) {
-    return fallback;
-  }
-
-  const pageSize = record.pageSize;
-  if (typeof pageSize !== "number" || Number.isNaN(pageSize)) {
-    return fallback;
-  }
-
-  return Math.max(1, Math.min(200, Math.floor(pageSize)));
-};
-
 const asPositiveInteger = (value: unknown, fallback: number): number => {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return fallback;
