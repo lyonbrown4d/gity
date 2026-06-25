@@ -1,0 +1,64 @@
+services:
+  traefik:
+    image: traefik:v3
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --api.dashboard=false
+      - --log.level=INFO
+    ports:
+      - "${GITY_BLACKBOX_WEB_PORT:-18080}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+  backend:
+    build:
+      context: .
+      dockerfile: build/blackbox/backend.Dockerfile
+    environment:
+      GITY_APP__ENVIRONMENT: production
+      GITY_HTTP__ADDRESS: 0.0.0.0:8080
+      GITY_HTTP__BASE_URL: http://127.0.0.1:${GITY_BLACKBOX_WEB_PORT:-18080}
+      GITY_DATABASE__DRIVER: sqlite
+      GITY_DATABASE__DSN: file:/var/lib/gity/gity.db?_pragma=foreign_keys(1)
+      GITY_DATABASE__NODE_ID: "1"
+      GITY_GIT__REPO_ROOT: /var/lib/gity/repos
+      GITY_STORAGE__DRIVER: local
+      GITY_STORAGE__ROOT: /var/lib/gity/storage
+      GITY_SEARCH__INDEX_ENABLED: "false"
+    volumes:
+      - blackbox_backend_data:/var/lib/gity
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gity-blackbox-api.rule: PathPrefix(`/api`)
+      traefik.http.routers.gity-blackbox-api.entrypoints: web
+      traefik.http.routers.gity-blackbox-api.priority: "100"
+      traefik.http.services.gity-blackbox-api.loadbalancer.server.port: "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: web
+      dockerfile: ../build/blackbox/web.Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.gity-blackbox-web.rule: PathPrefix(`/`)
+      traefik.http.routers.gity-blackbox-web.entrypoints: web
+      traefik.http.routers.gity-blackbox-web.priority: "1"
+      traefik.http.services.gity-blackbox-web.loadbalancer.server.port: "8080"
+
+volumes:
+  blackbox_backend_data:

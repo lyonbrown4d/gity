@@ -11,6 +11,7 @@
     "build:debug": "pnpm typecheck && vite build --config vite.config.ts --mode development --sourcemap",
     "preview": "vite preview --config vite.config.ts",
     "test:e2e": "pnpm typecheck:e2e && playwright test",
+    "test:e2e:blackbox": "pnpm typecheck:e2e && playwright test -c playwright.blackbox.config.ts",
     "e2e": "pnpm test:e2e",
     "e2e:ui": "playwright test --ui",
     "e2e:headed": "playwright test --headed",

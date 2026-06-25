@@ -122,6 +122,90 @@ jobs:
           path: .tmp-e2e/playwright-results
           if-no-files-found: ignore
 
+  web-blackbox-e2e:
+    name: Web blackbox E2E
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build runner binary
+        run: |
+          mkdir -p .tmp-e2e/bin
+          go build -o .tmp-e2e/bin/gity-runner-e2e ./cmd/runner
+
+      - name: Start blackbox stack
+        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml up -d --build
+
+      - name: Wait for blackbox gateway
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:18080/api/health >/dev/null && curl -fsS http://127.0.0.1:18080/ >/dev/null; then
+              exit 0
+            fi
+            docker compose -p gity-blackbox -f docker-compose.blackbox.yaml ps
+            sleep 2
+          done
+          docker compose -p gity-blackbox -f docker-compose.blackbox.yaml logs --no-color
+          exit 1
+
+      - name: Run blackbox Playwright E2E
+        working-directory: web
+        env:
+          E2E_WEB_BASE_URL: http://127.0.0.1:18080
+          E2E_API_BASE_URL: http://127.0.0.1:18080/api/v1
+          GITY_E2E_ROOT: ${{ github.workspace }}/.tmp-e2e/blackbox
+          GITY_E2E_RUNNER_BIN: ${{ github.workspace }}/.tmp-e2e/bin/gity-runner-e2e
+          GITY_E2E_REPO_ROOT: ""
+        run: pnpm test:e2e:blackbox
+
+      - name: Dump blackbox logs
+        if: failure()
+        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml logs --no-color
+
+      - name: Upload blackbox Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackbox-playwright-report
+          path: .tmp-e2e/blackbox-playwright-report
+          if-no-files-found: ignore
+
+      - name: Upload blackbox Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackbox-playwright-results
+          path: .tmp-e2e/blackbox-playwright-results
+          if-no-files-found: ignore
+
+      - name: Stop blackbox stack
+        if: always()
+        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml down -v
   release-config:
     name: GoReleaser package snapshot
     runs-on: ubuntu-latest
