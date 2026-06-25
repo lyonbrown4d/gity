@@ -21,6 +21,7 @@ const repoRoot = toSlash(path.join(runRoot, "repos"));
 const storageRoot = toSlash(path.join(runRoot, "storage"));
 const searchRoot = toSlash(path.join(runRoot, "search-index"));
 const binRoot = toSlash(path.join(runRoot, "bin"));
+const runnerBin = toSlash(path.join(binRoot, process.platform === "win32" ? "gity-runner-e2e.exe" : "gity-runner-e2e"));
 
 for (const dir of [repoRoot, storageRoot, searchRoot, binRoot]) {
   fs.mkdirSync(dir, { recursive: true });
@@ -28,6 +29,10 @@ for (const dir of [repoRoot, storageRoot, searchRoot, binRoot]) {
 
 process.env.E2E_WEB_BASE_URL = webBaseURL;
 process.env.E2E_API_BASE_URL = apiBaseURL;
+process.env.GITY_E2E_ROOT = runRoot;
+process.env.GITY_E2E_BIN_ROOT = binRoot;
+process.env.GITY_E2E_REPO_ROOT = repoRoot;
+process.env.GITY_E2E_RUNNER_BIN = runnerBin;
 const backendEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key, value]) => key !== "GOCACHE" && value !== undefined),
 ) as Record<string, string>;

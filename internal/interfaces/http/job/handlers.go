@@ -12,7 +12,7 @@ func (e *Endpoint) listProjectJobs(ctx context.Context, in *projectJobsInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: items}, nil
+	return &jobOutput{Body: toProjectJobViews(items)}, nil
 }
 
 func (e *Endpoint) createJob(ctx context.Context, in *createJobInput) (*jobOutput, error) {
@@ -24,7 +24,7 @@ func (e *Endpoint) createJob(ctx context.Context, in *createJobInput) (*jobOutpu
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobView(item)}, nil
 }
 
 func (e *Endpoint) getProjectJob(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
@@ -32,7 +32,7 @@ func (e *Endpoint) getProjectJob(ctx context.Context, in *projectJobInput) (*job
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobView(item)}, nil
 }
 
 func (e *Endpoint) cancelProjectJob(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
@@ -43,7 +43,7 @@ func (e *Endpoint) cancelProjectJob(ctx context.Context, in *projectJobInput) (*
 	if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobView(item)}, nil
 }
 
 func (e *Endpoint) retryProjectJob(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
@@ -54,7 +54,7 @@ func (e *Endpoint) retryProjectJob(ctx context.Context, in *projectJobInput) (*j
 	if err := e.refreshPipelineForJob(ctx, in.ProjectID, in.JobID); err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobView(item)}, nil
 }
 
 func (e *Endpoint) getProjectJobTrace(ctx context.Context, in *projectJobTraceInput) (*jobOutput, error) {
@@ -62,7 +62,7 @@ func (e *Endpoint) getProjectJobTrace(ctx context.Context, in *projectJobTraceIn
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobTraceView(item)}, nil
 }
 
 func (e *Endpoint) listProjectJobArtifacts(ctx context.Context, in *projectJobInput) (*jobOutput, error) {
@@ -70,7 +70,7 @@ func (e *Endpoint) listProjectJobArtifacts(ctx context.Context, in *projectJobIn
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: items}, nil
+	return &jobOutput{Body: toProjectJobArtifactViews(items)}, nil
 }
 
 func (e *Endpoint) getProjectJobArtifact(ctx context.Context, in *projectJobArtifactInput) (*jobOutput, error) {
@@ -78,5 +78,6 @@ func (e *Endpoint) getProjectJobArtifact(ctx context.Context, in *projectJobArti
 	if err != nil {
 		return nil, err
 	}
-	return &jobOutput{Body: item}, nil
+	return &jobOutput{Body: toProjectJobArtifactContentView(item)}, nil
 }
+

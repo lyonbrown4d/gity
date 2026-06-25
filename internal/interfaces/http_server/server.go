@@ -71,7 +71,7 @@ func (h *Host) Start(ctx context.Context) error {
 	}
 
 	// The hook context is canceled when OnStart returns; keep the listener alive until Stop cancels it.
-	runCtx, cancel := context.WithCancel(context.Background())
+	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	h.cancel = cancel
 	go func() {
 		h.done <- h.server.ListenAndServeContext(runCtx, h.address)

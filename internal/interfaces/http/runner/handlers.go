@@ -13,7 +13,7 @@ func (e *Endpoint) listProjectRunners(ctx context.Context, in *projectRunnersInp
 	if err != nil {
 		return nil, err
 	}
-	return &runnerOutput{Body: items}, nil
+	return &runnerOutput{Body: toRunnerViews(items)}, nil
 }
 
 func (e *Endpoint) registerProjectRunner(ctx context.Context, in *registerRunnerInput) (*runnerOutput, error) {
@@ -25,7 +25,7 @@ func (e *Endpoint) registerProjectRunner(ctx context.Context, in *registerRunner
 	if err != nil {
 		return nil, err
 	}
-	return &runnerOutput{Body: item}, nil
+	return &runnerOutput{Body: toRegistrationView(item)}, nil
 }
 
 func (e *Endpoint) deleteProjectRunner(ctx context.Context, in *projectRunnerInput) (*runnerOutput, error) {
@@ -33,7 +33,7 @@ func (e *Endpoint) deleteProjectRunner(ctx context.Context, in *projectRunnerInp
 	if err != nil {
 		return nil, err
 	}
-	return &runnerOutput{Body: item}, nil
+	return &runnerOutput{Body: toRunnerView(item)}, nil
 }
 
 func (e *Endpoint) listProjectVariables(ctx context.Context, in *projectVariablesInput) (*runnerOutput, error) {
@@ -41,7 +41,7 @@ func (e *Endpoint) listProjectVariables(ctx context.Context, in *projectVariable
 	if err != nil {
 		return nil, err
 	}
-	return &runnerOutput{Body: items}, nil
+	return &runnerOutput{Body: toVariableViews(items)}, nil
 }
 
 func (e *Endpoint) upsertProjectVariable(ctx context.Context, in *upsertVariableInput) (*runnerOutput, error) {
@@ -53,7 +53,7 @@ func (e *Endpoint) upsertProjectVariable(ctx context.Context, in *upsertVariable
 	if err != nil {
 		return nil, err
 	}
-	return &runnerOutput{Body: item}, nil
+	return &runnerOutput{Body: toVariableView(item)}, nil
 }
 
 func (e *Endpoint) deleteProjectVariable(ctx context.Context, in *projectVariableInput) (*runnerOutput, error) {
@@ -79,7 +79,7 @@ func (e *Endpoint) claimJob(ctx context.Context, in *claimJobInput) (*runnerOutp
 	return &runnerOutput{Body: item}, nil
 }
 
-func (e *Endpoint) completeJob(ctx context.Context, in *runnerJobInput) (*runnerOutput, error) {
+func (e *Endpoint) completeJob(ctx context.Context, in *runnerCompleteJobInput) (*runnerOutput, error) {
 	item, err := e.service.CompleteJob(ctx, in.Body.Token, in.JobID, in.Body.Result)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (e *Endpoint) completeJob(ctx context.Context, in *runnerJobInput) (*runner
 	return &runnerOutput{Body: item}, nil
 }
 
-func (e *Endpoint) failJob(ctx context.Context, in *runnerJobInput) (*runnerOutput, error) {
+func (e *Endpoint) failJob(ctx context.Context, in *runnerFailJobInput) (*runnerOutput, error) {
 	item, err := e.service.FailJob(ctx, in.Body.Token, in.JobID, in.Body.Error, in.Body.Result, runnerRetryDelay(in.Body.RetryAfterSeconds))
 	if err != nil {
 		return nil, err

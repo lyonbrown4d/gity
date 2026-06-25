@@ -65,9 +65,14 @@ type claimJobInput struct {
 	Body claimJobBody `json:"body"`
 }
 
-type runnerJobInput struct {
-	JobID int64         `path:"job_id"`
-	Body  runnerJobBody `json:"body"`
+type runnerCompleteJobInput struct {
+	JobID int64                 `path:"job_id"`
+	Body  runnerCompleteJobBody `json:"body"`
+}
+
+type runnerFailJobInput struct {
+	JobID int64             `path:"job_id"`
+	Body  runnerFailJobBody `json:"body"`
 }
 
 type runnerTokenBody struct {
@@ -84,7 +89,12 @@ type claimJobBody struct {
 	LeaseSeconds int    `json:"lease_seconds"`
 }
 
-type runnerJobBody struct {
+type runnerCompleteJobBody struct {
+	Token  string `json:"token"`
+	Result string `json:"result"`
+}
+
+type runnerFailJobBody struct {
 	Token             string `json:"token"`
 	Result            string `json:"result"`
 	Error             string `json:"error"`

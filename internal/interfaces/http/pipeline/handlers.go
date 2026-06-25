@@ -12,7 +12,7 @@ func (e *Endpoint) listPipelines(ctx context.Context, in *projectPipelinesInput)
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: items}, nil
+	return &pipelineOutput{Body: toProjectPipelineViews(items)}, nil
 }
 
 func (e *Endpoint) createPipeline(ctx context.Context, in *createPipelineInput) (*pipelineOutput, error) {
@@ -24,7 +24,7 @@ func (e *Endpoint) createPipeline(ctx context.Context, in *createPipelineInput) 
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: item}, nil
+	return &pipelineOutput{Body: toPipelineDetailView(item)}, nil
 }
 
 func (e *Endpoint) lintPipeline(ctx context.Context, in *lintPipelineInput) (*pipelineOutput, error) {
@@ -44,7 +44,7 @@ func (e *Endpoint) getPipeline(ctx context.Context, in *projectPipelineInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: item}, nil
+	return &pipelineOutput{Body: toPipelineDetailView(item)}, nil
 }
 
 func (e *Endpoint) refreshPipeline(ctx context.Context, in *projectPipelineInput) (*pipelineOutput, error) {
@@ -52,7 +52,7 @@ func (e *Endpoint) refreshPipeline(ctx context.Context, in *projectPipelineInput
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: item}, nil
+	return &pipelineOutput{Body: toPipelineDetailView(item)}, nil
 }
 
 func (e *Endpoint) cancelPipeline(ctx context.Context, in *projectPipelineInput) (*pipelineOutput, error) {
@@ -60,7 +60,7 @@ func (e *Endpoint) cancelPipeline(ctx context.Context, in *projectPipelineInput)
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: item}, nil
+	return &pipelineOutput{Body: toPipelineDetailView(item)}, nil
 }
 
 func (e *Endpoint) retryPipeline(ctx context.Context, in *projectPipelineInput) (*pipelineOutput, error) {
@@ -68,7 +68,7 @@ func (e *Endpoint) retryPipeline(ctx context.Context, in *projectPipelineInput) 
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: item}, nil
+	return &pipelineOutput{Body: toPipelineDetailView(item)}, nil
 }
 
 func (e *Endpoint) listPipelineJobs(ctx context.Context, in *projectPipelineInput) (*pipelineOutput, error) {
@@ -76,5 +76,5 @@ func (e *Endpoint) listPipelineJobs(ctx context.Context, in *projectPipelineInpu
 	if err != nil {
 		return nil, err
 	}
-	return &pipelineOutput{Body: items}, nil
+	return &pipelineOutput{Body: toPipelineJobViews(items)}, nil
 }

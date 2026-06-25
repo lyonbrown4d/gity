@@ -8,6 +8,7 @@ const rootDir = path.resolve(scriptDir, "../../..");
 const goBin = process.platform === "win32" ? "go.exe" : "go";
 const binRoot = process.env.GITY_E2E_BIN_ROOT ?? path.join(rootDir, ".tmp-e2e", "bin");
 const serverBin = path.join(binRoot, process.platform === "win32" ? "gity-server-e2e.exe" : "gity-server-e2e");
+const runnerBin = path.join(binRoot, process.platform === "win32" ? "gity-runner-e2e.exe" : "gity-runner-e2e");
 
 mkdirSync(binRoot, { recursive: true });
 
@@ -33,6 +34,7 @@ const run = (command, args, options = {}) =>
 
 await run(goBin, ["run", "./cmd/migration"]);
 await run(goBin, ["build", "-o", serverBin, "./cmd/server"]);
+await run(goBin, ["build", "-o", runnerBin, "./cmd/runner"]);
 
 let stopping = false;
 const server = spawn(serverBin, [], {

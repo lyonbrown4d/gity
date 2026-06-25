@@ -54,9 +54,12 @@ func (c *Client) ClaimJob(ctx context.Context, leaseSeconds int) (ClaimResponse,
 }
 
 func (c *Client) GetProjectJob(ctx context.Context, projectID, jobID int64) (cidomain.ProjectJob, error) {
-	var out cidomain.ProjectJob
+	var out projectJobWire
 	err := c.get(ctx, fmt.Sprintf("/projects/%d/jobs/%d", projectID, jobID), &out)
-	return out, err
+	if err != nil {
+		return cidomain.ProjectJob{}, err
+	}
+	return out.ProjectJob(), nil
 }
 
 func (c *Client) CompleteJob(ctx context.Context, jobID int64, result string) error {
@@ -160,7 +163,9 @@ func (c *Client) handleResponse(resp *http.Response, method, path string, out an
 		return oops.In("runner_agent").With("method", method, "path", path).Wrapf(err, "read runner response")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return oops.In("runner_agent").With("method", method, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).New("runner request failed")
+		return oops.In("runner_agent").
+			With("method", method, "path", path, "status", resp.StatusCode, "body", strings.TrimSpace(string(content))).
+			New(fmt.Sprintf("runner request failed: status=%d body=%s", resp.StatusCode, truncateRunnerResponse(content)))
 	}
 	if out == nil {
 		return nil
@@ -169,6 +174,15 @@ func (c *Client) handleResponse(resp *http.Response, method, path string, out an
 		return oops.In("runner_agent").With("method", method, "path", path).Wrapf(err, "decode runner response")
 	}
 	return nil
+}
+
+func truncateRunnerResponse(content []byte) string {
+	const limit = 1024
+	body := strings.TrimSpace(string(content))
+	if len(body) <= limit {
+		return body
+	}
+	return body[:limit] + "...(truncated)"
 }
 
 func decodeBody(content []byte, out any) error {
