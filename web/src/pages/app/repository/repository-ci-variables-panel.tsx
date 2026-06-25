@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import type { RepositoryCIVariableView } from "@/pages/types";
 import { extractErrorMessage } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
@@ -38,8 +40,17 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
     () => resolveVariables(variablesQuery.result.data).map(normalizeVariable),
     [variablesQuery.result.data],
   );
+  const variableStats = useMemo(
+    () => ({
+      total: variables.length,
+      masked: variables.filter((item) => item.masked).length,
+      protected: variables.filter((item) => item.protected).length,
+    }),
+    [variables],
+  );
   const canAdminVariables = permissions.runnerAdmin;
   const isBusy = isSaving || isDeleting;
+  const isLoadingVariables = variablesQuery.query.isFetching && !variablesQuery.query.data;
 
   const reload = async () => {
     const result = await variablesQuery.query.refetch();
@@ -100,17 +111,22 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
   }, [variablesQuery.query.error, onError]);
 
   return (
-    <div className="space-y-4 rounded-md border p-3">
+    <div className="flex flex-col gap-4 rounded-md border p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="flex flex-col gap-2">
           <p className="flex items-center gap-2 font-medium">
             <KeyRound className="size-4" />
             {t("CI variables")}
           </p>
           <p className="text-xs text-muted-foreground">{t("Masked variables are injected into script jobs and redacted from logs.")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary">{t("Variables")}: {variableStats.total}</Badge>
+            <Badge variant="outline">{t("Masked")}: {variableStats.masked}</Badge>
+            <Badge variant="outline">{t("Protected")}: {variableStats.protected}</Badge>
+          </div>
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
-          <RefreshCw className="size-4" />
+          <RefreshCw data-icon="inline-start" />
           {t("Reload")}
         </Button>
       </div>
@@ -122,7 +138,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
       ) : null}
 
       <form className="grid gap-3 rounded-md border bg-muted/10 p-3 lg:grid-cols-[180px_1fr_auto]" onSubmit={submitVariable}>
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground" htmlFor="ci-variable-key">
             {t("Key")}
           </Label>
@@ -134,7 +150,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
             disabled={!canAdminVariables || isBusy}
           />
         </div>
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <Label className="text-xs text-muted-foreground" htmlFor="ci-variable-value">
             {t("Value")}
           </Label>
@@ -151,26 +167,33 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
           <ToggleButton active={masked} disabled={!canAdminVariables || isBusy} label={t("Masked")} onToggle={() => setMasked((current) => !current)} />
           <ToggleButton active={protectedVariable} disabled={!canAdminVariables || isBusy} label={t("Protected")} onToggle={() => setProtectedVariable((current) => !current)} />
           <Button type="submit" disabled={!canAdminVariables || isBusy || !key.trim() || !value}>
-            <Plus className="size-4" />
+            <Plus data-icon="inline-start" />
             {isSaving ? t("Saving...") : t("Save")}
           </Button>
         </div>
       </form>
 
-      <div className="space-y-2 rounded-md border p-2">
-        {variablesQuery.query.isFetching && !variablesQuery.query.data ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading CI variables...")}</p>
-        ) : null}
-        {variables.length === 0 ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">{t("No CI variables configured.")}</p>
+      <div className="flex flex-col gap-2 rounded-md border p-2">
+        {isLoadingVariables ? <VariableListSkeleton /> : null}
+        {!isLoadingVariables && variables.length === 0 ? (
+          <VariableEmptyState canAdmin={canAdminVariables} t={t} />
         ) : null}
         {variables.map((variable) => (
-          <div key={variable.id || variable.key} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0">
+          <div
+            key={variable.id || variable.key}
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-3 rounded-md border p-3",
+              variable.protected ? "border-primary/30 bg-primary/5" : "bg-background/60",
+            )}
+          >
+            <div className="flex min-w-0 flex-col gap-2">
               <p className="font-mono text-sm font-medium">{variable.key}</p>
-              <div className="mt-1 flex flex-wrap gap-2">
+              <p className="text-xs text-muted-foreground">
+                {variable.updated_at ? `${t("Updated")}: ${variable.updated_at}` : t("Value is hidden after save")}
+              </p>
+              <div className="flex flex-wrap gap-2">
                 {variable.masked ? <Badge variant="secondary">{t("masked")}</Badge> : <Badge variant="outline">{t("visible")}</Badge>}
-                {variable.protected ? <Badge variant="outline">{t("protected")}</Badge> : null}
+                {variable.protected ? <Badge variant="outline">{t("protected")}</Badge> : <Badge variant="outline">{t("unprotected")}</Badge>}
               </div>
             </div>
             <ConfirmAction
@@ -181,7 +204,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
               onConfirm={() => void submitDeleteVariable(variable)}
             >
               <Button type="button" size="sm" variant="outline" disabled={!canAdminVariables || isBusy}>
-                <Trash2 className="size-4" />
+                <Trash2 data-icon="inline-start" />
                 {isDeleting ? t("Deleting...") : t("Delete")}
               </Button>
             </ConfirmAction>
@@ -191,6 +214,25 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
     </div>
   );
 };
+
+const VariableEmptyState = ({ canAdmin, t }: { canAdmin: boolean; t: (text: string) => string }) => (
+  <Alert className="border-dashed bg-muted/20">
+    <AlertTitle>{t("No CI variables configured")}</AlertTitle>
+    <AlertDescription className="flex flex-col gap-3">
+      <p>{t("Add masked variables for tokens, deployment keys, and environment values that jobs need at runtime.")}</p>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant={canAdmin ? "secondary" : "outline"}>{canAdmin ? t("Use the form above") : t("Runner admin required")}</Badge>
+      </div>
+    </AlertDescription>
+  </Alert>
+);
+
+const VariableListSkeleton = () => (
+  <div className="flex flex-col gap-2">
+    <Skeleton className="h-20 w-full" />
+    <Skeleton className="h-20 w-full" />
+  </div>
+);
 
 const ToggleButton = ({
   active,
@@ -203,7 +245,7 @@ const ToggleButton = ({
   label: string;
   onToggle: () => void;
 }) => (
-  <Button type="button" variant={active ? "secondary" : "outline"} disabled={disabled} onClick={onToggle}>
+  <Button type="button" variant={active ? "secondary" : "outline"} disabled={disabled} aria-pressed={active} onClick={onToggle}>
     {label}
   </Button>
 );

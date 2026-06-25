@@ -5,8 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts",
-    "build": "tsc --noEmit -p tsconfig.json && vite build --config vite.config.ts",
-    "preview": "vite preview --config vite.config.ts"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "pnpm typecheck && vite build --config vite.config.ts",
+    "build:ci": "pnpm typecheck && vite build --config vite.config.ts --mode production",
+    "build:debug": "pnpm typecheck && vite build --config vite.config.ts --mode development --sourcemap",
+    "preview": "vite preview --config vite.config.ts",
+    "test:e2e": "pnpm typecheck:e2e && playwright test",
+    "e2e": "pnpm test:e2e",
+    "e2e:ui": "playwright test --ui",
+    "e2e:headed": "playwright test --headed",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json"
   },
   "dependencies": {
     "@milkdown/core": "^7.21.2",
@@ -45,6 +53,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.17",

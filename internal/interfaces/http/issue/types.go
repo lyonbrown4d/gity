@@ -64,7 +64,7 @@ type issueOutput struct {
 }
 
 type createIssueBody struct {
-	AuthorUserID int64  `json:"author_user_id"`
+	AuthorUserID *int64 `json:"author_user_id,omitempty"`
 	Title        string `json:"title"`
 	Description  string `json:"description"`
 }
@@ -77,7 +77,7 @@ type updateIssueBody struct {
 }
 
 type createCommentBody struct {
-	AuthorUserID int64  `json:"author_user_id"`
+	AuthorUserID *int64 `json:"author_user_id,omitempty"`
 	Body         string `json:"body"`
 	Content      string `json:"content"`
 }

@@ -2,14 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Link2, Plus, RefreshCw, Tag, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { RepositoryReleaseDetailView, RepositoryReleaseLinkView, RepositoryReleaseView, RepositoryTagView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
@@ -199,10 +200,17 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   return (
     <Card className="card-enter">
       <CardHeader>
-        <CardTitle>{t("Releases")}</CardTitle>
-        <CardDescription>{t("Manage repository tags, release notes, and external release asset links.")}</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{t("Releases")}</CardTitle>
+            <CardDescription>{t("Manage repository tags, release notes, and external release asset links.")}</CardDescription>
+          </div>
+          <Badge variant={canAdminReleases ? "secondary" : "outline"}>
+            {canAdminReleases ? t("Admin actions enabled") : t("Read only")}
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <ReleaseStat label={t("Releases")} value={releases.length} />
           <ReleaseStat label={t("Tags")} value={tags.length} />
@@ -211,56 +219,59 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant={isComposerOpen ? "secondary" : "outline"} disabled={!canAdminReleases} onClick={() => setComposerOpen((current) => !current)}>
-              <Plus className="size-4" />
+            <Button type="button" variant={isComposerOpen ? "secondary" : "default"} disabled={!canAdminReleases} onClick={() => setComposerOpen((current) => !current)}>
+              <Plus data-icon="inline-start" />
               {isComposerOpen ? t("Hide release form") : t("New release")}
             </Button>
             <Button type="button" variant={isLinkComposerOpen ? "secondary" : "outline"} disabled={!canAdminReleases || !selectedRelease} onClick={() => setLinkComposerOpen((current) => !current)}>
-              <Link2 className="size-4" />
+              <Link2 data-icon="inline-start" />
               {isLinkComposerOpen ? t("Hide link form") : t("Add asset link")}
             </Button>
           </div>
           <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
-            <RefreshCw className="size-4" />
+            <RefreshCw data-icon="inline-start" />
             {t("Reload")}
           </Button>
         </div>
 
         {!canAdminReleases ? (
           <Alert>
+            <AlertTitle>{t("Release management is read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect releases, but cannot change them.")}</AlertDescription>
           </Alert>
         ) : null}
 
         {isComposerOpen ? (
-          <form className="space-y-3 rounded-md border p-3" onSubmit={submitRelease}>
+          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitRelease}>
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_160px]">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="release-tag">{t("Tag name")}</Label>
                 <Input id="release-tag" value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="v0.1.0" />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="release-source">{t("Source ref")}</Label>
                 <Input id="release-source" value={sourceRef} onChange={(event) => setSourceRef(event.target.value)} placeholder={defaultBranch || "main"} />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label>{t("Create tag")}</Label>
                 <Select value={createTag ? "yes" : "no"} onValueChange={(value) => setCreateTag(value === "yes")}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yes">{t("Yes")}</SelectItem>
-                    <SelectItem value="no">{t("No")}</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="yes">{t("Yes")}</SelectItem>
+                      <SelectItem value="no">{t("No")}</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="release-name">{t("Release name")}</Label>
               <Input id="release-name" value={releaseName} onChange={(event) => setReleaseName(event.target.value)} placeholder="Gity 0.1.0 beta" />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="release-description">{t("Release notes")}</Label>
               <Textarea id="release-description" className="min-h-28" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("Describe user-facing changes, upgrade notes, and known limitations.")} />
             </div>
@@ -274,25 +285,27 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
 
         {isLinkComposerOpen && selectedRelease ? (
           <form className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1.6fr_160px_auto]" onSubmit={submitLink}>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="release-link-name">{t("Link name")}</Label>
               <Input id="release-link-name" value={linkName} onChange={(event) => setLinkName(event.target.value)} placeholder="linux-amd64 tarball" />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="release-link-url">{t("URL")}</Label>
               <Input id="release-link-url" value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://example.com/artifact.tar.gz" />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label>{t("Link type")}</Label>
               <Select value={linkType} onValueChange={setLinkType}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="package">package</SelectItem>
-                  <SelectItem value="image">image</SelectItem>
-                  <SelectItem value="runbook">runbook</SelectItem>
-                  <SelectItem value="other">other</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value="package">package</SelectItem>
+                    <SelectItem value="image">image</SelectItem>
+                    <SelectItem value="runbook">runbook</SelectItem>
+                    <SelectItem value="other">other</SelectItem>
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -305,17 +318,23 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {isLoadingReleases ? <p className="text-sm text-muted-foreground">{t("Loading releases...")}</p> : null}
             {!isLoadingReleases && releases.length === 0 ? (
-              <div className="rounded-md border p-4 text-sm text-muted-foreground">{t("No releases yet.")}</div>
+              <ReleaseEmptyState
+                title={t("No releases yet.")}
+                description={canAdminReleases ? t("Create a release from an existing tag or source ref.") : t("Releases will appear here after maintainers publish them.")}
+              />
             ) : null}
             {releases.map((item) => (
               <div
                 key={item.release.id}
                 role="button"
                 tabIndex={0}
-                className={`w-full rounded-md border p-4 text-left transition hover:bg-muted/40 ${selectedRelease?.release.id === item.release.id ? "border-primary bg-primary/5" : ""}`}
+                className={cn(
+                  "w-full rounded-md border p-4 text-left transition hover:bg-muted/40",
+                  selectedRelease?.release.id === item.release.id ? "border-primary bg-primary/5" : "",
+                )}
                 onClick={() => setSelectedReleaseId(item.release.id)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -324,7 +343,7 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
                 }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">{item.release.name}</h3>
                       <Badge variant="secondary">{item.release.tag_name}</Badge>
@@ -344,18 +363,18 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
                       onConfirm={() => void deleteRelease(item.release)}
                     >
                       <Button type="button" size="sm" variant="ghost" onClick={(event) => event.stopPropagation()}>
-                        <Trash2 className="size-4" />
+                        <Trash2 />
                       </Button>
                     </ConfirmAction>
                   ) : null}
                 </div>
                 {item.links.length > 0 ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 pt-3">
                     {item.links.map((link) => (
-                      <span key={link.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-muted-foreground">
+                      <Badge key={link.id} variant="outline" className="gap-1 font-normal text-muted-foreground">
                         <Link2 className="size-3" />
                         {link.name}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 ) : null}
@@ -363,20 +382,22 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
             ))}
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-md border p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-2">
                 <p className="font-medium">{t("Tags")}</p>
                 {isLoadingTags ? <span className="text-xs text-muted-foreground">{t("Loading...")}</span> : null}
               </div>
-              <div className="space-y-2">
-                {tags.length === 0 && !isLoadingTags ? <p className="text-sm text-muted-foreground">{t("No tags yet.")}</p> : null}
+              <div className="flex flex-col gap-2">
+                {tags.length === 0 && !isLoadingTags ? (
+                  <ReleaseEmptyState title={t("No tags yet.")} description={t("Tags created for releases will appear here.")} />
+                ) : null}
                 {tags.map((tag) => (
                   <div key={tag.name} className="rounded-md border p-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          <Tag className="mr-1 inline size-3.5" />
+                        <p className="flex items-center gap-1 truncate text-sm font-medium">
+                          <Tag className="size-3.5" />
                           {tag.name}
                         </p>
                         <p className="font-mono text-xs text-muted-foreground">{shortSHA(tag.target_sha)}</p>
@@ -390,7 +411,7 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
                           onConfirm={() => void deleteTag(tag)}
                         >
                           <Button type="button" size="icon" variant="ghost">
-                            <Trash2 className="size-4" />
+                            <Trash2 />
                           </Button>
                         </ConfirmAction>
                       ) : null}
@@ -400,21 +421,25 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
               </div>
             </div>
 
-            <div className="rounded-md border p-3">
-              <p className="mb-3 font-medium">{t("Selected release assets")}</p>
-              {!selectedRelease ? <p className="text-sm text-muted-foreground">{t("Select a release.")}</p> : null}
-              {selectedRelease?.links.length === 0 ? <p className="text-sm text-muted-foreground">{t("No asset links.")}</p> : null}
-              <div className="space-y-2">
+            <div className="flex flex-col gap-3 rounded-md border p-3">
+              <p className="font-medium">{t("Selected release assets")}</p>
+              {!selectedRelease ? (
+                <ReleaseEmptyState title={t("Select a release.")} description={t("Release asset links are shown for the selected release.")} />
+              ) : null}
+              {selectedRelease?.links.length === 0 ? (
+                <ReleaseEmptyState title={t("No asset links.")} description={canAdminReleases ? t("Add an asset link for downloadable artifacts or runbooks.") : t("Asset links will appear here after they are added.")} />
+              ) : null}
+              <div className="flex flex-col gap-2">
                 {selectedRelease?.links.map((link) => (
                   <div key={link.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                    <a className="min-w-0 text-sm underline underline-offset-4" href={link.url} target="_blank" rel="noreferrer">
-                      <ExternalLink className="mr-1 inline size-3.5" />
+                    <a className="inline-flex min-w-0 items-center gap-1 text-sm underline underline-offset-4" href={link.url} target="_blank" rel="noreferrer">
+                      <ExternalLink className="size-3.5" />
                       {link.name}
                     </a>
                     <Badge variant="outline">{link.link_type}</Badge>
                     {canAdminReleases ? (
                       <Button type="button" size="icon" variant="ghost" onClick={() => void deleteLink(selectedRelease.release, link)}>
-                        <Trash2 className="size-4" />
+                        <Trash2 />
                       </Button>
                     ) : null}
                   </div>
@@ -429,9 +454,19 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
 };
 
 const ReleaseStat = ({ label, value }: { label: string; value: number }) => (
-  <div className="rounded-md border p-3">
+  <div className="flex flex-col gap-1 rounded-md border p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
+
+const ReleaseEmptyState = ({ title, description }: { title: string; description: string }) => (
+  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center">
+    <Tag className="size-5 text-muted-foreground" />
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
   </div>
 );
 

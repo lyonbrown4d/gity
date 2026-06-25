@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Ban, CheckCircle2, Clock3, Loader2, Play, RefreshCw, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { RepositoryJobStatus, RepositoryJobView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
@@ -129,12 +131,12 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
         <CardTitle>{t("Jobs")}</CardTitle>
         <CardDescription>{t("Inspect and enqueue project background jobs.")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-4">
-          <JobStat label={t("Pending")} value={stats.pending} tone="amber" />
-          <JobStat label={t("Running")} value={stats.running} tone="blue" />
-          <JobStat label={t("Succeeded")} value={stats.completed} tone="emerald" />
-          <JobStat label={t("Failed")} value={stats.failed} tone="rose" />
+          <JobStat label={t("Pending")} value={stats.pending} description={stats.pending > 0 ? t("Waiting for a runner") : t("Queue is clear")} status="pending" />
+          <JobStat label={t("Running")} value={stats.running} description={stats.running > 0 ? t("Currently executing") : t("No active jobs")} status="running" />
+          <JobStat label={t("Succeeded")} value={stats.completed} description={stats.completed > 0 ? t("Completed successfully") : t("No successful jobs yet")} status="succeeded" />
+          <JobStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs attention") : t("No failures")} status="failed" />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -144,13 +146,18 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
             disabled={!canMutateJobs}
             onClick={() => setComposerOpen((current) => !current)}
           >
-            <Play className="size-4" />
+            <Play data-icon="inline-start" />
             {isComposerOpen ? t("Hide new job form") : t("New job")}
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => void loadJobs()}>
-            <RefreshCw className="size-4" />
-            {t("Reload")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={canMutateJobs ? "secondary" : "outline"}>
+              {t("Role")}: {t(permissions.roleLabel)}
+            </Badge>
+            <Button type="button" size="sm" variant="ghost" onClick={() => void loadJobs()}>
+              <RefreshCw data-icon="inline-start" />
+              {t("Reload")}
+            </Button>
+          </div>
         </div>
 
         {!canMutateJobs ? (
@@ -160,9 +167,9 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
         ) : null}
 
         {isComposerOpen ? (
-          <form className="space-y-3 rounded-md border p-3" onSubmit={submitEnqueueJob}>
+          <form className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3" onSubmit={submitEnqueueJob}>
             <div className="grid gap-3 md:grid-cols-[1fr_160px]">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground" htmlFor="job-kind">
                   {t("Job kind")}
                 </Label>
@@ -173,7 +180,7 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
                   placeholder="noop"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground" htmlFor="job-max-attempts">
                   {t("Max attempts")}
                 </Label>
@@ -186,7 +193,7 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
                 />
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground" htmlFor="job-payload">
                 {t("Payload JSON")}
               </Label>
@@ -206,25 +213,33 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
           </form>
         ) : null}
 
-        <div className="space-y-2 rounded-md border p-2">
-          {isLoadingJobs ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading jobs...")}</p> : null}
+        <div className="flex flex-col gap-2 rounded-md border p-2">
+          {isLoadingJobs ? <JobListSkeleton /> : null}
           {!isLoadingJobs && jobs.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-muted-foreground">{t("No jobs found.")}</p>
+            <JobEmptyState
+              canMutate={canMutateJobs}
+              t={t}
+              onCreate={() => setComposerOpen(true)}
+            />
           ) : null}
           {jobs.map((job) => (
-            <div key={job.id} className="rounded-md border p-3">
+            <div
+              key={job.id}
+              className={cn(
+                "flex flex-col gap-3 rounded-md border p-3",
+                job.status === "failed" ? "border-destructive/30 bg-destructive/5" : "bg-background/60",
+                job.status === "running" ? "border-primary/30 bg-primary/5" : undefined,
+              )}
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">
-                      #{job.id} {job.kind}
-                    </p>
+                    <p className="truncate font-medium">#{job.id}</p>
+                    <Badge variant="outline">{job.kind}</Badge>
                     <JobStatusBadge status={job.status} t={t} />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {t("Attempts")}: {job.attempts}/{job.max_attempts}
-                    {job.locked_by ? ` · ${t("Worker")}: ${job.locked_by}` : ""}
-                    {job.updated_at ? ` · ${formatRelativeTime(job.updated_at)}` : ""}
+                    {getJobStatusDescription(job.status, t)}
                   </p>
                 </div>
                 {!terminalStatuses.includes(job.status) ? (
@@ -235,18 +250,23 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
                     disabled={!canMutateJobs || isCancelling}
                     onClick={() => void submitCancelJob(job)}
                   >
-                    <Ban className="size-4" />
+                    <Ban data-icon="inline-start" />
                     {t("Cancel job")}
                   </Button>
                 ) : null}
               </div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <JobMeta label={t("Attempts")} value={`${job.attempts}/${job.max_attempts}`} />
+                <JobMeta label={t("Worker")} value={job.locked_by || t("Unassigned")} />
+                <JobMeta label={t("Updated")} value={job.updated_at ? formatRelativeTime(job.updated_at) : t("Not updated")} />
+              </div>
               {job.last_error ? (
-                <Alert variant="destructive" className="mt-2 px-2 py-1 text-xs">
+                <Alert variant="destructive" className="px-2 py-1 text-xs">
                   <AlertDescription className="text-xs leading-5">{job.last_error}</AlertDescription>
                 </Alert>
               ) : null}
               {job.result ? (
-                <pre className="mt-2 overflow-auto rounded-md bg-muted p-2 text-xs">{job.result}</pre>
+                <pre className="overflow-auto rounded-md bg-muted p-2 text-xs">{job.result}</pre>
               ) : null}
             </div>
           ))}
@@ -256,33 +276,90 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
   );
 };
 
-const JobStat = ({ label, value, tone }: { label: string; value: number; tone: "amber" | "blue" | "emerald" | "rose" }) => {
-  const toneClass = {
-    amber: "border-amber-500/30 bg-amber-500/5",
-    blue: "border-blue-500/30 bg-blue-500/5",
-    emerald: "border-emerald-500/30 bg-emerald-500/5",
-    rose: "border-rose-500/30 bg-rose-500/5",
-  }[tone];
+const JobStat = ({
+  label,
+  value,
+  description,
+  status,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  status: RepositoryJobStatus;
+}) => (
+  <Card className={cn("shadow-none", status === "failed" ? "border-destructive/30 bg-destructive/5" : "bg-muted/20", status === "running" ? "border-primary/30 bg-primary/5" : undefined)}>
+    <CardContent className="flex flex-col gap-1 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <JobStatusBadge status={status} t={(text) => text} />
+      </div>
+      <p className="text-2xl font-semibold">{value}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </CardContent>
+  </Card>
+);
 
-  return (
-    <div className={`rounded-md border p-3 ${toneClass}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold">{value}</p>
-    </div>
-  );
+const JobMeta = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-md border bg-muted/20 px-3 py-2">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="truncate text-sm font-medium">{value}</p>
+  </div>
+);
+
+const JobEmptyState = ({
+  canMutate,
+  t,
+  onCreate,
+}: {
+  canMutate: boolean;
+  t: (text: string) => string;
+  onCreate: () => void;
+}) => (
+  <Alert className="border-dashed bg-muted/20">
+    <AlertTitle>{t("No jobs in the queue")}</AlertTitle>
+    <AlertDescription className="flex flex-col gap-3">
+      <p>{t("Enqueue a manual job to validate runner connectivity, or wait for a pipeline to create jobs automatically.")}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={!canMutate} onClick={onCreate}>
+          <Play data-icon="inline-start" />
+          {t("Enqueue first job")}
+        </Button>
+        {!canMutate ? <Badge variant="outline">{t("Read-only role")}</Badge> : null}
+      </div>
+    </AlertDescription>
+  </Alert>
+);
+
+const JobListSkeleton = () => (
+  <div className="flex flex-col gap-2">
+    <Skeleton className="h-24 w-full" />
+    <Skeleton className="h-24 w-full" />
+    <Skeleton className="h-24 w-full" />
+  </div>
+);
+
+const getJobStatusDescription = (status: RepositoryJobStatus, t: (text: string) => string): string => {
+  const descriptions: Record<RepositoryJobStatus, string> = {
+    pending: t("Queued and waiting for an available runner."),
+    running: t("Claimed by a runner and currently executing."),
+    succeeded: t("Completed successfully with no reported errors."),
+    failed: t("Finished with an error. Inspect the failure output below."),
+    cancelled: t("Stopped before completion."),
+  };
+  return descriptions[status];
 };
 
 const JobStatusBadge = ({ status, t }: { status: RepositoryJobStatus; t: (text: string) => string }) => {
   const icon = {
-    pending: <Clock3 className="mr-1 size-3" />,
-    running: <Loader2 className="mr-1 size-3 animate-spin" />,
-    succeeded: <CheckCircle2 className="mr-1 size-3" />,
-    failed: <XCircle className="mr-1 size-3" />,
-    cancelled: <Ban className="mr-1 size-3" />,
+    pending: <Clock3 className="size-3" />,
+    running: <Loader2 className="size-3 animate-spin" />,
+    succeeded: <CheckCircle2 className="size-3" />,
+    failed: <XCircle className="size-3" />,
+    cancelled: <Ban className="size-3" />,
   }[status];
   const variant = status === "succeeded" ? "default" : status === "pending" || status === "running" ? "secondary" : "outline";
   return (
-    <Badge variant={variant}>
+    <Badge variant={variant} className="gap-1">
       {icon}
       {t(status)}
     </Badge>

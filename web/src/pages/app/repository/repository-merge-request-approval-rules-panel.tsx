@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { RepositoryBranchView, RepositoryMergeRequestApprovalRuleView, UserView } from "@/pages/types";
 import { extractErrorMessage } from "./issues-utils";
 import { formatUserLabel } from "./repository-user-utils";
@@ -56,6 +57,14 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
   const rules = useMemo(
     () => resolveApprovalRules(rulesQuery.result.data).map(normalizeApprovalRule),
     [rulesQuery.result.data],
+  );
+  const ruleStats = useMemo(
+    () => ({
+      total: rules.length,
+      branchScoped: rules.filter((rule) => rule.target_branch && rule.target_branch !== "*").length,
+      codeOwner: rules.filter((rule) => rule.code_owner).length,
+    }),
+    [rules],
   );
   const userByID = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
   const availableUsers = users.filter((user) => !eligibleUserIDs.includes(user.id));
@@ -149,8 +158,8 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
   }, [rulesQuery.query.error, onError]);
 
   return (
-    <div className="rounded-md border p-3">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+    <div className="flex flex-col gap-3 rounded-md border p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="flex items-center gap-2 font-medium">
             <ShieldCheck className="size-4" />
@@ -159,20 +168,26 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
           <p className="text-xs text-muted-foreground">{t("Configure branch scoped approvals and CODEOWNERS requirements.")}</p>
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
-          <RefreshCw className="size-4" />
+          <RefreshCw data-icon="inline-start" />
           {t("Reload")}
         </Button>
       </div>
 
+      <div className="grid gap-2 md:grid-cols-3">
+        <ApprovalRuleStat label={t("Rules")} value={ruleStats.total} />
+        <ApprovalRuleStat label={t("Branch scoped")} value={ruleStats.branchScoped} />
+        <ApprovalRuleStat label={t("CODEOWNERS")} value={ruleStats.codeOwner} />
+      </div>
+
       {!canAdminRules ? (
-        <Alert className="mb-3">
+        <Alert>
           <AlertDescription>{t("Your current project role can inspect approval rules, but cannot change them.")}</AlertDescription>
         </Alert>
       ) : null}
 
-      <form className="space-y-3 rounded-md border bg-muted/10 p-3" onSubmit={submitRule}>
+      <form className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3" onSubmit={submitRule}>
         <div className="grid gap-3 lg:grid-cols-[1fr_180px_140px]">
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground" htmlFor="approval-rule-name">
               {t("Rule name")}
             </Label>
@@ -184,23 +199,25 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
               disabled={!canAdminRules || isBusy}
             />
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground">{t("Target branch")}</Label>
             <Select value={targetBranch || "*"} onValueChange={setTargetBranch} disabled={!canAdminRules || isBusy}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="*">{t("All branches")}</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.name} value={branch.name}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value="*">{t("All branches")}</SelectItem>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.name} value={branch.name}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground" htmlFor="approval-rule-required">
               {t("Required")}
             </Label>
@@ -216,7 +233,7 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <Label className="text-xs text-muted-foreground">{t("Eligible users")}</Label>
             <div className="flex flex-wrap gap-2">
               {eligibleUserIDs.length === 0 ? <span className="text-xs text-muted-foreground">{t("Any approver can satisfy this rule.")}</span> : null}
@@ -242,11 +259,13 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
                   <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select eligible user")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableUsers.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {formatUserLabel(user, user.id)}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {availableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {formatUserLabel(user, user.id)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <Button
@@ -269,7 +288,7 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
               {codeOwner ? t("CODEOWNERS required") : t("CODEOWNERS optional")}
             </Button>
             <Button type="submit" disabled={!canAdminRules || isBusy || !name.trim()}>
-              <Plus className="size-4" />
+              <Plus data-icon="inline-start" />
               {editingRuleID ? (isUpdating ? t("Updating...") : t("Update rule")) : (isCreating ? t("Creating...") : t("Create rule"))}
             </Button>
             {editingRuleID ? (
@@ -281,52 +300,82 @@ export const RepositoryMergeRequestApprovalRulesPanel = ({
         </div>
       </form>
 
-      <div className="mt-3 space-y-2 rounded-md border p-2">
-        {rulesQuery.query.isFetching && !rulesQuery.query.data ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading approval rules...")}</p>
-        ) : null}
-        {rules.length === 0 ? (
-          <p className="px-2 py-2 text-sm text-muted-foreground">{t("No approval rules configured.")}</p>
-        ) : null}
-        {rules.map((rule) => (
-          <div key={rule.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">{rule.name}</p>
-                <Badge variant="outline">{rule.target_branch || "*"}</Badge>
-                <Badge variant="secondary">{rule.approvals_required} {t("approval(s)")}</Badge>
-                {rule.code_owner ? <Badge>{t("CODEOWNERS")}</Badge> : null}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {rule.eligible_user_ids.length > 0
-                  ? rule.eligible_user_ids.map((userID) => formatUserLabel(userByID.get(userID), userID)).join(", ")
-                  : t("Any approver can satisfy this rule.")}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="outline" disabled={!canAdminRules || isBusy} onClick={() => editRule(rule)}>
-                <Pencil className="size-4" />
-                {t("Edit")}
-              </Button>
-              <ConfirmAction
-                title={t("Delete approval rule?")}
-                description={t("Existing merge request approvals remain, but future checks will ignore this rule.")}
-                confirmLabel={t("Delete")}
-                cancelLabel={t("Cancel")}
-                onConfirm={() => void submitDeleteRule(rule)}
-              >
-                <Button type="button" size="sm" variant="outline" disabled={!canAdminRules || isBusy}>
-                  <Trash2 className="size-4" />
-                  {isDeleting ? t("Deleting...") : t("Delete")}
-                </Button>
-              </ConfirmAction>
-            </div>
-          </div>
-        ))}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("Rule")}</TableHead>
+              <TableHead>{t("Scope")}</TableHead>
+              <TableHead>{t("Approvers")}</TableHead>
+              <TableHead>{t("Requirement")}</TableHead>
+              <TableHead className="text-right">{t("Actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rulesQuery.query.isFetching && !rulesQuery.query.data ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground">{t("Loading approval rules...")}</TableCell>
+              </TableRow>
+            ) : null}
+            {!rulesQuery.query.isFetching && rules.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-muted-foreground">{t("No approval rules configured.")}</TableCell>
+              </TableRow>
+            ) : null}
+            {rules.map((rule) => (
+              <TableRow key={rule.id}>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium">{rule.name}</span>
+                    {rule.code_owner ? <Badge className="w-fit">{t("CODEOWNERS")}</Badge> : null}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{rule.target_branch || "*"}</Badge>
+                </TableCell>
+                <TableCell className="max-w-[320px] text-muted-foreground">
+                  {rule.eligible_user_ids.length > 0
+                    ? rule.eligible_user_ids.map((userID) => formatUserLabel(userByID.get(userID), userID)).join(", ")
+                    : t("Any approver can satisfy this rule.")}
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">{rule.approvals_required} {t("approval(s)")}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={!canAdminRules || isBusy} onClick={() => editRule(rule)}>
+                      <Pencil data-icon="inline-start" />
+                      {t("Edit")}
+                    </Button>
+                    <ConfirmAction
+                      title={t("Delete approval rule?")}
+                      description={t("Existing merge request approvals remain, but future checks will ignore this rule.")}
+                      confirmLabel={t("Delete")}
+                      cancelLabel={t("Cancel")}
+                      onConfirm={() => void submitDeleteRule(rule)}
+                    >
+                      <Button type="button" size="sm" variant="outline" disabled={!canAdminRules || isBusy}>
+                        <Trash2 data-icon="inline-start" />
+                        {isDeleting ? t("Deleting...") : t("Delete")}
+                      </Button>
+                    </ConfirmAction>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
 };
+
+const ApprovalRuleStat = ({ label, value }: { label: string; value: number }) => (
+  <div className="rounded-md border bg-card p-3">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
 
 const resolveApprovalRules = (payload: unknown): RawRecord[] => {
   const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : payload;
@@ -348,6 +397,4 @@ const normalizeApprovalRule = (raw: RawRecord): RepositoryMergeRequestApprovalRu
   eligible_user_ids: normalizeStringArray(raw.eligible_user_ids ?? raw.EligibleUserIDs),
   code_owner: normalizeBoolean(raw.code_owner ?? raw.CodeOwner),
 });
-
-
 

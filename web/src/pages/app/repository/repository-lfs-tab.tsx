@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Copy, Database, Lock, RefreshCw, Unlock } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,10 +139,17 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
   return (
     <Card className="card-enter">
       <CardHeader>
-        <CardTitle>{t("Git LFS")}</CardTitle>
-        <CardDescription>{t("Inspect stored LFS objects and manage project file locks.")}</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{t("Git LFS")}</CardTitle>
+            <CardDescription>{t("Inspect stored LFS objects and manage project file locks.")}</CardDescription>
+          </div>
+          <Badge variant={canWriteLFS ? "secondary" : "outline"}>
+            {canWriteLFS ? t("Locks enabled") : t("Read only")}
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <LFSStat label={t("Objects")} value={objects.length} />
           <LFSStat label={t("Storage")} value={formatBytes(totalBytes)} />
@@ -151,19 +158,20 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
 
         {!canWriteLFS ? (
           <Alert>
+            <AlertTitle>{t("LFS locks are read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect LFS, but cannot manage locks.")}</AlertDescription>
           </Alert>
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">{t("LFS endpoint")}</p>
                 <p className="break-all text-xs text-muted-foreground">{lfsEndpoint}</p>
               </div>
               <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
-                <RefreshCw className="size-4" />
+                <RefreshCw data-icon="inline-start" />
                 {t("Reload")}
               </Button>
             </div>
@@ -191,8 +199,11 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
                   ) : null}
                   {!isLoadingObjects && objects.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-sm text-muted-foreground">
-                        {t("No LFS objects stored yet.")}
+                      <TableCell colSpan={3}>
+                        <div className="flex flex-col gap-1 py-3 text-sm">
+                          <span className="font-medium">{t("No LFS objects stored yet.")}</span>
+                          <span className="text-muted-foreground">{t("Tracked large files will appear here after the first LFS push.")}</span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -212,9 +223,9 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
                 <Lock className="size-4 text-muted-foreground" />
                 <p className="font-medium">{t("File locks")}</p>
               </div>
-              <div className="space-y-3 p-3">
+              <div className="flex flex-col gap-3 p-3">
                 <form className="grid gap-2 md:grid-cols-[1fr_auto]" onSubmit={submitCreateLock}>
-                  <div className="space-y-1">
+                  <div className="flex flex-col gap-1">
                     <Label htmlFor="lfs-lock-path">{t("Lock path")}</Label>
                     <Input
                       id="lfs-lock-path"
@@ -226,20 +237,23 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
                   </div>
                   <div className="flex items-end">
                     <Button type="submit" disabled={!canWriteLFS || isCreatingLock}>
-                      <Lock className="size-4" />
+                      <Lock data-icon="inline-start" />
                       {isCreatingLock ? t("Locking...") : t("Create lock")}
                     </Button>
                   </div>
                 </form>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   {isLoadingLocks ? <p className="text-sm text-muted-foreground">{t("Loading LFS locks...")}</p> : null}
                   {!isLoadingLocks && locks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("No file locks.")}</p>
+                    <LFSEmptyState
+                      title={t("No file locks.")}
+                      description={canWriteLFS ? t("Create a lock to reserve an LFS-managed path before editing.") : t("Active file locks will appear here.")}
+                    />
                   ) : null}
                   {locks.map((item) => (
                     <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3">
-                      <div className="min-w-0 space-y-1">
+                      <div className="flex min-w-0 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="break-all font-medium">{item.path}</p>
                           <Badge variant="secondary">{item.owner.name || t("Unknown owner")}</Badge>
@@ -257,7 +271,7 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
                         onConfirm={() => void submitUnlock(item)}
                       >
                         <Button type="button" size="sm" variant="outline" disabled={!canWriteLFS || isUnlocking}>
-                          <Unlock className="size-4" />
+                          <Unlock data-icon="inline-start" />
                           {t("Unlock")}
                         </Button>
                       </ConfirmAction>
@@ -268,18 +282,18 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
             </div>
           </div>
 
-          <div className="rounded-md border bg-muted/20 p-3">
+          <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">{t("Client setup")}</p>
               <Button type="button" size="sm" variant="outline" onClick={() => void copySetupCommand()}>
-                <Copy className="size-4" />
+                <Copy data-icon="inline-start" />
                 {isCopied ? t("Copied") : t("Copy")}
               </Button>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {t("Use standard Git LFS clients against the project clone URL.")}
             </p>
-            <ScrollArea className="mt-3 h-44 rounded-md border bg-background">
+            <ScrollArea className="h-44 rounded-md border bg-background">
               <pre className="p-3 text-xs leading-6">{setupCommand}</pre>
             </ScrollArea>
           </div>
@@ -290,18 +304,28 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
 };
 
 const LFSStat = ({ label, value }: { label: string; value: number | string }) => (
-  <div className="rounded-md border p-3">
+  <div className="flex flex-col gap-1 rounded-md border p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="text-lg font-semibold">{value}</p>
   </div>
 );
 
+const LFSEmptyState = ({ title, description }: { title: string; description: string }) => (
+  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center">
+    <Lock className="size-5 text-muted-foreground" />
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
+  </div>
+);
+
 const resolveObjectList = (payload: unknown): RawRecord[] => {
-	const raw = resolveBody(payload);
-	if (!isRecord(raw)) {
-		return [];
-	}
-	return resolveRecordArray(raw.objects ?? raw.Objects);
+  const raw = resolveBody(payload);
+  if (!isRecord(raw)) {
+    return [];
+  }
+  return resolveRecordArray(raw.objects ?? raw.Objects);
 };
 
 const resolveLockList = (payload: unknown): RawRecord[] => {
@@ -309,7 +333,7 @@ const resolveLockList = (payload: unknown): RawRecord[] => {
   if (!isRecord(raw)) {
     return [];
   }
-	return resolveRecordArray(raw.locks ?? raw.Locks);
+  return resolveRecordArray(raw.locks ?? raw.Locks);
 };
 
 const normalizeLFSObject = (raw: RawRecord): RepositoryLFSObjectView => ({

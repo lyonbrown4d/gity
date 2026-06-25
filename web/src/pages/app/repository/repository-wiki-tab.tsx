@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Edit3, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmAction } from "@/components/common/confirm-action";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { RepositoryWikiPageView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
@@ -231,54 +233,51 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
   return (
     <Card className="card-enter">
       <CardHeader>
-        <CardTitle>{t("Wiki")}</CardTitle>
-        <CardDescription>{t("Maintain project wiki pages with markdown content.")}</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{t("Wiki")}</CardTitle>
+            <CardDescription>{t("Maintain project wiki pages with markdown content.")}</CardDescription>
+          </div>
+          <Badge variant={canWriteWiki ? "secondary" : "outline"}>
+            {canWriteWiki ? t("Editing enabled") : t("Read only")}
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3">
-            <p className="text-xs text-muted-foreground">{t("Wiki pages")}</p>
-            <p className="text-lg font-semibold">{pages.length}</p>
-          </div>
-          <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{t("Selected page")}</p>
-            <p className="truncate text-lg font-semibold">{selectedPage?.title ?? "--"}</p>
-          </div>
-          <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{t("Format")}</p>
-            <p className="text-lg font-semibold">{selectedPage?.format ?? "markdown"}</p>
-          </div>
+          <WikiStat label={t("Wiki pages")} value={pages.length} />
+          <WikiStat label={t("Selected page")} value={selectedPage?.title ?? "--"} />
+          <WikiStat label={t("Format")} value={selectedPage?.format ?? "markdown"} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
-            variant={isComposerOpen ? "secondary" : "outline"}
+            variant={isComposerOpen ? "secondary" : "default"}
             disabled={!canWriteWiki}
             onClick={() => setComposerOpen((current) => !current)}
           >
-            <Plus className="size-4" />
+            <Plus data-icon="inline-start" />
             {isComposerOpen ? t("Hide new wiki page form") : t("New wiki page")}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => void loadPages()}>
-            <RefreshCw className="size-4" />
+            <RefreshCw data-icon="inline-start" />
             {t("Reload")}
           </Button>
         </div>
 
         {!canWriteWiki ? (
           <Alert>
+            <AlertTitle>{t("Wiki is read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect wiki pages, but cannot edit them.")}</AlertDescription>
           </Alert>
         ) : null}
 
         {isComposerOpen ? (
-          <form className="space-y-3 rounded-md border p-3" onSubmit={submitCreatePage}>
+          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitCreatePage}>
             <div className="grid gap-3 md:grid-cols-[1fr_220px_180px]">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="wiki-title">
-                  {t("Wiki page title")}
-                </label>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="wiki-title">{t("Wiki page title")}</Label>
                 <Input
                   id="wiki-title"
                   value={newTitle}
@@ -286,10 +285,8 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                   placeholder={t("Getting Started")}
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="wiki-slug">
-                  {t("Slug optional")}
-                </label>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="wiki-slug">{t("Slug optional")}</Label>
                 <Input
                   id="wiki-slug"
                   value={newSlug}
@@ -297,10 +294,8 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                   placeholder="getting-started"
                 />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor="wiki-author-id">
-                  {t("Author user ID")}
-                </label>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="wiki-author-id">{t("Author user ID")}</Label>
                 <Input
                   id="wiki-author-id"
                   value={authorUserId}
@@ -309,12 +304,16 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                 />
               </div>
             </div>
-            <Textarea
-              className="min-h-44"
-              value={newContent}
-              onChange={(event) => setNewContent(event.target.value)}
-              placeholder="# Getting Started"
-            />
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="wiki-content">{t("Content")}</Label>
+              <Textarea
+                id="wiki-content"
+                className="min-h-44"
+                value={newContent}
+                onChange={(event) => setNewContent(event.target.value)}
+                placeholder="# Getting Started"
+              />
+            </div>
             <div className="flex justify-end">
               <Button type="submit" disabled={!canWriteWiki || isCreatingPage}>
                 {isCreatingPage ? t("Creating wiki page...") : t("Create wiki page")}
@@ -324,16 +323,22 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-          <div className="space-y-2 rounded-md border p-2">
+          <div className="flex flex-col gap-2 rounded-md border p-2">
             {isLoadingPages ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading wiki pages...")}</p> : null}
             {!isLoadingPages && pages.length === 0 ? (
-              <p className="px-2 py-2 text-sm text-muted-foreground">{t("No wiki pages found.")}</p>
+              <WikiEmptyState
+                title={t("No wiki pages found.")}
+                description={canWriteWiki ? t("Create the first wiki page to document this project.") : t("Wiki pages will appear here after maintainers create them.")}
+              />
             ) : null}
             {pages.map((page) => (
               <button
                 key={page.slug}
                 type="button"
-                className={`w-full rounded-md border p-3 text-left transition hover:bg-muted/40 ${selectedPage?.slug === page.slug ? "border-primary bg-primary/5" : ""}`}
+                className={cn(
+                  "flex w-full flex-col gap-2 rounded-md border p-3 text-left transition hover:bg-muted/40",
+                  selectedPage?.slug === page.slug ? "border-primary bg-primary/5" : "",
+                )}
                 onClick={() => setSelectedSlug(page.slug)}
               >
                 <div className="flex items-start gap-2">
@@ -343,7 +348,7 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                     <p className="truncate text-xs text-muted-foreground">{page.slug}</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {page.updated_at ? formatRelativeTime(page.updated_at) : t("Not edited yet")}
                 </p>
               </button>
@@ -352,9 +357,9 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
 
           <div className="rounded-md border">
             {selectedPage ? (
-              <form className="space-y-4 p-4" onSubmit={submitUpdatePage}>
+              <form className="flex flex-col gap-4 p-4" onSubmit={submitUpdatePage}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary">{selectedPage.slug}</Badge>
                       <Badge variant="outline">{selectedPage.format}</Badge>
@@ -376,17 +381,15 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                       size="sm"
                       disabled={!canWriteWiki || isDeletingPage}
                     >
-                      <Trash2 className="size-4" />
+                      <Trash2 data-icon="inline-start" />
                       {t("Delete")}
                     </Button>
                   </ConfirmAction>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-[1fr_180px]">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="wiki-draft-title">
-                      {t("Wiki page title")}
-                    </label>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="wiki-draft-title">{t("Wiki page title")}</Label>
                     <Input
                       id="wiki-draft-title"
                       value={draftTitle}
@@ -394,10 +397,8 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                       onChange={(event) => setDraftTitle(event.target.value)}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="wiki-editor-id">
-                      {t("Editor user ID")}
-                    </label>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="wiki-editor-id">{t("Editor user ID")}</Label>
                     <Input
                       id="wiki-editor-id"
                       value={editorUserId}
@@ -409,7 +410,7 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-2">
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Edit3 className="size-4" />
                       {t("Write")}
@@ -421,7 +422,7 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                       onChange={(event) => setDraftContent(event.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <Eye className="size-4" />
                       {t("Preview")}
@@ -440,9 +441,11 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
                 </div>
               </form>
             ) : (
-              <div className="flex min-h-64 items-center justify-center p-6 text-sm text-muted-foreground">
-                {t("Select or create a wiki page.")}
-              </div>
+              <WikiEmptyState
+                className="min-h-64 border-0"
+                title={t("Select or create a wiki page.")}
+                description={canWriteWiki ? t("Create a wiki page or select one from the list to edit markdown content.") : t("Select a wiki page from the list to preview its content.")}
+              />
             )}
           </div>
         </div>
@@ -450,6 +453,23 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
     </Card>
   );
 };
+
+const WikiStat = ({ label, value }: { label: string; value: number | string }) => (
+  <div className="flex flex-col gap-1 rounded-md border p-3">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="truncate text-lg font-semibold">{value}</p>
+  </div>
+);
+
+const WikiEmptyState = ({ title, description, className }: { title: string; description: string; className?: string }) => (
+  <div className={cn("flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center", className)}>
+    <BookOpen className="size-5 text-muted-foreground" />
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
+  </div>
+);
 
 const resolveWikiList = (payload: unknown): RawWikiPage[] => {
   if (Array.isArray(payload)) {

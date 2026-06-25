@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Package, Plus, RefreshCw } from "lucide-react";
 import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type {
   RepositoryPackageDetailView,
   RepositoryPackageFileContentView,
@@ -213,10 +214,17 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   return (
     <Card className="card-enter">
       <CardHeader>
-        <CardTitle>{t("Package Registry")}</CardTitle>
-        <CardDescription>{t("Publish generic project artifacts and inspect package versions.")}</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
+            <CardTitle>{t("Package Registry")}</CardTitle>
+            <CardDescription>{t("Publish generic project artifacts and inspect package versions.")}</CardDescription>
+          </div>
+          <Badge variant={canWritePackages ? "secondary" : "outline"}>
+            {canWritePackages ? t("Upload enabled") : t("Read only")}
+          </Badge>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <PackageStat label={t("Packages")} value={packages.length} />
           <PackageStat label={t("Versions")} value={packageDetail?.versions.length ?? 0} />
@@ -226,43 +234,46 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
-            variant={isComposerOpen ? "secondary" : "outline"}
+            variant={isComposerOpen ? "secondary" : "default"}
             disabled={!canWritePackages}
             onClick={() => setComposerOpen((current) => !current)}
           >
-            <Plus className="size-4" />
+            <Plus data-icon="inline-start" />
             {isComposerOpen ? t("Hide upload form") : t("Upload package file")}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => void loadPackages()}>
-            <RefreshCw className="size-4" />
+            <RefreshCw data-icon="inline-start" />
             {t("Reload")}
           </Button>
         </div>
 
         {!canWritePackages ? (
           <Alert>
+            <AlertTitle>{t("Package registry is read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect packages, but cannot upload them.")}</AlertDescription>
           </Alert>
         ) : null}
 
         {isComposerOpen ? (
-          <form className="space-y-3 rounded-md border p-3" onSubmit={submitUpload}>
+          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitUpload}>
             <div className="grid gap-3 md:grid-cols-[180px_1fr_180px]">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-type">{t("Package type")}</Label>
                 <Select value={packageType} onValueChange={setPackageType}>
                   <SelectTrigger id="package-type">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="generic">generic</SelectItem>
-                    <SelectItem value="npm">npm</SelectItem>
-                    <SelectItem value="maven">maven</SelectItem>
-                    <SelectItem value="container">container</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="generic">generic</SelectItem>
+                      <SelectItem value="npm">npm</SelectItem>
+                      <SelectItem value="maven">maven</SelectItem>
+                      <SelectItem value="container">container</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-name">{t("Package name")}</Label>
                 <Input
                   id="package-name"
@@ -271,7 +282,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                   placeholder="gity-cli"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-version">{t("Version")}</Label>
                 <Input
                   id="package-version"
@@ -282,7 +293,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_200px]">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-file-name">{t("File name")}</Label>
                 <Input
                   id="package-file-name"
@@ -291,7 +302,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                   placeholder="artifact.tar.gz"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-file-path">{t("File path optional")}</Label>
                 <Input
                   id="package-file-path"
@@ -300,7 +311,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                   placeholder="dist/artifact.tar.gz"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="package-content-type">{t("Content type")}</Label>
                 <Input
                   id="package-content-type"
@@ -310,14 +321,14 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 />
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="package-file">{t("Package file")}</Label>
               <Input id="package-file" type="file" onChange={(event) => void selectPackageFile(event)} />
               {fileContentBase64 ? (
                 <p className="text-xs text-muted-foreground">{t("Selected file content will be uploaded as base64.")}</p>
               ) : null}
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="package-content">{t("Inline file content fallback")}</Label>
               <Textarea
                 id="package-content"
@@ -336,16 +347,22 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <div className="space-y-2 rounded-md border p-2">
+          <div className="flex flex-col gap-2 rounded-md border p-2">
             {isLoadingPackages ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading packages...")}</p> : null}
             {!isLoadingPackages && packages.length === 0 ? (
-              <p className="px-2 py-2 text-sm text-muted-foreground">{t("No packages published yet.")}</p>
+              <PackageEmptyState
+                title={t("No packages published yet.")}
+                description={canWritePackages ? t("Upload the first package file to create a version.") : t("Packages will appear here after maintainers publish artifacts.")}
+              />
             ) : null}
             {packages.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={`w-full rounded-md border p-3 text-left transition hover:bg-muted/40 ${selectedPackage?.id === item.id ? "border-primary bg-primary/5" : ""}`}
+                className={cn(
+                  "flex w-full flex-col gap-2 rounded-md border p-3 text-left transition hover:bg-muted/40",
+                  selectedPackage?.id === item.id ? "border-primary bg-primary/5" : "",
+                )}
                 onClick={() => setSelectedPackageId(item.id)}
               >
                 <div className="flex items-start gap-2">
@@ -355,7 +372,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                     <p className="text-xs text-muted-foreground">{item.type}</p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {item.updated_at ? formatRelativeTime(item.updated_at) : t("No updates yet")}
                 </p>
               </button>
@@ -364,9 +381,9 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
 
           <div className="rounded-md border">
             {selectedPackage ? (
-              <div className="space-y-4 p-4">
+              <div className="flex flex-col gap-4 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="truncate text-lg font-semibold">{selectedPackage.name}</h3>
                       <Badge variant="secondary">{selectedPackage.type}</Badge>
@@ -377,17 +394,20 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                     </p>
                   </div>
                   <Button type="button" size="sm" variant="ghost" onClick={() => void loadSelectedPackage()}>
-                    <RefreshCw className="size-4" />
+                    <RefreshCw data-icon="inline-start" />
                     {t("Reload detail")}
                   </Button>
                 </div>
 
                 {isLoadingDetail ? <p className="text-sm text-muted-foreground">{t("Loading package detail...")}</p> : null}
                 {!isLoadingDetail && packageDetail?.versions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("No package versions found.")}</p>
+                  <Alert>
+                    <AlertTitle>{t("No package versions found.")}</AlertTitle>
+                    <AlertDescription>{t("Upload a package file to create the first version for this package.")}</AlertDescription>
+                  </Alert>
                 ) : null}
                 {packageDetail?.versions.map((item) => (
-                  <div key={item.version.id} className="space-y-2 rounded-md border p-3">
+                  <div key={item.version.id} className="flex flex-col gap-2 rounded-md border p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="font-medium">{item.version.version}</p>
@@ -420,7 +440,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                                 disabled={isDownloading}
                                 onClick={() => void downloadFile(file)}
                               >
-                                <Download className="size-4" />
+                                <Download data-icon="inline-start" />
                                 {t("Download")}
                               </Button>
                             </TableCell>
@@ -439,9 +459,11 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 ))}
               </div>
             ) : (
-              <div className="flex min-h-64 items-center justify-center p-6 text-sm text-muted-foreground">
-                {t("Select or upload a package.")}
-              </div>
+              <PackageEmptyState
+                className="min-h-64 border-0"
+                title={t("Select or upload a package.")}
+                description={canWritePackages ? t("Upload a package file or select an existing package to inspect versions.") : t("Select an existing package to inspect versions and files.")}
+              />
             )}
           </div>
         </div>
@@ -451,9 +473,19 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
 };
 
 const PackageStat = ({ label, value }: { label: string; value: number }) => (
-  <div className="rounded-md border p-3">
+  <div className="flex flex-col gap-1 rounded-md border p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
+
+const PackageEmptyState = ({ title, description, className }: { title: string; description: string; className?: string }) => (
+  <div className={cn("flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center", className)}>
+    <Package className="size-5 text-muted-foreground" />
+    <div className="flex flex-col gap-1">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
   </div>
 );
 

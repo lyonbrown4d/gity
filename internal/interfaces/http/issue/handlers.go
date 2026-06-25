@@ -30,9 +30,10 @@ func (e *Endpoint) getIssue(ctx context.Context, in *projectIssueInput) (*issueO
 }
 
 func (e *Endpoint) createIssue(ctx context.Context, in *createIssueInput) (*issueOutput, error) {
-	input, err := mapperx.MapStrict[issueservice.CreateIssueInput](e.mapper, in.Body)
-	if err != nil {
-		return nil, err
+	input := issueservice.CreateIssueInput{
+		AuthorUserID: optionalInt64(in.Body.AuthorUserID),
+		Title:        in.Body.Title,
+		Description:  in.Body.Description,
 	}
 	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
 	if err != nil {
@@ -74,9 +75,9 @@ func (e *Endpoint) listComments(ctx context.Context, in *projectIssueInput) (*is
 }
 
 func (e *Endpoint) createComment(ctx context.Context, in *createCommentInput) (*issueOutput, error) {
-	input, err := mapperx.MapStrict[issueservice.CreateCommentInput](e.mapper, in.Body)
-	if err != nil {
-		return nil, err
+	input := issueservice.CreateCommentInput{
+		AuthorUserID: optionalInt64(in.Body.AuthorUserID),
+		Body:         in.Body.Body,
 	}
 	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
 	if err != nil {
@@ -168,4 +169,11 @@ func (e *Endpoint) getAttachment(ctx context.Context, in *projectAttachmentInput
 		return nil, err
 	}
 	return &issueOutput{Body: item}, nil
+}
+
+func optionalInt64(value *int64) int64 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }

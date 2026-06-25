@@ -58,7 +58,10 @@ func (e *Endpoint) getProject(ctx context.Context, in *projectByIDInput) (*proje
 }
 
 func (e *Endpoint) createProject(ctx context.Context, in *createProjectInput) (*projectOutput, error) {
-	input := buildCreateProjectInput(in)
+	input, err := buildCreateProjectInput(in)
+	if err != nil {
+		return nil, err
+	}
 	if err := e.requireProjectCreate(ctx, in.Authorization, input.OrganizationID); err != nil {
 		return nil, err
 	}

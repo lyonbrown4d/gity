@@ -6,6 +6,9 @@ import { compression } from "vite-plugin-compression2";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const EDITOR_PACKAGES = ["@monaco-editor", "monaco-editor", "@milkdown"];
+const MARKDOWN_PACKAGES = ["marked", "dompurify"];
+
 function normalizeProxyTarget(raw: string | undefined): string {
   if (!raw || raw.trim().length === 0) {
     return "http://127.0.0.1:8080";
@@ -22,6 +25,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const rawTarget = env.VITE_DEV_API_PROXY_TARGET || env.DEV_API_PROXY_TARGET;
   const proxyTarget = normalizeProxyTarget(rawTarget);
+  const sourcemap = env.VITE_BUILD_SOURCEMAP === "true";
 
   return {
     plugins: [
@@ -38,14 +42,24 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      cssCodeSplit: true,
+      minify: "oxc",
+      sourcemap,
+      chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (!id.includes("node_modules")) {
               return;
             }
+            if (EDITOR_PACKAGES.some((pkg) => id.includes(pkg))) {
+              return "editor";
+            }
+            if (MARKDOWN_PACKAGES.some((pkg) => id.includes(pkg))) {
+              return "markdown";
+            }
             if (id.includes("@refinedev") || id.includes("@tanstack/react-query")) {
-              return "refine";
+              return "app-runtime";
             }
             if (id.includes("@radix-ui")) {
               return "radix";
@@ -72,3 +86,5 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
+
+

@@ -41,6 +41,14 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
     () => resolveAuditEvents(auditQuery.result.data).map(normalizeAuditEvent),
     [auditQuery.result.data],
   );
+  const actorCount = useMemo(
+    () => new Set(events.map((event) => event.actor_user_id || "system")).size,
+    [events],
+  );
+  const targetTypeCount = useMemo(
+    () => new Set(events.map((event) => event.target_type).filter(Boolean)).size,
+    [events],
+  );
   const isLoading = auditQuery.query.isFetching && !auditQuery.query.data;
 
   const loadEvents = async () => {
@@ -63,17 +71,28 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
     <Card className="card-enter">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="flex flex-col gap-1.5">
             <CardTitle>{t("Audit")}</CardTitle>
             <CardDescription>{t("Review project audit events emitted by repository, CI, and collaboration workflows.")}</CardDescription>
           </div>
-          <Button type="button" size="sm" variant="ghost" onClick={() => void loadEvents()}>
-            <RefreshCw className="size-4" />
-            {t("Reload")}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={isLoading ? "outline" : "secondary"}>
+              {isLoading ? t("Loading") : t("Latest 100")}
+            </Badge>
+            <Button type="button" size="sm" variant="ghost" onClick={() => void loadEvents()}>
+              <RefreshCw data-icon="inline-start" />
+              {t("Reload")}
+            </Button>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <AuditStat label={t("Events")} value={events.length} />
+          <AuditStat label={t("Actors")} value={actorCount} />
+          <AuditStat label={t("Target types")} value={targetTypeCount} />
+        </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -95,8 +114,11 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
               ) : null}
               {!isLoading && events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-sm text-muted-foreground">
-                    {t("No audit events found.")}
+                  <TableCell colSpan={5}>
+                    <div className="flex flex-col gap-1 py-4 text-sm">
+                      <span className="font-medium">{t("No audit events found.")}</span>
+                      <span className="text-muted-foreground">{t("Repository, CI, and collaboration activity will appear here after events are emitted.")}</span>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -126,6 +148,13 @@ export const RepositoryAuditTab = ({ repoId, t, onError }: RepositoryAuditTabPro
     </Card>
   );
 };
+
+const AuditStat = ({ label, value }: { label: string; value: number | string }) => (
+  <div className="flex flex-col gap-1 rounded-md border p-3">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
 
 const resolveAuditEvents = (payload: unknown): RawRecord[] => {
   if (Array.isArray(payload)) {

@@ -9,6 +9,7 @@ import type {
   RepositoryView,
 } from "@/pages/types";
 import { extractErrorMessage } from "./repository-utils";
+import { resolveArrayPayload } from "./repository-normalizers";
 
 interface UseRepositoryMetaControllerArgs {
   organizationId: string;
@@ -70,8 +71,14 @@ export const useRepositoryMetaController = ({
     () => (repoQuery.result.data ?? []).find((item) => item.id === repoId) ?? null,
     [repoQuery.result.data, repoId],
   );
-  const branches = branchesQuery.result.data ?? [];
-  const commits = commitsQuery.result.data ?? [];
+  const branches = useMemo(
+    () => resolveArrayPayload<RepositoryBranchView>(branchesQuery.result.data),
+    [branchesQuery.result.data],
+  );
+  const commits = useMemo(
+    () => resolveArrayPayload<RepositoryCommitView>(commitsQuery.result.data),
+    [commitsQuery.result.data],
+  );
 
   const loadBranches = async (): Promise<void> => {
     const result = await branchesQuery.query.refetch();
@@ -222,3 +229,5 @@ export const useRepositoryMetaController = ({
 
 const defaultProtectionRuleType = (branchName: string): RepositoryBranchProtectionRuleType =>
   branchName.includes("*") || branchName.includes("?") ? "pattern" : "exact";
+
+

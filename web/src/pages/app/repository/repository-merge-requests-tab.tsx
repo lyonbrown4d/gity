@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type {
   RepositoryBranchView,
   RepositoryMergeRequestApprovalView,
@@ -480,7 +481,7 @@ export const RepositoryMergeRequestsTab = ({
         <CardTitle>{t("Merge Requests")}</CardTitle>
         <CardDescription>{t("Review branch changes and merge them into protected targets.")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <MergeRequestStat label={t("Open")} value={stats.opened} tone="emerald" />
           <MergeRequestStat label={t("Merged")} value={stats.merged} tone="blue" />
@@ -501,7 +502,7 @@ export const RepositoryMergeRequestsTab = ({
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div className="rounded-md border p-3">
               <div className="grid gap-2 md:grid-cols-[1fr_150px] xl:grid-cols-1">
                 <div className="relative">
@@ -521,10 +522,12 @@ export const RepositoryMergeRequestsTab = ({
                     <SelectValue placeholder={t("Status")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="opened">{t("Open merge requests")}</SelectItem>
-                    <SelectItem value="merged">{t("Merged merge requests")}</SelectItem>
-                    <SelectItem value="closed">{t("Closed merge requests")}</SelectItem>
-                    <SelectItem value="all">{t("All merge requests")}</SelectItem>
+                    <SelectGroup>
+                      <SelectItem value="opened">{t("Open merge requests")}</SelectItem>
+                      <SelectItem value="merged">{t("Merged merge requests")}</SelectItem>
+                      <SelectItem value="closed">{t("Closed merge requests")}</SelectItem>
+                      <SelectItem value="all">{t("All merge requests")}</SelectItem>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -537,11 +540,11 @@ export const RepositoryMergeRequestsTab = ({
                 disabled={!canCreateMergeRequest}
                 onClick={() => setComposerOpen((current) => !current)}
               >
-                <GitPullRequest className="size-4" />
+                <GitPullRequest data-icon="inline-start" />
                 {isComposerOpen ? t("Hide new merge request form") : t("New merge request")}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => void loadMergeRequests()}>
-                <RefreshCw className="size-4" />
+                <RefreshCw data-icon="inline-start" />
                 {t("Reload")}
               </Button>
             </div>
@@ -553,7 +556,7 @@ export const RepositoryMergeRequestsTab = ({
             ) : null}
 
             {isComposerOpen ? (
-              <form className="space-y-3 rounded-md border p-3" onSubmit={submitCreateMergeRequest}>
+              <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitCreateMergeRequest}>
                 <Input
                   placeholder={t("Merge request title")}
                   value={title}
@@ -592,7 +595,7 @@ export const RepositoryMergeRequestsTab = ({
               </form>
             ) : null}
 
-            <div className="space-y-2 rounded-md border p-2">
+            <div className="flex flex-col gap-2 rounded-md border p-2">
               {isLoadingMergeRequests ? (
                 <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading merge requests...")}</p>
               ) : null}
@@ -603,9 +606,10 @@ export const RepositoryMergeRequestsTab = ({
                 <button
                   key={mergeRequest.id}
                   type="button"
-                  className={`w-full rounded-md border p-3 text-left transition hover:bg-muted/40 ${
-                    selectedMergeRequest?.iid === mergeRequest.iid ? "border-primary/60 bg-primary/5" : ""
-                  }`}
+                  className={cn(
+                    "w-full rounded-md border p-3 text-left transition hover:bg-muted/40",
+                    selectedMergeRequest?.iid === mergeRequest.iid ? "border-primary/60 bg-primary/5" : "",
+                  )}
                   onClick={() => setSelectedIID(mergeRequest.iid)}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -627,9 +631,9 @@ export const RepositoryMergeRequestsTab = ({
             {!selectedMergeRequest ? (
               <p className="text-sm text-muted-foreground">{t("Select a merge request to inspect the diff.")}</p>
             ) : (
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">
                         !{selectedMergeRequest.iid} {selectedMergeRequest.title}
@@ -642,7 +646,7 @@ export const RepositoryMergeRequestsTab = ({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button type="button" size="sm" variant="ghost" onClick={() => void loadDiff()}>
-                      <RefreshCw className="size-4" />
+                      <RefreshCw data-icon="inline-start" />
                       {t("Reload diff")}
                     </Button>
                     {selectedMergeRequest.state === "opened" ? (
@@ -651,7 +655,7 @@ export const RepositoryMergeRequestsTab = ({
                           {t("Close merge request")}
                         </Button>
                         <Button type="button" size="sm" disabled={!canMergeMergeRequest || isMerging || isMergeBlocked} onClick={() => void submitMerge()}>
-                          <GitMerge className="size-4" />
+                          <GitMerge data-icon="inline-start" />
                           {isMerging ? t("Merging...") : t("Merge")}
                         </Button>
                       </>
@@ -668,80 +672,97 @@ export const RepositoryMergeRequestsTab = ({
                   <p className="rounded-md border bg-muted/20 px-3 py-2 text-sm">{selectedMergeRequest.description}</p>
                 ) : null}
 
-                <MergeRequestChecksPanel
-                  organizationId={organizationId}
-                  repoId={repoId}
+                <MergeRequestReadinessSummary
+                  mergeRequest={selectedMergeRequest}
                   checks={checksView}
-                  isLoading={checksQuery.query.isFetching}
-                  t={t}
-                  onReload={() => void loadChecks()}
-                />
-
-                <MergeRequestParticipantsPanel
-                  reviewers={reviewers}
-                  assignees={assignees}
-                  users={users}
-                  userByID={userByID}
-                  reviewerDraftUserID={reviewerDraftUserID}
-                  assigneeDraftUserID={assigneeDraftUserID}
-                  isLoading={participantsQuery.query.isFetching || usersQuery.query.isFetching}
-                  isUpdating={isUpdatingParticipants}
-                  canEdit={canWriteMergeRequest}
-                  t={t}
-                  onChangeReviewerDraftUserID={setReviewerDraftUserID}
-                  onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
-                  onAddReviewer={() => {
-                    if (!reviewerDraftUserID) return;
-                    void submitSetParticipants("reviewer", uniqueStrings([...reviewers.map((item) => item.user_id), reviewerDraftUserID]));
-                  }}
-                  onRemoveReviewer={(userID) =>
-                    void submitSetParticipants("reviewer", reviewers.map((item) => item.user_id).filter((item) => item !== userID))
-                  }
-                  onAddAssignee={() => {
-                    if (!assigneeDraftUserID) return;
-                    void submitSetParticipants("assignee", uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
-                  }}
-                  onRemoveAssignee={(userID) =>
-                    void submitSetParticipants("assignee", assignees.map((item) => item.user_id).filter((item) => item !== userID))
-                  }
-                  onReload={() => void loadParticipants()}
-                />
-
-                <MergeRequestApprovalsPanel
-                  approvals={approvals}
-                  userByID={userByID}
+                  approvalsCount={approvals.length}
+                  reviewersCount={reviewers.length}
+                  assigneesCount={assignees.length}
+                  commentsCount={comments.length}
                   currentUserApproved={currentUserApproved}
-                  isLoading={approvalsQuery.query.isFetching}
-                  isUpdating={isUpdatingApproval}
-                  canApprove={canWriteMergeRequest && selectedMergeRequest.state === "opened"}
                   t={t}
-                  onApprove={() => void submitApproval(true)}
-                  onUnapprove={() => void submitApproval(false)}
-                  onReload={() => void loadApprovals()}
                 />
 
-                <MergeRequestCommentsPanel
-                  comments={comments}
-                  userByID={userByID}
-                  newComment={newComment}
-                  isLoading={commentsQuery.query.isFetching}
-                  isCreating={isCreatingComment}
-                  canComment={canCommentMergeRequest}
-                  t={t}
-                  onChangeNewComment={setNewComment}
-                  onSubmit={submitCreateComment}
-                  onReload={() => void loadComments()}
-                />
+                <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <div className="flex min-w-0 flex-col gap-3">
+                    <MergeRequestChecksPanel
+                      organizationId={organizationId}
+                      repoId={repoId}
+                      checks={checksView}
+                      isLoading={checksQuery.query.isFetching}
+                      t={t}
+                      onReload={() => void loadChecks()}
+                    />
 
-                <div>
-                  <p className="mb-2 text-sm font-medium">{t("Diff")}</p>
-                  {diffQuery.query.isFetching ? (
-                    <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading diff...")}</p>
-                  ) : (
-                    <pre className="max-h-[620px] overflow-auto rounded-md border bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100">
-                      {diffView?.diff?.trim() ? diffView.diff : t("No diff available.")}
-                    </pre>
-                  )}
+                    <MergeRequestCommentsPanel
+                      comments={comments}
+                      userByID={userByID}
+                      newComment={newComment}
+                      isLoading={commentsQuery.query.isFetching}
+                      isCreating={isCreatingComment}
+                      canComment={canCommentMergeRequest}
+                      t={t}
+                      onChangeNewComment={setNewComment}
+                      onSubmit={submitCreateComment}
+                      onReload={() => void loadComments()}
+                    />
+
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm font-medium">{t("Diff")}</p>
+                      {diffQuery.query.isFetching ? (
+                        <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading diff...")}</p>
+                      ) : (
+                        <pre className="max-h-[620px] overflow-auto rounded-md border bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100">
+                          {diffView?.diff?.trim() ? diffView.diff : t("No diff available.")}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <MergeRequestParticipantsPanel
+                      reviewers={reviewers}
+                      assignees={assignees}
+                      users={users}
+                      userByID={userByID}
+                      reviewerDraftUserID={reviewerDraftUserID}
+                      assigneeDraftUserID={assigneeDraftUserID}
+                      isLoading={participantsQuery.query.isFetching || usersQuery.query.isFetching}
+                      isUpdating={isUpdatingParticipants}
+                      canEdit={canWriteMergeRequest}
+                      t={t}
+                      onChangeReviewerDraftUserID={setReviewerDraftUserID}
+                      onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
+                      onAddReviewer={() => {
+                        if (!reviewerDraftUserID) return;
+                        void submitSetParticipants("reviewer", uniqueStrings([...reviewers.map((item) => item.user_id), reviewerDraftUserID]));
+                      }}
+                      onRemoveReviewer={(userID) =>
+                        void submitSetParticipants("reviewer", reviewers.map((item) => item.user_id).filter((item) => item !== userID))
+                      }
+                      onAddAssignee={() => {
+                        if (!assigneeDraftUserID) return;
+                        void submitSetParticipants("assignee", uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
+                      }}
+                      onRemoveAssignee={(userID) =>
+                        void submitSetParticipants("assignee", assignees.map((item) => item.user_id).filter((item) => item !== userID))
+                      }
+                      onReload={() => void loadParticipants()}
+                    />
+
+                    <MergeRequestApprovalsPanel
+                      approvals={approvals}
+                      userByID={userByID}
+                      currentUserApproved={currentUserApproved}
+                      isLoading={approvalsQuery.query.isFetching}
+                      isUpdating={isUpdatingApproval}
+                      canApprove={canWriteMergeRequest && selectedMergeRequest.state === "opened"}
+                      t={t}
+                      onApprove={() => void submitApproval(true)}
+                      onUnapprove={() => void submitApproval(false)}
+                      onReload={() => void loadApprovals()}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -752,6 +773,57 @@ export const RepositoryMergeRequestsTab = ({
   );
 };
 
+const MergeRequestReadinessSummary = ({
+  mergeRequest,
+  checks,
+  approvalsCount,
+  reviewersCount,
+  assigneesCount,
+  commentsCount,
+  currentUserApproved,
+  t,
+}: {
+  mergeRequest: RepositoryMergeRequestView;
+  checks: RepositoryMergeRequestCheckStatusView | null;
+  approvalsCount: number;
+  reviewersCount: number;
+  assigneesCount: number;
+  commentsCount: number;
+  currentUserApproved: boolean;
+  t: (text: string) => string;
+}) => {
+  const isOpen = mergeRequest.state === "opened";
+  const statusLabel = !isOpen
+    ? mergeRequest.state === "merged" ? "Merged" : "Closed"
+    : checks?.mergeable ? "Ready to merge" : checks?.required ? "Blocked" : "Review in progress";
+  const requiredApprovals = checks?.required_approvals ?? 0;
+  const approvalCount = checks?.approval_count ?? approvalsCount;
+  return (
+    <div className="rounded-md border bg-card p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <p className="font-medium">{t("Merge readiness")}</p>
+          <p className="text-xs text-muted-foreground">{t("GitLab-style merge gate summary for reviewers and maintainers.")}</p>
+        </div>
+        <Badge variant={isOpen && checks?.mergeable ? "default" : "secondary"}>{t(statusLabel)}</Badge>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <MergeRequestSummaryItem label={t("Approvals")} value={`${approvalCount}/${requiredApprovals}`} detail={currentUserApproved ? t("You approved") : t("Your approval pending")} />
+        <MergeRequestSummaryItem label={t("Reviewers")} value={String(reviewersCount)} detail={assigneesCount > 0 ? `${assigneesCount} ${t("assignee(s)")}` : t("No assignee")} />
+        <MergeRequestSummaryItem label={t("Pipeline")} value={checks?.pipeline?.status ? t(checks.pipeline.status) : t(checks?.status || "unknown")} detail={checks?.pipeline_required ? t("Required") : t("Optional")} />
+        <MergeRequestSummaryItem label={t("Discussion")} value={String(commentsCount)} detail={t("comment(s)")} />
+      </div>
+    </div>
+  );
+};
+
+const MergeRequestSummaryItem = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
+  <div className="rounded-md border bg-background/60 px-3 py-2">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-base font-semibold">{value}</p>
+    <p className="text-xs text-muted-foreground">{detail}</p>
+  </div>
+);
 const MergeRequestChecksPanel = ({
   organizationId,
   repoId,
@@ -846,12 +918,12 @@ const MergeRequestChecksPanel = ({
       </Link>
     );
   };
-  const meta = checks ? checkStatusMeta(checks) : { label: "Not loaded", className: "border-slate-500/30 bg-slate-500/5", Icon: Clock3 };
+  const meta = checks ? checkStatusMeta(checks) : { label: "Not loaded", Icon: Clock3 };
   const Icon = meta.Icon;
   return (
-    <div className={`rounded-md border p-3 ${meta.className}`}>
+    <div className="rounded-md border bg-card p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
+        <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <Icon className="size-4" />
             <p className="font-medium">{t("Merge checks")}</p>
@@ -862,7 +934,7 @@ const MergeRequestChecksPanel = ({
           </p>
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={onReload} disabled={isLoading}>
-          <RefreshCw className="size-4" />
+          <RefreshCw data-icon="inline-start" />
           {isLoading ? t("Checking...") : t("Reload checks")}
         </Button>
       </div>
@@ -879,13 +951,13 @@ const MergeRequestChecksPanel = ({
       {checks?.blockers?.length ? (
         <div className="mt-3 rounded-md border bg-background/70 px-3 py-2">
           <p className="mb-2 text-xs font-medium text-muted-foreground">{t("Blocking reasons")}</p>
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {checks.blockers.map((blocker) => {
               const blockerHint = renderBlockerHint(blocker.code, blocker.message);
               return (
                 <div
                   key={`${blocker.category}:${blocker.code}:${blocker.message}`}
-                  className="space-y-1 rounded-md border px-2 py-1.5"
+                  className="flex flex-col gap-1 rounded-md border px-2 py-1.5"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
@@ -908,7 +980,7 @@ const MergeRequestChecksPanel = ({
         </div>
       ) : null}
       {checks?.approval_rules?.length ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 flex flex-col gap-2">
           <p className="text-xs font-medium text-muted-foreground">
             {t("Approval rules")}: {checks.approval_count}/{checks.required_approvals}
           </p>
@@ -972,7 +1044,7 @@ const MergeRequestParticipantsPanel = ({
 }) => (
   <div className="rounded-md border p-3">
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <div className="space-y-1">
+      <div className="flex flex-col gap-1">
         <p className="flex items-center gap-2 font-medium">
           <UserRound className="size-4" />
           {t("Reviewers and assignees")}
@@ -980,7 +1052,7 @@ const MergeRequestParticipantsPanel = ({
         <p className="text-xs text-muted-foreground">{t("Assign people who should review or own this merge request.")}</p>
       </div>
       <Button type="button" size="sm" variant="ghost" onClick={onReload} disabled={isLoading}>
-        <RefreshCw className="size-4" />
+        <RefreshCw data-icon="inline-start" />
         {isLoading ? t("Loading...") : t("Reload")}
       </Button>
     </div>
@@ -1047,7 +1119,7 @@ const ParticipantRoleSection = ({
   const selectedIDs = selected.map((item) => item.user_id);
   const availableUsers = users.filter((user) => !selectedIDs.includes(user.id));
   return (
-    <div className="space-y-2 rounded-md border bg-muted/10 p-3">
+    <div className="flex flex-col gap-2 rounded-md border bg-muted/10 p-3">
       <p className="text-sm font-medium">{label}</p>
       <div className="flex flex-wrap gap-2">
         {selected.length === 0 ? <span className="text-xs text-muted-foreground">{emptyLabel}</span> : null}
@@ -1073,11 +1145,13 @@ const ParticipantRoleSection = ({
             <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
           </SelectTrigger>
           <SelectContent>
-            {availableUsers.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {formatUserLabel(user, user.id)}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {availableUsers.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {formatUserLabel(user, user.id)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
         <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdating || !draftUserID} onClick={onAdd}>
@@ -1122,7 +1196,7 @@ const MergeRequestApprovalsPanel = ({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
-          <RefreshCw className="size-4" />
+          <RefreshCw data-icon="inline-start" />
           {isLoading ? t("Loading...") : t("Reload")}
         </Button>
         {currentUserApproved ? (
@@ -1181,11 +1255,11 @@ const MergeRequestCommentsPanel = ({
         <p className="text-xs text-muted-foreground">{t("Review conversation for this merge request.")}</p>
       </div>
       <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
-        <RefreshCw className="size-4" />
+        <RefreshCw data-icon="inline-start" />
         {isLoading ? t("Loading...") : t("Reload")}
       </Button>
     </div>
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       {isLoading ? <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading comments...")}</p> : null}
       {!isLoading && comments.length === 0 ? (
         <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No comments yet.")}</p>
@@ -1200,7 +1274,7 @@ const MergeRequestCommentsPanel = ({
         </div>
       ))}
     </div>
-    <form className="mt-3 space-y-2" onSubmit={onSubmit}>
+    <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
       <Textarea
         className="min-h-24"
         value={newComment}
@@ -1232,7 +1306,7 @@ const BranchSelect = ({
   placeholder: string;
   onChange: (value: string) => void;
 }) => (
-  <div className="space-y-1">
+  <div className="flex flex-col gap-1">
     <Label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
       {label}
     </Label>
@@ -1241,29 +1315,24 @@ const BranchSelect = ({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {branches.map((branch) => (
-          <SelectItem key={branch.name} value={branch.name}>
-            {branch.name}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {branches.map((branch) => (
+            <SelectItem key={branch.name} value={branch.name}>
+              {branch.name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   </div>
 );
 
-const MergeRequestStat = ({ label, value, tone }: { label: string; value: number; tone: "emerald" | "blue" | "slate" }) => {
-  const toneClass = {
-    emerald: "border-emerald-500/30 bg-emerald-500/5",
-    blue: "border-blue-500/30 bg-blue-500/5",
-    slate: "border-slate-500/30 bg-slate-500/5",
-  }[tone];
-  return (
-    <div className={`rounded-md border p-3 ${toneClass}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold">{value}</p>
-    </div>
-  );
-};
+const MergeRequestStat = ({ label, value }: { label: string; value: number; tone: "emerald" | "blue" | "slate" }) => (
+  <div className="rounded-md border bg-card p-3">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-lg font-semibold">{value}</p>
+  </div>
+);
 
 const MergeRequestStateBadge = ({ state, t }: { state: RepositoryMergeRequestState; t: (text: string) => string }) => {
   const variant = state === "opened" ? "default" : state === "merged" ? "secondary" : "outline";
@@ -1280,15 +1349,15 @@ const CheckLine = ({ label, value }: { label: string; value: string }) => (
 
 const checkStatusMeta = (checks: RepositoryMergeRequestCheckStatusView) => {
   if (!checks.required) {
-    return { label: "No checks required", className: "border-slate-500/30 bg-slate-500/5", Icon: ShieldCheck };
+    return { label: "No checks required", Icon: ShieldCheck };
   }
   if (checks.mergeable) {
-    return { label: "Ready to merge", className: "border-emerald-500/30 bg-emerald-500/5", Icon: CheckCircle2 };
+    return { label: "Ready to merge", Icon: CheckCircle2 };
   }
   if (checks.status === "missing") {
-    return { label: "Pipeline missing", className: "border-amber-500/30 bg-amber-500/5", Icon: Clock3 };
+    return { label: "Pipeline missing", Icon: Clock3 };
   }
-  return { label: "Blocked", className: "border-red-500/30 bg-red-500/5", Icon: XCircle };
+  return { label: "Blocked", Icon: XCircle };
 };
 
 
@@ -1539,5 +1608,3 @@ const normalizePipelineStatus = (value: unknown) => {
   }
   return "pending";
 };
-
-

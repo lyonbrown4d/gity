@@ -4,11 +4,13 @@ import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type {
   RepositoryJobArtifactContentView,
   RepositoryJobArtifactView,
@@ -411,12 +413,12 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
         <CardTitle>{t("Pipelines")}</CardTitle>
         <CardDescription>{t("Track CI pipelines triggered by pushes and merge requests.")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-4">
-          <PipelineStat label={t("Pending")} value={stats.pending} tone="amber" />
-          <PipelineStat label={t("Running")} value={stats.running} tone="blue" />
-          <PipelineStat label={t("Succeeded")} value={stats.succeeded} tone="emerald" />
-          <PipelineStat label={t("Failed")} value={stats.failed} tone="rose" />
+          <PipelineStat label={t("Pending")} value={stats.pending} description={stats.pending > 0 ? t("Waiting for execution") : t("No queued pipelines")} status="pending" />
+          <PipelineStat label={t("Running")} value={stats.running} description={stats.running > 0 ? t("Jobs are executing") : t("No active pipelines")} status="running" />
+          <PipelineStat label={t("Succeeded")} value={stats.succeeded} description={stats.succeeded > 0 ? t("Healthy completions") : t("No successes yet")} status="succeeded" />
+          <PipelineStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs investigation") : t("No failures")} status="failed" />
         </div>
 
         {!canMutateCI ? (
@@ -434,7 +436,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
             disabled={!canMutateCI}
             onClick={() => setComposerOpen((current) => !current)}
           >
-            <Play className="size-4" />
+            <Play data-icon="inline-start" />
             {isComposerOpen ? t("Hide pipeline form") : t("New pipeline")}
           </Button>
           <div className="flex flex-wrap items-center gap-2">
@@ -442,16 +444,16 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
               {t("Role")}: {t(permissions.roleLabel)}
             </Badge>
             <Button type="button" size="sm" variant="ghost" onClick={() => void loadPipelines()}>
-              <RefreshCw className="size-4" />
+              <RefreshCw data-icon="inline-start" />
               {t("Reload")}
             </Button>
           </div>
         </div>
 
         {isComposerOpen ? (
-          <form className="space-y-3 rounded-md border bg-muted/10 p-3" onSubmit={submitCreatePipeline}>
+          <form className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3" onSubmit={submitCreatePipeline}>
             <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr]">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="pipeline-source" className="text-xs text-muted-foreground">
                   {t("Source")}
                 </Label>
@@ -467,7 +469,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="pipeline-ref" className="text-xs text-muted-foreground">
                   {t("Ref")}
                 </Label>
@@ -478,7 +480,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                   placeholder={defaultBranch || "main"}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <Label htmlFor="pipeline-commit" className="text-xs text-muted-foreground">
                   {t("Commit SHA")}
                 </Label>
@@ -490,7 +492,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                 />
               </div>
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="pipeline-config-source" className="text-xs text-muted-foreground">
                 {t("Config source")}
               </Label>
@@ -501,7 +503,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                 placeholder=".gity-ci.plano"
               />
             </div>
-            <div className="space-y-1">
+            <div className="flex flex-col gap-1">
               <Label htmlFor="pipeline-config-content" className="text-xs text-muted-foreground">
                 {t("Plano CI config")}
               </Label>
@@ -532,22 +534,25 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">{t("Pipelines")}</p>
             </div>
-            <div className="space-y-2 rounded-md border p-2">
-              {isLoadingPipelines ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading pipelines...")}</p> : null}
+            <div className="flex flex-col gap-2 rounded-md border p-2">
+              {isLoadingPipelines ? <PipelineListSkeleton /> : null}
               {!isLoadingPipelines && pipelines.length === 0 ? (
-                <p className="px-2 py-2 text-sm text-muted-foreground">{t("No pipelines found.")}</p>
+                <PipelineEmptyState canMutate={canMutateCI} t={t} onCreate={() => setComposerOpen(true)} />
               ) : null}
               {pipelines.map((pipeline) => (
                 <button
                   key={pipeline.id}
                   type="button"
-                  className={`w-full rounded-md border p-3 text-left transition hover:bg-muted/40 ${
-                    visiblePipeline?.id === pipeline.id ? "border-primary/60 bg-primary/5" : ""
-                  }`}
+                  className={cn(
+                    "w-full rounded-md border bg-background/60 p-3 text-left transition hover:bg-muted/40",
+                    visiblePipeline?.id === pipeline.id ? "border-primary/60 bg-primary/5" : undefined,
+                    pipeline.status === "failed" ? "border-destructive/30 bg-destructive/5" : undefined,
+                  )}
+                  aria-pressed={visiblePipeline?.id === pipeline.id}
                   onClick={() => setSelectedPipelineID(pipeline.id)}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -570,11 +575,11 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
 
           <div className="min-w-0 rounded-md border p-3">
             {!visiblePipeline ? (
-              <p className="text-sm text-muted-foreground">{t("Select a pipeline to inspect jobs.")}</p>
+              <PipelinePanelEmptyState t={t} />
             ) : (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 flex flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-semibold">
                         #{visiblePipeline.iid} {visiblePipeline.name || "pipeline"}
@@ -587,7 +592,7 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button type="button" size="sm" variant="ghost" onClick={() => void loadDetail()}>
-                      <RefreshCw className="size-4" />
+                      <RefreshCw data-icon="inline-start" />
                       {t("Reload pipeline")}
                     </Button>
                     <Button
@@ -597,18 +602,18 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                       disabled={!canMutateCI || isRefreshingPipeline}
                       onClick={() => void submitRefreshPipeline()}
                     >
-                      <RefreshCw className="size-4" />
+                      <RefreshCw data-icon="inline-start" />
                       {isRefreshingPipeline ? t("Refreshing...") : t("Refresh state")}
                     </Button>
                     {!terminalPipelineStatuses.includes(visiblePipeline.status) ? (
                       <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isCancelling} onClick={() => void submitCancelPipeline()}>
-                        <Ban className="size-4" />
+                        <Ban data-icon="inline-start" />
                         {isCancelling ? t("Cancelling...") : t("Cancel pipeline")}
                       </Button>
                     ) : null}
                     {visiblePipeline.status !== "running" ? (
                       <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isRetrying} onClick={() => void submitRetryPipeline()}>
-                        <Repeat2 className="size-4" />
+                        <Repeat2 data-icon="inline-start" />
                         {isRetrying ? t("Retrying...") : t("Retry pipeline")}
                       </Button>
                     ) : null}
@@ -621,13 +626,11 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                   <PipelineMeta label={t("Finished")} value={visiblePipeline.finished_at ? formatRelativeTime(visiblePipeline.finished_at) : t("N/A")} />
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">{t("Pipeline jobs")}</p>
-                  {detailQuery.query.isFetching ? (
-                    <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading jobs...")}</p>
-                  ) : null}
+                  {detailQuery.query.isFetching ? <PipelineJobsSkeleton /> : null}
                   {!detailQuery.query.isFetching && pipelineJobs.length === 0 ? (
-                    <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No pipeline jobs found.")}</p>
+                    <PipelineJobsEmptyState t={t} />
                   ) : null}
                   {pipelineJobs.map((job) => (
                     <PipelineJobCard
@@ -666,26 +669,86 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
   );
 };
 
-const PipelineStat = ({ label, value, tone }: { label: string; value: number; tone: "amber" | "blue" | "emerald" | "rose" }) => {
-  const toneClass = {
-    amber: "border-amber-500/30 bg-amber-500/5",
-    blue: "border-blue-500/30 bg-blue-500/5",
-    emerald: "border-emerald-500/30 bg-emerald-500/5",
-    rose: "border-rose-500/30 bg-rose-500/5",
-  }[tone];
-
-  return (
-    <div className={`rounded-md border p-3 ${toneClass}`}>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-lg font-semibold">{value}</p>
-    </div>
-  );
-};
+const PipelineStat = ({
+  label,
+  value,
+  description,
+  status,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  status: RepositoryPipelineStatus;
+}) => (
+  <Card className={cn("shadow-none", status === "failed" ? "border-destructive/30 bg-destructive/5" : "bg-muted/20", status === "running" ? "border-primary/30 bg-primary/5" : undefined)}>
+    <CardContent className="flex flex-col gap-1 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <PipelineStatusBadge status={status} t={(text) => text} />
+      </div>
+      <p className="text-2xl font-semibold">{value}</p>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </CardContent>
+  </Card>
+);
 
 const PipelineMeta = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-md border bg-muted/20 p-3">
+  <div className="flex flex-col gap-1 rounded-md border bg-muted/20 p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="mt-1 truncate text-sm font-medium">{value}</p>
+    <p className="truncate text-sm font-medium">{value}</p>
+  </div>
+);
+
+const PipelineEmptyState = ({
+  canMutate,
+  t,
+  onCreate,
+}: {
+  canMutate: boolean;
+  t: (text: string) => string;
+  onCreate: () => void;
+}) => (
+  <Alert className="border-dashed bg-muted/20">
+    <AlertTitle>{t("No pipelines yet")}</AlertTitle>
+    <AlertDescription className="flex flex-col gap-3">
+      <p>{t("Create a manual pipeline to validate CI config, or push commits to let pipelines appear here automatically.")}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" disabled={!canMutate} onClick={onCreate}>
+          <Play data-icon="inline-start" />
+          {t("Create first pipeline")}
+        </Button>
+        {!canMutate ? <Badge variant="outline">{t("CI write permission required")}</Badge> : null}
+      </div>
+    </AlertDescription>
+  </Alert>
+);
+
+const PipelinePanelEmptyState = ({ t }: { t: (text: string) => string }) => (
+  <Alert className="border-dashed bg-muted/20">
+    <AlertTitle>{t("Select a pipeline")}</AlertTitle>
+    <AlertDescription>{t("Choose a pipeline from the list to inspect jobs, logs, artifacts, and retry controls.")}</AlertDescription>
+  </Alert>
+);
+
+const PipelineJobsEmptyState = ({ t }: { t: (text: string) => string }) => (
+  <Alert className="border-dashed bg-muted/20">
+    <AlertTitle>{t("No jobs in this pipeline")}</AlertTitle>
+    <AlertDescription>{t("This pipeline has no materialized jobs yet. Refresh the pipeline state after workers process the config.")}</AlertDescription>
+  </Alert>
+);
+
+const PipelineListSkeleton = () => (
+  <div className="flex flex-col gap-2">
+    <Skeleton className="h-20 w-full" />
+    <Skeleton className="h-20 w-full" />
+    <Skeleton className="h-20 w-full" />
+  </div>
+);
+
+const PipelineJobsSkeleton = () => (
+  <div className="flex flex-col gap-2">
+    <Skeleton className="h-24 w-full" />
+    <Skeleton className="h-24 w-full" />
   </div>
 );
 
@@ -710,13 +773,16 @@ const PipelineJobCard = ({
   onCancel: () => void;
   onRetry: () => void;
 }) => (
-  <div className={`rounded-md border p-3 ${active ? "border-primary/60 bg-primary/5" : ""}`}>
+  <div className={cn("flex flex-col gap-3 rounded-md border p-3", active ? "border-primary/60 bg-primary/5" : "bg-background/60", item.status === "failed" ? "border-destructive/30 bg-destructive/5" : undefined)}>
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0 space-y-1">
+      <div className="min-w-0 flex flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">{item.pipeline_job.name || item.pipeline_job.stage || "job"}</p>
           <PipelineJobStatusBadge status={item.status} t={t} />
         </div>
+        <p className="text-xs text-muted-foreground">
+          {getPipelineJobStatusDescription(item.status, t)}
+        </p>
         <p className="text-xs text-muted-foreground">
           {t("Attempts")}: {item.project_job.attempts}/{item.project_job.max_attempts}
           {item.project_job.locked_by ? ` · ${t("Worker")}: ${item.project_job.locked_by}` : ""}
@@ -726,18 +792,18 @@ const PipelineJobCard = ({
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{item.pipeline_job.stage || t("N/A")}</Badge>
         <Button type="button" size="sm" variant="ghost" onClick={onInspect}>
-          <ScrollText className="size-4" />
+          <ScrollText data-icon="inline-start" />
           {t("Logs")}
         </Button>
         {!terminalJobStatuses.includes(item.project_job.status) ? (
           <Button type="button" size="sm" variant="outline" disabled={!canMutate || isCancelling} onClick={onCancel}>
-            <Ban className="size-4" />
+            <Ban data-icon="inline-start" />
             {isCancelling ? t("Cancelling...") : t("Cancel")}
           </Button>
         ) : null}
         {item.project_job.status !== "running" ? (
           <Button type="button" size="sm" variant="outline" disabled={!canMutate || isRetrying} onClick={onRetry}>
-            <Repeat2 className="size-4" />
+            <Repeat2 data-icon="inline-start" />
             {isRetrying ? t("Retrying...") : t("Retry")}
           </Button>
         ) : null}
@@ -807,7 +873,7 @@ const JobDetailPanel = ({
         </p>
       </div>
       <Button type="button" size="sm" variant="ghost" onClick={onReload}>
-        <RefreshCw className="size-4" />
+        <RefreshCw data-icon="inline-start" />
         {t("Reload job")}
       </Button>
     </div>
@@ -816,7 +882,7 @@ const JobDetailPanel = ({
       <div className="min-w-0">
         <p className="mb-2 text-sm font-medium">{t("Trace")}</p>
         {loadingTrace ? (
-          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading trace...")}</p>
+          <Skeleton className="h-48 w-full" />
         ) : (
           <pre className="max-h-96 overflow-auto rounded-md bg-background p-3 text-xs">
             {trace?.trace || item.project_job.last_error || t("No trace output.")}
@@ -828,19 +894,19 @@ const JobDetailPanel = ({
           <FileArchive className="size-4" />
           {t("Artifacts")}
         </p>
-        {loadingArtifacts ? (
-          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading artifacts...")}</p>
-        ) : null}
+        {loadingArtifacts ? <Skeleton className="h-24 w-full" /> : null}
         {!loadingArtifacts && artifacts.length === 0 ? (
-          <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No artifacts uploaded.")}</p>
+          <Alert className="border-dashed bg-muted/20">
+            <AlertDescription>{t("No artifacts uploaded for this job.")}</AlertDescription>
+          </Alert>
         ) : null}
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           {artifacts.map((artifact) => (
             <div key={artifact.id} className="rounded-md border bg-background p-2">
               <p className="truncate text-sm font-medium">{artifact.file_name || artifact.name || "artifact"}</p>
               <p className="text-xs text-muted-foreground">{formatBytes(artifact.byte_size)}</p>
               <Button type="button" size="sm" variant="ghost" className="mt-2 w-full justify-start" onClick={() => onDownloadArtifact(artifact)}>
-                <Download className="size-4" />
+                <Download data-icon="inline-start" />
                 {t("Download")}
               </Button>
             </div>
@@ -853,26 +919,38 @@ const JobDetailPanel = ({
 
 const PipelineStatusBadge = ({ status, t }: { status: RepositoryPipelineStatus; t: (text: string) => string }) => {
   const icon = {
-    pending: <Clock3 className="mr-1 size-3" />,
-    running: <Loader2 className="mr-1 size-3 animate-spin" />,
-    succeeded: <CheckCircle2 className="mr-1 size-3" />,
-    failed: <XCircle className="mr-1 size-3" />,
-    cancelled: <Ban className="mr-1 size-3" />,
+    pending: <Clock3 className="size-3" />,
+    running: <Loader2 className="size-3 animate-spin" />,
+    succeeded: <CheckCircle2 className="size-3" />,
+    failed: <XCircle className="size-3" />,
+    cancelled: <Ban className="size-3" />,
   }[status];
   const variant = status === "succeeded" ? "default" : status === "pending" || status === "running" ? "secondary" : "outline";
   return (
-    <Badge variant={variant}>
+    <Badge variant={variant} className="gap-1">
       {icon}
       {t(status)}
     </Badge>
   );
 };
 
+const getPipelineJobStatusDescription = (status: RepositoryPipelineJobStatus, t: (text: string) => string): string => {
+  const descriptions: Record<RepositoryPipelineJobStatus, string> = {
+    pending: t("Waiting for dependencies or an available runner."),
+    running: t("Currently executing on a runner."),
+    succeeded: t("Completed successfully."),
+    failed: t("Failed and needs log review."),
+    cancelled: t("Cancelled before completion."),
+    blocked: t("Blocked by upstream job dependencies."),
+  };
+  return descriptions[status];
+};
+
 const PipelineJobStatusBadge = ({ status, t }: { status: RepositoryPipelineJobStatus; t: (text: string) => string }) => {
   if (status === "blocked") {
     return (
-      <Badge variant="outline">
-        <Clock3 className="mr-1 size-3" />
+      <Badge variant="outline" className="gap-1">
+        <Clock3 className="size-3" />
         {t("blocked")}
       </Badge>
     );

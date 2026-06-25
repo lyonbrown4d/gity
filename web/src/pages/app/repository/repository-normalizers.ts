@@ -40,6 +40,25 @@ export const resolveBody = (payload: unknown): unknown => {
   return payload.body ?? payload.Body ?? payload;
 };
 
+export const resolveArrayPayload = <T = unknown>(payload: unknown): T[] => {
+  const candidates = [payload, resolveBody(payload)];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as T[];
+    }
+    if (!isRecord(candidate)) {
+      continue;
+    }
+    for (const key of ["data", "items", "body", "Body"]) {
+      const nested = candidate[key];
+      if (Array.isArray(nested)) {
+        return nested as T[];
+      }
+    }
+  }
+  return [];
+};
+
 export const normalizeString = (value: unknown): string => stringValueSchema.parse(value);
 
 export const normalizeOptionalString = (value: unknown): string | null => optionalStringValueSchema.parse(value);
@@ -63,3 +82,4 @@ export const normalizeStringArray = (value: unknown): string[] => {
     return [raw];
   }
 };
+

@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import type {
   RepositoryIssueAssigneeView,
   RepositoryIssueCommentView,
@@ -25,8 +26,7 @@ import {
   isRecord,
   normalizeOptionalString,
   normalizeString,
-  resolveBody,
-  resolveRecordArray,
+  resolveArrayPayload,
   type RawRecord,
 } from "@/pages/app/repository/repository-normalizers";
 
@@ -124,7 +124,10 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       refetchOnWindowFocus: false,
     },
   });
-  const comments = commentsQuery.result.data ?? [];
+  const comments = useMemo(
+    () => resolveArrayPayload<RepositoryIssueCommentView>(commentsQuery.result.data),
+    [commentsQuery.result.data],
+  );
   const assignees = useMemo(
     () => resolveIssueAssignees(assigneesQuery.result.data).map(normalizeIssueAssignee),
     [assigneesQuery.result.data],
@@ -334,7 +337,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   }, [labelsQuery.query.error]);
 
   return (
-    <div className="space-y-4 page-enter">
+    <div className="flex flex-col gap-4 page-enter">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <Link to="/app/projects" className="underline underline-offset-4">
           {t("My Projects")}
@@ -361,18 +364,23 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
         <Card className="card-enter">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <CardTitle>
-                  #{issue.number} {issue.title}
-                </CardTitle>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle>
+                    #{issue.number} {issue.title}
+                  </CardTitle>
+                  <Badge variant={issue.status === "open" ? "default" : "secondary"}>
+                    {issue.status === "open" ? t("Open") : t("Closed")}
+                  </Badge>
+                </div>
                 <CardDescription>
-                  {issue.author_user_id} · {formatRelativeTime(issue.created_at)}
+                  {t("Opened by")} {formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id)}
+                  {" · "}
+                  {formatRelativeTime(issue.created_at)}
+                  {issue.updated_at ? ` · ${t("updated")} ${formatRelativeTime(issue.updated_at)}` : ""}
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={issue.status === "open" ? "default" : "secondary"}>
-                  {issue.status === "open" ? t("Open") : t("Closed")}
-                </Badge>
+              <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" size="sm" variant="outline" disabled={!canWriteIssue || isUpdatingIssue} onClick={() => void toggleIssueStatus()}>
                   {issue.status === "open" ? t("Close issue") : t("Reopen issue")}
                 </Button>
@@ -382,84 +390,82 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border p-3">
-              {issue.description ? (
-                <MarkdownContent content={issue.description} organizationId={organizationId} repoId={repoId} />
-              ) : (
-                <p className="text-sm text-muted-foreground">{t("No description provided.")}</p>
-              )}
-            </div>
-
-            <IssueCollaborationPanel
-              assignees={assignees}
-              labels={labels}
-              users={users}
-              userByID={userByID}
-              assigneeDraftUserID={assigneeDraftUserID}
-              labelDraftName={labelDraftName}
-              labelDraftColor={labelDraftColor}
-              isLoading={isLoadingCollaboration}
-              isUpdatingAssignees={isUpdatingAssignees}
-              isUpdatingLabels={isUpdatingLabels}
-              canEdit={canWriteIssue}
-              t={t}
-              onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
-              onChangeLabelDraftName={setLabelDraftName}
-              onChangeLabelDraftColor={setLabelDraftColor}
-              onAddAssignee={() => {
-                if (!assigneeDraftUserID) {
-                  return;
-                }
-                void updateAssignees(uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
-              }}
-              onRemoveAssignee={(userID) => void updateAssignees(assignees.map((item) => item.user_id).filter((item) => item !== userID))}
-              onAddLabel={() => void addLabel()}
-              onRemoveLabel={(name) => void removeLabel(name)}
-              onReload={() => void loadCollaboration()}
-            />
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{t("Discussion")}</p>
-              {isLoadingComments ? <p className="text-xs text-muted-foreground">{t("Loading comments...")}</p> : null}
-              {!isLoadingComments && comments.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("No comments yet.")}</p>
-              ) : null}
-              {comments.map((comment) => (
-                <div key={comment.id} className="rounded-md border p-3">
-                  <p className="mb-2 text-xs text-muted-foreground">
-                    {comment.author_user_id} · {formatRelativeTime(comment.created_at)}
-                  </p>
-                  <MarkdownContent content={comment.content} organizationId={organizationId} repoId={repoId} />
+          <CardContent>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="flex min-w-0 flex-col gap-4">
+                <div className="rounded-md border p-3">
+                  {issue.description ? (
+                    <MarkdownContent content={issue.description} organizationId={organizationId} repoId={repoId} />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("No description provided.")}</p>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            {canCommentIssue ? (
-              <form className="space-y-3 rounded-md border p-3" onSubmit={submitComment}>
-                <p className="text-sm font-medium">{t("Add a comment")}</p>
-                <IssueMarkdownEditor
+                <IssueDiscussionPanel
+                  comments={comments}
+                  userByID={userByID}
+                  isLoading={isLoadingComments}
                   organizationId={organizationId}
                   repoId={repoId}
-                  issueId={String(issue.number)}
                   t={t}
-                  value={newComment}
-                  placeholder={t("Comment with markdown, mention #123, or upload files...")}
-                  editorHeight={220}
-                  onChange={setNewComment}
-                  onError={setActionError}
                 />
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={isCreatingComment}>
-                    {isCreatingComment ? t("Commenting...") : t("Comment")}
-                  </Button>
-                </div>
-              </form>
-            ) : (
-              <Alert>
-                <AlertDescription>{t("Your current project role can inspect issues, but cannot comment on them.")}</AlertDescription>
-              </Alert>
-            )}
+
+                {canCommentIssue ? (
+                  <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitComment}>
+                    <p className="text-sm font-medium">{t("Add a comment")}</p>
+                    <IssueMarkdownEditor
+                      organizationId={organizationId}
+                      repoId={repoId}
+                      issueId={String(issue.number)}
+                      t={t}
+                      value={newComment}
+                      placeholder={t("Comment with markdown, mention #123, or upload files...")}
+                      editorHeight={220}
+                      onChange={setNewComment}
+                      onError={setActionError}
+                    />
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={isCreatingComment}>
+                        {isCreatingComment ? t("Commenting...") : t("Comment")}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <Alert>
+                    <AlertDescription>{t("Your current project role can inspect issues, but cannot comment on them.")}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              <IssueCollaborationPanel
+                issue={issue}
+                assignees={assignees}
+                labels={labels}
+                users={users}
+                userByID={userByID}
+                assigneeDraftUserID={assigneeDraftUserID}
+                labelDraftName={labelDraftName}
+                labelDraftColor={labelDraftColor}
+                isLoading={isLoadingCollaboration}
+                isUpdatingAssignees={isUpdatingAssignees}
+                isUpdatingLabels={isUpdatingLabels}
+                canEdit={canWriteIssue}
+                t={t}
+                onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
+                onChangeLabelDraftName={setLabelDraftName}
+                onChangeLabelDraftColor={setLabelDraftColor}
+                onAddAssignee={() => {
+                  if (!assigneeDraftUserID) {
+                    return;
+                  }
+                  void updateAssignees(uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
+                }}
+                onRemoveAssignee={(userID) => void updateAssignees(assignees.map((item) => item.user_id).filter((item) => item !== userID))}
+                onAddLabel={() => void addLabel()}
+                onRemoveLabel={(name) => void removeLabel(name)}
+                onReload={() => void loadCollaboration()}
+              />
+            </div>
           </CardContent>
         </Card>
       ) : null}
@@ -467,7 +473,45 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
   );
 };
 
+const IssueDiscussionPanel = ({
+  comments,
+  userByID,
+  isLoading,
+  organizationId,
+  repoId,
+  t,
+}: {
+  comments: RepositoryIssueCommentView[];
+  userByID: Map<string, UserView>;
+  isLoading: boolean;
+  organizationId: string;
+  repoId: string;
+  t: (text: string) => string;
+}) => (
+  <div className="flex flex-col gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm font-medium">{t("Discussion")}</p>
+      <Badge variant="outline">{comments.length} {t("comment(s)")}</Badge>
+    </div>
+    {isLoading ? <p className="text-xs text-muted-foreground">{t("Loading comments...")}</p> : null}
+    {!isLoading && comments.length === 0 ? (
+      <p className="rounded-md border px-3 py-2 text-xs text-muted-foreground">{t("No comments yet.")}</p>
+    ) : null}
+    {comments.map((comment) => (
+      <div key={comment.id} className="rounded-md border p-3">
+        <p className="mb-2 text-xs text-muted-foreground">
+          {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
+          {" · "}
+          {formatRelativeTime(comment.created_at)}
+        </p>
+        <MarkdownContent content={comment.content} organizationId={organizationId} repoId={repoId} />
+      </div>
+    ))}
+  </div>
+);
+
 const IssueCollaborationPanel = ({
+  issue,
   assignees,
   labels,
   users,
@@ -489,6 +533,7 @@ const IssueCollaborationPanel = ({
   onRemoveLabel,
   onReload,
 }: {
+  issue: RepositoryIssueView;
   assignees: RepositoryIssueAssigneeView[];
   labels: RepositoryIssueLabelView[];
   users: UserView[];
@@ -514,98 +559,107 @@ const IssueCollaborationPanel = ({
   const availableUsers = users.filter((user) => !assignedIDs.includes(user.id));
 
   return (
-    <div className="rounded-md border bg-muted/10 p-3">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+    <aside className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-medium">{t("Issue collaboration")}</p>
-          <p className="text-xs text-muted-foreground">{t("Manage issue assignees and labels.")}</p>
+          <p className="text-sm font-medium">{t("Issue sidebar")}</p>
+          <p className="text-xs text-muted-foreground">{t("GitLab-style triage fields for this issue.")}</p>
         </div>
         <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
           {isLoading ? t("Loading...") : t("Reload")}
         </Button>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <div className="space-y-3 rounded-md border bg-background/60 p-3">
-          <p className="text-sm font-medium">{t("Assignees")}</p>
-          <div className="flex flex-wrap gap-2">
-            {assignees.length === 0 ? <span className="text-xs text-muted-foreground">{t("No assignees assigned.")}</span> : null}
-            {assignees.map((assignee) => (
-              <Badge key={assignee.id || assignee.user_id} variant="outline" className="gap-2">
-                {formatUserLabel(userByID.get(assignee.user_id), assignee.user_id)}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-4 px-1 text-muted-foreground hover:text-foreground"
-                  disabled={!canEdit || isUpdatingAssignees}
-                  onClick={() => onRemoveAssignee(assignee.user_id)}
-                >
-                  x
-                </Button>
-              </Badge>
-            ))}
-          </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-            <Select
-              value={assigneeDraftUserID}
-              onValueChange={onChangeAssigneeDraftUserID}
-              disabled={!canEdit || isUpdatingAssignees || availableUsers.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
-              </SelectTrigger>
-              <SelectContent>
+      <IssueSidebarSection title={t("Status")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={issue.status === "open" ? "default" : "secondary"}>
+            {issue.status === "open" ? t("Open") : t("Closed")}
+          </Badge>
+          {issue.closed_at ? <span className="text-xs text-muted-foreground">{t("Closed")} {formatRelativeTime(issue.closed_at)}</span> : null}
+        </div>
+      </IssueSidebarSection>
+
+      <IssueSidebarSection title={t("Assignees")}>
+        <div className="flex flex-wrap gap-2">
+          {assignees.length === 0 ? <span className="text-xs text-muted-foreground">{t("No assignees assigned.")}</span> : null}
+          {assignees.map((assignee) => (
+            <Badge key={assignee.id || assignee.user_id} variant="outline" className="gap-2">
+              {formatUserLabel(userByID.get(assignee.user_id), assignee.user_id)}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-4 px-1 text-muted-foreground hover:text-foreground"
+                disabled={!canEdit || isUpdatingAssignees}
+                onClick={() => onRemoveAssignee(assignee.user_id)}
+              >
+                x
+              </Button>
+            </Badge>
+          ))}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
+          <Select
+            value={assigneeDraftUserID}
+            onValueChange={onChangeAssigneeDraftUserID}
+            disabled={!canEdit || isUpdatingAssignees || availableUsers.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
                 {availableUsers.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
                     {formatUserLabel(user, user.id)}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
-              {isUpdatingAssignees ? t("Saving...") : t("Add")}
-            </Button>
-          </div>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
+            {isUpdatingAssignees ? t("Saving...") : t("Add")}
+          </Button>
         </div>
+      </IssueSidebarSection>
 
-        <div className="space-y-3 rounded-md border bg-background/60 p-3">
-          <p className="text-sm font-medium">{t("Labels")}</p>
-          <div className="flex flex-wrap gap-2">
-            {labels.length === 0 ? <span className="text-xs text-muted-foreground">{t("No labels assigned.")}</span> : null}
-            {labels.map((label) => (
-              <Badge
-                key={label.id || label.name}
-                variant="outline"
-                className="gap-2"
-                style={label.color ? { borderColor: label.color, color: label.color } : undefined}
+      <IssueSidebarSection title={t("Labels")}>
+        <div className="flex flex-wrap gap-2">
+          {labels.length === 0 ? <span className="text-xs text-muted-foreground">{t("No labels assigned.")}</span> : null}
+          {labels.map((label) => (
+            <Badge
+              key={label.id || label.name}
+              variant="outline"
+              className="gap-2"
+              style={label.color ? { borderColor: label.color, color: label.color } : undefined}
+            >
+              {label.name}
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-4 px-1 text-muted-foreground hover:text-foreground"
+                disabled={!canEdit || isUpdatingLabels}
+                onClick={() => onRemoveLabel(label.name)}
               >
-                {label.name}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-4 px-1 text-muted-foreground hover:text-foreground"
-                  disabled={!canEdit || isUpdatingLabels}
-                  onClick={() => onRemoveLabel(label.name)}
-                >
-                  x
-                </Button>
-              </Badge>
-            ))}
+                x
+              </Button>
+            </Badge>
+          ))}
+        </div>
+        <div className="grid gap-2">
+          <div className="flex flex-col gap-1">
+            <Label className="sr-only" htmlFor="issue-label-name">{t("Label name")}</Label>
+            <Input
+              id="issue-label-name"
+              value={labelDraftName}
+              placeholder={t("Label name")}
+              disabled={!canEdit}
+              onChange={(event) => onChangeLabelDraftName(event.target.value)}
+            />
           </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_116px_auto]">
-            <div className="space-y-1">
-              <Label className="sr-only" htmlFor="issue-label-name">{t("Label name")}</Label>
-              <Input
-                id="issue-label-name"
-                value={labelDraftName}
-                placeholder={t("Label name")}
-                disabled={!canEdit}
-                onChange={(event) => onChangeLabelDraftName(event.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
+            <div className="flex flex-col gap-1">
               <Label className="sr-only" htmlFor="issue-label-color">{t("Label color")}</Label>
               <Input
                 id="issue-label-color"
@@ -620,24 +674,24 @@ const IssueCollaborationPanel = ({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </IssueSidebarSection>
+    </aside>
   );
 };
 
-const resolveIssueAssignees = (payload: unknown): RawRecord[] => {
-  if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
-  }
-  return resolveRecordArray(resolveBody(payload));
-};
+const IssueSidebarSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="flex flex-col gap-2">
+    <Separator />
+    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+    {children}
+  </div>
+);
 
-const resolveIssueLabels = (payload: unknown): RawRecord[] => {
-  if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
-  }
-  return resolveRecordArray(resolveBody(payload));
-};
+const resolveIssueAssignees = (payload: unknown): RawRecord[] =>
+  resolveArrayPayload<unknown>(payload).filter(isRecord);
+
+const resolveIssueLabels = (payload: unknown): RawRecord[] =>
+  resolveArrayPayload<unknown>(payload).filter(isRecord);
 
 const normalizeIssueAssignee = (raw: RawRecord): RepositoryIssueAssigneeView => ({
   id: normalizeString(raw.id ?? raw.ID),
@@ -656,8 +710,6 @@ const normalizeIssueLabel = (raw: RawRecord): RepositoryIssueLabelView => ({
   updated_at: normalizeString(raw.updated_at ?? raw.UpdatedAt),
 });
 
-
-
 const uniqueByName = (labels: Array<{ name: string; color: string }>): Array<{ name: string; color: string }> => {
   const seen = new Set<string>();
   const items: Array<{ name: string; color: string }> = [];
@@ -671,5 +723,4 @@ const uniqueByName = (labels: Array<{ name: string; color: string }>): Array<{ n
   }
   return items;
 };
-
 

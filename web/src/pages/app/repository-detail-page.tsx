@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCustom, usePermissions } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
 import { RepositoryAuditTab } from "@/pages/app/repository/repository-audit-tab";
 import { RepositoryBranchesTab } from "@/pages/app/repository/repository-branches-tab";
@@ -91,11 +92,27 @@ export const RepositoryDetailPage = (): JSX.Element => {
 
   return (
     <div className="flex flex-col gap-4 page-enter">
-      <div className="text-sm text-muted-foreground">
-        <Link to="/app/projects" className="font-medium text-foreground underline-offset-4 hover:underline">
-          {t("My Projects")}
-        </Link>
-      </div>
+      <Breadcrumb>
+        <BreadcrumbList className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 shadow-sm backdrop-blur">
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/app/projects">{t("Projects")}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <span className="max-w-[40vw] truncate text-muted-foreground">
+              {meta.organization?.name ?? (organizationId || t("Organization"))}
+            </span>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage className="max-w-[50vw] truncate font-medium">
+              {meta.repository?.name ?? (repoId || t("Project"))}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       <RepositoryHeaderCard
         activeTab={activeTab}

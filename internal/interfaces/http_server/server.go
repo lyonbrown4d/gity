@@ -70,7 +70,8 @@ func (h *Host) Start(ctx context.Context) error {
 		return nil
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	// The hook context is canceled when OnStart returns; keep the listener alive until Stop cancels it.
+	runCtx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
 	go func() {
 		h.done <- h.server.ListenAndServeContext(runCtx, h.address)
@@ -79,6 +80,9 @@ func (h *Host) Start(ctx context.Context) error {
 	select {
 	case err := <-h.done:
 		return err
+	case <-ctx.Done():
+		cancel()
+		return oops.In("http_server").Wrap(ctx.Err())
 	case <-time.After(200 * time.Millisecond):
 	}
 

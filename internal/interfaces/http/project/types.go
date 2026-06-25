@@ -108,7 +108,7 @@ type projectPermissionsView struct {
 }
 
 type createProjectBody struct {
-	OrganizationID int64  `json:"organization_id"`
+	OrganizationID string `json:"organization_id"`
 	Key            string `json:"key"`
 	Name           string `json:"name"`
 	PathKey        string `json:"path_key"`
