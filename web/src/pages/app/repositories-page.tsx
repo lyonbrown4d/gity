@@ -84,6 +84,7 @@ export function AppRepositoriesPage(): JSX.Element {
         values: {
           organization_id: createOwnerOrg,
           key,
+          path_key: key,
           name,
           description: description || undefined,
           visibility,
@@ -507,3 +508,5 @@ export function AppRepositoriesPage(): JSX.Element {
     </div>
   );
 }
+
+

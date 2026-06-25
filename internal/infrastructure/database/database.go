@@ -26,20 +26,11 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		logger.Warn("database dsn is empty; database runtime disabled")
 		return nil, oops.In("database").New("database dsn is required")
 	}
-	if settings.Database.Driver == "sqlite" {
-		if err := ensureSQLiteDatabaseDir(settings.Database.DSN); err != nil {
-			return nil, oops.In("database").Wrapf(err, "prepare sqlite database directory")
-		}
-	}
 
-	dbDialect, err := resolveDialect(settings.Database.Driver)
+	dbDialect, nodeID, err := prepareDatabaseRuntime(settings)
 	if err != nil {
 		return nil, err
 	}
-	if settings.Database.NodeID < 1 || settings.Database.NodeID > 1023 {
-		return nil, fmt.Errorf("database node id %d out of range [1,1023]", settings.Database.NodeID)
-	}
-
 	db, err := dbx.Open(
 		dbx.WithDriver(settings.Database.Driver),
 		dbx.WithDSN(settings.Database.DSN),
@@ -47,13 +38,60 @@ func NewDatabase(settings config.Settings, logger *slog.Logger) (*dbx.DB, error)
 		dbx.ApplyOptions(
 			dbx.WithLogger(logger),
 			dbx.WithDebug(settings.App.Environment == "development"),
-			dbx.WithNodeID(uint16(settings.Database.NodeID)),
+			dbx.WithNodeID(nodeID),
 		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("open dbx database: %w", err)
 	}
+	if err := configureDatabaseRuntime(settings.Database.Driver, db); err != nil {
+		return nil, err
+	}
 	return db, nil
+}
+
+func prepareDatabaseRuntime(settings config.Settings) (dialect.Dialect, uint16, error) {
+	if settings.Database.Driver == "sqlite" {
+		if err := ensureSQLiteDatabaseDir(settings.Database.DSN); err != nil {
+			return nil, 0, oops.In("database").Wrapf(err, "prepare sqlite database directory")
+		}
+	}
+	nodeID, err := databaseNodeID(settings.Database.NodeID)
+	if err != nil {
+		return nil, 0, err
+	}
+	dbDialect, err := resolveDialect(settings.Database.Driver)
+	if err != nil {
+		return nil, 0, err
+	}
+	return dbDialect, nodeID, nil
+}
+
+func databaseNodeID(value int) (uint16, error) {
+	if value < 1 || value > 1023 {
+		return 0, fmt.Errorf("database node id %d out of range [1,1023]", value)
+	}
+	return uint16(value), nil
+}
+
+func configureDatabaseRuntime(driver string, db *dbx.DB) error {
+	if driver != "sqlite" {
+		return nil
+	}
+	return configureSQLiteRuntime(db)
+}
+
+func configureSQLiteRuntime(db *dbx.DB) error {
+	if db == nil || db.SQLDB() == nil {
+		return nil
+	}
+	sqlDB := db.SQLDB()
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	if _, err := sqlDB.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		return oops.In("database").Wrapf(err, "configure sqlite busy timeout")
+	}
+	return nil
 }
 
 func ensureSQLiteDatabaseDir(dsn string) error {

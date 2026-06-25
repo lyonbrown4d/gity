@@ -109,9 +109,9 @@ type projectPermissionsView struct {
 
 type createProjectBody struct {
 	OrganizationID string `json:"organization_id"`
-	Key            string `json:"key"`
+	Key            string `json:"key,omitempty"`
 	Name           string `json:"name"`
-	PathKey        string `json:"path_key"`
+	PathKey        string `json:"path_key,omitempty"`
 	Visibility     string `json:"visibility"`
 	Description    string `json:"description"`
 	DefaultBranch  string `json:"default_branch"`
@@ -154,7 +154,7 @@ type repositoryView struct {
 	ID             string `json:"id"`
 	UUID           string `json:"uuid"`
 	OrganizationID string `json:"organization_id"`
-	Key            string `json:"key"`
+	Key            string `json:"key,omitempty"`
 	FullPath       string `json:"full_path"`
 	Name           string `json:"name"`
 	Description    string `json:"description"`

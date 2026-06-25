@@ -117,7 +117,7 @@ export const RepositoryIssuesTab = ({
         method: "post",
         values: {
           title,
-          description: newIssueDescription.trim() || null,
+          description: newIssueDescription.trim(),
         },
       });
       const assigneeID = newIssueAssigneeId.trim();

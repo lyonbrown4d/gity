@@ -32,6 +32,12 @@ export interface ProjectView {
   default_branch: string;
 }
 
+export interface BranchView {
+  name: string;
+  is_default: boolean;
+  hash: string;
+}
+
 export interface IssueView {
   id: string;
   number: number;
@@ -98,14 +104,42 @@ export async function createProject(
   return responseData<ProjectView>(response);
 }
 
-export async function createFileCommit(request: Request, session: AuthSession, project: ProjectView): Promise<void> {
+export async function createBranch(
+  request: Request,
+  session: AuthSession,
+  project: ProjectView,
+  name: string,
+  sourceRef = project.default_branch || "main",
+): Promise<BranchView> {
+  const response = await request.post(`${apiBaseURL}/projects/${project.id}/repository/branches`, {
+    headers: authHeaders(session),
+    data: {
+      name,
+      source_ref: sourceRef,
+    },
+  });
+  return responseData<BranchView>(response);
+}
+
+export async function createFileCommit(
+  request: Request,
+  session: AuthSession,
+  project: ProjectView,
+  options: {
+    branchName?: string;
+    path?: string;
+    content?: string;
+    message?: string;
+  } = {},
+): Promise<void> {
+  const filePath = options.path ?? "README.md";
   const response = await request.post(`${apiBaseURL}/projects/${project.id}/repository/files`, {
     headers: authHeaders(session),
     data: {
-      branch_name: project.default_branch || "main",
-      path: "README.md",
-      content: `# ${project.name}\n\nCreated by Playwright integration tests.\n`,
-      message: "Add README from Playwright",
+      branch_name: (options.branchName ?? project.default_branch) || "main",
+      path: filePath,
+      content: options.content ?? `# ${project.name}\n\nCreated by Playwright integration tests.\n`,
+      message: options.message ?? `Add ${filePath} from Playwright`,
       author_name: session.username,
       author_email: `${session.username}@local.gity`,
     },
@@ -123,6 +157,23 @@ export async function createIssue(request: Request, session: AuthSession, projec
     },
   });
   return responseData<IssueView>(response);
+}
+
+export async function createIssueComment(
+  request: Request,
+  session: AuthSession,
+  project: ProjectView,
+  issueNumber: number,
+  content: string,
+): Promise<void> {
+  const response = await request.post(`${apiBaseURL}/projects/${project.id}/issues/${issueNumber}/comments`, {
+    headers: authHeaders(session),
+    data: {
+      body: content,
+      content,
+    },
+  });
+  await expectOK(response);
 }
 
 export async function seedProject(request: Request): Promise<{
@@ -167,11 +218,5 @@ async function expectOK(response: APIResponse): Promise<string> {
 function isEnvelope<T>(value: T | Envelope<T>): value is Envelope<T> {
   return typeof value === "object" && value !== null && "data" in value && "code" in value;
 }
-
-
-
-
-
-
 
 

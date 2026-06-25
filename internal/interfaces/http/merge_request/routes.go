@@ -91,7 +91,7 @@ type mergeRequestOutput struct {
 }
 
 type createMergeRequestBody struct {
-	AuthorUserID int64  `json:"author_user_id"`
+	AuthorUserID int64  `json:"author_user_id,omitempty"`
 	Title        string `json:"title"`
 	Description  string `json:"description"`
 	SourceBranch string `json:"source_branch"`
@@ -99,9 +99,9 @@ type createMergeRequestBody struct {
 }
 
 type updateMergeRequestBody struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
-	State       *string `json:"state"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	State       *string `json:"state,omitempty"`
 }
 
 type mergeMergeRequestBody struct {
@@ -111,13 +111,13 @@ type mergeMergeRequestBody struct {
 }
 
 type createMergeRequestCommentBody struct {
-	AuthorUserID int64  `json:"author_user_id"`
-	Body         string `json:"body"`
-	Content      string `json:"content"`
+	AuthorUserID int64  `json:"author_user_id,omitempty"`
+	Body         string `json:"body,omitempty"`
+	Content      string `json:"content,omitempty"`
 }
 
 type mergeRequestApprovalBody struct {
-	UserID int64 `json:"user_id"`
+	UserID int64 `json:"user_id,omitempty"`
 }
 
 type approvalRuleBody struct {
@@ -129,11 +129,11 @@ type approvalRuleBody struct {
 }
 
 type updateApprovalRuleBody struct {
-	Name              *string  `json:"name"`
-	TargetBranch      *string  `json:"target_branch"`
-	ApprovalsRequired *int     `json:"approvals_required"`
-	EligibleUserIDs   *[]int64 `json:"eligible_user_ids"`
-	CodeOwner         *bool    `json:"code_owner"`
+	Name              *string  `json:"name,omitempty"`
+	TargetBranch      *string  `json:"target_branch,omitempty"`
+	ApprovalsRequired *int     `json:"approvals_required,omitempty"`
+	EligibleUserIDs   *[]int64 `json:"eligible_user_ids,omitempty"`
+	CodeOwner         *bool    `json:"code_owner,omitempty"`
 }
 
 type participantsBody struct {

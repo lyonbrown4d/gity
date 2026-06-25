@@ -66,20 +66,20 @@ type issueOutput struct {
 type createIssueBody struct {
 	AuthorUserID *int64 `json:"author_user_id,omitempty"`
 	Title        string `json:"title"`
-	Description  string `json:"description"`
+	Description  string `json:"description,omitempty"`
 }
 
 type updateIssueBody struct {
-	Title       *string `json:"title"`
-	Description *string `json:"description"`
-	State       *string `json:"state"`
-	Status      *string `json:"status"`
+	Title       *string `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+	State       *string `json:"state,omitempty"`
+	Status      *string `json:"status,omitempty"`
 }
 
 type createCommentBody struct {
 	AuthorUserID *int64 `json:"author_user_id,omitempty"`
-	Body         string `json:"body"`
-	Content      string `json:"content"`
+	Body         string `json:"body,omitempty"`
+	Content      string `json:"content,omitempty"`
 }
 
 type issueAssigneesBody struct {
@@ -87,9 +87,9 @@ type issueAssigneesBody struct {
 }
 
 type issueLabelsBody struct {
-	Labels     []issueLabelBody `json:"labels"`
-	Names      []string         `json:"names"`
-	LabelNames []string         `json:"label_names"`
+	Labels     []issueLabelBody `json:"labels,omitempty"`
+	Names      []string         `json:"names,omitempty"`
+	LabelNames []string         `json:"label_names,omitempty"`
 }
 
 type issueLabelBody struct {
@@ -141,7 +141,7 @@ type issueCommentView struct {
 	ID           string `json:"id"`
 	IssueID      string `json:"issue_id"`
 	AuthorUserID string `json:"author_user_id"`
-	Content      string `json:"content"`
+	Content      string `json:"content,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
 }

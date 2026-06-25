@@ -411,11 +411,12 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
 
                 <div className="grid gap-4 xl:grid-cols-2">
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
+                    <Label htmlFor="wiki-draft-content" className="flex items-center gap-2 text-sm font-medium">
                       <Edit3 className="size-4" />
-                      {t("Write")}
-                    </div>
+                      {t("Wiki page content")}
+                    </Label>
                     <Textarea
+                      id="wiki-draft-content"
                       className="min-h-80"
                       value={draftContent}
                       disabled={!canWriteWiki}
@@ -513,3 +514,4 @@ const parseOptionalUserID = (value: string): number | null => {
   }
   return parseRequiredUserID(value);
 };
+

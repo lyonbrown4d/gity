@@ -425,7 +425,7 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
                       onError={setActionError}
                     />
                     <div className="flex justify-end">
-                      <Button type="submit" disabled={isCreatingComment}>
+                      <Button type="submit" disabled={isCreatingComment || !newComment.trim()}>
                         {isCreatingComment ? t("Commenting...") : t("Comment")}
                       </Button>
                     </div>
@@ -723,4 +723,5 @@ const uniqueByName = (labels: Array<{ name: string; color: string }>): Array<{ n
   }
   return items;
 };
+
 

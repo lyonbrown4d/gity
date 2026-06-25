@@ -62,8 +62,8 @@ func (e *Endpoint) createProject(ctx context.Context, in *createProjectInput) (*
 	if err != nil {
 		return nil, err
 	}
-	if err := e.requireProjectCreate(ctx, in.Authorization, input.OrganizationID); err != nil {
-		return nil, err
+	if permissionErr := e.requireProjectCreate(ctx, in.Authorization, input.OrganizationID); permissionErr != nil {
+		return nil, permissionErr
 	}
 	item, err := e.service.Create(ctx, input)
 	if err != nil {

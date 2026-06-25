@@ -13,7 +13,7 @@ func (e *Endpoint) listMergeRequests(ctx context.Context, in *mergeRequestsInput
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: items}, nil
+	return &mergeRequestOutput{Body: toMergeRequestViews(items)}, nil
 }
 
 func (e *Endpoint) getMergeRequest(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -21,7 +21,7 @@ func (e *Endpoint) getMergeRequest(ctx context.Context, in *mergeRequestInput) (
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestView(item)}, nil
 }
 
 func (e *Endpoint) getDiff(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -29,7 +29,7 @@ func (e *Endpoint) getDiff(ctx context.Context, in *mergeRequestInput) (*mergeRe
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestDiffView(item)}, nil
 }
 
 func (e *Endpoint) getChecks(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -37,7 +37,7 @@ func (e *Endpoint) getChecks(ctx context.Context, in *mergeRequestInput) (*merge
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestCheckStatusView(item)}, nil
 }
 
 func (e *Endpoint) listParticipants(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -45,7 +45,7 @@ func (e *Endpoint) listParticipants(ctx context.Context, in *mergeRequestInput) 
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestParticipantsView(item)}, nil
 }
 
 func (e *Endpoint) listComments(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -53,7 +53,7 @@ func (e *Endpoint) listComments(ctx context.Context, in *mergeRequestInput) (*me
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestCommentsView(item)}, nil
 }
 
 func (e *Endpoint) listApprovals(ctx context.Context, in *mergeRequestInput) (*mergeRequestOutput, error) {
@@ -61,7 +61,7 @@ func (e *Endpoint) listApprovals(ctx context.Context, in *mergeRequestInput) (*m
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalsView(item)}, nil
 }
 
 func (e *Endpoint) listApprovalRules(ctx context.Context, in *approvalRulesInput) (*mergeRequestOutput, error) {
@@ -69,7 +69,7 @@ func (e *Endpoint) listApprovalRules(ctx context.Context, in *approvalRulesInput
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalRulesView(item)}, nil
 }
 
 func (e *Endpoint) createApprovalRule(ctx context.Context, in *createApprovalRuleInput) (*mergeRequestOutput, error) {
@@ -81,7 +81,7 @@ func (e *Endpoint) createApprovalRule(ctx context.Context, in *createApprovalRul
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalRuleView(item)}, nil
 }
 
 func (e *Endpoint) updateApprovalRule(ctx context.Context, in *updateApprovalRuleInput) (*mergeRequestOutput, error) {
@@ -93,7 +93,7 @@ func (e *Endpoint) updateApprovalRule(ctx context.Context, in *updateApprovalRul
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalRuleView(item)}, nil
 }
 
 func (e *Endpoint) deleteApprovalRule(ctx context.Context, in *approvalRuleInput) (*mergeRequestOutput, error) {
@@ -117,7 +117,7 @@ func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeReques
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestView(item)}, nil
 }
 
 func (e *Endpoint) createComment(ctx context.Context, in *createMergeRequestCommentInput) (*mergeRequestOutput, error) {
@@ -137,7 +137,7 @@ func (e *Endpoint) createComment(ctx context.Context, in *createMergeRequestComm
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestCommentsView(item)}, nil
 }
 
 func (e *Endpoint) approve(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
@@ -154,7 +154,7 @@ func (e *Endpoint) approve(ctx context.Context, in *mergeRequestApprovalInput) (
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalsView(item)}, nil
 }
 
 func (e *Endpoint) unapprove(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
@@ -171,7 +171,7 @@ func (e *Endpoint) unapprove(ctx context.Context, in *mergeRequestApprovalInput)
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestApprovalsView(item)}, nil
 }
 
 func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestInput) (*mergeRequestOutput, error) {
@@ -188,7 +188,7 @@ func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestI
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestView(item)}, nil
 }
 
 func (e *Endpoint) setReviewers(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
@@ -200,7 +200,7 @@ func (e *Endpoint) setReviewers(ctx context.Context, in *setParticipantsInput) (
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestParticipantsView(item)}, nil
 }
 
 func (e *Endpoint) setAssignees(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
@@ -212,7 +212,7 @@ func (e *Endpoint) setAssignees(ctx context.Context, in *setParticipantsInput) (
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestParticipantsView(item)}, nil
 }
 
 func (e *Endpoint) updateMergeRequest(ctx context.Context, in *updateMergeRequestInput) (*mergeRequestOutput, error) {
@@ -224,5 +224,5 @@ func (e *Endpoint) updateMergeRequest(ctx context.Context, in *updateMergeReques
 	if err != nil {
 		return nil, err
 	}
-	return &mergeRequestOutput{Body: item}, nil
+	return &mergeRequestOutput{Body: toMergeRequestView(item)}, nil
 }
