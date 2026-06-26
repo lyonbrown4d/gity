@@ -6,19 +6,22 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	identityports "github.com/lyonbrown4d/gity/internal/application/ports"
-	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
-	"github.com/samber/oops"
 	"log/slog"
 	"strings"
+	"unicode"
 
 	collectionx "github.com/arcgolabs/collectionx/list"
+	appports "github.com/lyonbrown4d/gity/internal/application/ports"
+	identity "github.com/lyonbrown4d/gity/internal/domain/identity"
+	"github.com/samber/oops"
 )
 
 type Service struct {
-	logger    *slog.Logger
-	repo      identityports.UserRepository
-	tokenRepo identityports.UserAccessTokenRepository
+	logger                 *slog.Logger
+	repo                   appports.UserRepository
+	tokenRepo              appports.UserAccessTokenRepository
+	organizationRepo       appports.OrganizationRepository
+	organizationMemberRepo appports.OrganizationMemberRepository
 }
 
 type CreateInput struct {
@@ -47,25 +50,29 @@ type AuthSession struct {
 }
 
 type Dependencies struct {
-	Logger    *slog.Logger
-	Repo      identityports.UserRepository
-	TokenRepo identityports.UserAccessTokenRepository
+	Logger                 *slog.Logger
+	Repo                   appports.UserRepository
+	TokenRepo              appports.UserAccessTokenRepository
+	OrganizationRepo       appports.OrganizationRepository
+	OrganizationMemberRepo appports.OrganizationMemberRepository
 }
 
-func NewDependencies(logger *slog.Logger, repo identityports.UserRepository, tokenRepo identityports.UserAccessTokenRepository) Dependencies {
-	return Dependencies{Logger: logger, Repo: repo, TokenRepo: tokenRepo}
+func NewDependencies(logger *slog.Logger, repo appports.UserRepository, tokenRepo appports.UserAccessTokenRepository, organizationRepo appports.OrganizationRepository, organizationMemberRepo appports.OrganizationMemberRepository) Dependencies {
+	return Dependencies{Logger: logger, Repo: repo, TokenRepo: tokenRepo, OrganizationRepo: organizationRepo, OrganizationMemberRepo: organizationMemberRepo}
 }
 
 func NewServiceWithDependencies(dependencies Dependencies) *Service {
 	return &Service{
-		logger:    dependencies.Logger,
-		repo:      dependencies.Repo,
-		tokenRepo: dependencies.TokenRepo,
+		logger:                 dependencies.Logger,
+		repo:                   dependencies.Repo,
+		tokenRepo:              dependencies.TokenRepo,
+		organizationRepo:       dependencies.OrganizationRepo,
+		organizationMemberRepo: dependencies.OrganizationMemberRepo,
 	}
 }
 
-func NewService(logger *slog.Logger, repo identityports.UserRepository, tokenRepo identityports.UserAccessTokenRepository) *Service {
-	return NewServiceWithDependencies(NewDependencies(logger, repo, tokenRepo))
+func NewService(logger *slog.Logger, repo appports.UserRepository, tokenRepo appports.UserAccessTokenRepository) *Service {
+	return NewServiceWithDependencies(Dependencies{Logger: logger, Repo: repo, TokenRepo: tokenRepo})
 }
 
 func (s *Service) List(ctx context.Context) (*collectionx.List[identity.User], error) {
@@ -99,7 +106,7 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (identity.User,
 	if strings.TrimSpace(input.DisplayName) == "" {
 		input.DisplayName = input.Username
 	}
-	item, err := s.repo.Create(ctx, identityports.CreateUserInput{
+	item, err := s.repo.Create(ctx, appports.CreateUserInput{
 		Username:     input.Username,
 		DisplayName:  input.DisplayName,
 		Email:        input.Email,
@@ -118,7 +125,7 @@ func (s *Service) Update(ctx context.Context, id int64, input UpdateInput) (iden
 	if err := s.ensureSuperAdminUpdateAllowed(ctx, id, input); err != nil {
 		return identity.User{}, err
 	}
-	if err := s.repo.UpdateByID(ctx, id, identityports.UpdateUserInput{
+	if err := s.repo.UpdateByID(ctx, id, appports.UpdateUserInput{
 		Username:     input.Username,
 		DisplayName:  input.DisplayName,
 		Email:        input.Email,
@@ -153,7 +160,7 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 	}
 	user, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
-		if !errors.Is(err, identityports.ErrNotFound) {
+		if !errors.Is(err, appports.ErrNotFound) {
 			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "load login user")
 		}
 		firstUser, firstUserErr := s.isFirstUser(ctx)
@@ -170,7 +177,83 @@ func (s *Service) Login(ctx context.Context, username string) (AuthSession, erro
 			return AuthSession{}, oops.In("user").With("username", username).Wrapf(err, "create login user")
 		}
 	}
+	if err := s.ensureDefaultOrganization(ctx, user); err != nil {
+		return AuthSession{}, err
+	}
 	return s.createSession(ctx, user)
+}
+
+func (s *Service) ensureDefaultOrganization(ctx context.Context, user identity.User) error {
+	if s.organizationRepo == nil || s.organizationMemberRepo == nil || user.ID <= 0 {
+		return nil
+	}
+	hasMembership, err := s.hasOrganizationMembership(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	if hasMembership {
+		return nil
+	}
+	pathKey := defaultOrganizationPathKey(user)
+	item, err := s.organizationRepo.Create(ctx, appports.CreateOrganizationInput{
+		Name:        user.DisplayName,
+		PathKey:     pathKey,
+		Description: "Personal project owner namespace for " + user.Username + ".",
+		Visibility:  "private",
+	})
+	if err != nil {
+		fallbackPathKey := fmt.Sprintf("%s-%d", pathKey, user.ID)
+		item, err = s.organizationRepo.Create(ctx, appports.CreateOrganizationInput{
+			Name:        user.DisplayName,
+			PathKey:     fallbackPathKey,
+			Description: "Personal project owner namespace for " + user.Username + ".",
+			Visibility:  "private",
+		})
+		if err != nil {
+			return oops.In("user").With("user_id", user.ID, "username", user.Username).Wrapf(err, "create default organization")
+		}
+	}
+	if _, err := s.organizationMemberRepo.Create(ctx, appports.CreateOrganizationMemberInput{OrganizationID: item.ID, UserID: user.ID, Role: "owner"}); err != nil {
+		return oops.In("user").With("user_id", user.ID, "organization_id", item.ID).Wrapf(err, "create default organization owner membership")
+	}
+	return nil
+}
+
+func (s *Service) hasOrganizationMembership(ctx context.Context, userID int64) (bool, error) {
+	organizations, err := s.organizationRepo.List(ctx)
+	if err != nil {
+		return false, oops.In("user").With("user_id", userID).Wrapf(err, "list organizations before default owner bootstrap")
+	}
+	for _, organization := range organizations.Values() {
+		if _, err := s.organizationMemberRepo.FindByOrganizationAndUser(ctx, organization.ID, userID); err == nil {
+			return true, nil
+		} else if !errors.Is(err, appports.ErrNotFound) {
+			return false, oops.In("user").With("user_id", userID, "organization_id", organization.ID).Wrapf(err, "check default organization membership")
+		}
+	}
+	return false, nil
+}
+
+func defaultOrganizationPathKey(user identity.User) string {
+	source := strings.TrimSpace(strings.ToLower(user.Username))
+	var builder strings.Builder
+	lastDash := false
+	for _, value := range source {
+		if unicode.IsLetter(value) || unicode.IsDigit(value) {
+			builder.WriteRune(value)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+	pathKey := strings.Trim(builder.String(), "-")
+	if pathKey == "" {
+		return fmt.Sprintf("user-%d", user.ID)
+	}
+	return pathKey
 }
 
 func (s *Service) isFirstUser(ctx context.Context) (bool, error) {
@@ -190,7 +273,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (AuthSession
 	if err != nil {
 		return AuthSession{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "load refresh user")
 	}
-	if err := s.tokenRepo.DeleteByToken(ctx, record.Token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
+	if err := s.tokenRepo.DeleteByToken(ctx, record.Token); err != nil && !errors.Is(err, appports.ErrNotFound) {
 		return AuthSession{}, oops.In("user").With("user_id", record.UserID).Wrapf(err, "revoke refresh token")
 	}
 	return s.createSession(ctx, user)
@@ -201,7 +284,7 @@ func (s *Service) RevokeToken(ctx context.Context, token string) error {
 	if token == "" {
 		return nil
 	}
-	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, identityports.ErrNotFound) {
+	if err := s.tokenRepo.DeleteByToken(ctx, token); err != nil && !errors.Is(err, appports.ErrNotFound) {
 		return oops.In("user").Wrapf(err, "revoke token")
 	}
 	return nil
@@ -242,7 +325,7 @@ func (s *Service) CreateToken(ctx context.Context, userID int64, input CreateTok
 	if err != nil {
 		return identity.UserAccessToken{}, oops.In("user").With("user_id", userID).Wrapf(err, "generate access token")
 	}
-	record, err := s.tokenRepo.Create(ctx, identityports.CreateUserAccessTokenInput{
+	record, err := s.tokenRepo.Create(ctx, appports.CreateUserAccessTokenInput{
 		UserID: userID,
 		Name:   name,
 		Token:  token,
