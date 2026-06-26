@@ -17,10 +17,10 @@ func authorizeProject(c fiber.Ctx, authRuntime *infraauth.Runtime, project proje
 	}
 	principal, ok, err := authRuntime.AuthenticateHeader(c.Context(), c.Get(fiber.HeaderAuthorization))
 	if err != nil {
-		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "invalid credentials")
+		return infraauth.Principal{}, gitAuthChallenge(c, "invalid credentials")
 	}
 	if !ok {
-		return infraauth.Principal{}, fiber.NewError(http.StatusUnauthorized, "authentication required")
+		return infraauth.Principal{}, gitAuthChallenge(c, "authentication required")
 	}
 	allowed := false
 	scope := infraauth.ProjectScope{ID: project.ID, OrganizationID: project.OrganizationID, Visibility: project.Visibility}
@@ -37,6 +37,12 @@ func authorizeProject(c fiber.Ctx, authRuntime *infraauth.Runtime, project proje
 		return infraauth.Principal{}, fiber.NewError(http.StatusForbidden, "forbidden")
 	}
 	return principal, nil
+}
+
+func gitAuthChallenge(c fiber.Ctx, message string) error {
+	// Git clients only retry URL credentials after a standard Basic challenge.
+	c.Set(fiber.HeaderWWWAuthenticate, `Basic realm="Gity Git"`)
+	return fiber.NewError(http.StatusUnauthorized, message)
 }
 
 func loadProject(ctx context.Context, repo *projectrepo.Repository, rawRepoPath string) (projectView, error) {

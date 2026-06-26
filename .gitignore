@@ -89,3 +89,4 @@ coverage.out
 
 node_modules/
 packages/
+.tmp-perf/
