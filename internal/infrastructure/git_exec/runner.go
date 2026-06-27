@@ -124,11 +124,32 @@ func (r *Runner) EnsureUpdateHook(_ context.Context, repoPath string) error {
 	if err := os.MkdirAll(filepath.Dir(hookPath), 0o750); err != nil {
 		return fmt.Errorf("create git hooks directory: %w", err)
 	}
-	if err := os.WriteFile(hookPath, []byte(updateHookScript), 0o600); err != nil {
-		return fmt.Errorf("write git update hook: %w", err)
+	if existing, readErr := os.ReadFile(hookPath); readErr == nil && string(existing) == updateHookScript {
+		if err := os.Chmod(hookPath, executableHookMode()); err != nil {
+			return fmt.Errorf("mark git update hook executable: %w", err)
+		}
+		return nil
 	}
-	if err := os.Chmod(hookPath, executableHookMode()); err != nil {
-		return fmt.Errorf("mark git update hook executable: %w", err)
+	tmpHook, err := os.CreateTemp(filepath.Dir(hookPath), "update-*")
+	if err != nil {
+		return fmt.Errorf("create git update hook temp file: %w", err)
+	}
+	tmpPath := tmpHook.Name()
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
+	if _, err := tmpHook.WriteString(updateHookScript); err != nil {
+		_ = tmpHook.Close()
+		return fmt.Errorf("write git update hook temp file: %w", err)
+	}
+	if err := tmpHook.Close(); err != nil {
+		return fmt.Errorf("close git update hook temp file: %w", err)
+	}
+	if err := os.Chmod(tmpPath, executableHookMode()); err != nil {
+		return fmt.Errorf("mark git update hook temp file executable: %w", err)
+	}
+	if err := os.Rename(tmpPath, hookPath); err != nil {
+		return fmt.Errorf("install git update hook: %w", err)
 	}
 	return nil
 }
