@@ -11,6 +11,7 @@ func TestSettingsEnvironmentOverridesTypedDefaults(t *testing.T) {
 	t.Setenv("GITY_DATABASE__DSN", "file:test-override.db?_pragma=foreign_keys(1)")
 	t.Setenv("GITY_DATABASE__NODE_ID", "7")
 	t.Setenv("GITY_GIT__REPO_ROOT", "./tmp/repos")
+	t.Setenv("GITY_GIT__MAX_CONCURRENT_RPC", "17")
 	t.Setenv("GITY_STORAGE__ROOT", "./tmp/storage")
 	t.Setenv("GITY_WORKER__POLL_INTERVAL_MILLIS", "42")
 
@@ -33,6 +34,9 @@ func TestSettingsEnvironmentOverridesTypedDefaults(t *testing.T) {
 	}
 	if settings.Git.RepoRoot != "./tmp/repos" {
 		t.Fatalf("git repo root = %q", settings.Git.RepoRoot)
+	}
+	if settings.Git.MaxConcurrentRPC != 17 {
+		t.Fatalf("git max concurrent rpc = %d", settings.Git.MaxConcurrentRPC)
 	}
 	if settings.Storage.Root != "./tmp/storage" {
 		t.Fatalf("storage root = %q", settings.Storage.Root)

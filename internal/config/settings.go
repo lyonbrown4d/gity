@@ -32,8 +32,9 @@ type DatabaseSettings struct {
 }
 
 type GitSettings struct {
-	RepoRoot string `json:"repo_root" koanf:"repo_root" mapstructure:"repo_root"`
-	Bin      string `json:"bin"       koanf:"bin"       mapstructure:"bin"`
+	RepoRoot         string `json:"repo_root"          koanf:"repo_root"          mapstructure:"repo_root"`
+	Bin              string `json:"bin"                koanf:"bin"                mapstructure:"bin"`
+	MaxConcurrentRPC int    `json:"max_concurrent_rpc" koanf:"max_concurrent_rpc" mapstructure:"max_concurrent_rpc"`
 }
 
 type StorageSettings struct {
@@ -80,8 +81,9 @@ func DefaultSettings() Settings {
 			NodeID: 1,
 		},
 		Git: GitSettings{
-			RepoRoot: "./data/repos",
-			Bin:      "git",
+			RepoRoot:         "./data/repos",
+			Bin:              "git",
+			MaxConcurrentRPC: 32,
 		},
 		Storage: StorageSettings{
 			Driver:             "local",

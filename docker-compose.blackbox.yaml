@@ -29,6 +29,7 @@ services:
       GITY_DATABASE__DSN: file:/var/lib/gity/gity.db?_pragma=foreign_keys(1)
       GITY_DATABASE__NODE_ID: "1"
       GITY_GIT__REPO_ROOT: /var/lib/gity/repos
+      GITY_GIT__MAX_CONCURRENT_RPC: "32"
       GITY_STORAGE__DRIVER: local
       GITY_STORAGE__ROOT: /var/lib/gity/storage
       GITY_SEARCH__INDEX_ENABLED: "false"

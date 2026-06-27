@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/lyonbrown4d/gity/internal/config"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/git_exec"
 	"github.com/samber/oops"
 )
@@ -14,37 +15,47 @@ type ReceivePackOptions struct {
 }
 
 type Service struct {
-	runner *gitexec.Runner
+	runner     *gitexec.Runner
+	rpcLimiter chan struct{}
 }
 
 type Dependencies struct {
-	Runner *gitexec.Runner
+	Runner           *gitexec.Runner
+	MaxConcurrentRPC int
 }
 
-func NewDependencies(runner *gitexec.Runner) Dependencies {
-	return Dependencies{Runner: runner}
+func NewDependencies(runner *gitexec.Runner, settings config.Settings) Dependencies {
+	return Dependencies{Runner: runner, MaxConcurrentRPC: settings.Git.MaxConcurrentRPC}
 }
 
 func NewServiceWithDependencies(dependencies Dependencies) *Service {
-	return &Service{runner: dependencies.Runner}
+	var rpcLimiter chan struct{}
+	if dependencies.MaxConcurrentRPC > 0 {
+		rpcLimiter = make(chan struct{}, dependencies.MaxConcurrentRPC)
+	}
+	return &Service{runner: dependencies.Runner, rpcLimiter: rpcLimiter}
 }
 
 func NewService(runner *gitexec.Runner) *Service {
-	return NewServiceWithDependencies(NewDependencies(runner))
+	return NewServiceWithDependencies(Dependencies{Runner: runner})
 }
 
 func (s *Service) UploadPack(ctx context.Context, repoPath string, stdin io.Reader, stdout, stderr io.Writer) error {
-	if err := s.runner.Run(ctx, repoPath, []string{"upload-pack", "--stateless-rpc", "."}, stdin, stdout, stderr); err != nil {
-		return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "run upload-pack")
-	}
-	return nil
+	return s.withRPCLimit(ctx, repoPath, "upload-pack", func() error {
+		if err := s.runner.Run(ctx, repoPath, []string{"upload-pack", "--stateless-rpc", "."}, stdin, stdout, stderr); err != nil {
+			return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "run upload-pack")
+		}
+		return nil
+	})
 }
 
 func (s *Service) AdvertiseUploadPack(ctx context.Context, repoPath string, stdout, stderr io.Writer) error {
-	if err := s.runner.Run(ctx, repoPath, []string{"upload-pack", "--stateless-rpc", "--advertise-refs", "."}, nil, stdout, stderr); err != nil {
-		return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "advertise upload-pack")
-	}
-	return nil
+	return s.withRPCLimit(ctx, repoPath, "advertise-upload-pack", func() error {
+		if err := s.runner.Run(ctx, repoPath, []string{"upload-pack", "--stateless-rpc", "--advertise-refs", "."}, nil, stdout, stderr); err != nil {
+			return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "advertise upload-pack")
+		}
+		return nil
+	})
 }
 
 func (s *Service) ReceivePack(ctx context.Context, repoPath string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -52,22 +63,39 @@ func (s *Service) ReceivePack(ctx context.Context, repoPath string, stdin io.Rea
 }
 
 func (s *Service) ReceivePackWithOptions(ctx context.Context, repoPath string, stdin io.Reader, stdout, stderr io.Writer, options ReceivePackOptions) error {
-	if err := s.runner.EnsureUpdateHook(ctx, repoPath); err != nil {
-		return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "ensure receive-pack update hook")
-	}
-	env := map[string]string{}
-	if len(options.DenyForcePushRefs) > 0 {
-		env["GITY_DENY_FORCE_PUSH_REFS"] = strings.Join(options.DenyForcePushRefs, "\n")
-	}
-	if err := s.runner.RunWithEnv(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "."}, env, stdin, stdout, stderr); err != nil {
-		return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "run receive-pack")
-	}
-	return nil
+	return s.withRPCLimit(ctx, repoPath, "receive-pack", func() error {
+		if err := s.runner.EnsureUpdateHook(ctx, repoPath); err != nil {
+			return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "ensure receive-pack update hook")
+		}
+		env := map[string]string{}
+		if len(options.DenyForcePushRefs) > 0 {
+			env["GITY_DENY_FORCE_PUSH_REFS"] = strings.Join(options.DenyForcePushRefs, "\n")
+		}
+		if err := s.runner.RunWithEnv(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "."}, env, stdin, stdout, stderr); err != nil {
+			return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "run receive-pack")
+		}
+		return nil
+	})
 }
 
 func (s *Service) AdvertiseReceivePack(ctx context.Context, repoPath string, stdout, stderr io.Writer) error {
-	if err := s.runner.Run(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "--advertise-refs", "."}, nil, stdout, stderr); err != nil {
-		return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "advertise receive-pack")
+	return s.withRPCLimit(ctx, repoPath, "advertise-receive-pack", func() error {
+		if err := s.runner.Run(ctx, repoPath, []string{"receive-pack", "--stateless-rpc", "--advertise-refs", "."}, nil, stdout, stderr); err != nil {
+			return oops.In("git_transport").With("repo_path", repoPath).Wrapf(err, "advertise receive-pack")
+		}
+		return nil
+	})
+}
+
+func (s *Service) withRPCLimit(ctx context.Context, repoPath, operation string, run func() error) error {
+	if s.rpcLimiter == nil {
+		return run()
 	}
-	return nil
+	select {
+	case s.rpcLimiter <- struct{}{}:
+		defer func() { <-s.rpcLimiter }()
+		return run()
+	case <-ctx.Done():
+		return oops.In("git_transport").With("repo_path", repoPath, "operation", operation).Wrapf(ctx.Err(), "wait for git rpc capacity")
+	}
 }

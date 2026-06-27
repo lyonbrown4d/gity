@@ -45,6 +45,11 @@ The token is used as the password part of HTTP Basic auth. Override the username
 For localhost targets, the runner bypasses Git/HTTP proxies and clears Git credential helpers for subprocesses. This keeps blackbox runs independent from machine-level proxy settings such as `HTTP_PROXY` or Git for Windows credential manager configuration.
 
 The server must return `WWW-Authenticate: Basic` on Git Smart HTTP authentication failures. Git clients use that challenge before retrying URL credentials for private repositories.
+
+## Server-Side Git RPC Capacity
+
+The server limits concurrent native Git Smart HTTP subprocesses with `git.max_concurrent_rpc` (`GITY_GIT__MAX_CONCURRENT_RPC`). The default is `32`; set it to `0` to disable the limiter. Raise it only when the host has enough CPU, file descriptors, and repository I/O capacity. Lower it if mixed API + Git traffic starts producing gateway errors or long tail latency.
+
 ## Metrics
 
 The runner prints per-operation count, failures, avg, p50, p95, and max for:
