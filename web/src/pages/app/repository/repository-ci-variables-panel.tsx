@@ -131,6 +131,8 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
         </Button>
       </div>
 
+      <VariableProtectionGuide t={t} />
+
       {!canAdminVariables ? (
         <Alert>
           <AlertDescription>{t("Your current project role can inspect runners, but cannot change CI variables.")}</AlertDescription>
@@ -171,6 +173,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
             {isSaving ? t("Saving...") : t("Save")}
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground lg:col-span-3">{getVariableFormGuidance(masked, protectedVariable, t)}</p>
       </form>
 
       <div className="flex flex-col gap-2 rounded-md border p-2">
@@ -191,6 +194,7 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
               <p className="text-xs text-muted-foreground">
                 {variable.updated_at ? `${t("Updated")}: ${variable.updated_at}` : t("Value is hidden after save")}
               </p>
+              <p className="text-xs text-muted-foreground">{getVariableExposureDescription(variable, t)}</p>
               <div className="flex flex-wrap gap-2">
                 {variable.masked ? <Badge variant="secondary">{t("masked")}</Badge> : <Badge variant="outline">{t("visible")}</Badge>}
                 {variable.protected ? <Badge variant="outline">{t("protected")}</Badge> : <Badge variant="outline">{t("unprotected")}</Badge>}
@@ -215,13 +219,31 @@ export const RepositoryCIVariablesPanel = ({ repoId, permissions, t, onError }: 
   );
 };
 
+const VariableProtectionGuide = ({ t }: { t: (text: string) => string }) => (
+  <Alert className="bg-muted/20">
+    <AlertTitle>{t("Masking and protection")}</AlertTitle>
+    <AlertDescription className="grid gap-2 md:grid-cols-2">
+      <VariableGuideItem label={t("Masked")} value={t("Masked values are hidden after save and redacted from job logs, but jobs can still read them at runtime.")} />
+      <VariableGuideItem label={t("Protected")} value={t("Protected marks secrets intended for protected refs or release jobs; keep deployment credentials protected and scoped.")} />
+    </AlertDescription>
+  </Alert>
+);
+
+const VariableGuideItem = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-md border bg-background px-3 py-2">
+    <p className="text-xs font-medium">{label}</p>
+    <p className="text-xs text-muted-foreground">{value}</p>
+  </div>
+);
+
 const VariableEmptyState = ({ canAdmin, t }: { canAdmin: boolean; t: (text: string) => string }) => (
   <Alert className="border-dashed bg-muted/20">
     <AlertTitle>{t("No CI variables configured")}</AlertTitle>
     <AlertDescription className="flex flex-col gap-3">
-      <p>{t("Add masked variables for tokens, deployment keys, and environment values that jobs need at runtime.")}</p>
+      <p>{t("Add masked variables for tokens, deployment keys, and environment values that jobs need at runtime. Use protected variables for release credentials and re-run the pipeline after saving.")}</p>
       <div className="flex flex-wrap gap-2">
         <Badge variant={canAdmin ? "secondary" : "outline"}>{canAdmin ? t("Use the form above") : t("Runner admin required")}</Badge>
+        <Badge variant="outline">{t("Example")}: DEPLOY_TOKEN</Badge>
       </div>
     </AlertDescription>
   </Alert>
@@ -249,6 +271,32 @@ const ToggleButton = ({
     {label}
   </Button>
 );
+
+const getVariableFormGuidance = (masked: boolean, protectedVariable: boolean, t: (text: string) => string): string => {
+  if (masked && protectedVariable) {
+    return t("This value will be hidden after save, redacted from logs, and marked for protected ref usage.");
+  }
+  if (masked) {
+    return t("This value will be hidden after save and redacted from logs. Masked values must be at least 8 characters.");
+  }
+  if (protectedVariable) {
+    return t("This value is visible to admins after entry but marked for protected ref usage; prefer masking deployment secrets too.");
+  }
+  return t("Unmasked variables are easier to diagnose but should only contain non-secret runtime configuration.");
+};
+
+const getVariableExposureDescription = (variable: RepositoryCIVariableView, t: (text: string) => string): string => {
+  if (variable.masked && variable.protected) {
+    return t("Hidden after save, redacted from logs, and intended for protected CI contexts.");
+  }
+  if (variable.masked) {
+    return t("Hidden after save and redacted from logs; still injected into eligible jobs.");
+  }
+  if (variable.protected) {
+    return t("Marked protected; avoid storing raw secrets unmasked.");
+  }
+  return t("Visible variable; use for non-secret configuration only.");
+};
 
 const resolveVariables = (payload: unknown): RawRecord[] => {
   if (Array.isArray(payload)) {

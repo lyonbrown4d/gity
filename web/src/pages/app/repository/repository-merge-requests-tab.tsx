@@ -53,6 +53,28 @@ interface RepositoryMergeRequestsTabProps {
   onMerged: () => Promise<void>;
 }
 
+type MergeRequestStateFilter = RepositoryMergeRequestState | "all";
+type MergeRequestBranchFilter = "all" | `branch:${string}`;
+type BadgeTone = "default" | "secondary" | "outline";
+
+interface MergeRequestBranchFilterOption {
+  name: string;
+  count: number;
+}
+
+interface MergeRequestFilterCriteria {
+  state: MergeRequestStateFilter;
+  query: string;
+  sourceBranch: MergeRequestBranchFilter;
+  targetBranch: MergeRequestBranchFilter;
+}
+
+interface MergeRequestListGateSummary {
+  gateLabel: string;
+  gateVariant: BadgeTone;
+  approvalLabel?: string;
+  blockerDetail?: string;
+}
 export const RepositoryMergeRequestsTab = ({
   organizationId,
   repoId,
@@ -128,8 +150,10 @@ export const RepositoryMergeRequestsTab = ({
   const { mutateAsync: createMergeRequestComment, mutation: { isPending: isCreatingComment } } = useCustomMutation<RawRecord>();
   const { mutateAsync: approveMergeRequest, mutation: { isPending: isUpdatingApproval } } = useCustomMutation<RawRecord>();
   const [isComposerOpen, setComposerOpen] = useState(false);
-  const [stateFilter, setStateFilter] = useState<RepositoryMergeRequestState | "all">("opened");
+  const [stateFilter, setStateFilter] = useState<MergeRequestStateFilter>("opened");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sourceBranchFilter, setSourceBranchFilter] = useState<MergeRequestBranchFilter>("all");
+  const [targetBranchFilter, setTargetBranchFilter] = useState<MergeRequestBranchFilter>("all");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [sourceBranch, setSourceBranch] = useState("");
@@ -146,15 +170,29 @@ export const RepositoryMergeRequestsTab = ({
     () => mergeRequests.find((item) => item.iid === selectedIID) ?? mergeRequests[0] ?? null,
     [mergeRequests, selectedIID],
   );
+  const sourceBranchOptions = useMemo(
+    () => buildMergeRequestBranchFilterOptions(mergeRequests, "source_branch"),
+    [mergeRequests],
+  );
+  const targetBranchOptions = useMemo(
+    () => buildMergeRequestBranchFilterOptions(mergeRequests, "target_branch"),
+    [mergeRequests],
+  );
   const filteredMergeRequests = useMemo(
-    () => filterMergeRequests(mergeRequests, stateFilter, searchQuery),
-    [mergeRequests, stateFilter, searchQuery],
+    () => filterMergeRequests(mergeRequests, {
+      state: stateFilter,
+      query: searchQuery,
+      sourceBranch: sourceBranchFilter,
+      targetBranch: targetBranchFilter,
+    }),
+    [mergeRequests, stateFilter, searchQuery, sourceBranchFilter, targetBranchFilter],
   );
   const stats = useMemo(
     () => ({
       opened: mergeRequests.filter((item) => item.state === "opened").length,
       merged: mergeRequests.filter((item) => item.state === "merged").length,
       closed: mergeRequests.filter((item) => item.state === "closed").length,
+      total: mergeRequests.length,
     }),
     [mergeRequests],
   );
@@ -166,6 +204,13 @@ export const RepositoryMergeRequestsTab = ({
     () => normalizeCheckStatusView(checksQuery.result.data),
     [checksQuery.result.data],
   );
+  const selectedChecksView = useMemo(() => {
+    if (!checksView || !selectedMergeRequest) {
+      return null;
+    }
+    const checksIID = checksView.merge_request.iid;
+    return checksIID === 0 || checksIID === selectedMergeRequest.iid ? checksView : null;
+  }, [checksView, selectedMergeRequest]);
   const participantsView = useMemo(
     () => normalizeParticipantsView(participantsQuery.result.data),
     [participantsQuery.result.data],
@@ -199,13 +244,22 @@ export const RepositoryMergeRequestsTab = ({
   const approvals = approvalsView?.approvals ?? [];
   const currentUserID = identityQuery.data?.id === undefined ? "" : String(identityQuery.data.id);
   const currentUserApproved = Boolean(currentUserID && approvals.some((item) => item.user_id === currentUserID));
-  const isMergeBlocked = Boolean(checksView?.required && !checksView.mergeable);
+  const isMergeBlocked = Boolean(selectedChecksView?.required && !selectedChecksView.mergeable);
   const isLoadingMergeRequests = mergeRequestsQuery.query.isFetching && !mergeRequestsQuery.query.data;
   const canCreateMergeRequest = permissions.mergeRequestCreate;
   const canWriteMergeRequest = permissions.mergeRequestWrite;
   const canCommentMergeRequest = permissions.mergeRequestComment;
   const canMergeMergeRequest = permissions.mergeRequestMerge;
-
+  const hasMergeRequestFilters = stateFilter !== "opened"
+    || sourceBranchFilter !== "all"
+    || targetBranchFilter !== "all"
+    || searchQuery.trim().length > 0;
+  const resetMergeRequestFilters = () => {
+    setStateFilter("opened");
+    setSearchQuery("");
+    setSourceBranchFilter("all");
+    setTargetBranchFilter("all");
+  };
   const loadMergeRequests = async () => {
     const result = await mergeRequestsQuery.query.refetch();
     if (result.error) {
@@ -504,19 +558,19 @@ export const RepositoryMergeRequestsTab = ({
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
           <div className="flex flex-col gap-3">
             <div className="rounded-md border p-3">
-              <div className="grid gap-2 md:grid-cols-[1fr_150px] xl:grid-cols-1">
-                <div className="relative">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
+                <div className="relative md:col-span-2 xl:col-span-1">
                   <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     className="pl-8"
-                    placeholder={t("Search merge requests")}
+                    placeholder={t("Search title, branch, or description")}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                   />
                 </div>
                 <Select
                   value={stateFilter}
-                  onValueChange={(value) => setStateFilter(value as RepositoryMergeRequestState | "all")}
+                  onValueChange={(value) => setStateFilter(value as MergeRequestStateFilter)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder={t("Status")} />
@@ -530,9 +584,48 @@ export const RepositoryMergeRequestsTab = ({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+                <Select value={sourceBranchFilter} onValueChange={(value) => setSourceBranchFilter(value as MergeRequestBranchFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Source branch")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="all">{t("Any source branch")}</SelectItem>
+                      {sourceBranchOptions.map((branch) => (
+                        <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
+                          {branch.name} ({branch.count})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Select value={targetBranchFilter} onValueChange={(value) => setTargetBranchFilter(value as MergeRequestBranchFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("Target branch")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="all">{t("Any target branch")}</SelectItem>
+                      {targetBranchOptions.map((branch) => (
+                        <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
+                          {branch.name} ({branch.count})
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>
+                  {t("Showing")} {filteredMergeRequests.length} {t("of")} {stats.total} {t("merge requests")}
+                </span>
+                {hasMergeRequestFilters ? (
+                  <Button type="button" size="sm" variant="ghost" onClick={resetMergeRequestFilters}>
+                    {t("Clear filters")}
+                  </Button>
+                ) : null}
               </div>
             </div>
-
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Button
                 type="button"
@@ -599,31 +692,37 @@ export const RepositoryMergeRequestsTab = ({
               {isLoadingMergeRequests ? (
                 <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading merge requests...")}</p>
               ) : null}
-              {!isLoadingMergeRequests && filteredMergeRequests.length === 0 ? (
-                <p className="px-2 py-2 text-sm text-muted-foreground">{t("No merge requests found.")}</p>
+              {!isLoadingMergeRequests && mergeRequests.length === 0 ? (
+                <MergeRequestEmptyState
+                  title={t("No merge requests yet.")}
+                  description={canCreateMergeRequest ? t("Create a merge request to start branch review and merge triage.") : t("Merge requests will appear here after they are created.")}
+                  actionLabel={canCreateMergeRequest ? t("Create merge request") : undefined}
+                  onAction={canCreateMergeRequest ? () => setComposerOpen(true) : undefined}
+                />
               ) : null}
-              {filteredMergeRequests.map((mergeRequest) => (
-                <button
-                  key={mergeRequest.id}
-                  type="button"
-                  className={cn(
-                    "w-full rounded-md border p-3 text-left transition hover:bg-muted/40",
-                    selectedMergeRequest?.iid === mergeRequest.iid ? "border-primary/60 bg-primary/5" : "",
-                  )}
-                  onClick={() => setSelectedIID(mergeRequest.iid)}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-medium">
-                      !{mergeRequest.iid} {mergeRequest.title}
-                    </p>
-                    <MergeRequestStateBadge state={mergeRequest.state} t={t} />
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {mergeRequest.source_branch} → {mergeRequest.target_branch}
-                    {mergeRequest.updated_at ? ` · ${formatRelativeTime(mergeRequest.updated_at)}` : ""}
-                  </p>
-                </button>
-              ))}
+              {!isLoadingMergeRequests && mergeRequests.length > 0 && filteredMergeRequests.length === 0 ? (
+                <MergeRequestEmptyState
+                  title={t("No merge requests match these filters.")}
+                  description={t("Try another state, source branch, target branch, or search term.")}
+                  actionLabel={hasMergeRequestFilters ? t("Clear filters") : undefined}
+                  onAction={hasMergeRequestFilters ? resetMergeRequestFilters : undefined}
+                />
+              ) : null}
+              {filteredMergeRequests.map((mergeRequest) => {
+                const isSelected = selectedMergeRequest?.iid === mergeRequest.iid;
+                return (
+                  <MergeRequestListItem
+                    key={mergeRequest.id || mergeRequest.iid}
+                    mergeRequest={mergeRequest}
+                    isSelected={isSelected}
+                    checks={isSelected ? selectedChecksView : null}
+                    approvalsCount={isSelected ? approvals.length : null}
+                    isLoadingChecks={isSelected && checksQuery.query.isFetching}
+                    t={t}
+                    onSelect={() => setSelectedIID(mergeRequest.iid)}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -674,7 +773,7 @@ export const RepositoryMergeRequestsTab = ({
 
                 <MergeRequestReadinessSummary
                   mergeRequest={selectedMergeRequest}
-                  checks={checksView}
+                  checks={selectedChecksView}
                   approvalsCount={approvals.length}
                   reviewersCount={reviewers.length}
                   assigneesCount={assignees.length}
@@ -688,7 +787,7 @@ export const RepositoryMergeRequestsTab = ({
                     <MergeRequestChecksPanel
                       organizationId={organizationId}
                       repoId={repoId}
-                      checks={checksView}
+                      checks={selectedChecksView}
                       isLoading={checksQuery.query.isFetching}
                       t={t}
                       onReload={() => void loadChecks()}
@@ -773,6 +872,125 @@ export const RepositoryMergeRequestsTab = ({
   );
 };
 
+const MergeRequestEmptyState = ({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) => (
+  <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center">
+    <p className="font-medium">{title}</p>
+    <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{description}</p>
+    {actionLabel && onAction ? (
+      <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onAction}>
+        {actionLabel}
+      </Button>
+    ) : null}
+  </div>
+);
+
+const MergeRequestListItem = ({
+  mergeRequest,
+  isSelected,
+  checks,
+  approvalsCount,
+  isLoadingChecks,
+  t,
+  onSelect,
+}: {
+  mergeRequest: RepositoryMergeRequestView;
+  isSelected: boolean;
+  checks: RepositoryMergeRequestCheckStatusView | null;
+  approvalsCount: number | null;
+  isLoadingChecks: boolean;
+  t: (text: string) => string;
+  onSelect: () => void;
+}) => {
+  const gateSummary = buildMergeRequestListGateSummary(mergeRequest, checks, approvalsCount, isSelected, isLoadingChecks, t);
+  return (
+    <button
+      type="button"
+      className={cn(
+        "w-full rounded-md border p-3 text-left transition hover:bg-muted/40",
+        isSelected ? "border-primary/60 bg-primary/5" : "",
+      )}
+      onClick={onSelect}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="font-medium">
+          !{mergeRequest.iid} {mergeRequest.title}
+        </p>
+        <MergeRequestStateBadge state={mergeRequest.state} t={t} />
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {mergeRequest.updated_at ? `${t("updated")} ${formatRelativeTime(mergeRequest.updated_at)}` : t("No update timestamp")}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Badge variant="outline">{t("Source")}: {mergeRequest.source_branch || t("N/A")}</Badge>
+        <Badge variant="outline">{t("Target")}: {mergeRequest.target_branch || t("N/A")}</Badge>
+        <Badge variant={gateSummary.gateVariant}>{gateSummary.gateLabel}</Badge>
+        {gateSummary.approvalLabel ? <Badge variant="secondary">{gateSummary.approvalLabel}</Badge> : null}
+      </div>
+      {gateSummary.blockerDetail ? (
+        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{gateSummary.blockerDetail}</p>
+      ) : null}
+    </button>
+  );
+};
+
+const buildMergeRequestListGateSummary = (
+  mergeRequest: RepositoryMergeRequestView,
+  checks: RepositoryMergeRequestCheckStatusView | null,
+  approvalsCount: number | null,
+  isSelected: boolean,
+  isLoadingChecks: boolean,
+  t: (text: string) => string,
+): MergeRequestListGateSummary => {
+  if (mergeRequest.state === "merged") {
+    return { gateLabel: t("Merged"), gateVariant: "secondary" };
+  }
+  if (mergeRequest.state === "closed") {
+    return { gateLabel: t("Closed"), gateVariant: "outline" };
+  }
+  if (!isSelected) {
+    return { gateLabel: t("Select to inspect gates"), gateVariant: "secondary" };
+  }
+  if (isLoadingChecks) {
+    return { gateLabel: t("Loading gates"), gateVariant: "secondary" };
+  }
+  if (!checks) {
+    return { gateLabel: t("Gate status unavailable"), gateVariant: "outline" };
+  }
+
+  const approvalCount = Math.max(checks.approval_count, approvalsCount ?? 0);
+  const approvalLabel = checks.required_approvals > 0
+    ? `${t("Approvals")} ${approvalCount}/${checks.required_approvals}`
+    : t("No approvals required");
+  if (!checks.required) {
+    return { gateLabel: t("No blockers"), gateVariant: "secondary", approvalLabel };
+  }
+  if (checks.mergeable) {
+    return { gateLabel: t("Ready to merge"), gateVariant: "default", approvalLabel };
+  }
+
+  const firstBlockerMessage = checks.blockers
+    .map((blocker) => blocker.message.trim())
+    .find((message) => message.length > 0);
+  const blockerDetail = firstBlockerMessage
+    || checks.blocking_reason
+    || (checks.pipeline?.status ? `${t("Pipeline")}: ${t(checks.pipeline.status)}` : t("Review merge checks for details."));
+  return {
+    gateLabel: t("Blocked"),
+    gateVariant: "outline",
+    approvalLabel,
+    blockerDetail,
+  };
+};
 const MergeRequestReadinessSummary = ({
   mergeRequest,
   checks,
@@ -1364,14 +1582,36 @@ const checkStatusMeta = (checks: RepositoryMergeRequestCheckStatusView) => {
 const shortText = (value: string, length = 8): string => (value.length > length ? value.slice(0, length) : value);
 
 
+const mergeRequestBranchFilterValue = (branch: string): MergeRequestBranchFilter => `branch:${branch}`;
+
+const selectedMergeRequestBranch = (filter: MergeRequestBranchFilter): string => (
+  filter.startsWith("branch:") ? filter.slice("branch:".length) : ""
+);
+
+const buildMergeRequestBranchFilterOptions = (
+  items: RepositoryMergeRequestView[],
+  branchField: "source_branch" | "target_branch",
+): MergeRequestBranchFilterOption[] => {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const branch = item[branchField].trim();
+    if (branch) {
+      counts.set(branch, (counts.get(branch) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts, ([name, count]) => ({ name, count }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+};
+
 const filterMergeRequests = (
   items: RepositoryMergeRequestView[],
-  state: RepositoryMergeRequestState | "all",
-  query: string,
+  criteria: MergeRequestFilterCriteria,
 ): RepositoryMergeRequestView[] => {
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = criteria.query.trim().toLowerCase();
   return items
-    .filter((item) => state === "all" || item.state === state)
+    .filter((item) => criteria.state === "all" || item.state === criteria.state)
+    .filter((item) => mergeRequestMatchesBranchFilter(item.source_branch, criteria.sourceBranch))
+    .filter((item) => mergeRequestMatchesBranchFilter(item.target_branch, criteria.targetBranch))
     .filter((item) => {
       if (!normalizedQuery) {
         return true;
@@ -1387,6 +1627,12 @@ const filterMergeRequests = (
     });
 };
 
+const mergeRequestMatchesBranchFilter = (branch: string, filter: MergeRequestBranchFilter): boolean => {
+  if (filter === "all") {
+    return true;
+  }
+  return branch === selectedMergeRequestBranch(filter);
+};
 const resolveMergeRequestList = (payload: unknown): RawRecord[] => {
   if (Array.isArray(payload)) {
     return payload.filter(isRecord);

@@ -148,6 +148,10 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
     }),
     [pipelines],
   );
+  const pipelineActivitySummary = useMemo(
+    () => getPipelineActivitySummary(pipelines, t),
+    [pipelines, t],
+  );
   const isLoadingPipelines = pipelinesQuery.query.isFetching && !pipelinesQuery.query.data;
 
   const loadPipelines = async () => {
@@ -421,6 +425,18 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
           <PipelineStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs investigation") : t("No failures")} status="failed" />
         </div>
 
+        <Alert className="bg-muted/20">
+          <AlertTitle>{t("Pipeline status summary")}</AlertTitle>
+          <AlertDescription className="flex flex-col gap-2">
+            <p>{pipelineActivitySummary}</p>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className={stats.failed > 0 ? "border-destructive/30 bg-destructive/10 text-destructive" : undefined}>{t("Failures")}: {stats.failed}</Badge>
+              <Badge variant={stats.running > 0 ? "secondary" : "outline"}>{t("Running")}: {stats.running}</Badge>
+              <Badge variant={stats.pending > 0 ? "secondary" : "outline"}>{t("Queued")}: {stats.pending}</Badge>
+            </div>
+          </AlertDescription>
+        </Alert>
+
         {!canMutateCI ? (
           <Alert>
             <AlertDescription>
@@ -626,6 +642,8 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
                   <PipelineMeta label={t("Finished")} value={visiblePipeline.finished_at ? formatRelativeTime(visiblePipeline.finished_at) : t("N/A")} />
                 </div>
 
+                <PipelineDiagnosticsSummary pipeline={visiblePipeline} jobs={pipelineJobs} canMutate={canMutateCI} t={t} />
+
                 <div className="flex flex-col gap-2">
                   <p className="text-sm font-medium">{t("Pipeline jobs")}</p>
                   {detailQuery.query.isFetching ? <PipelineJobsSkeleton /> : null}
@@ -696,6 +714,56 @@ const PipelineMeta = ({ label, value }: { label: string; value: string }) => (
   <div className="flex flex-col gap-1 rounded-md border bg-muted/20 p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="truncate text-sm font-medium">{value}</p>
+  </div>
+);
+
+const PipelineDiagnosticsSummary = ({
+  pipeline,
+  jobs,
+  canMutate,
+  t,
+}: {
+  pipeline: RepositoryPipelineView;
+  jobs: RepositoryPipelineJobView[];
+  canMutate: boolean;
+  t: (text: string) => string;
+}) => {
+  const summary = getPipelineJobSummary(jobs);
+  const problemJobs = jobs.filter((job) => job.status === "failed" || job.status === "blocked").slice(0, 3);
+  const hasBlockingIssue = summary.failed > 0 || summary.blocked > 0;
+
+  return (
+    <Alert variant={summary.failed > 0 ? "destructive" : "default"} className={cn("bg-muted/20", hasBlockingIssue ? undefined : "border-dashed")}>
+      <AlertTitle>{t("Pipeline diagnostics")}</AlertTitle>
+      <AlertDescription className="flex flex-col gap-3">
+        <div className="grid gap-2 sm:grid-cols-4">
+          <PipelineSummaryPill label={t("Jobs")} value={summary.total.toString()} />
+          <PipelineSummaryPill label={t("Failed")} value={summary.failed.toString()} urgent={summary.failed > 0} />
+          <PipelineSummaryPill label={t("Blocked")}
+            value={summary.blocked.toString()}
+            urgent={summary.blocked > 0}
+          />
+          <PipelineSummaryPill label={t("Artifacts expected")} value={summary.artifactJobs.toString()} />
+        </div>
+        <p>{getPipelineNextAction(pipeline, summary, canMutate, t)}</p>
+        {problemJobs.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {problemJobs.map((job) => (
+              <Badge key={job.project_job.id} variant="outline" className={job.status === "failed" ? "border-destructive/30 bg-destructive/10 text-destructive" : undefined}>
+                {job.pipeline_job.name || job.pipeline_job.stage || job.project_job.id}: {t(job.status)}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+      </AlertDescription>
+    </Alert>
+  );
+};
+
+const PipelineSummaryPill = ({ label, value, urgent = false }: { label: string; value: string; urgent?: boolean }) => (
+  <div className={cn("rounded-md border bg-background px-3 py-2", urgent ? "border-destructive/30 bg-destructive/10" : undefined)}>
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-sm font-semibold">{value}</p>
   </div>
 );
 
@@ -831,6 +899,13 @@ const PipelineJobCard = ({
         {t("Artifacts")}: {item.artifacts.join(", ")}
       </p>
     ) : null}
+    {item.status === "failed" || item.status === "blocked" ? (
+      <Alert variant={item.status === "failed" ? "destructive" : "default"} className="mt-2 bg-muted/20 px-2 py-1 text-xs">
+        <AlertDescription className="text-xs leading-5">
+          {getPipelineJobNextAction(item, t)}
+        </AlertDescription>
+      </Alert>
+    ) : null}
     {item.project_job.last_error ? (
       <Alert variant="destructive" className="mt-2 px-2 py-1 text-xs">
         <AlertDescription className="text-xs leading-5">{item.project_job.last_error}</AlertDescription>
@@ -883,10 +958,15 @@ const JobDetailPanel = ({
         <p className="mb-2 text-sm font-medium">{t("Trace")}</p>
         {loadingTrace ? (
           <Skeleton className="h-48 w-full" />
-        ) : (
+        ) : trace?.trace || item.project_job.last_error ? (
           <pre className="max-h-96 overflow-auto rounded-md bg-background p-3 text-xs">
-            {trace?.trace || item.project_job.last_error || t("No trace output.")}
+            {trace?.trace || item.project_job.last_error}
           </pre>
+        ) : (
+          <Alert className="border-dashed bg-background">
+            <AlertTitle>{t("No trace captured yet")}</AlertTitle>
+            <AlertDescription>{getPipelineTraceEmptyMessage(item.status, t)}</AlertDescription>
+          </Alert>
         )}
       </div>
       <div>
@@ -897,7 +977,8 @@ const JobDetailPanel = ({
         {loadingArtifacts ? <Skeleton className="h-24 w-full" /> : null}
         {!loadingArtifacts && artifacts.length === 0 ? (
           <Alert className="border-dashed bg-muted/20">
-            <AlertDescription>{t("No artifacts uploaded for this job.")}</AlertDescription>
+            <AlertTitle>{t("No artifacts available")}</AlertTitle>
+            <AlertDescription>{getPipelineArtifactEmptyMessage(item, t)}</AlertDescription>
           </Alert>
         ) : null}
         <div className="flex flex-col gap-2">
@@ -944,6 +1025,112 @@ const getPipelineJobStatusDescription = (status: RepositoryPipelineJobStatus, t:
     blocked: t("Blocked by upstream job dependencies."),
   };
   return descriptions[status];
+};
+
+interface PipelineJobSummary {
+  total: number;
+  pending: number;
+  running: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  blocked: number;
+  artifactJobs: number;
+}
+
+const getPipelineJobSummary = (jobs: RepositoryPipelineJobView[]): PipelineJobSummary =>
+  jobs.reduce<PipelineJobSummary>(
+    (summary, job) => ({
+      total: summary.total + 1,
+      pending: summary.pending + (job.status === "pending" ? 1 : 0),
+      running: summary.running + (job.status === "running" ? 1 : 0),
+      succeeded: summary.succeeded + (job.status === "succeeded" ? 1 : 0),
+      failed: summary.failed + (job.status === "failed" ? 1 : 0),
+      cancelled: summary.cancelled + (job.status === "cancelled" ? 1 : 0),
+      blocked: summary.blocked + (job.status === "blocked" ? 1 : 0),
+      artifactJobs: summary.artifactJobs + (job.artifacts.length > 0 ? 1 : 0),
+    }),
+    { total: 0, pending: 0, running: 0, succeeded: 0, failed: 0, cancelled: 0, blocked: 0, artifactJobs: 0 },
+  );
+
+const getPipelineNextAction = (
+  pipeline: RepositoryPipelineView,
+  summary: PipelineJobSummary,
+  canMutate: boolean,
+  t: (text: string) => string,
+): string => {
+  if (summary.failed > 0) {
+    return canMutate
+      ? t("Next action: open the failed job log, compare the exit code with the script, download any artifacts, then retry only the failed stage after fixing the cause.")
+      : t("Next action: open the failed job log and artifacts, then ask a CI maintainer to retry after the cause is fixed.");
+  }
+  if (summary.blocked > 0) {
+    return t("Next action: inspect the blocked jobs' Needs list and upstream stages. A blocked job usually waits for a dependency to finish or for a failed dependency to be retried.");
+  }
+  if (summary.pending > 0 && summary.running === 0) {
+    return t("Next action: check runner health and tag matching. Queued jobs stay pending when no active runner can claim their tags.");
+  }
+  if (pipeline.status === "running" || summary.running > 0) {
+    return t("Next action: watch the active job trace and reload artifacts after the job finishes.");
+  }
+  if (pipeline.status === "succeeded") {
+    return t("Pipeline completed. Review artifacts from the producing jobs before promoting the commit.");
+  }
+  if (pipeline.status === "cancelled") {
+    return canMutate ? t("Pipeline was cancelled. Retry it if the ref and CI config are still valid.") : t("Pipeline was cancelled. Ask a CI maintainer to retry it if needed.");
+  }
+  return t("No blocking diagnosis yet. Refresh pipeline state after runners process the config.");
+};
+
+const getPipelineJobNextAction = (job: RepositoryPipelineJobView, t: (text: string) => string): string => {
+  if (job.status === "failed") {
+    return job.artifacts.length > 0
+      ? t("Next action: inspect the trace around the first failing command, then download artifacts for reports, coverage, screenshots, or build output.")
+      : t("Next action: inspect the trace around the first failing command. No artifact pattern is declared for this job.");
+  }
+  return job.needs.length > 0
+    ? t("Next action: check upstream Needs jobs first. This job will remain blocked until required dependencies complete successfully.")
+    : t("Next action: refresh pipeline state. If it stays blocked, check runner capacity and tag matching.");
+};
+
+const getPipelineTraceEmptyMessage = (status: RepositoryPipelineJobStatus, t: (text: string) => string): string => {
+  if (status === "pending" || status === "blocked") {
+    return t("Trace is empty because the job has not run yet. Check dependencies, runner availability, and matching tags.");
+  }
+  if (status === "running") {
+    return t("Trace may still be streaming. Reload the job after the runner flushes output.");
+  }
+  return t("No trace was stored for this job. Use the last error, exit code, and artifacts to continue diagnosis.");
+};
+
+const getPipelineArtifactEmptyMessage = (job: RepositoryPipelineJobView, t: (text: string) => string): string => {
+  if (job.artifacts.length === 0) {
+    return t("This job does not declare artifact paths in the CI config, so no downloadable files are expected.");
+  }
+  if (job.status === "failed") {
+    return t("Artifact paths were declared, but nothing is available. Check whether the script failed before producing files or whether upload failed.");
+  }
+  return t("Artifact paths were declared, but no files have been uploaded yet. Reload after the job completes.");
+};
+
+const getPipelineActivitySummary = (pipelines: RepositoryPipelineView[], t: (text: string) => string): string => {
+  if (pipelines.length === 0) {
+    return t("No pipeline history yet. Create a manual pipeline or push a commit to start collecting CI diagnostics.");
+  }
+  const newest = pipelines[0];
+  if (newest.status === "failed") {
+    return t("Latest pipeline failed. Select it to inspect failed jobs, trace output, artifacts, and retry options.");
+  }
+  if (newest.status === "running") {
+    return t("Latest pipeline is running. Watch active job traces and refresh artifacts after completion.");
+  }
+  if (newest.status === "pending") {
+    return t("Latest pipeline is queued. Check runner health and tag matching if it does not start soon.");
+  }
+  if (newest.status === "succeeded") {
+    return t("Latest pipeline succeeded. Use job artifacts and logs as the release evidence trail.");
+  }
+  return t("Latest pipeline was cancelled. Retry it only if the ref and CI config still represent the intended run.");
 };
 
 const PipelineJobStatusBadge = ({ status, t }: { status: RepositoryPipelineJobStatus; t: (text: string) => string }) => {

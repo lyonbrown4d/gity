@@ -130,6 +130,8 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
           <RunnerStat label={t("Active runners")} value={runners.filter((item) => item.active).length} description={t("Eligible to claim jobs")} active />
         </div>
 
+        <RunnerTrustGuide t={t} />
+
         {lastToken ? (
           <Alert>
             <AlertTitle>{t("Runner token generated")}</AlertTitle>
@@ -245,6 +247,7 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
                       <Badge key={tag} variant="outline">{tag}</Badge>
                     ))}
                   </div>
+                  <RunnerOperationalDiagnostics runner={runner} t={t} />
                 </div>
                 <ConfirmAction
                   title={t("Delete runner \"{name}\"?").replace("{name}", runner.name)}
@@ -270,8 +273,9 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
 
         <Alert className="bg-muted/20">
           <AlertTitle>{t("Runner protocol")}</AlertTitle>
-          <AlertDescription>
-            {t("Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/{id}/complete, and /runners/jobs/{id}/fail.")}
+          <AlertDescription className="flex flex-col gap-2">
+            <p>{t("Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/{id}/complete, and /runners/jobs/{id}/fail.")}</p>
+            <p>{t("Treat runner tokens like deployment secrets. Runners execute repository scripts and can receive CI variables, so install them only on hosts you trust and can patch.")}</p>
           </AlertDescription>
         </Alert>
 
@@ -291,6 +295,37 @@ const RunnerStat = ({ label, value, description, active = false }: { label: stri
   </Card>
 );
 
+const RunnerTrustGuide = ({ t }: { t: (text: string) => string }) => (
+  <Alert className="bg-muted/20">
+    <AlertTitle>{t("Runner trust and matching")}</AlertTitle>
+    <AlertDescription className="grid gap-2 md:grid-cols-3">
+      <RunnerGuideItem label={t("Trusted host")} value={t("Install runners only on machines allowed to read repository workspaces and injected variables.")} />
+      <RunnerGuideItem label={t("Runtime")} value={t("The runner host provides shell tools, containers, caches, and network access; keep that runtime patched and scoped.")} />
+      <RunnerGuideItem label={t("Tag matching")} value={t("Pending jobs need an active runner whose tags satisfy the job tags declared in the CI config.")} />
+    </AlertDescription>
+  </Alert>
+);
+
+const RunnerGuideItem = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-md border bg-background px-3 py-2">
+    <p className="text-xs font-medium">{label}</p>
+    <p className="text-xs text-muted-foreground">{value}</p>
+  </div>
+);
+
+const RunnerOperationalDiagnostics = ({ runner, t }: { runner: RepositoryRunnerView; t: (text: string) => string }) => {
+  const tags = parseRunnerTags(runner.tags);
+  return (
+    <div className="grid gap-2 md:grid-cols-3">
+      <RunnerGuideItem label={t("Trusted host")} value={runner.active ? t("Can claim jobs; verify this host is isolated for CI workloads.") : t("Paused runners should not claim jobs until reactivated.")} />
+      <RunnerGuideItem label={t("Runtime health")} value={runner.status === "online" ? t("Heartbeat is present; verify toolchains and caches if jobs still fail.") : t("No recent heartbeat; restart the runner process or rotate the token if needed.")} />
+      <RunnerGuideItem label={t("Tags")}
+        value={tags.length > 0 ? tags.join(", ") : t("No tags configured; tagged jobs will not match this runner.")}
+      />
+    </div>
+  );
+};
+
 const RunnerEmptyState = ({
   canAdmin,
   t,
@@ -303,7 +338,7 @@ const RunnerEmptyState = ({
   <Alert className="border-dashed bg-muted/20">
     <AlertTitle>{t("No runners registered")}</AlertTitle>
     <AlertDescription className="flex flex-col gap-3">
-      <p>{t("Register a project runner before pipelines can claim CI jobs on this repository.")}</p>
+      <p>{t("Register a project runner on a trusted host before pipelines can claim CI jobs on this repository. Add tags that match your CI config, then verify the runner sends heartbeats.")}</p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" disabled={!canAdmin} onClick={onRegister}>
           <Plus data-icon="inline-start" />
@@ -330,9 +365,9 @@ const getRunnerHealthDescription = (runner: RepositoryRunnerView, t: (text: stri
     return `${t("Last heartbeat")}: ${formatRelativeTime(runner.last_contact_at)}`;
   }
   if (runner.status === "online") {
-    return t("Online, but no heartbeat timestamp is available.");
+    return t("Online, but no heartbeat timestamp is available. Verify runtime toolchains if jobs are still failing.");
   }
-  return t("Offline runner. Check the runner process and token configuration.");
+  return t("Offline runner. Check the runner process, trusted host network, and token configuration.");
 };
 
 const RunnerStatusBadge = ({ runner, t }: { runner: RepositoryRunnerView; t: (text: string) => string }) => {

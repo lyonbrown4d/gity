@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { useGetIdentity, useLogout, usePermissions } from "@refinedev/core";
 import { AppSidebar } from "@/components/app-sidebar";
+import { GlobalQuickJump } from "@/components/global-quick-jump";
 import { ViewControls } from "@/components/common/view-controls";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -62,7 +63,10 @@ export function UserLayout(): JSX.Element {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <ViewControls compact />
+          <div className="flex items-center gap-2">
+            <GlobalQuickJump />
+            <ViewControls compact />
+          </div>
         </header>
         <main id="main-content" className="flex flex-1 flex-col gap-5 p-4 pt-4 md:p-6 page-enter">
           <Outlet />

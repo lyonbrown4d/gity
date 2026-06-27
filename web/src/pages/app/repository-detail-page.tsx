@@ -15,6 +15,7 @@ import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-ta
 import { RepositoryLFSTab } from "@/pages/app/repository/repository-lfs-tab";
 import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
 import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
+import { RepositoryOverviewTab } from "@/pages/app/repository/repository-overview-tab";
 import { RepositoryPackagesTab } from "@/pages/app/repository/repository-packages-tab";
 import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
 import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
@@ -35,7 +36,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const organizationId = params.organizationId ?? "";
   const repoId = params.projectId ?? params.repoId ?? "";
   const initialTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "code");
+  const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "overview");
   const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
   const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>({});
   const projectPermissionsQuery = useCustom<RawRecord>({
@@ -71,18 +72,13 @@ export const RepositoryDetailPage = (): JSX.Element => {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (!tab) {
-      return;
-    }
-    if (isRepoTab(tab)) {
-      setActiveTab(tab);
-    }
+    setActiveTab(isRepoTab(tab) ? tab : "overview");
   }, [searchParams]);
 
   const handleChangeTab = (tab: RepoTab) => {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
-    if (tab === "code") {
+    if (tab === "overview") {
       next.delete("tab");
     } else {
       next.set("tab", tab);
@@ -138,6 +134,20 @@ export const RepositoryDetailPage = (): JSX.Element => {
             <p className="text-sm text-muted-foreground">{t("Project not found in selected organization.")}</p>
           </CardContent>
         </Card>
+      ) : null}
+
+      {meta.repository && activeTab === "overview" ? (
+        <RepositoryOverviewTab
+          repoId={repoId}
+          repository={meta.repository}
+          branches={meta.branches}
+          commits={meta.commits}
+          isLoadingCommits={meta.isLoadingCommits}
+          permissions={repositoryPermissions}
+          t={t}
+          onOpenTab={handleChangeTab}
+          onCopyCloneUrl={() => void meta.copyCloneUrl()}
+        />
       ) : null}
 
       {meta.repository && activeTab === "code" ? (
@@ -341,7 +351,8 @@ export const RepositoryDetailPage = (): JSX.Element => {
 };
 
 const isRepoTab = (value: string | null): value is RepoTab =>
-  value === "code"
+  value === "overview"
+  || value === "code"
   || value === "issues"
   || value === "merge-requests"
   || value === "wiki"

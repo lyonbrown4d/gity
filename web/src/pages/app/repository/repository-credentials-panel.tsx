@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, KeyRound, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { Copy, KeyRound, Plus, RefreshCw, ShieldCheck, Terminal, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
+import { getApiBaseUrl } from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,14 @@ const accessTokenScopes = ["read_repository", "write_repository", "read_package"
 const deployTokenScopes = ["read_repository", "write_repository", "read_package", "write_package"];
 
 export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: RepositoryCredentialsPanelProps): JSX.Element => {
+  const repositoryQuery = useCustom<RawRecord>({
+    url: `/projects/${repoId}`,
+    method: "get",
+    queryOptions: {
+      enabled: Boolean(repoId),
+      refetchOnWindowFocus: false,
+    },
+  });
   const accessTokensQuery = useCustom<RawRecord[]>({
     url: `/projects/${repoId}/access-tokens`,
     method: "get",
@@ -90,9 +99,19 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
     () => resolveCredentialRecords(deployKeysQuery.result.data).map(normalizeDeployKey),
     [deployKeysQuery.result.data],
   );
+  const cloneHttpUrl = useMemo(() => normalizeCloneHttpUrl(repositoryQuery.result.data), [repositoryQuery.result.data]);
+  const packageAutomationCommand = useMemo(
+    () => `curl --header "Authorization: Bearer <token>" ${absoluteApiUrl(`/projects/${repoId}/packages`)}`,
+    [repoId],
+  );
 
   const reload = async () => {
-    const results = await Promise.all([accessTokensQuery.query.refetch(), deployTokensQuery.query.refetch(), deployKeysQuery.query.refetch()]);
+    const results = await Promise.all([
+      repositoryQuery.query.refetch(),
+      accessTokensQuery.query.refetch(),
+      deployTokensQuery.query.refetch(),
+      deployKeysQuery.query.refetch(),
+    ]);
     const error = results.find((result) => result.error)?.error;
     onError(error ? extractErrorMessage(error) : null);
   };
@@ -220,24 +239,28 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
     }
   };
 
+  const copyText = async (value: string, errorMessage = t("Failed to copy command.")) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      onError(null);
+    } catch {
+      onError(errorMessage);
+    }
+  };
+
   const copyCreatedToken = async () => {
     if (!createdToken) {
       return;
     }
-    try {
-      await navigator.clipboard.writeText(createdToken.token);
-      onError(null);
-    } catch {
-      onError(t("Failed to copy token."));
-    }
+    await copyText(createdToken.token, t("Failed to copy token."));
   };
 
   useEffect(() => {
-    const error = accessTokensQuery.query.error ?? deployTokensQuery.query.error ?? deployKeysQuery.query.error;
+    const error = repositoryQuery.query.error ?? accessTokensQuery.query.error ?? deployTokensQuery.query.error ?? deployKeysQuery.query.error;
     if (error) {
       onError(extractErrorMessage(error));
     }
-  }, [accessTokensQuery.query.error, deployTokensQuery.query.error, deployKeysQuery.query.error, onError]);
+  }, [repositoryQuery.query.error, accessTokensQuery.query.error, deployTokensQuery.query.error, deployKeysQuery.query.error, onError]);
 
   return (
     <Card className="card-enter">
@@ -249,6 +272,13 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
         <CardDescription>{t("Manage project-scoped tokens and deploy keys for Git, packages and automation.")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        <CloneAutomationGuide
+          cloneHttpUrl={cloneHttpUrl}
+          packageAutomationCommand={packageAutomationCommand}
+          t={t}
+          onCopy={copyText}
+        />
+
         {!canAdminCredentials ? (
           <Alert>
             <AlertDescription>{t("Your current project role can inspect settings, but cannot change project credentials.")}</AlertDescription>
@@ -256,22 +286,15 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
         ) : null}
 
         {createdToken ? (
-          <Alert>
-            <KeyRound className="size-4" />
-            <AlertDescription className="space-y-2">
-              <p className="font-medium">{t("Token created. Copy it now because it will not be shown again.")}</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="rounded bg-muted px-2 py-1 text-xs">{createdToken.token}</code>
-                <Button type="button" size="sm" variant="outline" onClick={() => void copyCreatedToken()}>
-                  <Copy className="size-4" />
-                  {t("Copy")}
-                </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCreatedToken(null)}>
-                  {t("Dismiss")}
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
+          <CreatedTokenGuide
+            createdToken={createdToken}
+            cloneHttpUrl={cloneHttpUrl}
+            repoId={repoId}
+            t={t}
+            onCopy={copyText}
+            onCopyToken={copyCreatedToken}
+            onDismiss={() => setCreatedToken(null)}
+          />
         ) : null}
 
         <section className="space-y-3 rounded-md border p-3">
@@ -368,6 +391,218 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
   );
 };
 
+type CopyTextHandler = (value: string, errorMessage?: string) => Promise<void>;
+
+const tokenScopeGuideItems: Array<{ scope: string; description: string }> = [
+  { scope: "read_repository", description: "Clone and fetch repository contents." },
+  { scope: "write_repository", description: "Push commits and branches." },
+  { scope: "read_package", description: "Download package files and install dependencies." },
+  { scope: "write_package", description: "Publish or upload package files." },
+  { scope: "read_api", description: "Read project API data for automation." },
+  { scope: "write_api", description: "Write project API data for automation." },
+];
+
+const CloneAutomationGuide = ({
+  cloneHttpUrl,
+  packageAutomationCommand,
+  t,
+  onCopy,
+}: {
+  cloneHttpUrl: string;
+  packageAutomationCommand: string;
+  t: (text: string) => string;
+  onCopy: CopyTextHandler;
+}): JSX.Element => {
+  const cloneCommand = cloneHttpUrl ? `git clone ${cloneHttpUrl}` : t("Clone URL is loading...");
+
+  return (
+    <section className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-1">
+          <p className="flex items-center gap-2 font-medium">
+            <Terminal className="size-4" />
+            {t("Clone and automation guide")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("Use the HTTP clone URL with a project access token or deploy token. Tokens are sent as Git Basic auth passwords.")}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">HTTP</Badge>
+          <Badge variant="outline">{t("Project access tokens")}</Badge>
+          <Badge variant="outline">{t("Deploy tokens")}</Badge>
+        </div>
+      </div>
+
+      <CommandLine
+        label={t("HTTP clone command")}
+        value={cloneCommand}
+        copyLabel={t("Copy command")}
+        disabled={!cloneHttpUrl}
+        t={t}
+        onCopy={(value) => void onCopy(value)}
+      />
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <GuideBlock title={t("Project access token scopes")}>
+          <ScopeGuideList t={t} />
+          <p className="text-xs text-muted-foreground">
+            {t("Project access tokens can also use read_api/write_api for issue, merge request, wiki, job and runner automation.")}
+          </p>
+        </GuideBlock>
+        <GuideBlock title={t("Deploy token fit")}>
+          <p className="text-sm text-muted-foreground">
+            {t("Deploy tokens are best for CI/CD and production deploys that only need repository or package access.")}
+          </p>
+          <p className="text-xs text-muted-foreground">{t("Use read_repository for clone/fetch; add write_repository for push.")}</p>
+          <p className="text-xs text-muted-foreground">{t("Use read_package/write_package for package pull/publish automation.")}</p>
+        </GuideBlock>
+        <GuideBlock title={t("Deploy key status")}>
+          <p className="text-sm text-muted-foreground">
+            {t("Deploy keys can be stored and marked read-only or can-push. HTTP clone uses tokens today; SSH clone transport is not enabled yet.")}
+          </p>
+        </GuideBlock>
+      </div>
+
+      <CommandLine
+        label={t("Package automation command")}
+        value={packageAutomationCommand}
+        copyLabel={t("Copy command")}
+        t={t}
+        onCopy={(value) => void onCopy(value)}
+      />
+    </section>
+  );
+};
+
+const GuideBlock = ({ title, children }: { title: string; children: React.ReactNode }): JSX.Element => (
+  <div className="flex flex-col gap-2 rounded-md border bg-background/60 p-3">
+    <p className="text-sm font-medium">{title}</p>
+    {children}
+  </div>
+);
+
+const ScopeGuideList = ({ t }: { t: (text: string) => string }): JSX.Element => (
+  <div className="flex flex-col gap-2">
+    {tokenScopeGuideItems.map((item) => (
+      <div key={item.scope} className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="outline">{t(item.scope)}</Badge>
+        <span>{t(item.description)}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const CreatedTokenGuide = ({
+  createdToken,
+  cloneHttpUrl,
+  repoId,
+  t,
+  onCopy,
+  onCopyToken,
+  onDismiss,
+}: {
+  createdToken: CreatedRepositoryProjectTokenView;
+  cloneHttpUrl: string;
+  repoId: string;
+  t: (text: string) => string;
+  onCopy: CopyTextHandler;
+  onCopyToken: () => Promise<void>;
+  onDismiss: () => void;
+}): JSX.Element => {
+  const username = createdToken.project_token.username || createdToken.project_token.id || "token";
+  const authenticatedCloneUrl = cloneHttpUrl ? withUrlCredentials(cloneHttpUrl, username, createdToken.token) : "";
+  const cloneCommand = authenticatedCloneUrl ? `git clone ${authenticatedCloneUrl}` : "";
+  const remoteCommand = authenticatedCloneUrl ? `git remote set-url origin ${authenticatedCloneUrl}` : "";
+  const packageCommand = `curl --header "Authorization: Bearer ${createdToken.token}" ${absoluteApiUrl(`/projects/${repoId}/packages`)}`;
+  const tokenKind = createdToken.project_token.kind === "deploy" ? t("Deploy token") : t("Project access token");
+
+  return (
+    <Alert>
+      <KeyRound className="size-4" />
+      <AlertDescription className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="font-medium">
+            {tokenKind}: {t("Token created. Copy it now because it will not be shown again.")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("When Git asks for credentials, enter the token username as the username and the token as the password.")}
+          </p>
+        </div>
+
+        <div className="grid gap-2 lg:grid-cols-2">
+          <CommandLine label={t("Token username")} value={username} copyLabel={t("Copy")} t={t} onCopy={(value) => void onCopy(value)} />
+          <CommandLine label={t("Token")} value={createdToken.token} copyLabel={t("Copy token")} t={t} onCopy={() => void onCopyToken()} />
+        </div>
+
+        {cloneCommand ? (
+          <div className="grid gap-2 lg:grid-cols-2">
+            <CommandLine
+              label={t("Git clone with token")}
+              value={cloneCommand}
+              copyLabel={t("Copy authenticated clone command")}
+              t={t}
+              onCopy={(value) => void onCopy(value)}
+            />
+            <CommandLine
+              label={t("Git remote with token")}
+              value={remoteCommand}
+              copyLabel={t("Copy authenticated remote command")}
+              t={t}
+              onCopy={(value) => void onCopy(value)}
+            />
+          </div>
+        ) : null}
+
+        <CommandLine
+          label={t("Package API with token")}
+          value={packageCommand}
+          copyLabel={t("Copy package command")}
+          t={t}
+          onCopy={(value) => void onCopy(value)}
+        />
+
+        <p className="text-xs text-muted-foreground">
+          {t("Store tokens in CI secrets or local credential helpers instead of committing them to repository files.")}
+        </p>
+        <div>
+          <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
+            {t("Dismiss")}
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
+const CommandLine = ({
+  label,
+  value,
+  copyLabel,
+  disabled = false,
+  t,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copyLabel?: string;
+  disabled?: boolean;
+  t: (text: string) => string;
+  onCopy?: (value: string) => void;
+}): JSX.Element => (
+  <div className="flex flex-col gap-1 rounded-md border bg-background/70 p-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {onCopy ? (
+        <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => onCopy(value)}>
+          <Copy />
+          {copyLabel ?? t("Copy command")}
+        </Button>
+      ) : null}
+    </div>
+    <code className="break-all rounded bg-muted px-2 py-2 font-mono text-xs">{value}</code>
+  </div>
+);
 const CredentialSectionHeader = ({
   title,
   description,
@@ -591,6 +826,38 @@ const resolveCredentialRecords = (payload: unknown): RawRecord[] => {
     return body.filter(isRecord);
   }
   return [];
+};
+
+const normalizeCloneHttpUrl = (payload: unknown): string => {
+  const body = resolveBody(payload);
+  if (!isRecord(body)) {
+    return "";
+  }
+  return normalizeString(body.clone_http_url ?? body.CloneHTTPURL);
+};
+
+const absoluteApiUrl = (path: string): string => {
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (/^https?:\/\//i.test(base)) {
+    return `${base}${normalizedPath}`;
+  }
+  if (typeof window === "undefined") {
+    return `${base}${normalizedPath}`;
+  }
+  return `${window.location.origin}${base}${normalizedPath}`;
+};
+
+const withUrlCredentials = (rawUrl: string, username: string, token: string): string => {
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.username = username;
+    parsed.password = token;
+    return parsed.toString();
+  } catch {
+    const encodedCredentials = `${encodeURIComponent(username)}:${encodeURIComponent(token)}@`;
+    return rawUrl.replace(/^(https?:\/\/)/i, `$1${encodedCredentials}`);
+  }
 };
 
 const normalizeProjectToken = (raw: RawRecord): RepositoryProjectTokenView => ({

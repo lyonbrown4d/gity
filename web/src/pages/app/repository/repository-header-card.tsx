@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import {
+  Activity,
   ArrowLeft,
   BookOpen,
   Code2,
@@ -45,6 +46,7 @@ const TAB_GROUPS: Array<{
   {
     label: "Project",
     items: [
+      { value: "overview", label: "Overview", icon: Activity },
       { value: "code", label: "Code", icon: Code2 },
       { value: "wiki", label: "Wiki", icon: BookOpen },
       { value: "packages", label: "Packages", icon: Package },

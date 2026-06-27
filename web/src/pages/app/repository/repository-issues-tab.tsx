@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import type { RepositoryIssueView, UserView } from "@/pages/types";
 import { buildIssueDetailPath } from "./issue-markdown";
 import { IssueMarkdownEditor } from "./issue-markdown-editor";
-import { extractErrorMessage, filterAndSortIssues, formatRelativeTime, type IssueSortMode } from "./issues-utils";
+import { extractErrorMessage, formatRelativeTime, toTimestamp, type IssueSortMode } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
 import { isRecord, normalizeBoolean, normalizeOptionalString, normalizeString, resolveArrayPayload, type RawRecord } from "./repository-normalizers";
 import { formatUserLabel } from "./repository-user-utils";
@@ -22,6 +22,30 @@ interface RepositoryIssuesTabProps {
   permissions: RepositoryPermissions;
   t: (text: string) => string;
   onError: (message: string | null) => void;
+}
+
+type IssueStatusFilter = RepositoryIssueView["status"] | "all";
+type IssueLabelFilter = "all" | "unlabeled" | `label:${string}`;
+type IssueAssigneeFilter = "all" | "unassigned" | `user:${string}`;
+
+interface IssueLabelFilterOption {
+  name: string;
+  count: number;
+}
+
+interface IssueAssigneeFilterOption {
+  id: string;
+  label: string;
+  count: number;
+}
+
+interface IssueFilterCriteria {
+  status: IssueStatusFilter;
+  label: IssueLabelFilter;
+  assignee: IssueAssigneeFilter;
+  query: string;
+  sort: IssueSortMode;
+  userByID: Map<string, UserView>;
 }
 
 export const RepositoryIssuesTab = ({
@@ -67,8 +91,10 @@ export const RepositoryIssuesTab = ({
     () => new Map(users.map((user) => [user.id, user])),
     [users],
   );
-  const [issueStatusFilter, setIssueStatusFilter] = useState<"open" | "closed" | "all">("open");
+  const [issueStatusFilter, setIssueStatusFilter] = useState<IssueStatusFilter>("open");
   const [issueSearchQuery, setIssueSearchQuery] = useState("");
+  const [issueLabelFilter, setIssueLabelFilter] = useState<IssueLabelFilter>("all");
+  const [issueAssigneeFilter, setIssueAssigneeFilter] = useState<IssueAssigneeFilter>("all");
   const [issueSort, setIssueSort] = useState<IssueSortMode>("updated_desc");
   const [isIssueComposerOpen, setIssueComposerOpen] = useState(false);
   const [newIssueTitle, setNewIssueTitle] = useState("");
@@ -85,13 +111,39 @@ export const RepositoryIssuesTab = ({
     }),
     [issues],
   );
+  const issueLabelOptions = useMemo(
+    () => buildIssueLabelFilterOptions(issues),
+    [issues],
+  );
+  const issueAssigneeOptions = useMemo(
+    () => buildIssueAssigneeFilterOptions(issues, userByID),
+    [issues, userByID],
+  );
   const filteredIssues = useMemo(
-    () => filterAndSortIssues(issues, issueStatusFilter, issueSearchQuery, issueSort),
-    [issues, issueStatusFilter, issueSearchQuery, issueSort],
+    () => filterAndSortIssuesForTriage(issues, {
+      status: issueStatusFilter,
+      label: issueLabelFilter,
+      assignee: issueAssigneeFilter,
+      query: issueSearchQuery,
+      sort: issueSort,
+      userByID,
+    }),
+    [issues, issueStatusFilter, issueLabelFilter, issueAssigneeFilter, issueSearchQuery, issueSort, userByID],
   );
   const isLoadingIssues = issuesQuery.query.isFetching && !issuesQuery.query.data;
   const { mutateAsync: setIssueAssignees } = useCustomMutation<RepositoryIssueView>();
   const canCreateIssue = permissions.issueCreate;
+  const hasIssueFilters = issueStatusFilter !== "open"
+    || issueLabelFilter !== "all"
+    || issueAssigneeFilter !== "all"
+    || issueSearchQuery.trim().length > 0;
+  const resetIssueFilters = () => {
+    setIssueStatusFilter("open");
+    setIssueSearchQuery("");
+    setIssueLabelFilter("all");
+    setIssueAssigneeFilter("all");
+    setIssueSort("updated_desc");
+  };
 
   const loadIssues = async () => {
     const result = await issuesQuery.query.refetch();
@@ -172,19 +224,19 @@ export const RepositoryIssuesTab = ({
         </div>
 
         <div className="rounded-md border p-3">
-          <div className="grid gap-2 md:grid-cols-[1fr_auto_auto]">
-            <div className="relative">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px_180px_170px]">
+            <div className="relative md:col-span-2 xl:col-span-1">
               <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-8"
-                placeholder={t("Search issues")}
+                placeholder={t("Search title, label, or assignee")}
                 value={issueSearchQuery}
                 onChange={(event) => setIssueSearchQuery(event.target.value)}
               />
             </div>
             <Select
               value={issueStatusFilter}
-              onValueChange={(value) => setIssueStatusFilter(value as "open" | "closed" | "all")}
+              onValueChange={(value) => setIssueStatusFilter(value as IssueStatusFilter)}
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("Status")} />
@@ -194,6 +246,38 @@ export const RepositoryIssuesTab = ({
                   <SelectItem value="open">{t("Open issues")}</SelectItem>
                   <SelectItem value="closed">{t("Closed issues")}</SelectItem>
                   <SelectItem value="all">{t("All issues")}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select value={issueLabelFilter} onValueChange={(value) => setIssueLabelFilter(value as IssueLabelFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("Label")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">{t("Any label")}</SelectItem>
+                  <SelectItem value="unlabeled">{t("Unlabeled")}</SelectItem>
+                  {issueLabelOptions.map((label) => (
+                    <SelectItem key={label.name} value={issueLabelFilterValue(label.name)}>
+                      {label.name} ({label.count})
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select value={issueAssigneeFilter} onValueChange={(value) => setIssueAssigneeFilter(value as IssueAssigneeFilter)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t("Assignee")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">{t("Any assignee")}</SelectItem>
+                  <SelectItem value="unassigned">{t("Unassigned")}</SelectItem>
+                  {issueAssigneeOptions.map((assignee) => (
+                    <SelectItem key={assignee.id} value={issueAssigneeFilterValue(assignee.id)}>
+                      {assignee.label} ({assignee.count})
+                    </SelectItem>
+                  ))}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -210,6 +294,16 @@ export const RepositoryIssuesTab = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              {t("Showing")} {filteredIssues.length} {t("of")} {issueStats.total} {t("issues")}
+            </span>
+            {hasIssueFilters ? (
+              <Button type="button" size="sm" variant="ghost" onClick={resetIssueFilters}>
+                {t("Clear filters")}
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -274,8 +368,21 @@ export const RepositoryIssuesTab = ({
 
         <div className="flex flex-col gap-2 rounded-md border p-2">
           {isLoadingIssues ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading issues...")}</p> : null}
-          {!isLoadingIssues && filteredIssues.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-muted-foreground">{t("No issues found.")}</p>
+          {!isLoadingIssues && issues.length === 0 ? (
+            <IssueEmptyState
+              title={t("No issues yet.")}
+              description={canCreateIssue ? t("Create the first issue to start triage for this project.") : t("Issues will appear here after they are created.")}
+              actionLabel={canCreateIssue ? t("Create an issue") : undefined}
+              onAction={canCreateIssue ? () => setIssueComposerOpen(true) : undefined}
+            />
+          ) : null}
+          {!isLoadingIssues && issues.length > 0 && filteredIssues.length === 0 ? (
+            <IssueEmptyState
+              title={t("No issues match these filters.")}
+              description={t("Try another state, label, assignee, or search term.")}
+              actionLabel={hasIssueFilters ? t("Clear filters") : undefined}
+              onAction={hasIssueFilters ? resetIssueFilters : undefined}
+            />
           ) : null}
           {filteredIssues.map((issue) => (
             <IssueListItem
@@ -299,6 +406,27 @@ const IssueStat = ({ label, value }: { label: string; value: number }) => (
   </div>
 );
 
+const IssueEmptyState = ({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) => (
+  <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center">
+    <p className="font-medium">{title}</p>
+    <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{description}</p>
+    {actionLabel && onAction ? (
+      <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onAction}>
+        {actionLabel}
+      </Button>
+    ) : null}
+  </div>
+);
 const IssueListItem = ({
   issue,
   userByID,
@@ -338,16 +466,25 @@ const IssueListItem = ({
         <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{issue.description}</p>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
+        <Badge variant="outline" className="gap-1">
           <UserRound className="size-3" />
-          {assigneeIDs.length > 0
+          {t("Assignee")}: {assigneeIDs.length > 0
             ? assigneeIDs.map((userID) => formatUserLabel(userByID.get(userID), userID)).join(", ")
             : t("Unassigned")}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Tags className="size-3" />
-          {labels.length > 0 ? labels.map((label) => label.name).join(", ") : t("No labels")}
-        </span>
+        </Badge>
+        {labels.length > 0 ? (
+          labels.map((label) => (
+            <Badge key={`${label.id}:${label.name}`} variant="secondary" className="gap-1">
+              <Tags className="size-3" />
+              {label.name}
+            </Badge>
+          ))
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <Tags className="size-3" />
+            {t("No labels")}
+          </Badge>
+        )}
       </div>
     </button>
   );
@@ -357,6 +494,131 @@ const issueAssigneeIDs = (issue: RepositoryIssueView): string[] => {
   const values = issue.assignee_user_ids?.length ? issue.assignee_user_ids : issue.assignee_user_id ? [issue.assignee_user_id] : [];
   return values.map(String).filter(Boolean);
 };
+
+const issueLabelFilterValue = (name: string): IssueLabelFilter => `label:${name}`;
+
+const issueAssigneeFilterValue = (userID: string): IssueAssigneeFilter => `user:${userID}`;
+
+const selectedIssueLabelName = (filter: IssueLabelFilter): string => (
+  filter.startsWith("label:") ? filter.slice("label:".length) : ""
+);
+
+const selectedIssueAssigneeID = (filter: IssueAssigneeFilter): string => (
+  filter.startsWith("user:") ? filter.slice("user:".length) : ""
+);
+
+const buildIssueLabelFilterOptions = (issues: RepositoryIssueView[]): IssueLabelFilterOption[] => {
+  const counts = new Map<string, number>();
+  for (const issue of issues) {
+    for (const label of issue.labels ?? []) {
+      const name = label.name.trim();
+      if (name) {
+        counts.set(name, (counts.get(name) ?? 0) + 1);
+      }
+    }
+  }
+  return Array.from(counts, ([name, count]) => ({ name, count }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+};
+
+const buildIssueAssigneeFilterOptions = (
+  issues: RepositoryIssueView[],
+  userByID: Map<string, UserView>,
+): IssueAssigneeFilterOption[] => {
+  const counts = new Map<string, number>();
+  for (const issue of issues) {
+    for (const userID of issueAssigneeIDs(issue)) {
+      counts.set(userID, (counts.get(userID) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts, ([id, count]) => ({
+    id,
+    count,
+    label: formatUserLabel(userByID.get(id), id),
+  })).sort((left, right) => left.label.localeCompare(right.label));
+};
+
+const filterAndSortIssuesForTriage = (
+  items: RepositoryIssueView[],
+  criteria: IssueFilterCriteria,
+): RepositoryIssueView[] => {
+  const normalizedQuery = normalizeIssueSearch(criteria.query);
+  const filtered = items.filter((item) => {
+    if (criteria.status !== "all" && item.status !== criteria.status) {
+      return false;
+    }
+    if (!issueMatchesLabelFilter(item, criteria.label)) {
+      return false;
+    }
+    if (!issueMatchesAssigneeFilter(item, criteria.assignee)) {
+      return false;
+    }
+    if (!normalizedQuery) {
+      return true;
+    }
+    return issueMatchesSearch(item, normalizedQuery, criteria.userByID);
+  });
+
+  const sorted = [...filtered];
+  sorted.sort((left, right) => {
+    if (criteria.sort === "updated_desc") {
+      return toTimestamp(right.updated_at) - toTimestamp(left.updated_at);
+    }
+    if (criteria.sort === "created_desc") {
+      return toTimestamp(right.created_at) - toTimestamp(left.created_at);
+    }
+    if (criteria.sort === "number_asc") {
+      return left.number - right.number;
+    }
+    return right.number - left.number;
+  });
+  return sorted;
+};
+
+const issueMatchesLabelFilter = (issue: RepositoryIssueView, filter: IssueLabelFilter): boolean => {
+  if (filter === "all") {
+    return true;
+  }
+  const labels = (issue.labels ?? [])
+    .map((label) => label.name.trim())
+    .filter(Boolean);
+  if (filter === "unlabeled") {
+    return labels.length === 0;
+  }
+  return labels.includes(selectedIssueLabelName(filter));
+};
+
+const issueMatchesAssigneeFilter = (issue: RepositoryIssueView, filter: IssueAssigneeFilter): boolean => {
+  if (filter === "all") {
+    return true;
+  }
+  const assigneeIDs = issueAssigneeIDs(issue);
+  if (filter === "unassigned") {
+    return assigneeIDs.length === 0;
+  }
+  return assigneeIDs.includes(selectedIssueAssigneeID(filter));
+};
+
+const issueMatchesSearch = (
+  issue: RepositoryIssueView,
+  normalizedQuery: string,
+  userByID: Map<string, UserView>,
+): boolean => {
+  const assigneeIDs = issueAssigneeIDs(issue);
+  const searchableValues = [
+    `#${issue.number}`,
+    String(issue.number),
+    issue.title,
+    issue.description ?? "",
+    issue.author_user_id,
+    formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id),
+    ...(issue.labels ?? []).map((label) => label.name),
+    ...assigneeIDs.flatMap((userID) => [userID, formatUserLabel(userByID.get(userID), userID)]),
+  ];
+  return searchableValues.some((value) => normalizeIssueSearch(value).includes(normalizedQuery));
+};
+
+const normalizeIssueSearch = (value: string): string => value.trim().toLowerCase();
 
 const resolveUsers = (payload: unknown): RawRecord[] =>
   resolveArrayPayload<unknown>(payload).filter(isRecord);

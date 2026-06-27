@@ -1,4 +1,4 @@
-export type RepoTab = "code" | "issues" | "merge-requests" | "wiki" | "packages" | "releases" | "lfs" | "pipelines" | "jobs" | "runners" | "commits" | "branches" | "audit" | "settings";
+export type RepoTab = "overview" | "code" | "issues" | "merge-requests" | "wiki" | "packages" | "releases" | "lfs" | "pipelines" | "jobs" | "runners" | "commits" | "branches" | "audit" | "settings";
 
 export interface RepositoryTreeNode {
   name: string;

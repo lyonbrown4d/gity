@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Ban, CheckCircle2, Clock3, Loader2, Play, RefreshCw, XCircle } from "lucide-react";
+import { Ban, CheckCircle2, Clock3, FileArchive, Loader2, Play, RefreshCw, ScrollText, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -139,6 +139,8 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
           <JobStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs attention") : t("No failures")} status="failed" />
         </div>
 
+        <JobQueueDiagnostics stats={stats} t={t} />
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
@@ -265,9 +267,7 @@ export const RepositoryJobsTab = ({ repoId, permissions, t, onError }: Repositor
                   <AlertDescription className="text-xs leading-5">{job.last_error}</AlertDescription>
                 </Alert>
               ) : null}
-              {job.result ? (
-                <pre className="overflow-auto rounded-md bg-muted p-2 text-xs">{job.result}</pre>
-              ) : null}
+              <JobOutputDiagnostics job={job} t={t} />
             </div>
           ))}
         </div>
@@ -303,6 +303,55 @@ const JobMeta = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-md border bg-muted/20 px-3 py-2">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="truncate text-sm font-medium">{value}</p>
+  </div>
+);
+
+interface JobQueueStats {
+  pending: number;
+  running: number;
+  failed: number;
+  completed: number;
+}
+
+const JobQueueDiagnostics = ({ stats, t }: { stats: JobQueueStats; t: (text: string) => string }) => (
+  <Alert className="bg-muted/20">
+    <AlertTitle>{t("Job diagnostics guide")}</AlertTitle>
+    <AlertDescription className="flex flex-col gap-2">
+      <p>{getJobQueueDiagnosticMessage(stats, t)}</p>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant={stats.failed > 0 ? "secondary" : "outline"}>{t("Trace")}: {t("pipeline job detail")}</Badge>
+        <Badge variant="outline">{t("Artifacts")}: {t("download after upload")}</Badge>
+        <Badge variant="outline">{t("Empty logs")}: {t("not claimed, not flushed, or no stored output")}</Badge>
+      </div>
+    </AlertDescription>
+  </Alert>
+);
+
+const JobOutputDiagnostics = ({ job, t }: { job: RepositoryJobView; t: (text: string) => string }) => (
+  <div className="flex flex-col gap-2 rounded-md border bg-muted/10 p-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="flex items-center gap-2 text-xs font-medium">
+        <ScrollText className="size-4 text-muted-foreground" />
+        {t("Trace and artifacts")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">{t("Job ID")}: {job.id}</Badge>
+        <Badge variant="outline">{t("Attempts")}: {job.attempts}/{job.max_attempts}</Badge>
+      </div>
+    </div>
+    <p className="text-xs text-muted-foreground">{getJobTraceArtifactGuidance(job, t)}</p>
+    {job.result ? (
+      <pre className="overflow-auto rounded-md bg-background p-2 text-xs">{job.result}</pre>
+    ) : (
+      <Alert className="border-dashed bg-background">
+        <AlertTitle>{t("No stored job output")}</AlertTitle>
+        <AlertDescription>{getJobOutputEmptyMessage(job.status, t)}</AlertDescription>
+      </Alert>
+    )}
+    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+      <FileArchive className="size-4" />
+      {t("Artifacts are produced by CI script jobs. If none appear, confirm the pipeline job declares artifact paths and the script reaches upload.")}
+    </p>
   </div>
 );
 
@@ -347,6 +396,51 @@ const getJobStatusDescription = (status: RepositoryJobStatus, t: (text: string) 
     cancelled: t("Stopped before completion."),
   };
   return descriptions[status];
+};
+
+const getJobQueueDiagnosticMessage = (stats: JobQueueStats, t: (text: string) => string): string => {
+  if (stats.failed > 0) {
+    return t("Start with failed jobs: read last_error, open the related pipeline job trace when available, and verify whether artifacts were expected but missing.");
+  }
+  if (stats.pending > 0 && stats.running === 0) {
+    return t("Queued jobs with no active workers usually indicate runner capacity, heartbeat, or tag-matching problems.");
+  }
+  if (stats.running > 0) {
+    return t("Running jobs may not have flushed output yet. Reload after completion or inspect the pipeline job trace for live diagnostics.");
+  }
+  return t("Use this queue as the low-level CI control plane: result text, last_error, attempts, worker assignment, trace, and artifacts together explain job outcomes.");
+};
+
+const getJobTraceArtifactGuidance = (job: RepositoryJobView, t: (text: string) => string): string => {
+  if (job.status === "failed") {
+    return t("For failures, compare last_error with the pipeline trace and inspect artifacts for test reports, screenshots, or partial build output.");
+  }
+  if (job.status === "pending") {
+    return t("Trace and artifacts are not expected until a runner claims the job and starts the script.");
+  }
+  if (job.status === "running") {
+    return t("Trace output may still be streaming. If artifacts are missing, wait until the runner completes upload.");
+  }
+  if (job.status === "succeeded") {
+    return t("A successful job can still have empty output. Use artifacts as the durable evidence when the script uploaded files.");
+  }
+  return t("Cancelled jobs may have partial trace output but should not be expected to produce complete artifacts.");
+};
+
+const getJobOutputEmptyMessage = (status: RepositoryJobStatus, t: (text: string) => string): string => {
+  if (status === "pending") {
+    return t("No log is available because the job is still queued and has not been claimed by a runner.");
+  }
+  if (status === "running") {
+    return t("The runner has not stored output yet. Reload after the next trace flush or after completion.");
+  }
+  if (status === "failed") {
+    return t("The job failed without stored result output. Use last_error, attempt count, worker assignment, and the pipeline trace to diagnose it.");
+  }
+  if (status === "succeeded") {
+    return t("The job succeeded without a stored result payload. This can be normal for jobs that only update status or upload artifacts.");
+  }
+  return t("The job was cancelled before a durable result payload was recorded.");
 };
 
 const JobStatusBadge = ({ status, t }: { status: RepositoryJobStatus; t: (text: string) => string }) => {

@@ -18,8 +18,12 @@ This repository now uses a single Go module for the backend runtime and keeps th
 - Git process boundary through native `git` subprocesses
 - Git read model through `go-git`
 - Current business chains online:
-  - `organization -> project`
-  - `project -> issue -> comment -> attachment`
+  - `organization -> project -> project member`
+  - `project -> repository -> branch/protection/commit/tree/blob`
+  - `project -> issue -> comment/attachment/assignee/label`
+  - `project -> merge request -> reviewer/assignee/approval/comment/check`
+  - `project -> pipeline -> job -> trace/artifact/runner`
+  - `project -> package/wiki/release/LFS/credential/audit`
 
 The old Rust backend has been removed so the repository can move forward on one backend stack.
 
@@ -215,7 +219,7 @@ Runner runtime modes and security notes are documented in [docs/runner-container
 
 ## Roadmap
 
-Detailed planning lives in [ROADMAP.md](ROADMAP.md).
+Detailed product and engineering planning lives in [ROADMAP.md](ROADMAP.md). It tracks the repository bootstrap, collaboration, CI/CD, package/release, and operations loops required for beta readiness.
 
 ## API Examples
 
