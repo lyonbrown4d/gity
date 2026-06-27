@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, Package, Plus, RefreshCw } from "lucide-react";
+import { Copy, Download, Package, Plus, RefreshCw, Terminal } from "lucide-react";
 import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { getApiBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
   RepositoryPackageDetailView,
@@ -62,6 +63,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   const [contentType, setContentType] = useState("text/plain");
   const [content, setContent] = useState("");
   const [fileContentBase64, setFileContentBase64] = useState("");
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
   const packages = useMemo(
     () => resolvePackageList(packagesQuery.result.data).map(normalizePackage),
@@ -76,6 +78,12 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
     [packageDetailQuery.result.data],
   );
   const totalFiles = packageDetail?.versions.reduce((total, item) => total + item.files.length, 0) ?? 0;
+  const selectedVersion = packageDetail?.versions[0] ?? null;
+  const selectedFile = selectedVersion?.files[0] ?? null;
+  const protocolGuides = useMemo(
+    () => buildPackageProtocolGuides(repoId, selectedPackage, selectedVersion, selectedFile),
+    [repoId, selectedPackage, selectedVersion, selectedFile],
+  );
   const isLoadingPackages = packagesQuery.query.isFetching && !packagesQuery.query.data;
   const isLoadingDetail = packageDetailQuery.query.isFetching && !packageDetailQuery.query.data;
   const canWritePackages = permissions.packageWrite;
@@ -162,6 +170,17 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
       onError(extractErrorMessage(error));
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const copyCommand = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedCommand(command);
+      window.setTimeout(() => setCopiedCommand((current) => (current === command ? null : current)), 1400);
+      onError(null);
+    } catch {
+      onError(t("Failed to copy command."));
     }
   };
 
@@ -472,6 +491,116 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   );
 };
 
+interface PackageProtocolGuideItem {
+  id: string;
+  title: string;
+  description: string;
+  endpoint: string;
+  scopes: string[];
+  publishCommands: string[];
+  installCommands: string[];
+}
+
+const PackageProtocolGuide = ({
+  guides,
+  copiedCommand,
+  t,
+  onCopy,
+}: {
+  guides: PackageProtocolGuideItem[];
+  copiedCommand: string | null;
+  t: (text: string) => string;
+  onCopy: (command: string) => void;
+}) => {
+  const [activeProtocol, setActiveProtocol] = useState("generic");
+  const activeGuide = guides.find((guide) => guide.id === activeProtocol) ?? guides[0];
+
+  useEffect(() => {
+    if (!guides.some((guide) => guide.id === activeProtocol)) {
+      setActiveProtocol(guides[0]?.id ?? "generic");
+    }
+  }, [activeProtocol, guides]);
+
+  if (!activeGuide) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-3 lg:grid-cols-[240px_1fr]">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <Terminal className="size-4 text-primary" />
+          <p className="font-medium">{t("Registry setup guide")}</p>
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">
+          {t("Copy publish and install commands for the selected package protocol. Use a project access token or deploy token with package scopes.")}
+        </p>
+        <Select value={activeProtocol} onValueChange={setActiveProtocol}>
+          <SelectTrigger aria-label={t("Package protocol")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {guides.map((guide) => (
+                <SelectItem key={guide.id} value={guide.id}>{guide.title}</SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <div className="flex flex-wrap gap-1">
+          {activeGuide.scopes.map((scope) => (
+            <Badge key={scope} variant="outline">{scope}</Badge>
+          ))}
+        </div>
+      </div>
+      <div className="grid gap-3 xl:grid-cols-2">
+        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 p-3">
+          <div>
+            <p className="text-sm font-medium">{activeGuide.title}</p>
+            <p className="text-xs text-muted-foreground">{t(activeGuide.description)}</p>
+          </div>
+          <PackageCommandLine label={t("Endpoint")} value={activeGuide.endpoint} copiedCommand={copiedCommand} t={t} onCopy={onCopy} />
+          {activeGuide.publishCommands.map((command) => (
+            <PackageCommandLine key={command} label={t("Publish")} value={command} copiedCommand={copiedCommand} t={t} onCopy={onCopy} />
+          ))}
+        </div>
+        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 p-3">
+          <p className="text-sm font-medium">{t("Install or consume")}</p>
+          {activeGuide.installCommands.map((command) => (
+            <PackageCommandLine key={command} label={t("Install")} value={command} copiedCommand={copiedCommand} t={t} onCopy={onCopy} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PackageCommandLine = ({
+  label,
+  value,
+  copiedCommand,
+  t,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copiedCommand: string | null;
+  t: (text: string) => string;
+  onCopy: (command: string) => void;
+}) => (
+  <div className="flex flex-col gap-1">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <Button type="button" size="sm" variant="ghost" className="h-7 px-2" onClick={() => onCopy(value)}>
+        <Copy className="size-3.5" />
+        {copiedCommand === value ? t("Copied") : t("Copy")}
+      </Button>
+    </div>
+    <code className="block overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 text-foreground">
+      {value}
+    </code>
+  </div>
+);
 const PackageStat = ({ label, value }: { label: string; value: number }) => (
   <div className="flex flex-col gap-1 rounded-md border p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
@@ -607,3 +736,91 @@ const formatBytes = (value: number): string => {
   }
   return `${(value / 1024 / 1024).toFixed(1)} MiB`;
 };
+
+const buildPackageProtocolGuides = (
+  repoId: string,
+  selectedPackage: RepositoryPackageView | null,
+  selectedVersion: RepositoryPackageVersionDetailView | null,
+  selectedFile: RepositoryPackageFileView | null,
+): PackageProtocolGuideItem[] => {
+  const packageName = encodePathSegment(selectedPackage?.name || "my-package");
+  const versionValue = encodePathSegment(selectedVersion?.version.version || "0.1.0");
+  const filePath = encodePathTail(selectedFile?.file_path || selectedFile?.file_name || "artifact.tar.gz");
+  const apiBase = absoluteApiUrl(`/projects/${repoId}/packages`);
+  const genericEndpoint = `${apiBase}/generic/${packageName}/${versionValue}/${filePath}`;
+  const nugetEndpoint = `${apiBase}/nuget/index.json`;
+  const mavenFilePath = "com/example/demo/0.1.0/demo-0.1.0.jar";
+  const pypiPackageName = encodePathSegment(selectedPackage?.name || "my_package");
+  const npmPackageName = selectedPackage?.name?.startsWith("@") ? selectedPackage.name : "@gity/my-package";
+  const npmEncodedPackage = encodePathTail(npmPackageName);
+
+  return [
+    {
+      id: "generic",
+      title: "Generic",
+      description: "Upload arbitrary build artifacts through the generic registry endpoint.",
+      endpoint: genericEndpoint,
+      scopes: ["read_package", "write_package"],
+      publishCommands: [`curl --request PUT --header "Authorization: Bearer <token>" --upload-file ./artifact.tar.gz ${genericEndpoint}`],
+      installCommands: [`curl --location --header "Authorization: Bearer <token>" --output artifact.tar.gz ${genericEndpoint}`],
+    },
+    {
+      id: "npm",
+      title: "npm",
+      description: "Use the npm endpoint for package metadata and publish payloads.",
+      endpoint: `${apiBase}/npm/${npmEncodedPackage}`,
+      scopes: ["read_package", "write_package"],
+      publishCommands: ["npm publish --registry " + apiBase + "/npm/"],
+      installCommands: [
+        "npm config set @gity:registry " + apiBase + "/npm/",
+        "npm install " + npmPackageName,
+      ],
+    },
+    {
+      id: "maven",
+      title: "Maven",
+      description: "Upload Maven artifacts by repository-relative artifact path.",
+      endpoint: `${apiBase}/maven/${mavenFilePath}`,
+      scopes: ["read_package", "write_package"],
+      publishCommands: [`curl --request PUT --header "Authorization: Bearer <token>" --upload-file ./demo-0.1.0.jar ${apiBase}/maven/${mavenFilePath}`],
+      installCommands: [`mvn dependency:get -DremoteRepositories=gity::::${apiBase}/maven -Dartifact=com.example:demo:0.1.0`],
+    },
+    {
+      id: "pypi",
+      title: "PyPI",
+      description: "Expose a simple Python package index and upload distribution files.",
+      endpoint: `${apiBase}/pypi/simple`,
+      scopes: ["read_package", "write_package"],
+      publishCommands: [`curl --request PUT --header "Authorization: Bearer <token>" --upload-file ./dist/my_package-0.1.0.tar.gz ${apiBase}/pypi/${pypiPackageName}/${versionValue}/my_package-0.1.0.tar.gz`],
+      installCommands: [`pip install --index-url ${apiBase}/pypi/simple ${selectedPackage?.name || "my-package"}`],
+    },
+    {
+      id: "nuget",
+      title: "NuGet",
+      description: "Use the NuGet v3 service index and raw package upload endpoint.",
+      endpoint: nugetEndpoint,
+      scopes: ["read_package", "write_package"],
+      publishCommands: [`curl --request PUT --header "Authorization: Bearer <token>" --upload-file ./My.Package.0.1.0.nupkg ${apiBase}/nuget/My.Package/0.1.0/My.Package.0.1.0.nupkg`],
+      installCommands: [
+        `dotnet nuget add source ${nugetEndpoint} --name gity --username <username> --password <token> --store-password-in-clear-text`,
+        "dotnet add package My.Package --version 0.1.0 --source gity",
+      ],
+    },
+  ];
+};
+
+const absoluteApiUrl = (path: string): string => {
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (/^https?:\/\//i.test(base)) {
+    return `${base}${normalizedPath}`;
+  }
+  if (typeof window === "undefined") {
+    return `${base}${normalizedPath}`;
+  }
+  return `${window.location.origin}${base}${normalizedPath}`;
+};
+
+const encodePathSegment = (value: string): string => encodeURIComponent(value).replace(/%2F/gi, "/");
+
+const encodePathTail = (value: string): string => value.split("/").map((part) => encodeURIComponent(part)).join("/");

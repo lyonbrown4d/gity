@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Link2, Plus, RefreshCw, Tag, Trash2 } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, Link2, Package, Plus, RefreshCw, Tag, Terminal, Trash2 } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { getApiBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { RepositoryReleaseDetailView, RepositoryReleaseLinkView, RepositoryReleaseView, RepositoryTagView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
@@ -53,6 +54,7 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   const [linkName, setLinkName] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkType, setLinkType] = useState("package");
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
 
   const releases = useMemo(
     () => resolveReleaseList(releasesQuery.result.data).map(normalizeReleaseDetail),
@@ -70,11 +72,23 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   const canAdminReleases = permissions.repositoryAdmin;
   const isLoadingReleases = releasesQuery.query.isFetching && !releasesQuery.query.data;
   const isLoadingTags = tagsQuery.query.isFetching && !tagsQuery.query.data;
+  const releaseGuide = useMemo(() => buildReleaseGuide(repoId, defaultBranch, selectedRelease), [repoId, defaultBranch, selectedRelease]);
 
   const reload = async () => {
     const [releaseResult, tagResult] = await Promise.all([releasesQuery.query.refetch(), tagsQuery.query.refetch()]);
     const error = releaseResult.error ?? tagResult.error;
     onError(error ? extractErrorMessage(error) : null);
+  };
+
+  const copyCommand = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedCommand(command);
+      window.setTimeout(() => setCopiedCommand((current) => (current === command ? null : current)), 1400);
+      onError(null);
+    } catch {
+      onError(t("Failed to copy command."));
+    }
   };
 
   const submitRelease = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -453,6 +467,89 @@ export const RepositoryReleasesTab = ({ repoId, defaultBranch, permissions, t, o
   );
 };
 
+interface ReleaseGuide {
+  checklist: Array<{ label: string; done: boolean }>;
+  commands: Array<{ label: string; value: string }>;
+  packageHint: string;
+}
+
+const ReleaseReadinessGuide = ({
+  guide,
+  copiedCommand,
+  t,
+  onCopy,
+}: {
+  guide: ReleaseGuide;
+  copiedCommand: string | null;
+  t: (text: string) => string;
+  onCopy: (command: string) => void;
+}) => (
+  <div className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-3 xl:grid-cols-[280px_1fr]">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <Terminal className="size-4 text-primary" />
+        <p className="font-medium">{t("Release readiness")}</p>
+      </div>
+      <p className="text-xs leading-5 text-muted-foreground">
+        {t("Use this checklist to connect Git tags, package artifacts, and release links into one consumable delivery flow.")}
+      </p>
+      <div className="flex flex-col gap-2">
+        {guide.checklist.map((item) => (
+          <div key={item.label} className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className={cn("size-4", item.done ? "text-emerald-500" : "text-muted-foreground")} />
+            <span className={item.done ? "text-foreground" : "text-muted-foreground"}>{t(item.label)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border bg-background/80 p-3 text-xs leading-5 text-muted-foreground">
+        <div className="mb-1 flex items-center gap-2 font-medium text-foreground">
+          <Package className="size-3.5" />
+          {t("Package handoff")}
+        </div>
+        {t(guide.packageHint)}
+      </div>
+    </div>
+    <div className="grid gap-2 md:grid-cols-2">
+      {guide.commands.map((command) => (
+        <ReleaseCommandLine
+          key={`${command.label}:${command.value}`}
+          label={t(command.label)}
+          value={command.value}
+          copiedCommand={copiedCommand}
+          t={t}
+          onCopy={onCopy}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+const ReleaseCommandLine = ({
+  label,
+  value,
+  copiedCommand,
+  t,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copiedCommand: string | null;
+  t: (text: string) => string;
+  onCopy: (command: string) => void;
+}) => (
+  <div className="flex flex-col gap-1 rounded-lg border bg-background/80 p-3">
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <Button type="button" size="sm" variant="ghost" className="h-7 px-2" onClick={() => onCopy(value)}>
+        <Copy className="size-3.5" />
+        {copiedCommand === value ? t("Copied") : t("Copy")}
+      </Button>
+    </div>
+    <code className="block overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs leading-5 text-foreground">
+      {value}
+    </code>
+  </div>
+);
 const ReleaseStat = ({ label, value }: { label: string; value: number }) => (
   <div className="flex flex-col gap-1 rounded-md border p-3">
     <p className="text-xs text-muted-foreground">{label}</p>
@@ -525,3 +622,39 @@ const normalizeTag = (value: unknown): RepositoryTagView => {
 };
 
 const shortSHA = (value: string): string => (value ? value.slice(0, 8) : "--------");
+
+const buildReleaseGuide = (repoId: string, defaultBranch: string, selectedRelease: RepositoryReleaseDetailView | null): ReleaseGuide => {
+  const tagName = selectedRelease?.release.tag_name || "v0.1.0";
+  const releaseID = selectedRelease?.release.id || "<release-id>";
+  const packageEndpoint = absoluteApiUrl(`/projects/${repoId}/packages`);
+  const releaseEndpoint = absoluteApiUrl(`/projects/${repoId}/releases`);
+  const assetEndpoint = `${releaseEndpoint}/${releaseID}/links`;
+  const branch = defaultBranch || "main";
+  return {
+    checklist: [
+      { label: "Git tag exists", done: Boolean(selectedRelease?.tag) },
+      { label: "Release notes are written", done: Boolean(selectedRelease?.release.description) },
+      { label: "At least one asset link is attached", done: Boolean(selectedRelease?.links.length) },
+      { label: "Package artifact is published", done: true },
+    ],
+    packageHint: "Publish the build output to the package registry first, then add the package download URL or external artifact URL as a release asset link.",
+    commands: [
+      { label: "Create local tag", value: `git tag -a ${tagName} ${branch} -m "${tagName}"` },
+      { label: "Push tag", value: `git push origin ${tagName}` },
+      { label: "Publish package artifact", value: `curl --request PUT --header "Authorization: Bearer <token>" --upload-file ./artifact.tar.gz ${packageEndpoint}/generic/my-package/${tagName}/artifact.tar.gz` },
+      { label: "Attach release asset", value: `curl --request POST --header "Authorization: Bearer <token>" --header "Content-Type: application/json" --data '{"name":"artifact.tar.gz","url":"${packageEndpoint}/generic/my-package/${tagName}/artifact.tar.gz","link_type":"package"}' ${assetEndpoint}` },
+    ],
+  };
+};
+
+const absoluteApiUrl = (path: string): string => {
+  const base = getApiBaseUrl().replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (/^https?:\/\//i.test(base)) {
+    return `${base}${normalizedPath}`;
+  }
+  if (typeof window === "undefined") {
+    return `${base}${normalizedPath}`;
+  }
+  return `${window.location.origin}${base}${normalizedPath}`;
+};

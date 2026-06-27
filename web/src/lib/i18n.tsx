@@ -454,6 +454,39 @@ const zhDict: Record<string, string> = {
     "请将令牌存入 CI Secret 或本地凭据助手，不要提交到仓库文件中。",
   "Failed to copy command.": "复制命令失败。",
   "Failed to copy token.": "复制令牌失败。",
+  Copied: "已复制",
+  "Registry setup guide": "Registry 设置指南",
+  "Copy publish and install commands for the selected package protocol. Use a project access token or deploy token with package scopes.":
+    "复制当前包协议的发布和安装命令。请使用带包权限的项目访问令牌或部署令牌。",
+  "Package protocol": "包协议",
+  Endpoint: "端点",
+  Publish: "发布",
+  Install: "安装",
+  "Install or consume": "安装或消费",
+  "Upload arbitrary build artifacts through the generic registry endpoint.":
+    "通过 generic registry 端点上传任意构建产物。",
+  "Use the npm endpoint for package metadata and publish payloads.":
+    "使用 npm 端点读取包元数据并发布 payload。",
+  "Upload Maven artifacts by repository-relative artifact path.":
+    "按仓库相对 artifact 路径上传 Maven 产物。",
+  "Expose a simple Python package index and upload distribution files.":
+    "暴露 Python simple index，并上传发行文件。",
+  "Use the NuGet v3 service index and raw package upload endpoint.":
+    "使用 NuGet v3 service index 和原始包上传端点。",
+  "Release readiness": "发布准备度",
+  "Use this checklist to connect Git tags, package artifacts, and release links into one consumable delivery flow.":
+    "使用该清单把 Git tag、包产物和 release 链接串成一个可消费的交付流程。",
+  "Package handoff": "包产物交接",
+  "Git tag exists": "Git tag 已存在",
+  "Release notes are written": "Release notes 已填写",
+  "At least one asset link is attached": "至少已关联一个资产链接",
+  "Package artifact is published": "包产物已发布",
+  "Publish the build output to the package registry first, then add the package download URL or external artifact URL as a release asset link.":
+    "先把构建产物发布到 package registry，再把包下载地址或外部产物地址作为 release asset link 添加。",
+  "Create local tag": "创建本地 tag",
+  "Push tag": "推送 tag",
+  "Publish package artifact": "发布包产物",
+  "Attach release asset": "关联 release 资产",
   Dismiss: "关闭",
   read_repository: "读取仓库",
   write_repository: "写入仓库",
