@@ -104,7 +104,7 @@ func ensureSQLiteDatabaseDir(dsn string) error {
 		return nil
 	}
 
-	dbPath := strings.Split(trimmed, "?")[0]
+	dbPath, _, _ := strings.Cut(trimmed, "?")
 	dbPath, _ = strings.CutPrefix(dbPath, "//")
 	if dbPath == "" || isSQLiteRootPath(dbPath) {
 		return nil

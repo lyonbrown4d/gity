@@ -1,5 +1,5 @@
-import { ArrowRightLeft, FolderGit2, House, User } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { ArrowRightLeft, FolderGit2, House, Inbox, User } from "lucide-react";
+import { NavLink, useLocation } from "react-router";
 import { useI18n } from "@/lib/i18n";
 import { NavUser } from "@/components/nav-user";
 import {
@@ -29,6 +29,7 @@ export function AppSidebar({ user, onLogout, ...props }: AppSidebarProps) {
   const location = useLocation();
   const mainNavItems = [
     { title: t("Dashboard"), url: "/app/dashboard", icon: House },
+    { title: t("Inbox"), url: "/app/todos", icon: Inbox },
     { title: t("My Projects"), url: "/app/projects", icon: FolderGit2 },
     { title: t("Profile"), url: "/app/profile", icon: User },
   ] as const;

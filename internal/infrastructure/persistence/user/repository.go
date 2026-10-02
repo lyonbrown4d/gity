@@ -41,7 +41,7 @@ func (r *Repository) List(ctx context.Context) (*collectionx.List[identity.User]
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (identity.User, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.UserSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.UserSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByUsername(ctx context.Context, username string) (identity.User, error) {
@@ -81,7 +81,7 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.UserSchema.IsSuperAdmin.Set(boolAsInt(*input.IsSuperAdmin)))
 	}
 	assignments = append(assignments, dbschema.UserSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := dbxrepo.By(r.base, dbschema.UserSchema.ID).Update(ctx, id, assignments...); err != nil {
+	if _, err := r.base.By(dbschema.UserSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update user: %w", err)
 	}
 	return nil
@@ -95,7 +95,7 @@ func boolAsInt(value bool) int {
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.UserSchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.By(dbschema.UserSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete user: %w", err)
 	}
 	return nil

@@ -12,7 +12,8 @@ import (
 )
 
 type AssigneesInput struct {
-	UserIDs []int64 `json:"user_ids"`
+	UserIDs     []int64 `json:"user_ids"`
+	ActorUserID int64   `json:"actor_user_id"`
 }
 
 type AssigneesView struct {
@@ -61,6 +62,9 @@ func (s *Service) SetAssignees(ctx context.Context, projectID, issueIID int64, i
 	items, err := s.assigneeRepo.ReplaceByIssueID(ctx, issue.ID, userIDs)
 	if err != nil {
 		return AssigneesView{}, oops.In("issue").With("project_id", projectID, "issue_id", issue.ID, "issue_iid", issueIID).Wrapf(err, "replace issue assignees")
+	}
+	for _, assignee := range items.Values() {
+		s.publishIssueEventAsync(ctx, projectID, issuedomain.NewProjectIssueAssignedEvent(issue, assignee.UserID, input.ActorUserID))
 	}
 	return AssigneesView{Issue: issue, Assignees: items.Values()}, nil
 }

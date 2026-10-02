@@ -22,6 +22,7 @@ type Service struct {
 	labelRepo      storageports.ProjectIssueLabelRepository
 	userRepo       storageports.UserRepository
 	storage        storageports.ObjectStorage
+	events         storageports.DomainEventPublisher
 }
 
 type Repositories struct {
@@ -37,6 +38,7 @@ type RuntimeDependencies struct {
 	logger   *slog.Logger
 	userRepo storageports.UserRepository
 	storage  storageports.ObjectStorage
+	events   storageports.DomainEventPublisher
 }
 
 type CreateIssueInput struct {
@@ -68,7 +70,14 @@ func NewRepositories(projectRepo storageports.ProjectRepository, issueRepo stora
 }
 
 func NewRuntimeDependencies(logger *slog.Logger, userRepo storageports.UserRepository, storage storageports.ObjectStorage) RuntimeDependencies {
-	return RuntimeDependencies{logger: logger, userRepo: userRepo, storage: storage}
+	return NewRuntimeDependenciesWithEvents(logger, userRepo, storage, storageports.NoopDomainEventPublisher{})
+}
+
+func NewRuntimeDependenciesWithEvents(logger *slog.Logger, userRepo storageports.UserRepository, storage storageports.ObjectStorage, events storageports.DomainEventPublisher) RuntimeDependencies {
+	if events == nil {
+		events = storageports.NoopDomainEventPublisher{}
+	}
+	return RuntimeDependencies{logger: logger, userRepo: userRepo, storage: storage, events: events}
 }
 
 func NewService(logger *slog.Logger, projectRepo storageports.ProjectRepository, issueRepo storageports.ProjectIssueRepository, commentRepo storageports.ProjectIssueCommentRepository, attachmentRepo storageports.ProjectIssueAttachmentRepository, userRepo storageports.UserRepository, storage storageports.ObjectStorage) *Service {
@@ -89,6 +98,7 @@ func NewServiceWithDependencies(repos Repositories, runtime RuntimeDependencies)
 		labelRepo:      repos.labelRepo,
 		userRepo:       runtime.userRepo,
 		storage:        runtime.storage,
+		events:         runtime.events,
 	}
 }
 
@@ -126,6 +136,7 @@ func (s *Service) CreateIssue(ctx context.Context, projectID int64, input Create
 	if err != nil {
 		return issuedomain.ProjectIssue{}, oops.In("issue").With("project_id", projectID, "author_user_id", input.AuthorUserID).Wrapf(err, "create issue")
 	}
+	s.publishIssueEventAsync(ctx, projectID, issuedomain.NewProjectIssueCreatedEvent(issue))
 	return issue, nil
 }
 
@@ -176,6 +187,7 @@ func (s *Service) CreateComment(ctx context.Context, projectID, issueIID int64, 
 	if err != nil {
 		return issuedomain.ProjectIssueComment{}, oops.In("issue").With("project_id", projectID, "issue_id", issue.ID, "issue_iid", issueIID, "author_user_id", input.AuthorUserID).Wrapf(err, "create issue comment")
 	}
+	s.publishIssueEventAsync(ctx, projectID, issuedomain.NewProjectIssueCommentedEvent(issue, comment))
 	return comment, nil
 }
 

@@ -106,7 +106,11 @@ func (e *Endpoint) listAssignees(ctx context.Context, in *projectIssueInput) (*i
 }
 
 func (e *Endpoint) setAssignees(ctx context.Context, in *setIssueAssigneesInput) (*issueOutput, error) {
-	item, err := e.service.SetAssignees(ctx, in.ProjectID, in.IssueIID, issueservice.AssigneesInput{UserIDs: in.Body.UserIDs})
+	actorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, 0)
+	if err != nil {
+		return nil, err
+	}
+	item, err := e.service.SetAssignees(ctx, in.ProjectID, in.IssueIID, issueservice.AssigneesInput{UserIDs: in.Body.UserIDs, ActorUserID: actorUserID})
 	if err != nil {
 		return nil, err
 	}

@@ -40,7 +40,7 @@ func (r *Repository) List(ctx context.Context) (*collectionx.List[organizationdo
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (organizationdomain.Organization, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.OrganizationSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.OrganizationSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (organizationdomain.Organization, error) {
@@ -83,14 +83,14 @@ func (r *Repository) UpdateByID(ctx context.Context, id int64, input UpdateInput
 		assignments = append(assignments, dbschema.OrganizationSchema.Visibility.Set(strings.TrimSpace(*input.Visibility)))
 	}
 	assignments = append(assignments, dbschema.OrganizationSchema.UpdatedAt.Set(time.Now().UTC()))
-	if _, err := dbxrepo.By(r.base, dbschema.OrganizationSchema.ID).Update(ctx, id, assignments...); err != nil {
+	if _, err := r.base.By(dbschema.OrganizationSchema.ID).Update(ctx, id, assignments...); err != nil {
 		return fmt.Errorf("update organization: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.OrganizationSchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.By(dbschema.OrganizationSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete organization: %w", err)
 	}
 	return nil

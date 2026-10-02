@@ -134,6 +134,10 @@ func (s ProjectSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }
 
+func (s ProjectTodoSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
+	return querydsl.AllColumns(s)
+}
+
 func (s ProjectWikiPageSchemaDef) AllColumns() *collectionx.List[querydsl.SelectItem] {
 	return querydsl.AllColumns(s)
 }

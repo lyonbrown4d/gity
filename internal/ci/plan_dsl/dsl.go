@@ -50,17 +50,17 @@ func Compile(ctx context.Context, filename, source string) (PipelineSpec, error)
 }
 
 func Register(c *compiler.Compiler) error {
-	if err := c.RegisterForms(forms()); err != nil {
+	if err := c.RegisterAll(forms()...); err != nil {
 		return oops.In("ci_plan_dsl").Wrapf(err, "register ci plano forms")
 	}
-	if err := c.RegisterActions(actions()); err != nil {
+	if err := c.RegisterAll(actions()...); err != nil {
 		return oops.In("ci_plan_dsl").Wrapf(err, "register ci plano actions")
 	}
 	return nil
 }
 
-func forms() list.List[schema.FormSpec] {
-	return schema.FormSpecs(
+func forms() []schema.FormSpec {
+	return []schema.FormSpec{
 		schema.FormSpec{
 			Name:      "pipeline",
 			LabelKind: schema.LabelNone,
@@ -118,11 +118,11 @@ func forms() list.List[schema.FormSpec] {
 			LabelKind: schema.LabelNone,
 			BodyMode:  schema.BodyCallOnly,
 		},
-	)
+	}
 }
 
-func actions() list.List[compiler.ActionSpec] {
-	return compiler.ActionSpecs(
+func actions() []compiler.ActionSpec {
+	return []compiler.ActionSpec{
 		compiler.ActionSpec{
 			Name:         "shell",
 			MinArgs:      1,
@@ -139,7 +139,7 @@ func actions() list.List[compiler.ActionSpec] {
 			VariadicType: schema.TypeString,
 			Validate:     validateStringArgs("exec"),
 		},
-	)
+	}
 }
 
 func Lower(hir *compiler.HIR) (PipelineSpec, error) {

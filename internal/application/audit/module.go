@@ -19,7 +19,7 @@ func Module() dix.Module {
 			dix.Provider2(NewSubscriber),
 		),
 		dix.Hooks(
-			dix.OnStart2(func(_ context.Context, bus eventx.BusRuntime, subscriber *Subscriber) error {
+			dix.OnStart2(func(_ context.Context, bus *eventx.Bus, subscriber *Subscriber) error {
 				return subscriber.Subscribe(bus)
 			},
 				dix.LifecycleName("audit.subscribe"),

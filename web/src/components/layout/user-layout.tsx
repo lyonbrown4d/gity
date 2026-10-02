@@ -1,4 +1,4 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { useGetIdentity, useLogout, usePermissions } from "@refinedev/core";
 import { AppSidebar } from "@/components/app-sidebar";
 import { GlobalQuickJump } from "@/components/global-quick-jump";
@@ -16,6 +16,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 
 const routeTitleMap: Record<string, string> = {
   "/app/dashboard": "Dashboard",
+  "/app/todos": "Inbox",
   "/app/projects": "My Projects",
   "/app/repositories": "My Projects",
   "/app/profile": "Profile",
@@ -24,6 +25,7 @@ const routeTitleMap: Record<string, string> = {
 export function UserLayout(): JSX.Element {
   const { t } = useI18n();
   const location = useLocation();
+  const navigate = useNavigate();
   const { mutate: logout } = useLogout();
   const { data: identity } = useGetIdentity<{ name?: string; email?: string; isSuperAdmin?: boolean }>({});
   const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>({});
@@ -44,7 +46,15 @@ export function UserLayout(): JSX.Element {
           email: identity?.email ?? t("Unknown Email"),
           isSuperAdmin: Boolean(permissions?.isSuperAdmin),
         }}
-        onLogout={() => logout()}
+        onLogout={() =>
+          logout(undefined, {
+            onSuccess: ({ success }) => {
+              if (success) {
+                navigate("/login", { replace: true });
+              }
+            },
+          })
+        }
       />
       <SidebarInset className="overflow-hidden bg-background/55 backdrop-blur-xl md:border md:border-border/60 md:bg-background/60">
         <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background/75 px-4 backdrop-blur-xl">

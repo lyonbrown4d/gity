@@ -17,7 +17,7 @@ func Module() dix.Module {
 			dix.Provider1(NewPublisher, dix.Eager()),
 		),
 		dix.Hooks(
-			dix.OnStop(func(_ context.Context, bus eventx.BusRuntime) error {
+			dix.OnStop(func(_ context.Context, bus *eventx.Bus) error {
 				if bus == nil {
 					return nil
 				}

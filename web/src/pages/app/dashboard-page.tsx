@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useList, useOne } from "@refinedev/core";
-import { ArrowRight, Building2, FolderGit2, GitBranch, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, FolderGit2, GitBranch, Inbox, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ProductHero, ProductMetricCard } from "@/components/ui/product";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OrganizationView, RepositoryView, UserView } from "@/pages/types";
+import { useTodoList } from "./use-todos";
 
 export function AppDashboardPage(): JSX.Element {
   const { t } = useI18n();
@@ -22,6 +23,7 @@ export function AppDashboardPage(): JSX.Element {
   const repoQuery = useList<RepositoryView>({
     resource: "my-projects",
   });
+  const todoQuery = useTodoList("pending");
 
   const user = userQuery.result ?? null;
   const orgs = orgQuery.result.data ?? [];
@@ -34,7 +36,9 @@ export function AppDashboardPage(): JSX.Element {
       ? orgQuery.query.error.message
       : repoQuery.query.error instanceof Error
         ? repoQuery.query.error.message
-        : null;
+        : todoQuery.query.error instanceof Error
+          ? todoQuery.query.error.message
+          : null;
   const roleLabel = user?.is_super_admin ? t("Super Admin") : t("User");
 
   return (
@@ -46,6 +50,9 @@ export function AppDashboardPage(): JSX.Element {
           <>
             <Button asChild className="action-pop">
               <Link to="/app/projects">{t("Open Projects")}</Link>
+            </Button>
+            <Button asChild variant="outline" className="action-pop">
+              <Link to="/app/todos">{t("Open Inbox")}</Link>
             </Button>
             <Button asChild variant="outline" className="action-pop">
               <Link to="/app/profile">{t("Edit Profile")}</Link>
@@ -79,7 +86,7 @@ export function AppDashboardPage(): JSX.Element {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ProductMetricCard
           icon={Building2}
           label={t("Organizations")}
@@ -91,6 +98,12 @@ export function AppDashboardPage(): JSX.Element {
           label={t("Projects")}
           value={isLoading ? "--" : String(repos.length)}
           description={t("Total projects visible to you.")}
+        />
+        <ProductMetricCard
+          icon={Inbox}
+          label={t("Pending Todos")}
+          value={todoQuery.query.isLoading ? "--" : String(todoQuery.todos.length)}
+          description={t("Project activity waiting in your inbox.")}
         />
         <ProductMetricCard
           icon={ShieldCheck}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCustom, useCustomMutation, useList } from "@refinedev/core";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";

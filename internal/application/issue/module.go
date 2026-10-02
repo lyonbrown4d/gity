@@ -9,7 +9,7 @@ func Module() dix.Module {
 		dix.Description("Issue application services"),
 		dix.Providers(
 			dix.Provider6(NewRepositories),
-			dix.Provider3(NewRuntimeDependencies),
+			dix.Provider4(NewRuntimeDependenciesWithEvents),
 			dix.Provider2(NewServiceWithDependencies),
 		),
 	)

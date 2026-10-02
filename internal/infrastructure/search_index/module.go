@@ -40,7 +40,7 @@ func Module() dix.Module {
 				dix.LifecyclePriority(40),
 				dix.LifecycleTimeout(10*time.Second),
 			),
-			dix.OnStart2(func(_ context.Context, bus eventx.BusRuntime, subscriber *Subscriber) error {
+			dix.OnStart2(func(_ context.Context, bus *eventx.Bus, subscriber *Subscriber) error {
 				return subscriber.Subscribe(bus)
 			},
 				dix.LifecycleName("search_index.subscribe"),

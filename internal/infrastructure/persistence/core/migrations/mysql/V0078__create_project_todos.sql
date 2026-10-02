@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `project_todos` (
+    `id` BIGINT NOT NULL PRIMARY KEY,
+    `user_id` BIGINT NOT NULL,
+    `organization_id` BIGINT NOT NULL,
+    `project_id` BIGINT NOT NULL,
+    `kind` VARCHAR(64) NOT NULL,
+    `state` VARCHAR(32) NOT NULL,
+    `target_type` VARCHAR(64) NOT NULL,
+    `target_id` VARCHAR(128) NOT NULL,
+    `title` VARCHAR(255) NOT NULL,
+    `summary` TEXT NOT NULL,
+    `action_url` VARCHAR(512) NOT NULL,
+    `created_at` TIMESTAMP(6) NOT NULL,
+    `updated_at` TIMESTAMP(6) NOT NULL,
+    `done_at` TIMESTAMP(6) NULL,
+    CONSTRAINT `fk_project_todos_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_project_todos_organization_id` FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_project_todos_project_id` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+    UNIQUE KEY `ux_project_todos_user_kind_target` (`user_id`, `kind`, `target_type`, `target_id`),
+    KEY `ix_project_todos_user_state_created` (`user_id`, `state`, `created_at`),
+    KEY `ix_project_todos_project_user` (`project_id`, `user_id`),
+    KEY `ix_project_todos_organization_user` (`organization_id`, `user_id`)
+);

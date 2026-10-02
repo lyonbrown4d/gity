@@ -1,5 +1,5 @@
 import { LogOut, Shield, Boxes, Building2, UserCircle2, Users } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import { useGetIdentity, useLogout, usePermissions } from "@refinedev/core";
 import { ViewControls } from "@/components/common/view-controls";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 export function AdminLayout(): JSX.Element {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { mutate: logout } = useLogout();
   const { data: identity } = useGetIdentity<{ name?: string; isSuperAdmin?: boolean }>({});
   const { data: permissions } = usePermissions<{ isSuperAdmin?: boolean }>({});
@@ -79,7 +80,15 @@ export function AdminLayout(): JSX.Element {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => logout()}
+                onClick={() =>
+                  logout(undefined, {
+                    onSuccess: ({ success }) => {
+                      if (success) {
+                        navigate("/login", { replace: true });
+                      }
+                    },
+                  })
+                }
                 className="gap-2 action-pop"
               >
                 <LogOut className="h-4 w-4" />

@@ -15,6 +15,7 @@ import (
 	projectcredentialservice "github.com/lyonbrown4d/gity/internal/application/project_credential"
 	releaseservice "github.com/lyonbrown4d/gity/internal/application/release"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
+	todoservice "github.com/lyonbrown4d/gity/internal/application/todo"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
 	"github.com/lyonbrown4d/gity/internal/config"
@@ -59,6 +60,7 @@ import (
 	projectreleaserepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_release"
 	projectreleaselinkrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_release_link"
 	projectrunnerrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_runner"
+	projecttodorepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_todo"
 	projectwikipagerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user_token"
@@ -79,6 +81,7 @@ import (
 	releaseendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/release"
 	runnerendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/runner"
 	systemendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/system"
+	todoendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/todo"
 	userendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/user"
 	wikiendpoint "github.com/lyonbrown4d/gity/internal/interfaces/http/wiki"
 	httpapp "github.com/lyonbrown4d/gity/internal/interfaces/http_server"
@@ -177,6 +180,7 @@ func repositoryRuntimeModule() dix.Module {
 			projectreleaserepo.Module(),
 			projectreleaselinkrepo.Module(),
 			projectrunnerrepo.Module(),
+			projecttodorepo.Module(),
 			projectwikipagerepo.Module(),
 		),
 	)
@@ -217,6 +221,7 @@ func applicationRuntimeModule() dix.Module {
 			pipelineservice.Module(),
 			releaseservice.Module(),
 			runnerservice.Module(),
+			todoservice.Module(),
 			wikiservice.Module(),
 		),
 	)
@@ -254,6 +259,7 @@ func endpointRuntimeModule() dix.Module {
 			projectcredentialendpoint.Module(),
 			releaseendpoint.Module(),
 			runnerendpoint.Module(),
+			todoendpoint.Module(),
 			wikiendpoint.Module(),
 		),
 	)

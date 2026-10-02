@@ -50,7 +50,7 @@ The old Rust backend has been removed so the repository can move forward on one 
 
 ### 1. Prerequisites
 
-- Go 1.26+
+- Go 1.27.1+
 - Git
 - Docker Desktop or a compatible Docker runtime
 - Node.js + pnpm for the frontend

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLogin } from "@refinedev/core";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router";
 import { getTokens } from "@/lib/auth-store";
 import { useI18n } from "@/lib/i18n";
 import { ViewControls } from "@/components/common/view-controls";
@@ -8,6 +8,7 @@ import { LoginForm } from "@/components/login-form";
 
 export function LoginPage(): JSX.Element {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const tokens = getTokens();
   const { mutate: login, isPending: isLoading } = useLogin();
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +32,11 @@ export function LoginPage(): JSX.Element {
               { username, password },
               {
                 onError: (e) => setError(e?.message ?? t("Login failed")),
+                onSuccess: ({ success }) => {
+                  if (success) {
+                    navigate("/app/dashboard", { replace: true });
+                  }
+                },
               },
             );
           }}

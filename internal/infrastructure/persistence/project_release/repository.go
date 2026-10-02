@@ -39,7 +39,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (releasedomain.ProjectRelease, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectReleaseSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectReleaseSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByProjectAndTagName(ctx context.Context, projectID int64, tagName string) (releasedomain.ProjectRelease, error) {

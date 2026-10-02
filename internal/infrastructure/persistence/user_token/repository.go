@@ -66,7 +66,7 @@ func (r *Repository) DeleteByToken(ctx context.Context, token string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := dbxrepo.By(r.base, dbschema.UserAccessTokenSchema.ID).Delete(ctx, record.ID); err != nil {
+	if _, err := r.base.By(dbschema.UserAccessTokenSchema.ID).Delete(ctx, record.ID); err != nil {
 		return fmt.Errorf("delete user token: %w", err)
 	}
 	return nil

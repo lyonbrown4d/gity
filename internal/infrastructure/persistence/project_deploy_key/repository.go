@@ -47,7 +47,7 @@ func (r *Repository) ListByProjectID(ctx context.Context, projectID int64) (*col
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (identity.ProjectDeployKey, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectDeployKeySchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectDeployKeySchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (identity.ProjectDeployKey, error) {
@@ -69,7 +69,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (identity.Pr
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectDeployKeySchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.By(dbschema.ProjectDeployKeySchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project deploy key: %w", err)
 	}
 	return nil

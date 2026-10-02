@@ -24,30 +24,6 @@ var (
 	ErrMergeConflict           = gitports.ErrMergeConflict
 )
 
-const updateHookScript = `#!/bin/sh
-refname="$1"
-oldrev="$2"
-newrev="$3"
-zero="0000000000000000000000000000000000000000"
-
-case "
-$GITY_DENY_FORCE_PUSH_REFS
-" in
-*"
-$refname
-"*)
-	if [ "$oldrev" != "$zero" ] && [ "$newrev" != "$zero" ]; then
-		if ! git merge-base --is-ancestor "$oldrev" "$newrev"; then
-			echo "force push is not allowed for protected branch: ${refname#refs/heads/}" >&2
-			exit 1
-		fi
-	fi
-	;;
-esac
-
-exit 0
-`
-
 type Runner struct {
 	gitBin   string
 	repoRoot string
@@ -113,49 +89,6 @@ func (r *Runner) InitBare(ctx context.Context, repoPath, initialBranch string) e
 		return fmt.Errorf("init bare repo %s: %w", repoPath, err)
 	}
 	return r.EnsureUpdateHook(ctx, repoPath)
-}
-
-func (r *Runner) EnsureUpdateHook(_ context.Context, repoPath string) error {
-	absRepo, err := r.resolveRepoPath(repoPath)
-	if err != nil {
-		return err
-	}
-	hookPath := filepath.Join(absRepo, "hooks", "update")
-	if err := os.MkdirAll(filepath.Dir(hookPath), 0o750); err != nil {
-		return fmt.Errorf("create git hooks directory: %w", err)
-	}
-	if existing, readErr := os.ReadFile(hookPath); readErr == nil && string(existing) == updateHookScript {
-		if err := os.Chmod(hookPath, executableHookMode()); err != nil {
-			return fmt.Errorf("mark git update hook executable: %w", err)
-		}
-		return nil
-	}
-	tmpHook, err := os.CreateTemp(filepath.Dir(hookPath), "update-*")
-	if err != nil {
-		return fmt.Errorf("create git update hook temp file: %w", err)
-	}
-	tmpPath := tmpHook.Name()
-	defer func() {
-		_ = os.Remove(tmpPath)
-	}()
-	if _, err := tmpHook.WriteString(updateHookScript); err != nil {
-		_ = tmpHook.Close()
-		return fmt.Errorf("write git update hook temp file: %w", err)
-	}
-	if err := tmpHook.Close(); err != nil {
-		return fmt.Errorf("close git update hook temp file: %w", err)
-	}
-	if err := os.Chmod(tmpPath, executableHookMode()); err != nil {
-		return fmt.Errorf("mark git update hook temp file executable: %w", err)
-	}
-	if err := os.Rename(tmpPath, hookPath); err != nil {
-		return fmt.Errorf("install git update hook: %w", err)
-	}
-	return nil
-}
-
-func executableHookMode() os.FileMode {
-	return 0o755
 }
 
 func (r *Runner) CreateBranch(ctx context.Context, repoPath, branchName, sourceRef string) error {

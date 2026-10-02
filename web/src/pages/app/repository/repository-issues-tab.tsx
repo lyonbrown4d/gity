@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleDot, Search, Tags, UserRound } from "lucide-react";
 import { useCustom, useCustomMutation } from "@refinedev/core";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

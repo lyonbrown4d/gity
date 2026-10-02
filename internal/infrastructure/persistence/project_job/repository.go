@@ -56,7 +56,7 @@ func (r *Repository) GetByProjectAndID(ctx context.Context, projectID, id int64)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (cidomain.ProjectJob, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectJobSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectJobSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.ProjectJob, error) {

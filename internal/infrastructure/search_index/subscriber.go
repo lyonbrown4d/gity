@@ -17,7 +17,7 @@ func NewSubscriber(service *Service) *Subscriber {
 	return &Subscriber{service: service}
 }
 
-func (s *Subscriber) Subscribe(bus eventx.BusRuntime) error {
+func (s *Subscriber) Subscribe(bus *eventx.Bus) error {
 	if bus == nil || s.service == nil {
 		return nil
 	}
@@ -37,8 +37,8 @@ func (s *Subscriber) Close() {
 	s.unsubscribe = nil
 }
 
-func (s *Subscriber) subscribeProjectCreated(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectCreated)
+func (s *Subscriber) subscribeProjectCreated(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectCreated)
 	if err != nil {
 		return oops.In("search_index").Wrapf(err, "subscribe project created search indexing")
 	}
@@ -46,8 +46,8 @@ func (s *Subscriber) subscribeProjectCreated(bus eventx.BusRuntime) error {
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectDeleted(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectDeleted)
+func (s *Subscriber) subscribeProjectDeleted(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectDeleted)
 	if err != nil {
 		return oops.In("search_index").Wrapf(err, "subscribe project deleted search indexing")
 	}
@@ -55,8 +55,8 @@ func (s *Subscriber) subscribeProjectDeleted(bus eventx.BusRuntime) error {
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectRepositoryChanged(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectRepositoryChanged)
+func (s *Subscriber) subscribeProjectRepositoryChanged(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectRepositoryChanged)
 	if err != nil {
 		return oops.In("search_index").Wrapf(err, "subscribe project repository changed search indexing")
 	}

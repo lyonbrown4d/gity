@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, GitMerge, GitPullRequest, MessageSquare, RefreshCw, Search, ShieldCheck, ThumbsUp, UserRound, XCircle } from "lucide-react";
 import { useCustom, useCustomMutation, useGetIdentity } from "@refinedev/core";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -14,6 +14,7 @@ import (
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	projectcredentialservice "github.com/lyonbrown4d/gity/internal/application/project_credential"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
+	todoservice "github.com/lyonbrown4d/gity/internal/application/todo"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
 	"github.com/lyonbrown4d/gity/internal/config"
@@ -56,6 +57,7 @@ import (
 	projectpipelinerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline"
 	projectpipelinejobrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_pipeline_job"
 	projectrunnerrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_runner"
+	projecttodorepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_todo"
 	projectwikipagerepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/project_wiki_page"
 	userrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user"
 	usertokenrepo "github.com/lyonbrown4d/gity/internal/infrastructure/persistence/user_token"
@@ -155,6 +157,7 @@ func repositoryRuntimeModule() dix.Module {
 			projectpipelinerepo.Module(),
 			projectpipelinejobrepo.Module(),
 			projectrunnerrepo.Module(),
+			projecttodorepo.Module(),
 			projectwikipagerepo.Module(),
 		),
 	)
@@ -194,6 +197,7 @@ func applicationRuntimeModule() dix.Module {
 			packageregistryservice.Module(),
 			pipelineservice.Module(),
 			runnerservice.Module(),
+			todoservice.Module(),
 			wikiservice.Module(),
 		),
 	)

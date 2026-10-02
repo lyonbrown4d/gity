@@ -42,7 +42,7 @@ func (r *Repository) ListByProjectIDAndKind(ctx context.Context, projectID int64
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (identity.ProjectAccessToken, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectAccessTokenSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectAccessTokenSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByToken(ctx context.Context, token string) (identity.ProjectAccessToken, error) {

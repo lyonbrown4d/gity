@@ -36,7 +36,7 @@ func (r *Repository) ListByPackageID(ctx context.Context, packageID int64) (*col
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackageVersion, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectPackageVersionSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectPackageVersionSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) GetByPackageAndVersion(ctx context.Context, packageID int64, version string) (packagedomain.ProjectPackageVersion, error) {

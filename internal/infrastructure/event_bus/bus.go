@@ -12,10 +12,10 @@ import (
 )
 
 type Publisher struct {
-	bus eventx.BusRuntime
+	bus *eventx.Bus
 }
 
-func NewBus(logger *slog.Logger) eventx.BusRuntime {
+func NewBus(logger *slog.Logger) *eventx.Bus {
 	return eventx.New(
 		eventx.WithParallelDispatch(false),
 		eventx.WithMiddleware(eventx.RecoverMiddleware()),
@@ -27,7 +27,7 @@ func NewBus(logger *slog.Logger) eventx.BusRuntime {
 	)
 }
 
-func NewPublisher(bus eventx.BusRuntime) appports.DomainEventPublisher {
+func NewPublisher(bus *eventx.Bus) appports.DomainEventPublisher {
 	return Publisher{bus: bus}
 }
 

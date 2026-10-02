@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useList } from "@refinedev/core";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import {
   BookOpen,
   Boxes,
@@ -13,6 +13,7 @@ import {
   GitPullRequest,
   Gauge,
   Home,
+  Inbox,
   ListTodo,
   Package,
   PlayCircle,
@@ -100,6 +101,15 @@ export function GlobalQuickJump(): JSX.Element {
         path: "/app/dashboard",
         icon: Home,
         keywords: ["home", "workspace", "dashboard"],
+      },
+      {
+        id: "todos",
+        title: t("Inbox"),
+        description: t("Review pending project activity and completed todos."),
+        section: t("Workspace"),
+        path: "/app/todos",
+        icon: Inbox,
+        keywords: ["todo", "inbox", "notification", "pending"],
       },
       {
         id: "projects",

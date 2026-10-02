@@ -23,7 +23,7 @@ func NewSubscriber(repo auditports.ProjectAuditEventRepository, projectRepo audi
 	return &Subscriber{repo: repo, projectRepo: projectRepo}
 }
 
-func (s *Subscriber) Subscribe(bus eventx.BusRuntime) error {
+func (s *Subscriber) Subscribe(bus *eventx.Bus) error {
 	if bus == nil {
 		return nil
 	}
@@ -45,8 +45,8 @@ func (s *Subscriber) Close() {
 	s.unsubscribe = nil
 }
 
-func (s *Subscriber) subscribeProjectCreated(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectCreated)
+func (s *Subscriber) subscribeProjectCreated(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectCreated)
 	if err != nil {
 		return oops.In("audit").Wrapf(err, "subscribe project created audit")
 	}
@@ -54,8 +54,8 @@ func (s *Subscriber) subscribeProjectCreated(bus eventx.BusRuntime) error {
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectDeleted(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectDeleted)
+func (s *Subscriber) subscribeProjectDeleted(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectDeleted)
 	if err != nil {
 		return oops.In("audit").Wrapf(err, "subscribe project deleted audit")
 	}
@@ -63,8 +63,8 @@ func (s *Subscriber) subscribeProjectDeleted(bus eventx.BusRuntime) error {
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectBranchProtectionChanged(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectBranchProtectionChanged)
+func (s *Subscriber) subscribeProjectBranchProtectionChanged(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectBranchProtectionChanged)
 	if err != nil {
 		return oops.In("audit").Wrapf(err, "subscribe project branch protection audit")
 	}
@@ -72,8 +72,8 @@ func (s *Subscriber) subscribeProjectBranchProtectionChanged(bus eventx.BusRunti
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectBranchDeleted(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectBranchDeleted)
+func (s *Subscriber) subscribeProjectBranchDeleted(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectBranchDeleted)
 	if err != nil {
 		return oops.In("audit").Wrapf(err, "subscribe project branch deleted audit")
 	}
@@ -81,8 +81,8 @@ func (s *Subscriber) subscribeProjectBranchDeleted(bus eventx.BusRuntime) error 
 	return nil
 }
 
-func (s *Subscriber) subscribeProjectMergeRequestMerged(bus eventx.BusRuntime) error {
-	unsubscribe, err := eventx.Subscribe(bus, s.handleProjectMergeRequestMerged)
+func (s *Subscriber) subscribeProjectMergeRequestMerged(bus *eventx.Bus) error {
+	unsubscribe, err := bus.Subscribe(s.handleProjectMergeRequestMerged)
 	if err != nil {
 		return oops.In("audit").Wrapf(err, "subscribe project merge request merged audit")
 	}

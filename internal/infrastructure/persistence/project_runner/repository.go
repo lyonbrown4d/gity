@@ -84,7 +84,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (cidomain.Pr
 
 func (r *Repository) MarkHeartbeat(ctx context.Context, id int64) error {
 	now := time.Now().UTC()
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectRunnerSchema.ID).Update(ctx, id,
+	if _, err := r.base.By(dbschema.ProjectRunnerSchema.ID).Update(ctx, id,
 		dbschema.ProjectRunnerSchema.Status.Set(StatusOnline),
 		dbschema.ProjectRunnerSchema.LastContactAt.Set(now),
 		dbschema.ProjectRunnerSchema.UpdatedAt.Set(now),
@@ -95,7 +95,7 @@ func (r *Repository) MarkHeartbeat(ctx context.Context, id int64) error {
 }
 
 func (r *Repository) DeleteByID(ctx context.Context, id int64) error {
-	if _, err := dbxrepo.By(r.base, dbschema.ProjectRunnerSchema.ID).Delete(ctx, id); err != nil {
+	if _, err := r.base.By(dbschema.ProjectRunnerSchema.ID).Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete project runner: %w", err)
 	}
 	return nil

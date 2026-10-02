@@ -48,7 +48,7 @@ func (r *Repository) ListByVersionIDs(ctx context.Context, versionIDs ...int64) 
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (packagedomain.ProjectPackageFile, error) {
-	return persistence.One(dbxrepo.By(r.base, dbschema.ProjectPackageFileSchema.ID).Get(ctx, id))
+	return persistence.One(r.base.By(dbschema.ProjectPackageFileSchema.ID).Get(ctx, id))
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput) (packagedomain.ProjectPackageFile, error) {

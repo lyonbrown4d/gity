@@ -1,13 +1,7 @@
 import { Suspense, lazy, type ReactNode } from "react";
 import { Refine, Authenticated, usePermissions } from "@refinedev/core";
-import routerProvider, {
-  CatchAllNavigate,
-  DocumentTitleHandler,
-  NavigateToResource,
-  UnsavedChangesNotifier,
-} from "@refinedev/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { useI18n } from "@/lib/i18n";
 import { authProvider } from "@/providers/auth-provider";
 import { dataProvider } from "@/providers/data-provider";
@@ -39,6 +33,9 @@ const AppDashboardPage = lazy(() =>
 const AppRepositoriesPage = lazy(() =>
   import("@/pages/app/repositories-page").then((module) => ({ default: module.AppRepositoriesPage })),
 );
+const AppTodosPage = lazy(() =>
+  import("@/pages/app/todos-page").then((module) => ({ default: module.AppTodosPage })),
+);
 const RepositoryDetailPage = lazy(() =>
   import("@/pages/app/repository-detail-page").then((module) => ({ default: module.RepositoryDetailPage })),
 );
@@ -60,20 +57,16 @@ export function App(): JSX.Element {
         <Refine
           dataProvider={dataProvider}
           authProvider={authProvider}
-          routerProvider={routerProvider}
           resources={[
             { name: "admin-overview", list: "/admin", meta: { label: t("Overview") } },
             { name: "organizations", list: "/admin/orgs", meta: { label: t("Organizations") } },
             { name: "projects", list: "/admin/projects", meta: { label: t("Projects") } },
             { name: "users", list: "/admin/users", meta: { label: t("Users") } },
             { name: "dashboard", list: "/app/dashboard", meta: { label: t("Dashboard") } },
+            { name: "todos", list: "/app/todos", meta: { label: t("Inbox") } },
             { name: "my-projects", list: "/app/projects", meta: { label: t("My Projects") } },
             { name: "profile", list: "/app/profile", meta: { label: t("Profile") } },
           ]}
-          options={{
-            syncWithLocation: true,
-            warnWhenUnsavedChanges: true,
-          }}
         >
           <Suspense
             fallback={
@@ -109,6 +102,7 @@ export function App(): JSX.Element {
                 }
               >
                 <Route path="/app/dashboard" element={<AppDashboardPage />} />
+                <Route path="/app/todos" element={<AppTodosPage />} />
                 <Route path="/app/projects" element={<AppRepositoriesPage />} />
                 <Route path="/app/repositories" element={<Navigate to="/app/projects" replace />} />
                 <Route path="/app/projects/:organizationId/:projectId" element={<RepositoryDetailPage />} />
@@ -128,15 +122,13 @@ export function App(): JSX.Element {
                 path="/"
                 element={
                   <Authenticated key="root-redirect" fallback={<Navigate to="/login" replace />}>
-                    <NavigateToResource resource="dashboard" />
+                    <Navigate to="/app/dashboard" replace />
                   </Authenticated>
                 }
               />
-              <Route path="*" element={<CatchAllNavigate to="/app/dashboard" />} />
+              <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
             </Routes>
           </Suspense>
-          <UnsavedChangesNotifier />
-          <DocumentTitleHandler />
         </Refine>
       </QueryClientProvider>
     </BrowserRouter>
