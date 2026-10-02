@@ -2,7 +2,8 @@ package audit
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"strconv"
 
@@ -178,7 +179,14 @@ func (s *Subscriber) organizationID(ctx context.Context, projectID int64) (int64
 }
 
 func (s *Subscriber) create(ctx context.Context, input auditports.CreateProjectAuditEventInput, event any) error {
-	payload, err := json.Marshal(event)
+	payload, err := json.Marshal(
+		event,
+		json.Deterministic(true),
+		json.FormatNilMapAsNull(true),
+		json.FormatNilSliceAsNull(true),
+		jsontext.EscapeForHTML(true),
+		jsontext.EscapeForJS(true),
+	)
 	if err != nil {
 		return oops.In("audit").With("project_id", input.ProjectID, "event_name", input.EventName).Wrapf(err, "marshal audit event payload")
 	}

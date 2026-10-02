@@ -3,8 +3,9 @@ package pipeline
 import (
 	"context"
 
+	"github.com/arcgolabs/mapper"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listPipelines(ctx context.Context, in *projectPipelinesInput) (*pipelineOutput, error) {
@@ -16,9 +17,9 @@ func (e *Endpoint) listPipelines(ctx context.Context, in *projectPipelinesInput)
 }
 
 func (e *Endpoint) createPipeline(ctx context.Context, in *createPipelineInput) (*pipelineOutput, error) {
-	input, err := mapperx.MapStrict[pipelineservice.CreatePipelineInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[pipelineservice.CreatePipelineInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.CreatePipeline(ctx, in.ProjectID, input)
 	if err != nil {
@@ -28,9 +29,9 @@ func (e *Endpoint) createPipeline(ctx context.Context, in *createPipelineInput) 
 }
 
 func (e *Endpoint) lintPipeline(ctx context.Context, in *lintPipelineInput) (*pipelineOutput, error) {
-	input, err := mapperx.MapStrict[pipelineservice.LintInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[pipelineservice.LintInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.LintPipeline(ctx, in.ProjectID, input)
 	if err != nil {

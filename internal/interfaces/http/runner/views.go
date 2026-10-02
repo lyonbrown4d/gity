@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	streamx "github.com/arcgolabs/collectionx/stream"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
 )
 
@@ -37,11 +38,7 @@ type variableView struct {
 }
 
 func toRunnerViews(items []runnerservice.RunnerView) []runnerView {
-	views := make([]runnerView, 0, len(items))
-	for index := range items {
-		views = append(views, toRunnerView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[runnerView](toRunnerView))
 }
 
 func toRunnerView(item runnerservice.RunnerView) runnerView {
@@ -70,11 +67,7 @@ func toRegistrationView(item runnerservice.RegistrationView) registrationView {
 }
 
 func toVariableViews(items []runnerservice.VariableView) []variableView {
-	views := make([]variableView, 0, len(items))
-	for index := range items {
-		views = append(views, toVariableView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[variableView](toVariableView))
 }
 
 func toVariableView(item runnerservice.VariableView) variableView {
@@ -99,4 +92,12 @@ func formatRunnerTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func collectViews[T any](items streamx.Stream[T]) []T {
+	views := items.ToSlice()
+	if views == nil {
+		return []T{}
+	}
+	return views
 }

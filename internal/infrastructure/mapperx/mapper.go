@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/arcgolabs/mapper"
-	"github.com/samber/oops"
 )
 
 func NewMapper() *mapper.Mapper {
@@ -32,17 +31,4 @@ func Ensure(instance *mapper.Mapper) *mapper.Mapper {
 		return instance
 	}
 	return NewMapper()
-}
-
-func Map[T any](instance *mapper.Mapper, source any, opts ...mapper.Option) (T, error) {
-	var target T
-	err := Ensure(instance).MapInto(&target, source, opts...)
-	if err != nil {
-		return target, oops.In("mapper").Wrapf(err, "map value")
-	}
-	return target, nil
-}
-
-func MapStrict[T any](instance *mapper.Mapper, source any) (T, error) {
-	return Map[T](instance, source, mapper.Strict())
 }

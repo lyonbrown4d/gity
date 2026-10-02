@@ -32,13 +32,13 @@ func (s *Subscriber) Subscribe(bus *eventx.Bus) error {
 		return nil
 	}
 	return oops.Join(
-		subscribeTodoEvent(s, bus, s.handleProjectCreated),
-		subscribeTodoEvent(s, bus, s.handleProjectBranchProtectionChanged),
-		subscribeTodoEvent(s, bus, s.handleProjectBranchDeleted),
-		subscribeTodoEvent(s, bus, s.handleProjectMergeRequestMerged),
-		subscribeTodoEvent(s, bus, s.handleProjectIssueCreated),
-		subscribeTodoEvent(s, bus, s.handleProjectIssueAssigned),
-		subscribeTodoEvent(s, bus, s.handleProjectIssueCommented),
+		s.subscribeTodoEvent(bus, s.handleProjectCreated),
+		s.subscribeTodoEvent(bus, s.handleProjectBranchProtectionChanged),
+		s.subscribeTodoEvent(bus, s.handleProjectBranchDeleted),
+		s.subscribeTodoEvent(bus, s.handleProjectMergeRequestMerged),
+		s.subscribeTodoEvent(bus, s.handleProjectIssueCreated),
+		s.subscribeTodoEvent(bus, s.handleProjectIssueAssigned),
+		s.subscribeTodoEvent(bus, s.handleProjectIssueCommented),
 	)
 }
 
@@ -51,12 +51,12 @@ func (s *Subscriber) Close() {
 	s.unsubscribe = nil
 }
 
-func subscribeTodoEvent[T eventx.Event](subscriber *Subscriber, bus *eventx.Bus, handler func(context.Context, T) error) error {
+func (s *Subscriber) subscribeTodoEvent[T eventx.Event](bus *eventx.Bus, handler func(context.Context, T) error) error {
 	unsubscribe, err := bus.Subscribe(handler)
 	if err != nil {
 		return oops.In("todo").Wrapf(err, "subscribe todo event")
 	}
-	subscriber.unsubscribe = append(subscriber.unsubscribe, unsubscribe)
+	s.unsubscribe = append(s.unsubscribe, unsubscribe)
 	return nil
 }
 

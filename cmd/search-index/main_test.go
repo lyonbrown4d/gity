@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
-	"time"
 )
 
 func TestParseArgsDefault(t *testing.T) {
@@ -46,24 +46,25 @@ func TestParseArgsInvalidID(t *testing.T) {
 }
 
 func TestWithSignalContextCancel(t *testing.T) {
-	ctx, cancel := withSignalContext(context.Background())
-	defer cancel()
+	parent, cancelParent := context.WithCancel(t.Context())
+	t.Cleanup(cancelParent)
+	const label = "search-index-signal-context"
+
+	ctx, cancel := withLabeledSignalContext(parent, label)
+	t.Cleanup(cancel)
+	waitForGoroutineLabel(t, "goroutine", label)
 
 	if deadlineCtx, ok := ctx.Deadline(); ok {
 		t.Fatalf("unexpected deadline: %v", deadlineCtx)
 	}
 
-	goCtx := t.Context()
-	if goCtx == nil {
-		t.Fatalf("testing context is nil")
-	}
-
-	// Force a manual shutdown signal through the returned cancel.
+	cancelParent()
+	<-ctx.Done()
 	cancel()
-	select {
-	case <-ctx.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("context should be canceled after cancel()")
+
+	profile := writeRuntimeProfile(t, "goroutineleak")
+	if strings.Contains(profile, label) {
+		t.Fatalf("signal context leaked a goroutine after parent cancellation:\n%s", profile)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
@@ -235,15 +236,19 @@ func assertRetryableJobFailure(t *testing.T, fixture runnerFixture) {
 func assertRunnerLeaseExpiry(t *testing.T, fixture runnerFixture) {
 	t.Helper()
 
-	created := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Kind: jobservice.KindScript, Payload: `{"script":["echo expired"]}`}))
-	claim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, time.Millisecond))
-	if !claim.Claimed || claim.Job.ID != created.ID {
-		t.Fatalf("unexpected expired lease claim: %+v", claim)
-	}
-	time.Sleep(20 * time.Millisecond)
-	if _, err := fixture.runnerService.AppendTrace(fixture.ctx, fixture.runnerToken, created.ID, runnerservice.AppendTraceInput{Output: "late\n"}); err == nil {
-		t.Fatalf("expected expired runner lease to reject trace append")
-	}
+	synctest.Test(t, func(t *testing.T) {
+		const lease = time.Minute
+
+		created := testutil.Must(fixture.jobService.EnqueueProjectJob(fixture.ctx, fixture.projectID, jobservice.CreateInput{Kind: jobservice.KindScript, Payload: `{"script":["echo expired"]}`}))
+		claim := testutil.Must(fixture.runnerService.ClaimJob(fixture.ctx, fixture.runnerToken, lease))
+		if !claim.Claimed || claim.Job.ID != created.ID {
+			t.Fatalf("unexpected expired lease claim: %+v", claim)
+		}
+		time.Sleep(lease + time.Nanosecond)
+		if _, err := fixture.runnerService.AppendTrace(fixture.ctx, fixture.runnerToken, created.ID, runnerservice.AppendTraceInput{Output: "late\n"}); err == nil {
+			t.Fatalf("expected expired runner lease to reject trace append")
+		}
+	})
 }
 
 func zipContainsFile(t *testing.T, content []byte, fileName, contains string) bool {

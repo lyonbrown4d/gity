@@ -1,11 +1,15 @@
 package packageregistry
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/arcgolabs/httpx"
+	"github.com/danielgtaylor/huma/v2"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	packageregistryservice "github.com/lyonbrown4d/gity/internal/application/package_registry"
 	packagedomain "github.com/lyonbrown4d/gity/internal/domain/package_registry"
@@ -104,16 +108,150 @@ func npmDist(projectID int64, files []packagedomain.ProjectPackageFile) map[stri
 	}
 }
 
-func binaryResponse(blob packageregistryservice.PackageFileBlob) *packageBinaryOutput {
+func binaryResponse(blob packageregistryservice.PackageFileBlob, byteRange httpx.ByteRange, ifRange string) *packageBinaryOutput {
 	contentType := strings.TrimSpace(blob.File.ContentType)
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 	fileName := strings.ReplaceAll(blob.File.FileName, `"`, "")
-	return &packageBinaryOutput{
+	response := &packageBinaryOutput{
+		Status:             http.StatusOK,
 		ContentType:        contentType,
 		ContentDisposition: fmt.Sprintf("attachment; filename=%q", fileName),
-		Body:               httpx.StreamBytes(blob.Content),
+		ETag:               formatPackageETag(blob.ETag),
+		LastModified:       blob.LastModified.Format(http.TimeFormat),
+		AcceptRanges:       "bytes",
+		ContentLength:      int64(len(blob.Content)),
+		Body:               blob.Content,
+	}
+	if byteRange.IsZero() || !packageIfRangeMatches(ifRange, blob.ETag, blob.LastModified) {
+		return response
+	}
+
+	size := int64(len(blob.Content))
+	start, end, ok := byteRange.Bounds(size)
+	if !ok {
+		response.Status = http.StatusRequestedRangeNotSatisfiable
+		response.ContentRange = fmt.Sprintf("bytes */%d", size)
+		response.ContentLength = 0
+		response.Body = []byte{}
+		return response
+	}
+
+	response.Status = http.StatusPartialContent
+	response.ContentRange = fmt.Sprintf("bytes %d-%d/%d", start, end, size)
+	response.ContentLength = end - start + 1
+	response.Body = blob.Content[start : end+1]
+	return response
+}
+
+func packageIfRangeMatches(value, etag string, modified time.Time) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return true
+	}
+	if strings.HasPrefix(trimmed, `W/`) {
+		return false
+	}
+	if strings.HasPrefix(trimmed, `"`) {
+		return trimmed == formatPackageETag(etag)
+	}
+	parsed, err := http.ParseTime(trimmed)
+	if err != nil {
+		return false
+	}
+	return !modified.After(parsed)
+}
+
+func formatPackageETag(etag string) string {
+	return `"` + etag + `"`
+}
+
+type packageConditionalParamsGetter[I any] func(*I) *httpx.ConditionalParams
+
+func packageConditionalReadPolicy[I, O any](paramsGetter packageConditionalParamsGetter[I], stateGetter httpx.ConditionalStateGetter[I]) httpx.RoutePolicy[I, O] {
+	return httpx.RoutePolicy[I, O]{
+		Name:      "conditional",
+		Operation: httpx.OperationConditionalRead(),
+		Wrap:      packageConditionalReadWrapper[I, O](paramsGetter, stateGetter),
+	}
+}
+
+func packageConditionalReadWrapper[I, O any](paramsGetter packageConditionalParamsGetter[I], stateGetter httpx.ConditionalStateGetter[I]) func(httpx.TypedHandler[I, O]) httpx.TypedHandler[I, O] {
+	return func(next httpx.TypedHandler[I, O]) httpx.TypedHandler[I, O] {
+		if next == nil || paramsGetter == nil || stateGetter == nil {
+			return next
+		}
+		return func(ctx context.Context, input *I) (*O, error) {
+			return executePackageConditionalRead(ctx, input, next, paramsGetter, stateGetter)
+		}
+	}
+}
+
+func executePackageConditionalRead[I, O any](ctx context.Context, input *I, next httpx.TypedHandler[I, O], paramsGetter packageConditionalParamsGetter[I], stateGetter httpx.ConditionalStateGetter[I]) (*O, error) {
+	params := paramsGetter(input)
+	if params == nil || !params.HasConditionalParams() {
+		return next(ctx, input)
+	}
+	etag, modified, err := stateGetter(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if err := params.PreconditionFailed(etag, modified); err != nil {
+		conditionalErr := huma.ErrorWithHeaders(err, packageValidatorHeaders(etag, modified))
+		return nil, oops.In("http.package_registry").Wrapf(conditionalErr, "evaluate conditional package request")
+	}
+	return next(ctx, input)
+}
+
+func packageValidatorHeaders(etag string, modified time.Time) http.Header {
+	headers := http.Header{}
+	if etag != "" {
+		headers.Set("ETag", formatPackageETag(etag))
+	}
+	if !modified.IsZero() {
+		headers.Set("Last-Modified", modified.Format(http.TimeFormat))
+	}
+	return headers
+}
+
+func protocolPackageConditionalParams(input *protocolPackageDownloadInput) *httpx.ConditionalParams {
+	if input == nil {
+		return nil
+	}
+	return &input.ConditionalParams
+}
+
+func mavenPackageConditionalParams(input *mavenPackageDownloadInput) *httpx.ConditionalParams {
+	if input == nil {
+		return nil
+	}
+	return &input.ConditionalParams
+}
+
+func packageFileConditionalParams(input *packageFileDownloadInput) *httpx.ConditionalParams {
+	if input == nil {
+		return nil
+	}
+	return &input.ConditionalParams
+}
+
+func operationPackageBinaryResponse() httpx.OperationOption {
+	binary := httpx.OperationBinaryResponse("application/octet-stream")
+	return func(operation *huma.Operation) {
+		binary(operation)
+		if operation == nil {
+			return
+		}
+		if operation.Responses == nil {
+			operation.Responses = map[string]*huma.Response{}
+		}
+		partial := &huma.Response{Description: http.StatusText(http.StatusPartialContent)}
+		if success := operation.Responses["200"]; success != nil {
+			partial.Content = success.Content
+		}
+		operation.Responses["206"] = partial
+		operation.Responses["416"] = &huma.Response{Description: http.StatusText(http.StatusRequestedRangeNotSatisfiable)}
 	}
 }
 

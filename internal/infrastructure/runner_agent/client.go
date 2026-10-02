@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -128,7 +129,14 @@ func (c *Client) get(ctx context.Context, path string, out any) (err error) {
 }
 
 func (c *Client) post(ctx context.Context, path string, payload, out any) (err error) {
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(
+		payload,
+		json.Deterministic(true),
+		json.FormatNilMapAsNull(true),
+		json.FormatNilSliceAsNull(true),
+		jsontext.EscapeForHTML(true),
+		jsontext.EscapeForJS(true),
+	)
 	if err != nil {
 		return oops.In("runner_agent").With("method", http.MethodPost, "path", path).Wrapf(err, "encode runner request")
 	}
@@ -187,18 +195,18 @@ func truncateRunnerResponse(content []byte) string {
 
 func decodeBody(content []byte, out any) error {
 	var wrapper struct {
-		Body json.RawMessage `json:"body"`
+		Body jsontext.Value `json:"body"`
 	}
-	if err := json.Unmarshal(content, &wrapper); err != nil {
+	if err := json.Unmarshal(content, &wrapper, json.RejectUnknownMembers(false)); err != nil {
 		return oops.In("runner_agent").Wrapf(err, "decode response wrapper")
 	}
 	if len(wrapper.Body) == 0 {
-		if err := json.Unmarshal(content, out); err != nil {
+		if err := json.Unmarshal(content, out, json.RejectUnknownMembers(false)); err != nil {
 			return oops.In("runner_agent").Wrapf(err, "decode raw response body")
 		}
 		return nil
 	}
-	if err := json.Unmarshal(wrapper.Body, out); err != nil {
+	if err := json.Unmarshal(wrapper.Body, out, json.RejectUnknownMembers(false)); err != nil {
 		return oops.In("runner_agent").Wrapf(err, "decode wrapped response body")
 	}
 	return nil

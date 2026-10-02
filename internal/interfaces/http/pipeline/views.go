@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	streamx "github.com/arcgolabs/collectionx/stream"
 	pipelineservice "github.com/lyonbrown4d/gity/internal/application/pipeline"
 	plandsl "github.com/lyonbrown4d/gity/internal/ci/plan_dsl"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
@@ -78,11 +79,7 @@ type pipelineProjectJobView struct {
 }
 
 func toProjectPipelineViews(items []cidomain.ProjectPipeline) []projectPipelineView {
-	views := make([]projectPipelineView, 0, len(items))
-	for index := range items {
-		views = append(views, toProjectPipelineView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[projectPipelineView](toProjectPipelineView))
 }
 
 func toProjectPipelineView(item cidomain.ProjectPipeline) projectPipelineView {
@@ -113,11 +110,7 @@ func toPipelineDetailView(item pipelineservice.PipelineView) pipelineDetailView 
 }
 
 func toPipelineJobViews(items []pipelineservice.PipelineJobView) []pipelineJobView {
-	views := make([]pipelineJobView, 0, len(items))
-	for index := range items {
-		views = append(views, toPipelineJobView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[pipelineJobView](toPipelineJobView))
 }
 
 func toPipelineJobView(item pipelineservice.PipelineJobView) pipelineJobView {
@@ -180,4 +173,12 @@ func formatPipelineTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func collectViews[T any](items streamx.Stream[T]) []T {
+	views := items.ToSlice()
+	if views == nil {
+		return []T{}
+	}
+	return views
 }

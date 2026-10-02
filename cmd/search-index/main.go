@@ -121,15 +121,5 @@ func withSignalContext(ctx context.Context) (context.Context, context.CancelFunc
 		ctx = context.Background()
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		cancel()
-	}()
-	return ctx, func() {
-		signal.Stop(sigCh)
-		cancel()
-	}
+	return signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 }

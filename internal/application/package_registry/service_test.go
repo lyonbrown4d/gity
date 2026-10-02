@@ -9,10 +9,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	organizationservice "github.com/lyonbrown4d/gity/internal/application/organization"
 	packageregistryservice "github.com/lyonbrown4d/gity/internal/application/package_registry"
+	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
 	projectservice "github.com/lyonbrown4d/gity/internal/application/project"
 	userservice "github.com/lyonbrown4d/gity/internal/application/user"
 	"github.com/lyonbrown4d/gity/internal/config"
@@ -48,12 +51,67 @@ func TestPackageRegistryFlow(t *testing.T) {
 	assertPackageList(t, fixture, fileRecord.ID)
 }
 
+func TestPackageFileMetadataDoesNotLoadBlob(t *testing.T) {
+	t.Parallel()
+
+	fixture := newPackageRegistryFixture(t)
+	fileRecord := uploadPackageFile(t, fixture)
+	fixture.storage.resetLoadCount()
+
+	byID := testutil.Must(fixture.service.GetFileMetadata(fixture.ctx, fixture.projectID, fileRecord.ID))
+	byCoordinate := testutil.Must(fixture.service.GetFileMetadataByCoordinate(
+		fixture.ctx,
+		fixture.projectID,
+		"maven",
+		"io.gity:gity-api",
+		"1.0.0",
+		"io/gity/gity-api/1.0.0/gity-api-1.0.0.jar",
+	))
+
+	if byID.File.ID != fileRecord.ID || byCoordinate.File.ID != fileRecord.ID {
+		t.Fatalf("unexpected package file metadata: by_id=%+v by_coordinate=%+v", byID, byCoordinate)
+	}
+	if byID.ETag == "" || byID.ETag != byCoordinate.ETag {
+		t.Fatalf("expected stable non-empty ETag, by_id=%q by_coordinate=%q", byID.ETag, byCoordinate.ETag)
+	}
+	if want := fileRecord.UpdatedAt.UTC().Truncate(time.Second); !byID.LastModified.Equal(want) {
+		t.Fatalf("last modified = %s, want %s", byID.LastModified, want)
+	}
+	if got := fixture.storage.loadCount(); got != 0 {
+		t.Fatalf("metadata lookup loaded blob %d times", got)
+	}
+}
+
+func TestPackageFileMetadataETagChangesWhenFileChanges(t *testing.T) {
+	t.Parallel()
+
+	fixture := newPackageRegistryFixture(t)
+	firstFile := uploadPackageFile(t, fixture)
+	first := testutil.Must(fixture.service.GetFileMetadata(fixture.ctx, fixture.projectID, firstFile.ID))
+	repeated := testutil.Must(fixture.service.GetFileMetadata(fixture.ctx, fixture.projectID, firstFile.ID))
+	if first.ETag != repeated.ETag {
+		t.Fatalf("ETag changed for unchanged file: first=%q repeated=%q", first.ETag, repeated.ETag)
+	}
+
+	testutil.RequireNoError(t, fixture.fileRepo.MarkStored(fixture.ctx, firstFile.ID, storageports.StoreProjectPackageFileInput{
+		ContentType: "application/java-archive",
+		ByteSize:    firstFile.ByteSize + 1,
+		StorageKey:  firstFile.StorageKey + ".changed",
+	}), "change package file metadata")
+	changed := testutil.Must(fixture.service.GetFileMetadata(fixture.ctx, fixture.projectID, firstFile.ID))
+	if first.ETag == changed.ETag {
+		t.Fatalf("ETag did not change after file replacement: %q", first.ETag)
+	}
+}
+
 type packageRegistryFixture struct {
 	ctx             context.Context
 	repoRoot        string
 	projectID       int64
 	projectFullPath string
 	service         *packageregistryservice.Service
+	storage         *countingObjectStorage
+	fileRepo        *projectpackagefilerepo.Repository
 }
 
 func newPackageRegistryFixture(t *testing.T) packageRegistryFixture {
@@ -84,7 +142,8 @@ func newPackageRegistryFixture(t *testing.T) packageRegistryFixture {
 	storageRoot := filepath.Join(t.TempDir(), "storage")
 	runner := gitexec.NewRunner(config.Settings{Git: config.GitSettings{Bin: "git", RepoRoot: repoRoot}})
 	gitRepository := gitrepo.NewService(config.Settings{Git: config.GitSettings{RepoRoot: repoRoot}})
-	storage := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
+	storageBackend := testutil.Must(infrastorage.NewService(config.Settings{Storage: config.StorageSettings{Driver: "local", Root: storageRoot}}))
+	storage := &countingObjectStorage{ObjectStorage: storageBackend}
 
 	userSvc := userservice.NewService(logger, userRepository, userTokenRepository)
 	organizationSvc := organizationservice.NewService(logger, organizationRepository, organizationMemberRepository, userRepository)
@@ -100,7 +159,34 @@ func newPackageRegistryFixture(t *testing.T) packageRegistryFixture {
 		projectID:       project.ID,
 		projectFullPath: project.FullPath,
 		service:         packageSvc,
+		storage:         storage,
+		fileRepo:        fileRepository,
 	}
+}
+
+type countingObjectStorage struct {
+	storageports.ObjectStorage
+	mu        sync.Mutex
+	loadCalls int
+}
+
+func (s *countingObjectStorage) Load(ctx context.Context, key string) ([]byte, error) {
+	s.mu.Lock()
+	s.loadCalls++
+	s.mu.Unlock()
+	return s.ObjectStorage.Load(ctx, key)
+}
+
+func (s *countingObjectStorage) resetLoadCount() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.loadCalls = 0
+}
+
+func (s *countingObjectStorage) loadCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.loadCalls
 }
 
 func uploadPackageFile(t *testing.T, fixture packageRegistryFixture) packagedomain.ProjectPackageFile {

@@ -3,7 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"fmt"
 	"strings"
 	"time"
@@ -79,7 +79,7 @@ func decodeScriptSourcePayload(job cidomain.ProjectJob) (scriptSourcePayload, er
 		return scriptSourcePayload{}, apperror.BadRequest("job source archive is only available for script jobs", fmt.Errorf("job kind: %s", job.Kind))
 	}
 	var payload scriptSourcePayload
-	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload, json.RejectUnknownMembers(false)); err != nil {
 		return scriptSourcePayload{}, apperror.BadRequest("invalid script job payload", err)
 	}
 	payload.ProjectFullPath = strings.Trim(strings.ReplaceAll(payload.ProjectFullPath, "\\", "/"), "/")

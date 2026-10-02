@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/arcgolabs/mapper"
 	runnerservice "github.com/lyonbrown4d/gity/internal/application/runner"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listProjectRunners(ctx context.Context, in *projectRunnersInput) (*runnerOutput, error) {
@@ -17,9 +18,9 @@ func (e *Endpoint) listProjectRunners(ctx context.Context, in *projectRunnersInp
 }
 
 func (e *Endpoint) registerProjectRunner(ctx context.Context, in *registerRunnerInput) (*runnerOutput, error) {
-	input, err := mapperx.MapStrict[runnerservice.RegisterInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[runnerservice.RegisterInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.RegisterProjectRunner(ctx, in.ProjectID, input)
 	if err != nil {
@@ -45,9 +46,9 @@ func (e *Endpoint) listProjectVariables(ctx context.Context, in *projectVariable
 }
 
 func (e *Endpoint) upsertProjectVariable(ctx context.Context, in *upsertVariableInput) (*runnerOutput, error) {
-	input, err := mapperx.MapStrict[runnerservice.VariableInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[runnerservice.VariableInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.UpsertProjectVariable(ctx, in.ProjectID, input)
 	if err != nil {
@@ -96,9 +97,9 @@ func (e *Endpoint) failJob(ctx context.Context, in *runnerFailJobInput) (*runner
 }
 
 func (e *Endpoint) appendTrace(ctx context.Context, in *runnerTraceInput) (*runnerOutput, error) {
-	input, err := mapperx.MapStrict[runnerservice.AppendTraceInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[runnerservice.AppendTraceInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.AppendTrace(ctx, in.Body.Token, in.JobID, input)
 	if err != nil {
@@ -116,9 +117,9 @@ func (e *Endpoint) downloadSourceArchive(ctx context.Context, in *runnerSourceAr
 }
 
 func (e *Endpoint) uploadArtifact(ctx context.Context, in *runnerArtifactInput) (*runnerOutput, error) {
-	input, err := mapperx.MapStrict[runnerservice.UploadArtifactInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[runnerservice.UploadArtifactInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.UploadArtifact(ctx, in.Body.Token, in.JobID, input)
 	if err != nil {

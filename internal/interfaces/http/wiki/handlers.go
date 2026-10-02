@@ -3,9 +3,10 @@ package wiki
 import (
 	"context"
 
+	"github.com/arcgolabs/mapper"
 	wikiservice "github.com/lyonbrown4d/gity/internal/application/wiki"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listPages(ctx context.Context, in *wikiPagesInput) (*wikiOutput, error) {
@@ -17,9 +18,9 @@ func (e *Endpoint) listPages(ctx context.Context, in *wikiPagesInput) (*wikiOutp
 }
 
 func (e *Endpoint) createPage(ctx context.Context, in *createWikiPageInput) (*wikiOutput, error) {
-	input, err := mapperx.MapStrict[wikiservice.CreatePageInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[wikiservice.CreatePageInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
 	if err != nil {
@@ -42,9 +43,9 @@ func (e *Endpoint) getPage(ctx context.Context, in *wikiPageInput) (*wikiOutput,
 }
 
 func (e *Endpoint) updatePage(ctx context.Context, in *updateWikiPageInput) (*wikiOutput, error) {
-	input, err := mapperx.MapStrict[wikiservice.UpdatePageInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[wikiservice.UpdatePageInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	editorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.EditorUserID)
 	if err != nil {

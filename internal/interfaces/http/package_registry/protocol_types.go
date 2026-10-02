@@ -13,11 +13,14 @@ type protocolPackageFileInput struct {
 }
 
 type protocolPackageDownloadInput struct {
-	ProjectID      int64          `path:"id"`
-	PackageName    string         `path:"package_name"`
-	PackageVersion string         `path:"package_version"`
-	FileName       httpx.PathTail `path:"file_name"`
-	Authorization  string         `header:"Authorization"`
+	httpx.ConditionalParams
+	ProjectID      int64           `path:"id"`
+	PackageName    string          `path:"package_name"`
+	PackageVersion string          `path:"package_version"`
+	FileName       httpx.PathTail  `path:"file_name"`
+	Range          httpx.ByteRange `header:"Range"`
+	IfRange        string          `header:"If-Range"`
+	Authorization  string          `header:"Authorization"`
 }
 
 type mavenPackageFileInput struct {
@@ -29,9 +32,12 @@ type mavenPackageFileInput struct {
 }
 
 type mavenPackageDownloadInput struct {
-	ProjectID     int64          `path:"id"`
-	FilePath      httpx.PathTail `path:"file_path"`
-	Authorization string         `header:"Authorization"`
+	httpx.ConditionalParams
+	ProjectID     int64           `path:"id"`
+	FilePath      httpx.PathTail  `path:"file_path"`
+	Range         httpx.ByteRange `header:"Range"`
+	IfRange       string          `header:"If-Range"`
+	Authorization string          `header:"Authorization"`
 }
 
 type npmPackageInput struct {
@@ -59,15 +65,24 @@ type pypiPackageInput struct {
 }
 
 type packageFileDownloadInput struct {
-	ProjectID     int64  `path:"id"`
-	FileID        int64  `path:"file_id"`
-	Authorization string `header:"Authorization"`
+	httpx.ConditionalParams
+	ProjectID     int64           `path:"id"`
+	FileID        int64           `path:"file_id"`
+	Range         httpx.ByteRange `header:"Range"`
+	IfRange       string          `header:"If-Range"`
+	Authorization string          `header:"Authorization"`
 }
 
 type packageBinaryOutput struct {
+	Status             int
 	ContentType        string `header:"Content-Type"`
 	ContentDisposition string `header:"Content-Disposition"`
-	Body               httpx.ResponseStream
+	ETag               string `header:"ETag"`
+	LastModified       string `header:"Last-Modified"`
+	AcceptRanges       string `header:"Accept-Ranges"`
+	ContentRange       string `header:"Content-Range"`
+	ContentLength      int64  `header:"Content-Length"`
+	Body               []byte
 }
 
 type packageHTMLOutput struct {

@@ -3,9 +3,10 @@ package mergerequest
 import (
 	"context"
 
+	"github.com/arcgolabs/mapper"
 	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listMergeRequests(ctx context.Context, in *mergeRequestsInput) (*mergeRequestOutput, error) {
@@ -73,9 +74,9 @@ func (e *Endpoint) listApprovalRules(ctx context.Context, in *approvalRulesInput
 }
 
 func (e *Endpoint) createApprovalRule(ctx context.Context, in *createApprovalRuleInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.ApprovalRuleInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.ApprovalRuleInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.CreateApprovalRule(ctx, in.ProjectID, input)
 	if err != nil {
@@ -85,9 +86,9 @@ func (e *Endpoint) createApprovalRule(ctx context.Context, in *createApprovalRul
 }
 
 func (e *Endpoint) updateApprovalRule(ctx context.Context, in *updateApprovalRuleInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.UpdateApprovalRuleInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.UpdateApprovalRuleInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.UpdateApprovalRule(ctx, in.ProjectID, in.RuleID, input)
 	if err != nil {
@@ -104,9 +105,9 @@ func (e *Endpoint) deleteApprovalRule(ctx context.Context, in *approvalRuleInput
 }
 
 func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeRequestInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.CreateInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.CreateInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
 	if err != nil {
@@ -121,9 +122,9 @@ func (e *Endpoint) createMergeRequest(ctx context.Context, in *createMergeReques
 }
 
 func (e *Endpoint) createComment(ctx context.Context, in *createMergeRequestCommentInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.CommentInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.CommentInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	authorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.AuthorUserID)
 	if err != nil {
@@ -141,9 +142,9 @@ func (e *Endpoint) createComment(ctx context.Context, in *createMergeRequestComm
 }
 
 func (e *Endpoint) approve(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.ApprovalInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.ApprovalInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	userID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.UserID)
 	if err != nil {
@@ -158,9 +159,9 @@ func (e *Endpoint) approve(ctx context.Context, in *mergeRequestApprovalInput) (
 }
 
 func (e *Endpoint) unapprove(ctx context.Context, in *mergeRequestApprovalInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.ApprovalInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.ApprovalInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	userID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.UserID)
 	if err != nil {
@@ -175,9 +176,9 @@ func (e *Endpoint) unapprove(ctx context.Context, in *mergeRequestApprovalInput)
 }
 
 func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.MergeInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.MergeInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	actorUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.ActorUserID)
 	if err != nil {
@@ -192,9 +193,9 @@ func (e *Endpoint) mergeMergeRequest(ctx context.Context, in *mergeMergeRequestI
 }
 
 func (e *Endpoint) setReviewers(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.ParticipantsInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.ParticipantsInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.SetReviewers(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {
@@ -204,9 +205,9 @@ func (e *Endpoint) setReviewers(ctx context.Context, in *setParticipantsInput) (
 }
 
 func (e *Endpoint) setAssignees(ctx context.Context, in *setParticipantsInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.ParticipantsInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.ParticipantsInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.SetAssignees(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {
@@ -216,9 +217,9 @@ func (e *Endpoint) setAssignees(ctx context.Context, in *setParticipantsInput) (
 }
 
 func (e *Endpoint) updateMergeRequest(ctx context.Context, in *updateMergeRequestInput) (*mergeRequestOutput, error) {
-	input, err := mapperx.MapStrict[mergerequestservice.UpdateInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[mergerequestservice.UpdateInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.Update(ctx, in.ProjectID, in.MergeIID, input)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	infraauth "github.com/lyonbrown4d/gity/internal/infrastructure/auth"
 	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 type projectPackagesInput struct {
@@ -86,9 +87,9 @@ func (e *Endpoint) Register(registrar httpx.Registrar) {
 	}
 
 	uploadPackageFile := func(ctx context.Context, in *uploadPackageFileInput) (*packageOutput, error) {
-		input, err := mapperx.MapStrict[packageregistryservice.UploadFileInput](e.mapper, in.Body)
+		input, err := e.mapper.Map[packageregistryservice.UploadFileInput](in.Body, mapper.Strict())
 		if err != nil {
-			return nil, err
+			return nil, oops.In("mapper").Wrapf(err, "map value")
 		}
 		item, err := service.UploadFile(ctx, in.ProjectID, input)
 		if err != nil {

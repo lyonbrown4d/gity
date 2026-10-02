@@ -59,12 +59,14 @@ func (p Plan) Query() string {
 }
 
 func AppendMatches(fileName string, content []byte, plan Plan, results *collectionlist.List[gitports.SearchResult]) {
-	for lineNumber, line := range strings.Split(string(content), "\n") {
+	lineNumber := 0
+	for line := range strings.SplitSeq(string(content), "\n") {
+		lineNumber++
 		column, matchLength, matched := matchLine(line, plan.matcher)
 		if !matched {
 			continue
 		}
-		results.Add(gitports.SearchResult{Path: fileName, LineNumber: lineNumber + 1, Column: column, MatchLength: matchLength, LineContent: line})
+		results.Add(gitports.SearchResult{Path: fileName, LineNumber: lineNumber, Column: column, MatchLength: matchLength, LineContent: line})
 		if results.Len() >= plan.Limit() {
 			return
 		}

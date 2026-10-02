@@ -2,7 +2,7 @@ package runneragent_test
 
 import (
 	"context"
-	"encoding/json"
+	json "encoding/json/v2"
 	"runtime"
 	"strings"
 	"testing"

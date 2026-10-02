@@ -2,7 +2,7 @@ package job
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"strings"
 
@@ -161,14 +161,14 @@ func decodeScriptResult(trimmed string) (scriptResult, bool) {
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
 		return parsed, true
 	}
-	index := strings.LastIndex(trimmed, "\n{")
-	if index < 0 {
+	prefix, trailer, found := strings.CutLast(trimmed, "\n{")
+	if !found {
 		return scriptResult{}, false
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(trimmed[index+1:])), &parsed); err != nil {
+	if err := json.Unmarshal([]byte(strings.TrimSpace("{"+trailer)), &parsed); err != nil {
 		return scriptResult{}, false
 	}
-	if prefix := strings.TrimSpace(trimmed[:index]); prefix != "" && parsed.Output == "" {
+	if prefix = strings.TrimSpace(prefix); prefix != "" && parsed.Output == "" {
 		parsed.Output = prefix
 	}
 	return parsed, true

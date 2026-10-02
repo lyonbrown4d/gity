@@ -2,7 +2,8 @@ package runneragent
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -67,7 +68,7 @@ func ExecuteScriptJobWithSource(ctx context.Context, cfg Config, job cidomain.Pr
 
 func decodeScriptPayload(job cidomain.ProjectJob) (ScriptPayload, error) {
 	var payload ScriptPayload
-	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); err != nil {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload, json.RejectUnknownMembers(false)); err != nil {
 		return ScriptPayload{}, fmt.Errorf("decode script job payload: %w", err)
 	}
 	if len(payload.Script) == 0 {
@@ -242,7 +243,11 @@ func encodeScriptResult(started time.Time, workDir string, output *cappedBuffer,
 		DurationMillis:  time.Since(started).Milliseconds(),
 		WorkDir:         workDir,
 	}
-	encoded, encodeErr := json.Marshal(result)
+	encoded, encodeErr := json.Marshal(
+		result,
+		jsontext.EscapeForHTML(true),
+		jsontext.EscapeForJS(true),
+	)
 	if encodeErr != nil {
 		return "", fmt.Errorf("encode script result: %w", encodeErr)
 	}

@@ -30,6 +30,11 @@ func TestEndpointRegistersCanonicalPackageRegistryRoutes(t *testing.T) {
 	assertRoute(t, server, http.MethodPost, "/api/v1/projects/{id}/packages/files")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages/files/{file_id}")
 	assertRoute(t, server, http.MethodGet, "/api/v1/projects/{id}/packages/files/{file_id}/download")
+
+	assertDownloadResponses(t, server, "/api/v1/projects/{id}/packages/generic/{package_name}/{package_version}/{file_name}")
+	assertDownloadResponses(t, server, "/api/v1/projects/{id}/packages/nuget/{package_name}/{package_version}/{file_name}")
+	assertDownloadResponses(t, server, "/api/v1/projects/{id}/packages/maven/{file_path}")
+	assertDownloadResponses(t, server, "/api/v1/projects/{id}/packages/files/{file_id}/download")
 }
 
 func TestEndpointRegistersDeprecatedRepoPackageRegistryAliases(t *testing.T) {
@@ -47,5 +52,18 @@ func assertRoute(t *testing.T, server httpx.ServerRuntime, method, path string) 
 	t.Helper()
 	if !server.HasRoute(method, path) {
 		t.Fatalf("expected route %s %s", method, path)
+	}
+}
+
+func assertDownloadResponses(t *testing.T, server httpx.ServerRuntime, path string) {
+	t.Helper()
+	operation := server.OpenAPI().Paths[path].Get
+	if operation == nil {
+		t.Fatalf("expected GET operation for %s", path)
+	}
+	for _, status := range []string{"200", "206", "304", "416"} {
+		if _, ok := operation.Responses[status]; !ok {
+			t.Errorf("GET %s does not document response %s", path, status)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	streamx "github.com/arcgolabs/collectionx/stream"
 	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 )
@@ -72,11 +73,7 @@ type projectJobArtifactContentView struct {
 }
 
 func toProjectJobViews(items []cidomain.ProjectJob) []projectJobView {
-	views := make([]projectJobView, 0, len(items))
-	for index := range items {
-		views = append(views, toProjectJobView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[projectJobView](toProjectJobView))
 }
 
 func toProjectJobView(item cidomain.ProjectJob) projectJobView {
@@ -116,10 +113,8 @@ func toProjectJobTraceView(item jobservice.ProjectJobTrace) projectJobTraceView 
 }
 
 func toProjectJobLogViews(items []cidomain.ProjectJobLog) []projectJobLogView {
-	views := make([]projectJobLogView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, projectJobLogView{
+	return collectViews(streamx.Of(items...).Map[projectJobLogView](func(item cidomain.ProjectJobLog) projectJobLogView {
+		return projectJobLogView{
 			ID:              formatID(item.ID),
 			ProjectID:       formatID(item.ProjectID),
 			ProjectJobID:    formatID(item.ProjectJobID),
@@ -130,17 +125,12 @@ func toProjectJobLogViews(items []cidomain.ProjectJobLog) []projectJobLogView {
 			DurationMillis:  item.DurationMillis,
 			CreatedAt:       formatTime(item.CreatedAt),
 			UpdatedAt:       formatTime(item.UpdatedAt),
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func toProjectJobArtifactViews(items []cidomain.ProjectJobArtifact) []projectJobArtifactView {
-	views := make([]projectJobArtifactView, 0, len(items))
-	for index := range items {
-		views = append(views, toProjectJobArtifactView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[projectJobArtifactView](toProjectJobArtifactView))
 }
 
 func toProjectJobArtifactView(item cidomain.ProjectJobArtifact) projectJobArtifactView {
@@ -174,4 +164,12 @@ func formatTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func collectViews[T any](items streamx.Stream[T]) []T {
+	views := items.ToSlice()
+	if views == nil {
+		return []T{}
+	}
+	return views
 }

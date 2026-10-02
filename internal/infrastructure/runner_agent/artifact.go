@@ -1,7 +1,7 @@
 package runneragent
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"io/fs"
 	"os"
 	"path"
@@ -40,11 +40,11 @@ func CollectArtifacts(job cidomain.ProjectJob, result string) (artifacts []Artif
 
 func decodeArtifactInputs(job cidomain.ProjectJob, result string) (ScriptPayload, ScriptResult, error) {
 	var payload ScriptPayload
-	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload); decodeErr != nil {
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(job.Payload)), &payload, json.RejectUnknownMembers(false)); decodeErr != nil {
 		return ScriptPayload{}, ScriptResult{}, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script job payload")
 	}
 	var scriptResult ScriptResult
-	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult); decodeErr != nil {
+	if decodeErr := json.Unmarshal([]byte(strings.TrimSpace(result)), &scriptResult, json.RejectUnknownMembers(false)); decodeErr != nil {
 		return ScriptPayload{}, ScriptResult{}, oops.In("runner_agent").With("project_id", job.ProjectID, "job_id", job.ID).Wrapf(decodeErr, "decode script result")
 	}
 	return payload, scriptResult, nil

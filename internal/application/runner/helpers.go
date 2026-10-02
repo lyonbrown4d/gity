@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	json "encoding/json/v2"
 	"errors"
 	"fmt"
 	"strings"
@@ -130,7 +130,7 @@ func scriptJobTags(payload string) ([]string, error) {
 	var out struct {
 		Tags []string `json:"tags"`
 	}
-	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+	if err := json.Unmarshal([]byte(payload), &out, json.RejectUnknownMembers(false)); err != nil {
 		return nil, fmt.Errorf("decode script job tags: %w", err)
 	}
 	tags := tagSet(strings.Join(out.Tags, ","))

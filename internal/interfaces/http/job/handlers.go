@@ -3,8 +3,9 @@ package job
 import (
 	"context"
 
+	"github.com/arcgolabs/mapper"
 	jobservice "github.com/lyonbrown4d/gity/internal/application/job"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listProjectJobs(ctx context.Context, in *projectJobsInput) (*jobOutput, error) {
@@ -16,9 +17,9 @@ func (e *Endpoint) listProjectJobs(ctx context.Context, in *projectJobsInput) (*
 }
 
 func (e *Endpoint) createJob(ctx context.Context, in *createJobInput) (*jobOutput, error) {
-	input, err := mapperx.MapStrict[jobservice.CreateInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[jobservice.CreateInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	item, err := e.service.EnqueueProjectJob(ctx, in.ProjectID, input)
 	if err != nil {
@@ -80,4 +81,3 @@ func (e *Endpoint) getProjectJobArtifact(ctx context.Context, in *projectJobArti
 	}
 	return &jobOutput{Body: toProjectJobArtifactContentView(item)}, nil
 }
-

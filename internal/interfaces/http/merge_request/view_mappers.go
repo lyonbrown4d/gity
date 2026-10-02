@@ -4,17 +4,14 @@ import (
 	"strconv"
 	"time"
 
+	streamx "github.com/arcgolabs/collectionx/stream"
 	mergerequestservice "github.com/lyonbrown4d/gity/internal/application/merge_request"
 	cidomain "github.com/lyonbrown4d/gity/internal/domain/ci"
 	mergedomain "github.com/lyonbrown4d/gity/internal/domain/merge"
 )
 
 func toMergeRequestViews(items []mergedomain.ProjectMergeRequest) []mergeRequestView {
-	views := make([]mergeRequestView, 0, len(items))
-	for index := range items {
-		views = append(views, toMergeRequestView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[mergeRequestView](toMergeRequestView))
 }
 
 func toMergeRequestView(item mergedomain.ProjectMergeRequest) mergeRequestView {
@@ -65,16 +62,13 @@ func toMergeRequestCheckStatusView(item mergerequestservice.CheckStatusView) mer
 }
 
 func toMergeRequestCheckBlockerViews(items []mergerequestservice.CheckBlockerView) []mergeRequestCheckBlockerView {
-	views := make([]mergeRequestCheckBlockerView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, mergeRequestCheckBlockerView{
+	return collectViews(streamx.Of(items...).Map[mergeRequestCheckBlockerView](func(item mergerequestservice.CheckBlockerView) mergeRequestCheckBlockerView {
+		return mergeRequestCheckBlockerView{
 			Code:     item.Code,
 			Category: item.Category,
 			Message:  item.Message,
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func toMergeRequestPipelineView(item *cidomain.ProjectPipeline) *mergeRequestPipelineView {
@@ -107,19 +101,16 @@ func toMergeRequestParticipantsView(item mergerequestservice.ParticipantsView) m
 }
 
 func toMergeRequestParticipantViews(items []mergedomain.ProjectMergeRequestParticipant) []mergeRequestParticipantView {
-	views := make([]mergeRequestParticipantView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, mergeRequestParticipantView{
+	return collectViews(streamx.Of(items...).Map[mergeRequestParticipantView](func(item mergedomain.ProjectMergeRequestParticipant) mergeRequestParticipantView {
+		return mergeRequestParticipantView{
 			ID:             formatID(item.ID),
 			MergeRequestID: formatID(item.MergeRequestID),
 			UserID:         formatID(item.UserID),
 			Role:           item.Role,
 			CreatedAt:      formatMergeRequestTime(item.CreatedAt),
 			UpdatedAt:      formatMergeRequestTime(item.UpdatedAt),
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func toMergeRequestCommentsView(item mergerequestservice.CommentsView) mergeRequestCommentsView {
@@ -130,19 +121,16 @@ func toMergeRequestCommentsView(item mergerequestservice.CommentsView) mergeRequ
 }
 
 func toMergeRequestCommentViews(items []mergedomain.ProjectMergeRequestComment) []mergeRequestCommentView {
-	views := make([]mergeRequestCommentView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, mergeRequestCommentView{
+	return collectViews(streamx.Of(items...).Map[mergeRequestCommentView](func(item mergedomain.ProjectMergeRequestComment) mergeRequestCommentView {
+		return mergeRequestCommentView{
 			ID:             formatID(item.ID),
 			MergeRequestID: formatID(item.MergeRequestID),
 			AuthorUserID:   formatID(item.AuthorUserID),
 			Body:           item.Body,
 			CreatedAt:      formatMergeRequestTime(item.CreatedAt),
 			UpdatedAt:      formatMergeRequestTime(item.UpdatedAt),
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func toMergeRequestApprovalsView(item mergerequestservice.ApprovalsView) mergeRequestApprovalsView {
@@ -153,18 +141,15 @@ func toMergeRequestApprovalsView(item mergerequestservice.ApprovalsView) mergeRe
 }
 
 func toMergeRequestApprovalViews(items []mergedomain.ProjectMergeRequestApproval) []mergeRequestApprovalView {
-	views := make([]mergeRequestApprovalView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, mergeRequestApprovalView{
+	return collectViews(streamx.Of(items...).Map[mergeRequestApprovalView](func(item mergedomain.ProjectMergeRequestApproval) mergeRequestApprovalView {
+		return mergeRequestApprovalView{
 			ID:             formatID(item.ID),
 			MergeRequestID: formatID(item.MergeRequestID),
 			UserID:         formatID(item.UserID),
 			CreatedAt:      formatMergeRequestTime(item.CreatedAt),
 			UpdatedAt:      formatMergeRequestTime(item.UpdatedAt),
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func toMergeRequestApprovalRulesView(item mergerequestservice.ApprovalRulesView) mergeRequestApprovalRulesView {
@@ -175,11 +160,7 @@ func toMergeRequestApprovalRulesView(item mergerequestservice.ApprovalRulesView)
 }
 
 func toMergeRequestApprovalRuleViews(items []mergerequestservice.ApprovalRuleView) []mergeRequestApprovalRuleView {
-	views := make([]mergeRequestApprovalRuleView, 0, len(items))
-	for index := range items {
-		views = append(views, toMergeRequestApprovalRuleView(items[index]))
-	}
-	return views
+	return collectViews(streamx.Of(items...).Map[mergeRequestApprovalRuleView](toMergeRequestApprovalRuleView))
 }
 
 func toMergeRequestApprovalRuleView(item mergerequestservice.ApprovalRuleView) mergeRequestApprovalRuleView {
@@ -195,10 +176,8 @@ func toMergeRequestApprovalRuleView(item mergerequestservice.ApprovalRuleView) m
 }
 
 func toMergeRequestApprovalRuleCheckViews(items []mergerequestservice.ApprovalRuleCheck) []mergeRequestApprovalRuleCheckView {
-	views := make([]mergeRequestApprovalRuleCheckView, 0, len(items))
-	for index := range items {
-		item := items[index]
-		views = append(views, mergeRequestApprovalRuleCheckView{
+	return collectViews(streamx.Of(items...).Map[mergeRequestApprovalRuleCheckView](func(item mergerequestservice.ApprovalRuleCheck) mergeRequestApprovalRuleCheckView {
+		return mergeRequestApprovalRuleCheckView{
 			RuleID:            formatID(item.RuleID),
 			Name:              item.Name,
 			TargetBranch:      item.TargetBranch,
@@ -208,17 +187,12 @@ func toMergeRequestApprovalRuleCheckViews(items []mergerequestservice.ApprovalRu
 			CodeOwner:         item.CodeOwner,
 			Satisfied:         item.Satisfied,
 			BlockingReason:    item.BlockingReason,
-		})
-	}
-	return views
+		}
+	}))
 }
 
 func formatIDs(values []int64) []string {
-	ids := make([]string, 0, len(values))
-	for _, value := range values {
-		ids = append(ids, formatID(value))
-	}
-	return ids
+	return collectViews(streamx.Of(values...).Map[string](formatID))
 }
 
 func formatID(value int64) string {
@@ -230,4 +204,12 @@ func formatMergeRequestTime(value time.Time) string {
 		return ""
 	}
 	return value.UTC().Format(time.RFC3339)
+}
+
+func collectViews[T any](items streamx.Stream[T]) []T {
+	views := items.ToSlice()
+	if views == nil {
+		return []T{}
+	}
+	return views
 }

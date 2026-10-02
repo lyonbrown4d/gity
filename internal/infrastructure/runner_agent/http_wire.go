@@ -1,7 +1,7 @@
 package runneragent
 
 import (
-	"encoding/json"
+	json "encoding/json/v2"
 	"strconv"
 	"strings"
 	"time"

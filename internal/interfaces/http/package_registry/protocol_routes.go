@@ -8,6 +8,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/arcgolabs/httpx"
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
@@ -25,7 +26,11 @@ func (e *Endpoint) uploadGenericPackageFile(ctx context.Context, in *protocolPac
 }
 
 func (e *Endpoint) downloadGenericPackageFile(ctx context.Context, in *protocolPackageDownloadInput) (*packageBinaryOutput, error) {
-	return e.downloadProtocolFile(ctx, in.ProjectID, "generic", in.PackageName, in.PackageVersion, in.FileName.String())
+	return e.downloadProtocolFile(ctx, in.ProjectID, "generic", in.PackageName, in.PackageVersion, in.FileName.String(), in.Range, in.IfRange)
+}
+
+func (e *Endpoint) genericPackageFileState(ctx context.Context, in *protocolPackageDownloadInput) (string, time.Time, error) {
+	return e.protocolPackageFileState(ctx, in, "generic")
 }
 
 func (e *Endpoint) uploadNuGetPackageFile(ctx context.Context, in *protocolPackageFileInput) (*packageOutput, error) {
@@ -37,7 +42,11 @@ func (e *Endpoint) uploadNuGetPackageFile(ctx context.Context, in *protocolPacka
 }
 
 func (e *Endpoint) downloadNuGetPackageFile(ctx context.Context, in *protocolPackageDownloadInput) (*packageBinaryOutput, error) {
-	return e.downloadProtocolFile(ctx, in.ProjectID, "nuget", in.PackageName, in.PackageVersion, in.FileName.String())
+	return e.downloadProtocolFile(ctx, in.ProjectID, "nuget", in.PackageName, in.PackageVersion, in.FileName.String(), in.Range, in.IfRange)
+}
+
+func (e *Endpoint) nugetPackageFileState(ctx context.Context, in *protocolPackageDownloadInput) (string, time.Time, error) {
+	return e.protocolPackageFileState(ctx, in, "nuget")
 }
 
 func (e *Endpoint) nugetServiceIndex(_ context.Context, in *pypiIndexInput) (*packageOutput, error) {
@@ -111,7 +120,19 @@ func (e *Endpoint) downloadMavenPackageFile(ctx context.Context, in *mavenPackag
 	if err != nil {
 		return nil, err
 	}
-	return e.downloadProtocolFile(ctx, in.ProjectID, "maven", coordinate.PackageName, coordinate.Version, coordinate.FilePath)
+	return e.downloadProtocolFile(ctx, in.ProjectID, "maven", coordinate.PackageName, coordinate.Version, coordinate.FilePath, in.Range, in.IfRange)
+}
+
+func (e *Endpoint) mavenPackageFileState(ctx context.Context, in *mavenPackageDownloadInput) (string, time.Time, error) {
+	coordinate, err := mavenCoordinateFromPath(in.FilePath.String())
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	metadata, err := e.service.GetFileMetadataByCoordinate(ctx, in.ProjectID, "maven", coordinate.PackageName, coordinate.Version, coordinate.FilePath)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return metadata.ETag, metadata.LastModified, nil
 }
 
 func (e *Endpoint) getNPMPackageMetadata(ctx context.Context, in *npmPackageInput) (*packageOutput, error) {
@@ -168,7 +189,15 @@ func (e *Endpoint) downloadPackageFile(ctx context.Context, in *packageFileDownl
 	if err != nil {
 		return nil, err
 	}
-	return binaryResponse(blob), nil
+	return binaryResponse(blob, in.Range, in.IfRange), nil
+}
+
+func (e *Endpoint) packageFileState(ctx context.Context, in *packageFileDownloadInput) (string, time.Time, error) {
+	metadata, err := e.service.GetFileMetadata(ctx, in.ProjectID, in.FileID)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return metadata.ETag, metadata.LastModified, nil
 }
 
 func (e *Endpoint) uploadProtocolFile(ctx context.Context, packageType string, projectID int64, packageName, version, filePath, contentType string, payload httpx.RequestStream) (packagedomain.ProjectPackageFile, error) {
@@ -188,10 +217,18 @@ func (e *Endpoint) uploadProtocolFile(ctx context.Context, packageType string, p
 	})
 }
 
-func (e *Endpoint) downloadProtocolFile(ctx context.Context, projectID int64, packageType, packageName, version, filePath string) (*packageBinaryOutput, error) {
+func (e *Endpoint) downloadProtocolFile(ctx context.Context, projectID int64, packageType, packageName, version, filePath string, byteRange httpx.ByteRange, ifRange string) (*packageBinaryOutput, error) {
 	blob, err := e.service.GetFileByCoordinate(ctx, projectID, packageType, packageName, version, filePath)
 	if err != nil {
 		return nil, err
 	}
-	return binaryResponse(blob), nil
+	return binaryResponse(blob, byteRange, ifRange), nil
+}
+
+func (e *Endpoint) protocolPackageFileState(ctx context.Context, in *protocolPackageDownloadInput, packageType string) (string, time.Time, error) {
+	metadata, err := e.service.GetFileMetadataByCoordinate(ctx, in.ProjectID, packageType, in.PackageName, in.PackageVersion, in.FileName.String())
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return metadata.ETag, metadata.LastModified, nil
 }

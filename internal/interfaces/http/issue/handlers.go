@@ -4,10 +4,11 @@ import (
 	"context"
 
 	collectionlist "github.com/arcgolabs/collectionx/list"
+	"github.com/arcgolabs/mapper"
 	issueservice "github.com/lyonbrown4d/gity/internal/application/issue"
 	issuedomain "github.com/lyonbrown4d/gity/internal/domain/issue"
-	"github.com/lyonbrown4d/gity/internal/infrastructure/mapperx"
 	"github.com/lyonbrown4d/gity/internal/interfaces/http_api"
+	"github.com/samber/oops"
 )
 
 func (e *Endpoint) listIssues(ctx context.Context, in *projectIssuesInput) (*issueOutput, error) {
@@ -48,9 +49,9 @@ func (e *Endpoint) createIssue(ctx context.Context, in *createIssueInput) (*issu
 }
 
 func (e *Endpoint) updateIssue(ctx context.Context, in *updateIssueInput) (*issueOutput, error) {
-	input, err := mapperx.MapStrict[issueservice.UpdateIssueInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[issueservice.UpdateIssueInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	if input.State == nil && in.Body.Status != nil {
 		mapped := statusToState(*in.Body.Status)
@@ -151,9 +152,9 @@ func (e *Endpoint) listAttachments(ctx context.Context, in *projectIssueInput) (
 }
 
 func (e *Endpoint) createAttachment(ctx context.Context, in *createAttachmentInput) (*issueOutput, error) {
-	input, err := mapperx.MapStrict[issueservice.CreateAttachmentInput](e.mapper, in.Body)
+	input, err := e.mapper.Map[issueservice.CreateAttachmentInput](in.Body, mapper.Strict())
 	if err != nil {
-		return nil, err
+		return nil, oops.In("mapper").Wrapf(err, "map value")
 	}
 	uploadedByUserID, err := httpapi.ActorUserID(ctx, e.authRuntime, in.Authorization, input.UploadedByUserID)
 	if err != nil {

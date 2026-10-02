@@ -1,7 +1,8 @@
 package pipeline
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,14 @@ import (
 )
 
 func encodeScriptPayload(payload scriptJobPayload) (string, error) {
-	raw, err := json.Marshal(payload)
+	raw, err := json.Marshal(
+		payload,
+		json.Deterministic(true),
+		json.FormatNilMapAsNull(true),
+		json.FormatNilSliceAsNull(true),
+		jsontext.EscapeForHTML(true),
+		jsontext.EscapeForJS(true),
+	)
 	if err != nil {
 		return "", fmt.Errorf("encode script job payload: %w", err)
 	}
@@ -23,7 +31,11 @@ func encodeStringSlice(values []string) (string, error) {
 	if values == nil {
 		values = []string{}
 	}
-	raw, err := json.Marshal(values)
+	raw, err := json.Marshal(
+		values,
+		jsontext.EscapeForHTML(true),
+		jsontext.EscapeForJS(true),
+	)
 	if err != nil {
 		return "", fmt.Errorf("encode string slice: %w", err)
 	}
@@ -48,7 +60,7 @@ func decodeJobTags(payload string) ([]string, error) {
 	var out struct {
 		Tags []string `json:"tags"`
 	}
-	if err := json.Unmarshal([]byte(payload), &out); err != nil {
+	if err := json.Unmarshal([]byte(payload), &out, json.RejectUnknownMembers(false)); err != nil {
 		return nil, fmt.Errorf("decode job tags: %w", err)
 	}
 	return out.Tags, nil

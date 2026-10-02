@@ -2,9 +2,13 @@ package packageregistry
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	apperror "github.com/lyonbrown4d/gity/internal/application/app_error"
 	storageports "github.com/lyonbrown4d/gity/internal/application/ports"
@@ -23,8 +27,16 @@ type UploadRawFileInput struct {
 }
 
 type PackageFileBlob struct {
-	File    packagedomain.ProjectPackageFile
-	Content []byte
+	File         packagedomain.ProjectPackageFile
+	Content      []byte
+	ETag         string
+	LastModified time.Time
+}
+
+type PackageFileMetadata struct {
+	File         packagedomain.ProjectPackageFile
+	ETag         string
+	LastModified time.Time
 }
 
 func (s *Service) UploadRawFile(ctx context.Context, projectID int64, input UploadRawFileInput) (packagedomain.ProjectPackageFile, error) {
@@ -82,24 +94,32 @@ func normalizeFilePath(value string) string {
 }
 
 func (s *Service) GetFileBlob(ctx context.Context, projectID, fileID int64) (PackageFileBlob, error) {
+	metadata, err := s.GetFileMetadata(ctx, projectID, fileID)
+	if err != nil {
+		return PackageFileBlob{}, err
+	}
+	content, err := s.storage.Load(ctx, metadata.File.StorageKey)
+	if err != nil {
+		return PackageFileBlob{}, apperror.NotFound("package file content not found", err)
+	}
+	return PackageFileBlob{File: metadata.File, Content: content, ETag: metadata.ETag, LastModified: metadata.LastModified}, nil
+}
+
+func (s *Service) GetFileMetadata(ctx context.Context, projectID, fileID int64) (PackageFileMetadata, error) {
 	if _, err := s.projectRepo.GetByID(ctx, projectID); err != nil {
-		return PackageFileBlob{}, apperror.NotFound("project not found", err)
+		return PackageFileMetadata{}, apperror.NotFound("project not found", err)
 	}
 	fileRecord, err := s.fileRepo.GetByID(ctx, fileID)
 	if err != nil {
 		if errors.Is(err, storageports.ErrNotFound) {
-			return PackageFileBlob{}, apperror.NotFound("package file not found", err)
+			return PackageFileMetadata{}, apperror.NotFound("package file not found", err)
 		}
-		return PackageFileBlob{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileID).Wrapf(err, "load package file")
+		return PackageFileMetadata{}, oops.In("package_registry").With("project_id", projectID, "file_id", fileID).Wrapf(err, "load package file")
 	}
 	if ensureErr := s.ensureFileProject(ctx, projectID, fileRecord); ensureErr != nil {
-		return PackageFileBlob{}, ensureErr
+		return PackageFileMetadata{}, ensureErr
 	}
-	content, err := s.storage.Load(ctx, fileRecord.StorageKey)
-	if err != nil {
-		return PackageFileBlob{}, apperror.NotFound("package file content not found", err)
-	}
-	return PackageFileBlob{File: fileRecord, Content: content}, nil
+	return packageFileMetadata(fileRecord), nil
 }
 
 func (s *Service) GetPackageByTypeAndName(ctx context.Context, projectID int64, packageType, name string) (PackageDetail, error) {
@@ -117,19 +137,47 @@ func (s *Service) GetPackageByTypeAndName(ctx context.Context, projectID int64, 
 }
 
 func (s *Service) GetFileByCoordinate(ctx context.Context, projectID int64, packageType, name, version, filePath string) (PackageFileBlob, error) {
-	detail, err := s.GetPackageByTypeAndName(ctx, projectID, packageType, name)
+	metadata, err := s.GetFileMetadataByCoordinate(ctx, projectID, packageType, name, version, filePath)
 	if err != nil {
 		return PackageFileBlob{}, err
 	}
-	fileRecord, ok := findPackageFileByCoordinate(detail, version, filePath)
-	if !ok {
-		return PackageFileBlob{}, apperror.NotFound("package file not found", storageports.ErrNotFound)
-	}
-	content, err := s.storage.Load(ctx, fileRecord.StorageKey)
+	content, err := s.storage.Load(ctx, metadata.File.StorageKey)
 	if err != nil {
 		return PackageFileBlob{}, apperror.NotFound("package file content not found", err)
 	}
-	return PackageFileBlob{File: fileRecord, Content: content}, nil
+	return PackageFileBlob{File: metadata.File, Content: content, ETag: metadata.ETag, LastModified: metadata.LastModified}, nil
+}
+
+func (s *Service) GetFileMetadataByCoordinate(ctx context.Context, projectID int64, packageType, name, version, filePath string) (PackageFileMetadata, error) {
+	detail, err := s.GetPackageByTypeAndName(ctx, projectID, packageType, name)
+	if err != nil {
+		return PackageFileMetadata{}, err
+	}
+	fileRecord, ok := findPackageFileByCoordinate(detail, version, filePath)
+	if !ok {
+		return PackageFileMetadata{}, apperror.NotFound("package file not found", storageports.ErrNotFound)
+	}
+	return packageFileMetadata(fileRecord), nil
+}
+
+func packageFileMetadata(file packagedomain.ProjectPackageFile) PackageFileMetadata {
+	fingerprint := fmt.Sprintf(
+		"%d:%d:%q:%q:%q:%d:%q:%d",
+		file.ID,
+		file.ProjectPackageVersionID,
+		file.FileName,
+		file.FilePath,
+		file.ContentType,
+		file.ByteSize,
+		file.StorageKey,
+		file.UpdatedAt.UTC().UnixNano(),
+	)
+	sum := sha256.Sum256([]byte(fingerprint))
+	return PackageFileMetadata{
+		File:         file,
+		ETag:         hex.EncodeToString(sum[:]),
+		LastModified: file.UpdatedAt.UTC().Truncate(time.Second),
+	}
 }
 
 func findPackageFileByCoordinate(detail PackageDetail, version, filePath string) (packagedomain.ProjectPackageFile, bool) {
