@@ -15,7 +15,7 @@ func Module() dix.Module {
 			dix.OnStart(EnsureSchema,
 				dix.LifecycleName("schema.ensure"),
 				dix.LifecyclePriority(20),
-				dix.LifecycleTimeout(30*time.Second),
+				dix.LifecycleTimeout(5*time.Minute),
 			),
 		),
 	)

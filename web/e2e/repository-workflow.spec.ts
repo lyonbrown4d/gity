@@ -13,7 +13,7 @@ test("renders seeded project, repository content, and collaboration tabs", async
   await expect(page).toHaveURL(new RegExp(`/app/projects/${organization.id}/${project.id}`));
   await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
   await expect(page.getByText(project.full_path, { exact: true })).toBeVisible();
-  await expect(page.getByText("README.md")).toBeVisible();
+  await expect(page.getByText("README.md", { exact: true })).toBeVisible();
 
   await page.getByRole("tab", { name: "Issues" }).click();
   await expect(page).toHaveURL(/tab=issues/);
