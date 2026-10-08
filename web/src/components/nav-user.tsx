@@ -1,16 +1,6 @@
-import {
-  ChevronsUpDown,
-  LogOut,
-  Shield,
-  User,
-} from "lucide-react"
-import { Link } from "react-router"
-import { useI18n } from "@/lib/i18n"
-
-import {
-  Avatar,
-  AvatarFallback,
-} from "@/components/ui/avatar"
+import { ChevronsUpDown, LogOut, Shield, User } from "lucide-react";
+import { Link } from "react-router";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,93 +8,102 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/dropdown-menu";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { useI18n } from "@/lib/i18n";
 
-export function NavUser({
-  user,
-  onLogout,
-}: {
-  user: {
-    name: string;
-    email: string;
-    isSuperAdmin: boolean;
-  };
+interface NavUserProps {
+  user: { name: string; email: string; isSuperAdmin: boolean };
   onLogout: () => void;
-}) {
-  const { isMobile } = useSidebar()
-  const { t } = useI18n()
-  const initials = user.name.slice(0, 2).toUpperCase() || "GU"
+  onNavigate?: () => void;
+  compact?: boolean;
+}
+
+export function NavUser({ user, onLogout, onNavigate, compact = false }: NavUserProps): JSX.Element {
+  const { t } = useI18n();
+  const initials = user.name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase() || "GU";
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className={compact ? "w-10" : undefined}>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              aria-label={`${t("My Account")}: ${user.name}`}
+              className={compact
+                ? "mx-auto size-9 justify-center p-0 text-sidebar-foreground hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent"
+                : "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"}
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+              <Avatar className="size-7 rounded-md">
+                <AvatarFallback className="rounded-md bg-sidebar-primary text-[10px] font-semibold text-sidebar-primary-foreground">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
+              {compact ? null : (
+                <>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{user.name}</span>
+                    <span className="truncate text-xs">{user.email}</span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" aria-hidden="true" />
+                </>
+              )}
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
+            className={compact ? "w-64 rounded-md" : "w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-md"}
+            side="right"
             align="end"
-            sideOffset={4}
+            sideOffset={8}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+            <DropdownMenuLabel className="p-2 font-normal">
+              <div className="flex items-center gap-2 text-left text-sm">
+                <Avatar className="size-8 rounded-md">
+                  <AvatarFallback className="rounded-md bg-primary text-xs font-semibold text-primary-foreground">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="truncate font-semibold">{user.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                 </div>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to="/app/profile">
-                <User />
+              <Link to="/app/profile" onClick={onNavigate}>
+                <User aria-hidden="true" />
                 {t("Profile")}
               </Link>
             </DropdownMenuItem>
             {user.isSuperAdmin ? (
               <DropdownMenuItem asChild>
-                <Link to="/admin">
-                  <Shield />
+                <Link to="/admin" onClick={onNavigate}>
+                  <Shield aria-hidden="true" />
                   {t("Admin Dashboard")}
                 </Link>
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
+              onSelect={() => {
+                onNavigate?.();
                 onLogout();
               }}
             >
-              <LogOut />
+              <LogOut aria-hidden="true" />
               {t("Logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

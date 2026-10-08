@@ -1,7 +1,6 @@
-import { useState } from "react";
 import dayjs from "dayjs";
 import { ArrowUpRight, Check, CircleCheckBig, Inbox } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,8 @@ import { useMarkTodoDone, useTodoList } from "./use-todos";
 
 export function AppTodosPage(): JSX.Element {
   const { t } = useI18n();
-  const [state, setState] = useState<TodoState>("pending");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const state: TodoState = searchParams.get("state") === "done" ? "done" : "pending";
   const { todos, query } = useTodoList(state);
   const markTodo = useMarkTodoDone();
   const queryError = query.error instanceof Error ? query.error.message : null;
@@ -36,7 +36,14 @@ export function AppTodosPage(): JSX.Element {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={state} onValueChange={(value) => setState(value === "done" ? "done" : "pending")}>
+        <Tabs
+          value={state}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            next.set("state", value === "done" ? "done" : "pending");
+            setSearchParams(next, { replace: true });
+          }}
+        >
           <TabsList aria-label={t("Todo state")}>
             <TabsTrigger value="pending">{t("Pending")}</TabsTrigger>
             <TabsTrigger value="done">{t("Done")}</TabsTrigger>

@@ -2,34 +2,24 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useCustom, usePermissions } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Card, CardContent } from "@/components/ui/card";
-import { RepositoryAuditTab } from "@/pages/app/repository/repository-audit-tab";
-import { RepositoryBranchesTab } from "@/pages/app/repository/repository-branches-tab";
 import { RepositoryCodeTab } from "@/pages/app/repository/repository-code-tab";
-import { RepositoryCommitsTab } from "@/pages/app/repository/repository-commits-tab";
 import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-create-file-modal";
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
-import { RepositoryIssuesTab } from "@/pages/app/repository/repository-issues-tab";
-import { RepositoryLFSTab } from "@/pages/app/repository/repository-lfs-tab";
-import { RepositoryJobsTab } from "@/pages/app/repository/repository-jobs-tab";
-import { RepositoryMergeRequestsTab } from "@/pages/app/repository/repository-merge-requests-tab";
 import { RepositoryOverviewTab } from "@/pages/app/repository/repository-overview-tab";
-import { RepositoryPackagesTab } from "@/pages/app/repository/repository-packages-tab";
 import { buildRepositoryPermissions } from "@/pages/app/repository/repository-permissions";
-import { RepositoryPipelinesTab } from "@/pages/app/repository/repository-pipelines-tab";
-import { RepositoryReleasesTab } from "@/pages/app/repository/repository-releases-tab";
-import { RepositoryRunnersTab } from "@/pages/app/repository/repository-runners-tab";
-import { RepositorySettingsTab } from "@/pages/app/repository/repository-settings-tab";
-import { RepositoryWikiTab } from "@/pages/app/repository/repository-wiki-tab";
 import type { RepoTab } from "@/pages/app/repository/repository-types";
 import { useRepositoryMetaController } from "@/pages/app/repository/use-repository-meta-controller";
 import { useRepositorySourceController } from "@/pages/app/repository/use-repository-source-controller";
 import type { RawRecord } from "@/pages/app/repository/repository-normalizers";
+import { RepositorySecondaryTabContent } from "@/pages/app/repository/workspace/repository-secondary-tab-content";
 
 export const RepositoryDetailPage = (): JSX.Element => {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams<{ organizationId: string; projectId?: string; repoId?: string }>();
@@ -37,7 +27,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const repoId = params.projectId ?? params.repoId ?? "";
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "overview");
-  const editorTheme = document.documentElement.classList.contains("dark") ? "vs-dark" : "vs";
+  const editorTheme = theme === "dark" ? "vs-dark" : "vs";
   const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>({});
   const projectPermissionsQuery = useCustom<RawRecord>({
     url: repoId ? `/projects/${repoId}/permissions` : "/projects/0/permissions",
@@ -87,9 +77,9 @@ export const RepositoryDetailPage = (): JSX.Element => {
   };
 
   return (
-    <div className="flex flex-col gap-4 page-enter">
+    <div className="flex flex-col gap-3 page-enter">
       <Breadcrumb>
-        <BreadcrumbList className="rounded-xl border border-border/70 bg-card/70 px-3 py-2 shadow-sm backdrop-blur">
+        <BreadcrumbList className="px-1 py-0.5 text-xs">
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
               <Link to="/app/projects">{t("Projects")}</Link>
@@ -111,12 +101,10 @@ export const RepositoryDetailPage = (): JSX.Element => {
       </Breadcrumb>
 
       <RepositoryHeaderCard
-        activeTab={activeTab}
         organizationName={meta.organization?.name}
         repository={meta.repository}
         permissions={repositoryPermissions}
         t={t}
-        onChangeTab={handleChangeTab}
         onCopyCloneUrl={() => void meta.copyCloneUrl()}
       />
 
@@ -126,11 +114,15 @@ export const RepositoryDetailPage = (): JSX.Element => {
         </Alert>
       ) : null}
 
-      {meta.isLoading ? <p className="text-sm text-muted-foreground">{t("Loading...")}</p> : null}
+      {meta.isLoading ? (
+        <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          {t("Loading...")}
+        </div>
+      ) : null}
 
       {!meta.isLoading && !meta.repository ? (
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="border-dashed shadow-none">
+          <CardContent className="py-10 text-center">
             <p className="text-sm text-muted-foreground">{t("Project not found in selected organization.")}</p>
           </CardContent>
         </Card>
@@ -189,145 +181,14 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
-      {meta.repository && activeTab === "issues" ? (
-        <RepositoryIssuesTab
-          organizationId={organizationId}
-          repoId={repoId}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "merge-requests" ? (
-        <RepositoryMergeRequestsTab
-          organizationId={organizationId}
-          repoId={repoId}
-          branches={meta.branches}
-          defaultBranch={meta.repository.default_branch}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-          onMerged={async () => {
-            await Promise.all([meta.loadBranches(), meta.loadCommits()]);
-          }}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "pipelines" ? (
-        <RepositoryPipelinesTab
-          repoId={repoId}
-          defaultBranch={meta.repository.default_branch}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "jobs" ? (
-        <RepositoryJobsTab
-          repoId={repoId}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "wiki" ? (
-        <RepositoryWikiTab
-          repoId={repoId}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "packages" ? (
-        <RepositoryPackagesTab
-          repoId={repoId}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "releases" ? (
-        <RepositoryReleasesTab
-          repoId={repoId}
-          defaultBranch={meta.repository.default_branch}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "lfs" ? (
-        <RepositoryLFSTab
-          repoId={repoId}
-          repository={meta.repository}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "runners" ? (
-        <RepositoryRunnersTab
-          repoId={repoId}
-          permissions={repositoryPermissions}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "commits" ? (
-        <RepositoryCommitsTab
-          t={t}
-          branches={meta.branches}
-          commits={meta.commits}
-          branchFilter={meta.branchFilter}
-          isLoadingCommits={meta.isLoadingCommits}
-          onChangeBranchFilter={meta.setBranchFilter}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "branches" ? (
-        <RepositoryBranchesTab
-          t={t}
-          branches={meta.branches}
-          defaultBranch={meta.repository.default_branch}
-          newBranchName={meta.newBranchName}
-          isLoadingBranches={meta.isLoadingBranches}
-          isCreatingBranch={meta.isCreatingBranch}
-          isUpdatingBranch={meta.isUpdatingBranch}
-          isDeletingBranch={meta.isDeletingBranch}
-          permissions={repositoryPermissions}
-          onChangeNewBranchName={meta.setNewBranchName}
-          onSubmitCreateBranch={(event) => void meta.submitCreateBranch(event)}
-          onToggleBranchProtection={(branch, protect) => void meta.toggleBranchProtection(branch, protect)}
-          onUpdateBranchProtection={(branch, patch) => void meta.updateBranchProtection(branch, patch)}
-          onDeleteBranch={(branch) => void meta.removeBranch(branch)}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "settings" ? (
-        <RepositorySettingsTab
-          repository={meta.repository}
-          permissions={repositoryPermissions}
-          t={t}
-          isDeleting={meta.isDeleting}
-          onError={meta.setActionError}
-          onDelete={meta.submitDelete}
-        />
-      ) : null}
-
-      {meta.repository && activeTab === "audit" ? (
-        <RepositoryAuditTab
-          repoId={repoId}
-          t={t}
-          onError={meta.setActionError}
-        />
-      ) : null}
+      <RepositorySecondaryTabContent
+        activeTab={activeTab}
+        organizationId={organizationId}
+        repoId={repoId}
+        meta={meta}
+        permissions={repositoryPermissions}
+        t={t}
+      />
 
       <RepositoryCreateFileModal
         open={source.isCreateFileModalOpen}

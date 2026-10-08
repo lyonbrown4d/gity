@@ -30,14 +30,15 @@ test("drives repository collaboration across search, issues, wiki, pipelines, an
   await authenticatePage(page, session);
 
   await page.goto(projectURL);
-  await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
-  await expect(page.getByText(project.full_path, { exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: project.name })).toBeVisible();
+  await expect(page.locator("#main-content").getByText(project.full_path, { exact: true })).toBeVisible();
 
-  await typeInto(page.getByPlaceholder("Search text"), searchToken);
+  await page.getByRole("link", { name: "Code", exact: true }).click();
+  await typeInto(page.getByPlaceholder("Search in project"), searchToken);
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page.getByText("docs/search.md").first()).toBeVisible();
 
-  await page.getByRole("tab", { name: "Issues" }).click();
+  await page.getByRole("link", { name: "Issues", exact: true }).click();
   await page.getByRole("button", { name: "New issue" }).click();
   await typeInto(page.getByPlaceholder("Issue title"), issueTitle);
   await page.getByRole("button", { name: "Create issue" }).click();
@@ -89,7 +90,7 @@ test("drives repository collaboration across search, issues, wiki, pipelines, an
   await typeInto(page.getByPlaceholder("Merge request title"), mrTitle);
   await page.getByPlaceholder("Describe the merge request (optional)").fill("Created by the browser collaboration flow.");
   await selectRadixOption(page, "Source branch", featureBranch);
-  await page.getByRole("button", { name: "Create merge request" }).click();
+  await page.getByRole("button", { name: "Create merge request" }).first().click();
 
   await expect(page.getByText(mrTitle).first()).toBeVisible();
   await expect(page.getByText(`${featureBranch} → ${project.default_branch || "main"}`).first()).toBeVisible();

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useGetIdentity, useLogout, usePermissions } from "@refinedev/core";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -36,7 +37,10 @@ export function UserLayout(): JSX.Element {
   );
 
   return (
-    <SidebarProvider className="gity-shell">
+    <SidebarProvider
+      className="gity-shell bg-background"
+      style={{ "--sidebar-width": "19rem", "--sidebar-width-icon": "3.5rem" } as CSSProperties}
+    >
       <a href="#main-content" className="skip-link">
         {t("Skip to main content")}
       </a>
@@ -56,29 +60,29 @@ export function UserLayout(): JSX.Element {
           })
         }
       />
-      <SidebarInset className="overflow-hidden bg-background/55 backdrop-blur-xl md:border md:border-border/60 md:bg-background/60">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background/75 px-4 backdrop-blur-xl">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  {t("User Workspace")}
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold">{currentTitle}</BreadcrumbPage>
+      <SidebarInset className="min-w-0 overflow-hidden bg-background md:rounded-none md:shadow-none">
+        <header className="sticky top-0 z-20 grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border bg-background px-3 md:grid-cols-[minmax(12rem,1fr)_minmax(18rem,32rem)_minmax(12rem,1fr)]">
+          <div className="flex min-w-0 items-center gap-2">
+            <SidebarTrigger className="-ml-1 shrink-0" aria-label={t("Toggle Sidebar")} />
+            <Separator orientation="vertical" className="h-4" />
+            <Breadcrumb className="min-w-0">
+              <BreadcrumbList className="flex-nowrap">
+                <BreadcrumbItem className="hidden lg:block">{t("User Workspace")}</BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden lg:block" />
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage className="truncate text-sm font-medium">{currentTitle}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="flex items-center gap-2">
-            <GlobalQuickJump />
+          <div className="flex min-w-0 justify-end md:justify-center">
+            <GlobalQuickJump canAccessAdmin={Boolean(permissions?.isSuperAdmin)} />
+          </div>
+          <div className="flex items-center justify-end gap-1">
             <ViewControls compact />
           </div>
         </header>
-        <main id="main-content" className="flex flex-1 flex-col gap-5 p-4 pt-4 md:p-6 page-enter">
+        <main id="main-content" className="flex flex-1 flex-col gap-4 p-3 md:p-5 page-enter">
           <Outlet />
         </main>
       </SidebarInset>

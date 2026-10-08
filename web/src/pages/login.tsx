@@ -18,11 +18,13 @@ export function LoginPage(): JSX.Element {
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center p-6 md:p-10">
-      <div className="absolute right-6 top-6 z-10">
+    <main className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-background p-4 sm:p-6 md:p-10">
+      <div className="absolute inset-0 gity-soft-grid opacity-30" aria-hidden="true" />
+      <div className="absolute inset-x-0 top-0 h-px bg-primary/60" aria-hidden="true" />
+      <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
         <ViewControls compact />
       </div>
-      <div className="w-full max-w-5xl">
+      <div className="relative w-full max-w-4xl">
         <LoginForm
           loading={isLoading}
           error={error}
@@ -42,6 +44,6 @@ export function LoginPage(): JSX.Element {
           }}
         />
       </div>
-    </div>
+    </main>
   );
 }

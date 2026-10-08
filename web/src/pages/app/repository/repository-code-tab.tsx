@@ -1,23 +1,19 @@
-import { useEffect, useRef } from "react";
-import Editor from "@monaco-editor/react";
-import { ChevronDown, ChevronRight, FileCode2, FolderTree, Search } from "lucide-react";
+import { Code2, FilePlus2, GitBranch } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type {
   RepositoryBlobView,
   RepositoryBranchView,
-  RepositoryLanguageItemView,
   RepositoryLanguagesView,
   RepositorySearchResultView,
   RepositoryView,
 } from "@/pages/types";
 import type { RepositoryTreeNode } from "./repository-types";
-import { RepositoryEmptyState } from "./repository-empty-state";
-import { detectLanguage, formatBytes, formatTime, languageBarColor } from "./repository-utils";
+import { RepositorySourceCanvas } from "./workspace/repository-source-canvas";
+import { RepositorySourceIntelligence } from "./workspace/repository-source-intelligence";
+import { RepositorySourceNavigation } from "./workspace/repository-source-navigation";
 
 interface RepositoryCodeTabProps {
   t: (text: string) => string;
@@ -56,403 +52,97 @@ interface RepositoryCodeTabProps {
   setSearchRegex: (value: boolean) => void;
 }
 
-interface SearchableEditor {
-  setPosition: (position: {
-    lineNumber: number;
-    column: number;
-  }) => void;
-  revealLineInCenter: (lineNumber: number) => void;
-  focus: () => void;
-  deltaDecorations: (
-    oldDecorations: string[],
-    newDecorations: Array<{
-      range: {
-        startLineNumber: number;
-        startColumn: number;
-        endLineNumber: number;
-        endColumn: number;
-      };
-      options: {
-        isWholeLine?: boolean;
-        className: string;
-      };
-    }>,
-  ) => string[];
-}
-
-const renderLanguageRows = (items: RepositoryLanguageItemView[]): JSX.Element[] => {
-  return items.map((item) => (
-    <div key={item.language} className="space-y-1">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="truncate font-medium">{item.language}</span>
-        <span className="text-muted-foreground">{item.percentage.toFixed(2)}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded bg-muted">
-        <div
-          className="h-full"
-          style={{
-            width: `${Math.max(item.percentage, item.percentage > 0 ? 2 : 0)}%`,
-            backgroundColor: languageBarColor(item.language),
-          }}
-        />
-      </div>
-    </div>
-  ));
-};
-
 export const RepositoryCodeTab = ({
-  t,
-  repository,
-  branches,
-  codeBranch,
-  treeNodes,
-  selectedBlob,
-  readmePreview,
-  readmePath,
-  languages,
-  isLoadingTree,
-  isLoadingLanguages,
-  searchQuery,
-  searchPath,
-  searchMatchCase,
-  searchRegex,
-  isLoadingSearch,
-  searchLine,
-  searchColumn,
-  searchMatchLength,
-  searchJumpRequest,
-  searchTargetPath,
-  searchResults,
-  editorTheme,
-  onChangeCodeBranch,
-  onOpenCreateFile,
-  onOpenFile,
-  onToggleTreeDirectory,
-  onOpenFileAtLine,
-  onSearch,
-  setSearchQuery,
-  setSearchPath,
-  setSearchMatchCase,
-  setSearchRegex,
-  onRefreshLanguages,
+  t, repository, branches, codeBranch, treeNodes, selectedBlob, readmePreview,
+  readmePath, languages, isLoadingTree, isLoadingLanguages, searchQuery,
+  searchPath, searchMatchCase, searchRegex, isLoadingSearch, searchLine,
+  searchColumn, searchMatchLength, searchJumpRequest, searchTargetPath,
+  searchResults, editorTheme, onChangeCodeBranch, onOpenCreateFile, onOpenFile,
+  onToggleTreeDirectory, onOpenFileAtLine, onSearch, setSearchQuery,
+  setSearchPath, setSearchMatchCase, setSearchRegex, onRefreshLanguages,
 }: RepositoryCodeTabProps): JSX.Element => {
   const isEmptyRepository = !isLoadingTree && treeNodes.length === 0 && !selectedBlob && !readmePreview;
-  const editorRef = useRef<SearchableEditor | null>(null);
-  const searchLineDecorationsRef = useRef<string[]>([]);
-
-  const jumpToSearchLine = () => {
-    if (!editorRef.current) {
-      searchLineDecorationsRef.current = [];
-      return;
-    }
-    if (!selectedBlob || !searchTargetPath || selectedBlob.path !== searchTargetPath) {
-      if (searchLineDecorationsRef.current.length > 0) {
-        searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, []);
-      }
-      return;
-    }
-    const lines = selectedBlob.content.split("\n");
-    const totalLines = lines.length;
-    const targetLine = Math.min(Math.max(searchLine, 1), totalLines > 0 ? totalLines : 1);
-    const targetText = lines[targetLine - 1] ?? "";
-    const targetColumn = Math.min(Math.max(searchColumn, 1), targetText.length + 1);
-    const targetMatchLength = Math.max(0, Math.floor(searchMatchLength));
-    editorRef.current.setPosition({
-      lineNumber: targetLine,
-      column: targetColumn,
-    });
-    editorRef.current.revealLineInCenter(targetLine);
-    editorRef.current.focus();
-    const decorations = [
-      {
-        range: {
-          startLineNumber: targetLine,
-          startColumn: 1,
-          endLineNumber: targetLine,
-          endColumn: Math.max(targetText.length + 1, 1),
-        },
-        options: {
-          isWholeLine: true,
-          className: "search-jump-line-decoration",
-        },
-      },
-    ];
-    if (targetMatchLength > 0) {
-      decorations.push({
-        range: {
-          startLineNumber: targetLine,
-          startColumn: targetColumn,
-          endLineNumber: targetLine,
-          endColumn: Math.max(targetColumn + targetMatchLength, targetColumn + 1),
-        },
-        options: {
-          isWholeLine: false,
-          className: "search-jump-match-decoration",
-        },
-      });
-    }
-    searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, decorations);
-  };
-
-  useEffect(() => {
-    jumpToSearchLine();
-  }, [searchJumpRequest, searchLine, searchColumn, searchMatchLength, searchTargetPath, selectedBlob?.path, selectedBlob?.content]);
-
-  useEffect(() => () => {
-    if (editorRef.current && searchLineDecorationsRef.current.length > 0) {
-      searchLineDecorationsRef.current = editorRef.current.deltaDecorations(searchLineDecorationsRef.current, []);
-    }
-  }, []);
-
-  const renderTreeNodes = (nodes: RepositoryTreeNode[], depth = 0): JSX.Element[] =>
-    nodes.map((node) => (
-      <div key={node.path}>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={`w-full justify-start ${selectedBlob?.path === node.path ? "bg-muted" : ""}`}
-          style={{ paddingLeft: `${depth * 14 + 8}px` }}
-          onClick={() => {
-            if (node.kind === "tree") {
-              onToggleTreeDirectory(node.path);
-            } else {
-              onOpenFile(node.path);
-            }
-          }}
-        >
-          {node.kind === "tree" ? (
-            node.expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />
-          ) : (
-            <span className="inline-block size-4" />
-          )}
-          {node.kind === "tree" ? <FolderTree className="size-4" /> : <FileCode2 className="size-4" />}
-          <span className="truncate">{node.name}</span>
-        </Button>
-        {node.kind === "tree" && node.expanded ? (
-          node.loading ? (
-            <p className="px-2 py-1 text-xs text-muted-foreground" style={{ paddingLeft: `${(depth + 1) * 14 + 8}px` }}>
-              {t("Loading files...")}
-            </p>
-          ) : (
-            renderTreeNodes(node.children, depth + 1)
-          )
-        ) : null}
-      </div>
-    ));
-
-  const handleSearch = () => {
-    onSearch(searchQuery);
-  };
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <CardTitle>{t("Code")}</CardTitle>
-            <CardDescription>{t("Project source view and clone information.")}</CardDescription>
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm card-enter">
+      <div className="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Code2 className="size-4" />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="code-branch-select">{t("Branch")}</Label>
-            <Select value={codeBranch} onValueChange={onChangeCodeBranch}>
-              <SelectTrigger id="code-branch-select">
-                <SelectValue placeholder={t("Branch")} />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.name} value={branch.name}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-                {branches.length === 0 && repository.default_branch ? (
-                  <SelectItem value={repository.default_branch}>{repository.default_branch}</SelectItem>
-                ) : null}
-              </SelectContent>
-            </Select>
-            <Button type="button" size="sm" variant="outline" onClick={onOpenCreateFile}>
-              {t("Create file and commit")}
-            </Button>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">{t("Source workspace")}</h2>
+            <p className="truncate font-mono text-[11px] text-muted-foreground">{repository.clone_http_url}</p>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="rounded-md border bg-muted/40 px-3 py-2">
-          <p className="text-xs text-muted-foreground">{t("Clone URL")}</p>
-          <p className="break-all font-mono text-xs">{repository.clone_http_url}</p>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-[300px_minmax(0,1fr)_280px]">
-          <div className="space-y-2 rounded-md border p-2">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{t("Search in project")}</p>
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="pl-8"
-                    placeholder={t("Search text")}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        handleSearch();
-                      }
-                    }}
-                  />
-                </div>
-                <Input
-                  placeholder={t("Path (optional)")}
-                  value={searchPath}
-                  onChange={(event) => setSearchPath(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      handleSearch();
-                    }
-                  }}
-                />
-                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={searchMatchCase}
-                    onChange={(event) => setSearchMatchCase(event.target.checked)}
-                  />
-                  <span>{t("Match case")}</span>
-                </label>
-                <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={searchRegex}
-                    onChange={(event) => setSearchRegex(event.target.checked)}
-                  />
-                  <span>{t("Regular expression")}</span>
-                </label>
-                <Button type="button" size="sm" className="w-full" variant="outline" onClick={handleSearch} disabled={isLoadingSearch}>
-                  {isLoadingSearch ? t("Searching...") : t("Search")}
-                </Button>
-              </div>
-              {isLoadingSearch ? <p className="px-1 text-xs text-muted-foreground">{t("Searching...")}</p> : null}
-              {!isLoadingSearch && searchResults.length === 0 && searchQuery.trim() ? (
-                <p className="px-1 text-xs text-muted-foreground">{t("No matches found.")}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="hidden font-mono text-[10px] sm:inline-flex">
+            {treeNodes.length} {t("root item(s)")}
+          </Badge>
+          <Label htmlFor="code-branch-select" className="sr-only">{t("Branch")}</Label>
+          <Select value={codeBranch} onValueChange={onChangeCodeBranch}>
+            <SelectTrigger id="code-branch-select" className="h-8 w-44 font-mono text-xs">
+              <GitBranch className="size-3.5" />
+              <SelectValue placeholder={t("Branch")} />
+            </SelectTrigger>
+            <SelectContent>
+              {branches.map((branch) => <SelectItem key={branch.name} value={branch.name}>{branch.name}</SelectItem>)}
+              {branches.length === 0 && repository.default_branch ? (
+                <SelectItem value={repository.default_branch}>{repository.default_branch}</SelectItem>
               ) : null}
-            </div>
-            {searchResults.length > 0 ? (
-              <div className="space-y-1 rounded border p-1">
-                <p className="px-2 py-1 text-xs text-muted-foreground">
-                  {searchResults.length} {t("result(s)")}
-                </p>
-                <ScrollArea className="h-56">
-                  <div className="space-y-1 pr-3">
-                  {searchResults.map((result, index) => (
-                    <button
-                      key={`${result.path}-${result.line_number}-${result.column}-${result.match_length}-${index}`}
-                      type="button"
-                      className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-muted"
-                      onClick={() => onOpenFileAtLine(result.path, result.line_number, result.column, result.match_length)}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate font-mono">{result.path}</span>
-                        <span className="text-muted-foreground">
-                          {result.line_number}:{result.column}
-                        </span>
-                      </div>
-                      <p className="line-clamp-2 text-xs text-muted-foreground">
-                        {result.line_content || t("No content")}
-                      </p>
-                    </button>
-                  ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : null}
-            <div className="border-t pt-2" />
-            <ScrollArea className="h-[42vh] pr-3">
-              {isLoadingTree ? <p className="px-2 py-1 text-xs text-muted-foreground">{t("Loading files...")}</p> : null}
-              {!isLoadingTree ? renderTreeNodes(treeNodes) : null}
-              {!isLoadingTree && treeNodes.length === 0 ? (
-                <p className="px-2 py-1 text-xs text-muted-foreground">{t("No files found.")}</p>
-              ) : null}
-            </ScrollArea>
-          </div>
-
-          <div className="rounded-md border">
-            {selectedBlob ? (
-              selectedBlob.is_binary ? (
-                <div className="p-4 text-sm text-muted-foreground">
-                  {t("This file is binary cannot be shown in Monaco.")}
-                </div>
-              ) : (
-                <Editor
-                  height="68vh"
-                  language={detectLanguage(selectedBlob.path)}
-                  value={selectedBlob.content}
-                  theme={editorTheme}
-                  onMount={(instance) => {
-                    editorRef.current = instance;
-                    jumpToSearchLine();
-                  }}
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    wordWrap: "on",
-                    scrollBeyondLastLine: false,
-                  }}
-                />
-              )
-            ) : isEmptyRepository ? (
-              <RepositoryEmptyState
-                t={t}
-                repositoryName={repository.name}
-                cloneHttpUrl={repository.clone_http_url}
-                defaultBranch={repository.default_branch || "main"}
-              />
-            ) : readmePreview ? (
-              <div className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{t("README Preview")}</p>
-                  {readmePath ? (
-                    <Button type="button" size="sm" variant="outline" onClick={() => onOpenFile(readmePath)}>
-                      {t("View README source")}
-                    </Button>
-                  ) : null}
-                </div>
-                <article className="markdown-body" dangerouslySetInnerHTML={{ __html: readmePreview }} />
-              </div>
-            ) : (
-              <div className="p-4 text-sm text-muted-foreground">
-                {t("README not found. Select a source file from the left to open in Monaco.")}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 rounded-md border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">{t("Languages")}</p>
-              <Button type="button" size="sm" variant="outline" disabled={!codeBranch || isLoadingLanguages} onClick={onRefreshLanguages}>
-                {t("Refresh")}
-              </Button>
-            </div>
-
-            {isLoadingLanguages ? <p className="text-xs text-muted-foreground">{t("Loading language statistics...")}</p> : null}
-            {!isLoadingLanguages && languages?.status === "pending" ? (
-              <p className="text-xs text-muted-foreground">{t("Language statistics are being computed...")}</p>
-            ) : null}
-            {!isLoadingLanguages && languages?.status === "ready" && languages.languages.length > 0 ? (
-              <div className="space-y-3">{renderLanguageRows(languages.languages)}</div>
-            ) : null}
-            {!isLoadingLanguages && (!languages || languages.languages.length === 0) && languages?.status !== "pending" ? (
-              <p className="text-xs text-muted-foreground">{t("No language statistics yet.")}</p>
-            ) : null}
-            {languages?.status === "ready" ? (
-              <div className="space-y-1 border-t pt-2 text-xs text-muted-foreground">
-                <p>{t("Total size")}: {formatBytes(languages.total_bytes)}</p>
-                <p>{t("Last analyzed")}: {languages.analyzed_at ? formatTime(languages.analyzed_at) : t("N/A")}</p>
-              </div>
-            ) : null}
-          </div>
+            </SelectContent>
+          </Select>
+          <Button type="button" size="sm" onClick={onOpenCreateFile}>
+            <FilePlus2 data-icon="inline-start" />
+            {t("Create file")}
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div className="grid border-t border-border xl:grid-cols-[290px_minmax(0,1fr)_260px]">
+        <RepositorySourceNavigation
+          t={t}
+          treeNodes={treeNodes}
+          selectedPath={selectedBlob?.path}
+          isLoadingTree={isLoadingTree}
+          searchQuery={searchQuery}
+          searchPath={searchPath}
+          searchMatchCase={searchMatchCase}
+          searchRegex={searchRegex}
+          isLoadingSearch={isLoadingSearch}
+          searchResults={searchResults}
+          onOpenFile={onOpenFile}
+          onToggleTreeDirectory={onToggleTreeDirectory}
+          onOpenFileAtLine={onOpenFileAtLine}
+          onSearch={() => onSearch(searchQuery)}
+          setSearchQuery={setSearchQuery}
+          setSearchPath={setSearchPath}
+          setSearchMatchCase={setSearchMatchCase}
+          setSearchRegex={setSearchRegex}
+        />
+        <RepositorySourceCanvas
+          t={t}
+          repository={repository}
+          selectedBlob={selectedBlob}
+          readmePreview={readmePreview}
+          readmePath={readmePath}
+          isEmptyRepository={isEmptyRepository}
+          editorTheme={editorTheme}
+          searchLine={searchLine}
+          searchColumn={searchColumn}
+          searchMatchLength={searchMatchLength}
+          searchJumpRequest={searchJumpRequest}
+          searchTargetPath={searchTargetPath}
+          onOpenFile={onOpenFile}
+        />
+        <RepositorySourceIntelligence
+          t={t}
+          branch={codeBranch}
+          languages={languages}
+          isLoading={isLoadingLanguages}
+          onRefresh={onRefreshLanguages}
+        />
+      </div>
+    </section>
   );
 };

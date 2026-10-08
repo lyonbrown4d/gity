@@ -2,9 +2,16 @@ import { useList } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { OrganizationView, RepositoryView } from "@/pages/types";
+import {
+  ConsoleEmpty,
+  ConsoleLoadingRows,
+  ConsolePageHeader,
+  ConsolePanel,
+  MetricStrip,
+  StatusDot,
+} from "./workspace/console-primitives";
 
 export function AdminOverviewPage(): JSX.Element {
   const { t } = useI18n();
@@ -32,13 +39,12 @@ export function AdminOverviewPage(): JSX.Element {
       : null;
 
   return (
-    <div className="space-y-6 page-enter">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">{t("Admin Overview")}</h2>
-        <p className="text-sm text-muted-foreground">
-          {t("Monitor organizations, projects, and current control-plane baseline.")}
-        </p>
-      </div>
+    <div className="space-y-4 page-enter">
+      <ConsolePageHeader
+        eyebrow={t("Admin Side")}
+        title={t("Admin Overview")}
+        description={t("Monitor organizations, projects, and current control-plane baseline.")}
+      />
 
       {errorMessage ? (
         <Alert variant="destructive">
@@ -46,74 +52,63 @@ export function AdminOverviewPage(): JSX.Element {
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card className="card-enter">
-          <CardHeader>
-            <CardDescription>{t("Organizations")}</CardDescription>
-            <CardTitle className="text-3xl">{isLoading ? "--" : orgs.length}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-xs text-muted-foreground">{t("Total organizations visible to admin.")}</p>
-          </CardContent>
-        </Card>
+      <MetricStrip items={[
+        { label: t("Organizations"), value: isLoading ? "--" : orgs.length, detail: t("total"), active: orgs.length > 0 },
+        { label: t("Projects"), value: isLoading ? "--" : repos.length, detail: t("projects"), active: repos.length > 0 },
+        { label: t("Baseline"), value: "03", detail: t("System Composition"), active: !errorMessage },
+      ]} />
 
-        <Card className="card-enter">
-          <CardHeader>
-            <CardDescription>{t("Projects")}</CardDescription>
-            <CardTitle className="text-3xl">{isLoading ? "--" : repos.length}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-xs text-muted-foreground">{t("Projects under the primary organization.")}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-enter">
-          <CardHeader>
-            <CardDescription>{t("Baseline")}</CardDescription>
-            <CardTitle className="text-lg">{t("System Composition")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">refine</Badge>
-              <Badge variant="secondary">shadcn/ui</Badge>
-              <Badge variant="secondary">{t("split user/admin")}</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">{t("Current baseline aligns route auth with role-scoped layouts and CRUD pages.")}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="card-enter">
-        <CardHeader>
-          <CardTitle>{t("Organization Snapshot")}</CardTitle>
-          <CardDescription>
-            {t("Quick view of organizations and role mapping.")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : orgs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("No organizations available.")}</p>
-          ) : (
-            <div className="space-y-2">
-              {orgs.map((org) => (
-                <div key={org.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{org.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">{org.key}</p>
-                  </div>
-                  <Badge variant="outline">{org.role}</Badge>
-                </div>
-              ))}
-            </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.7fr)]">
+        <ConsolePanel
+          title={t("Organization Snapshot")}
+          description={t("Quick view of organizations and role mapping.")}
+          meta={`${orgs.length} ${t("total")}`}
+          bodyClassName="p-0"
+        >
+          {isLoading ? <div className="p-3"><ConsoleLoadingRows rows={4} /></div> : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/20">
+                  <TableHead className="h-8 px-3 text-[10px] uppercase tracking-wider">{t("Organization")}</TableHead>
+                  <TableHead className="h-8 text-[10px] uppercase tracking-wider">{t("Role")}</TableHead>
+                  <TableHead className="h-8 px-3 text-right text-[10px] uppercase tracking-wider">ID</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orgs.map((org) => (
+                  <TableRow key={org.id}>
+                    <TableCell className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <StatusDot />
+                        <div><p className="text-xs font-medium">{org.name}</p><p className="font-mono text-[10px] text-muted-foreground">{org.key}</p></div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2"><Badge variant="outline">{org.role}</Badge></TableCell>
+                    <TableCell className="max-w-44 truncate px-3 py-2 text-right font-mono text-[10px] text-muted-foreground">{org.id}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </CardContent>
-      </Card>
+          {!isLoading && orgs.length === 0 ? <ConsoleEmpty>{t("No organizations available.")}</ConsoleEmpty> : null}
+        </ConsolePanel>
+
+        <ConsolePanel title={t("System Composition")} description={t("Current baseline aligns route auth with role-scoped layouts and CRUD pages.")}>
+          <div className="divide-y divide-border/70">
+            {[
+              ["refine", t("Refine-driven routing and auth flow")],
+              ["shadcn/ui", t("Platform")],
+              [t("split user/admin"), t("Access role")],
+            ].map(([name, detail]) => (
+              <div key={name} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+                <StatusDot />
+                <div className="min-w-0 flex-1"><p className="font-mono text-xs font-medium">{name}</p><p className="truncate text-[10px] text-muted-foreground">{detail}</p></div>
+                <Badge variant="secondary" className="text-[9px]">{t("active")}</Badge>
+              </div>
+            ))}
+          </div>
+        </ConsolePanel>
+      </div>
     </div>
   );
 }

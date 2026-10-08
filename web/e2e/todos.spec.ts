@@ -48,7 +48,7 @@ test("shows generated todos and marks them done from the inbox", async ({ page }
   await page.goto("/app/dashboard");
 
   await expect(page.getByRole("link", { name: "Open Inbox" })).toBeVisible();
-  const pendingMetric = page.locator(".gity-metric-card").filter({ hasText: "Pending Todos" });
+  const pendingMetric = page.getByRole("group", { name: "Pending Todos" });
   await expect(pendingMetric).toContainText("1");
 
   await page.getByRole("link", { name: "Inbox", exact: true }).click();
@@ -69,7 +69,7 @@ test("shows generated todos and marks them done from the inbox", async ({ page }
 
   await page.getByRole("button", { name: "Quick jump" }).click();
   await page.getByPlaceholder("Search projects, issues, merge requests, files...").fill("inbox");
-  await expect(page.getByRole("button", { name: /Inbox/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Inbox/ })).toBeVisible();
 
   expect(todoRequests).toContain("GET /todos?state=pending&limit=100");
   expect(todoRequests).toContain("POST /todos/42/done");

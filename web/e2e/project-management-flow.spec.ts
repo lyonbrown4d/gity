@@ -23,15 +23,15 @@ test("creates, opens, and deletes a project through the workspace UI", async ({ 
   await dialog.getByRole("button", { name: "Create" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("link", { name: projectName })).toBeVisible();
+  await expect(page.locator("#main-content").getByRole("link", { name: projectName, exact: true })).toBeVisible();
   await expect(page.getByText(expectedFullPath).first()).toBeVisible();
 
-  await page.getByRole("link", { name: projectName }).click();
+  await page.locator("#main-content").getByRole("link", { name: projectName, exact: true }).click();
   await expect(page.getByText(projectName).first()).toBeVisible();
   await expect(page.getByText(expectedFullPath, { exact: true })).toBeVisible();
 
   await page.goto("/app/projects");
-  const projectCard = page.locator(".group").filter({ has: page.getByRole("link", { name: projectName }) }).first();
+  const projectCard = page.getByRole("article", { name: projectName });
   await projectCard.getByRole("button", { name: "Delete" }).click();
 
   const confirmDialog = page.getByRole("dialog", { name: new RegExp(`Delete project "${projectName}"`) });
@@ -40,7 +40,7 @@ test("creates, opens, and deletes a project through the workspace UI", async ({ 
   await confirmDialog.getByRole("button", { name: "Delete" }).click();
 
   await expect(confirmDialog).toBeHidden();
-  await expect(page.getByRole("link", { name: projectName })).toHaveCount(0);
+  await expect(page.locator("#main-content").getByRole("link", { name: projectName, exact: true })).toHaveCount(0);
 });
 
 async function typeInto(locator: Locator, value: string): Promise<void> {
