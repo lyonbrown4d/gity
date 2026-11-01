@@ -13,3 +13,5 @@
 *.zip binary
 *.gz binary
 *.tgz binary
+# Preserve upstream documentation bundles, including template-string whitespace.
+docs/shared/vendor/*.js -whitespace

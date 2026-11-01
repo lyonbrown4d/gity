@@ -1,0 +1,25 @@
+bundle = "mdbook-mermaid 0.17.1"
+
+[[files]]
+path = "mermaid.min.js"
+source = "https://github.com/badboy/mdbook-mermaid/blob/v0.17.1/src/bin/assets/mermaid.min.js"
+license = "MIT"
+sha256 = "eefea253bed9655e838eb874ff955c46872f982a8e26290c1dd2982ddc0a4703"
+
+[[files]]
+path = "mermaid-init.js"
+source = "https://github.com/badboy/mdbook-mermaid/blob/v0.17.1/src/bin/assets/mermaid-init.js"
+license = "MPL-2.0"
+sha256 = "53b67c5380e8f4dac4cd080370cfbe69ee46aced71c597eeaa5f55a3a9877611"
+
+[[files]]
+path = "mermaid-LICENSE"
+source = "https://github.com/mermaid-js/mermaid/blob/mermaid%4011.2.0/LICENSE"
+license = "MIT"
+sha256 = "ec9fb67dcb25eccc416ed56e1aab819222c805a2a4bfe4cb19e7556bf2ffde80"
+
+[[files]]
+path = "mdbook-mermaid-LICENSE"
+source = "https://github.com/badboy/mdbook-mermaid/blob/v0.17.1/LICENSE"
+license = "MPL-2.0"
+sha256 = "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"

@@ -1,0 +1,26 @@
+[book]
+title = "Gity 技术手册 / Technical Manual"
+description = "Rust 组件架构、开发与部署手册"
+language = "zh-CN"
+src = "docs"
+
+[build]
+build-dir = "target/book"
+create-missing = false
+
+[rust]
+edition = "2024"
+
+[output.html]
+git-repository-url = "https://github.com/lyonbrown4d/gity"
+edit-url-template = "https://github.com/lyonbrown4d/gity/edit/main/docs/{path}"
+additional-js = ["docs/shared/vendor/mermaid.min.js", "docs/shared/vendor/mermaid-init.js"]
+
+[output.html.fold]
+enable = true
+level = 1
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

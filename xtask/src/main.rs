@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 use std::{path::PathBuf, process::Command};
 mod blackbox;
 mod container_stats;
+mod docs;
 mod git_stress;
 mod k6;
 mod sources;
@@ -22,6 +23,11 @@ enum Task {
   Release,
   VendorCheck,
   SourceCheck,
+  /// Build or preview the mdBook manual.
+  Docs {
+    #[arg(long)]
+    serve: bool,
+  },
   GitStress(git_stress::GitStressArgs),
   K6(k6::K6Args),
   ContainerStats(container_stats::ContainerStatsArgs),
@@ -43,6 +49,7 @@ fn main() -> Result<()> {
     .to_path_buf();
   std::env::set_current_dir(&root)?;
   match Cli::parse().command.unwrap_or(Task::Check) {
+    Task::Docs { serve } => docs::run(&root, serve)?,
     Task::VendorCheck => verify_vendor(&root)?,
     Task::SourceCheck => sources::check(&root)?,
     Task::GitStress(args) => git_stress::run(&root, args)?,
