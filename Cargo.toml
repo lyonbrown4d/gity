@@ -1,5 +1,38 @@
 [workspace]
-members = ["crates/gity-core", "crates/gity-git", "crates/gity-i18n", "apps/gity-server", "apps/gity-web", "apps/gity-runner", "apps/gity-git-hook", "crates/gity-search", "apps/gity-search-index", "xtask"]
+members = [
+  "apps/gity-api",
+  "apps/gity-gateway",
+  "apps/gity-git-hook",
+  "apps/gity-git-node",
+  "apps/gity-git-server",
+  "apps/gity-registry",
+  "apps/gity-runner",
+  "apps/gity-search-index",
+  "apps/gity-server",
+  "apps/gity-standalone",
+  "apps/gity-web",
+  "apps/gity-worker",
+  "crates/gity-artifacts",
+  "crates/gity-authority",
+  "crates/gity-core",
+  "crates/gity-entities",
+  "crates/gity-gateway",
+  "crates/gity-git",
+  "crates/gity-git-cluster",
+  "crates/gity-git-node",
+  "crates/gity-git-wire",
+  "crates/gity-i18n",
+  "crates/gity-identity",
+  "crates/gity-ids",
+  "crates/gity-observability",
+  "crates/gity-oci",
+  "crates/gity-package-registry",
+  "crates/gity-platform",
+  "crates/gity-runtime",
+  "crates/gity-search",
+  "crates/gity-test-support",
+  "xtask",
+]
 resolver = "3"
 
 [workspace.package]
@@ -9,6 +42,25 @@ rust-version = "1.99.1"
 license = "MIT"
 
 [workspace.dependencies]
+testcontainers = { version = "0.28", features = ["http_wait_plain"] }
+toml = "0.8"
+sha2 = "0.10"
+subtle = "2"
+
+tonic = { version = "0.14", features = ["tls-ring"] }
+tonic-prost = "0.14"
+prost = "0.14"
+tokio-stream = { version = "0.1", features = ["net"] }
+
+zip = { version = "6", default-features = false, features = ["deflate"] }
+tar = "0.4"
+flate2 = "1"
+quick-xml = "0.38"
+pep440_rs = "0.7"
+semver = "1"
+thiserror = "2"
+futures-util = "0.3"
+async-trait = "0.1"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart", "macros"] }
 base64 = "0.22"
@@ -26,7 +78,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4", "v7", "serde"] }
 tempfile = "3"
-fluxdi = { version = "=2.0.0", features = ["thread-safe", "macros", "tracing"] }
+fluxdi = { version = "=2.0.0", features = ["thread-safe", "macros", "tracing", "async-factory", "lifecycle"] }
 
 [profile.release]
 lto = "thin"

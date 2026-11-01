@@ -1,0 +1,9 @@
+[package]
+name = "gity-test-support"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+testcontainers.workspace = true
+tokio.workspace = true

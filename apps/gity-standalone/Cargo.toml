@@ -1,0 +1,9 @@
+[package]
+name = "gity-standalone"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-platform = { path = "../../crates/gity-platform" }
+anyhow.workspace = true
+tokio.workspace = true

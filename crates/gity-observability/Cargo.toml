@@ -1,0 +1,23 @@
+[package]
+name = "gity-observability"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+serde.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+url = "2"
+metrics = "0.24"
+metrics-exporter-prometheus = "0.18"
+opentelemetry = "0.33"
+opentelemetry_sdk = "0.33"
+opentelemetry-otlp = { version = "0.33", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client", "reqwest-rustls"] }
+tracing-opentelemetry = "0.34"
+tracing-subscriber = { workspace = true, features = ["json"] }
+
+[dev-dependencies]
+tokio.workspace = true
+tower.workspace = true

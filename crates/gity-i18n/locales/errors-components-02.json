@@ -1,0 +1,283 @@
+{
+  "_version": 2,
+  "Maven metadata must be UTF-8 XML": {
+    "en": "Maven metadata must be UTF-8 XML",
+    "zh": "Maven 元数据必须是 UTF-8 XML"
+  },
+  "invalid Maven metadata XML": {
+    "en": "invalid Maven metadata XML",
+    "zh": "Maven 元数据 XML 无效"
+  },
+  "invalid Maven metadata path": {
+    "en": "invalid Maven metadata path",
+    "zh": "Maven 元数据路径无效"
+  },
+  "invalid Maven metadata coordinates": {
+    "en": "invalid Maven metadata coordinates",
+    "zh": "Maven 元数据坐标无效"
+  },
+  "npm tarball metadata does not match the publish request": {
+    "en": "npm tarball metadata does not match the publish request",
+    "zh": "npm 压缩包元数据与发布请求不匹配"
+  },
+  "npm dist-tag version must be a string": {
+    "en": "npm dist-tag version must be a string",
+    "zh": "npm dist-tag 版本必须是字符串"
+  },
+  "unsupported package format": {
+    "en": "unsupported package format",
+    "zh": "不支持的软件包格式"
+  },
+  "Cargo crate version is invalid": {
+    "en": "Cargo crate version is invalid",
+    "zh": "Cargo crate 版本无效"
+  },
+  "invalid Cargo publish body": {
+    "en": "invalid Cargo publish body",
+    "zh": "Cargo 发布请求正文无效"
+  },
+  "Cargo publish metadata is too large": {
+    "en": "Cargo publish metadata is too large",
+    "zh": "Cargo 发布元数据过大"
+  },
+  "invalid Cargo publish metadata": {
+    "en": "invalid Cargo publish metadata",
+    "zh": "Cargo 发布元数据无效"
+  },
+  "Cargo crate archive size is invalid": {
+    "en": "Cargo crate archive size is invalid",
+    "zh": "Cargo crate 压缩包大小无效"
+  },
+  "truncated Cargo publish body": {
+    "en": "truncated Cargo publish body",
+    "zh": "Cargo 发布请求正文不完整"
+  },
+  "trailing bytes in Cargo publish body": {
+    "en": "trailing bytes in Cargo publish body",
+    "zh": "Cargo 发布请求正文包含多余字节"
+  },
+  "truncated Cargo crate archive": {
+    "en": "truncated Cargo crate archive",
+    "zh": "Cargo crate 压缩包不完整"
+  },
+  "invalid request host": {
+    "en": "invalid request host",
+    "zh": "请求主机无效"
+  },
+  "Go module path not found": {
+    "en": "Go module path not found",
+    "zh": "Go 模块路径不存在"
+  },
+  "Go module version path not found": {
+    "en": "Go module version path not found",
+    "zh": "Go 模块版本路径不存在"
+  },
+  "unsupported Go module proxy request": {
+    "en": "unsupported Go module proxy request",
+    "zh": "不支持此 Go 模块代理请求"
+  },
+  "Go module version not found": {
+    "en": "Go module version not found",
+    "zh": "Go 模块版本不存在"
+  },
+  "invalid NuGet multipart upload": {
+    "en": "invalid NuGet multipart upload",
+    "zh": "NuGet 分段上传无效"
+  },
+  "NuGet package file is required": {
+    "en": "NuGet package file is required",
+    "zh": "必须提供 NuGet 软件包文件"
+  },
+  "failed to read NuGet package": {
+    "en": "failed to read NuGet package",
+    "zh": "读取 NuGet 软件包失败"
+  },
+  "invalid Maven metadata request": {
+    "en": "invalid Maven metadata request",
+    "zh": "Maven 元数据请求无效"
+  },
+  "Cargo crate index path does not match crate name": {
+    "en": "Cargo crate index path does not match crate name",
+    "zh": "Cargo crate 索引路径与 crate 名称不匹配"
+  },
+  "invalid Cargo token": {
+    "en": "invalid Cargo token",
+    "zh": "Cargo 令牌无效"
+  },
+  "package version is invalid": {
+    "en": "package version is invalid",
+    "zh": "软件包版本无效"
+  },
+  "package name is invalid": {
+    "en": "package name is invalid",
+    "zh": "软件包名称无效"
+  },
+  "package coordinate is incomplete": {
+    "en": "package coordinate is incomplete",
+    "zh": "软件包坐标不完整"
+  },
+  "invalid package file path": {
+    "en": "invalid package file path",
+    "zh": "软件包文件路径无效"
+  },
+  "invalid NuGet package archive": {
+    "en": "invalid NuGet package archive",
+    "zh": "NuGet 软件包压缩包无效"
+  },
+  "NuGet package is missing its nuspec": {
+    "en": "NuGet package is missing its nuspec",
+    "zh": "NuGet 软件包缺少 nuspec 文件"
+  },
+  "invalid NuGet package manifest": {
+    "en": "invalid NuGet package manifest",
+    "zh": "NuGet 软件包清单无效"
+  },
+  "NuGet package id is missing": {
+    "en": "NuGet package id is missing",
+    "zh": "NuGet 软件包缺少 ID"
+  },
+  "NuGet package version is missing": {
+    "en": "NuGet package version is missing",
+    "zh": "NuGet 软件包缺少版本"
+  },
+  "invalid NuGet dependency metadata": {
+    "en": "invalid NuGet dependency metadata",
+    "zh": "NuGet 依赖元数据无效"
+  },
+  "NuGet dependency id is missing": {
+    "en": "NuGet dependency id is missing",
+    "zh": "NuGet 依赖缺少 ID"
+  },
+  "invalid npm tarball": {
+    "en": "invalid npm tarball",
+    "zh": "npm 压缩包无效"
+  },
+  "invalid npm tarball path": {
+    "en": "invalid npm tarball path",
+    "zh": "npm 压缩包路径无效"
+  },
+  "invalid npm package manifest": {
+    "en": "invalid npm package manifest",
+    "zh": "npm 软件包清单无效"
+  },
+  "npm tarball has no package/package.json": {
+    "en": "npm tarball has no package/package.json",
+    "zh": "npm 压缩包缺少 package/package.json"
+  },
+  "invalid package checksum": {
+    "en": "invalid package checksum",
+    "zh": "软件包校验和无效"
+  },
+  "package file is too large": {
+    "en": "package file is too large",
+    "zh": "软件包文件过大"
+  },
+  "unsupported PyPI artifact format": {
+    "en": "unsupported PyPI artifact format",
+    "zh": "不支持的 PyPI 制品格式"
+  },
+  "Python package name is missing": {
+    "en": "Python package name is missing",
+    "zh": "缺少 Python 软件包名称"
+  },
+  "Python package version is missing": {
+    "en": "Python package version is missing",
+    "zh": "缺少 Python 软件包版本"
+  },
+  "Python package version is invalid": {
+    "en": "Python package version is invalid",
+    "zh": "Python 软件包版本无效"
+  },
+  "invalid Python wheel archive": {
+    "en": "invalid Python wheel archive",
+    "zh": "Python wheel 压缩包无效"
+  },
+  "invalid wheel metadata": {
+    "en": "invalid wheel metadata",
+    "zh": "wheel 元数据无效"
+  },
+  "wheel is missing dist-info/METADATA": {
+    "en": "wheel is missing dist-info/METADATA",
+    "zh": "wheel 缺少 dist-info/METADATA"
+  },
+  "invalid Python source archive": {
+    "en": "invalid Python source archive",
+    "zh": "Python 源码压缩包无效"
+  },
+  "invalid Python source metadata": {
+    "en": "invalid Python source metadata",
+    "zh": "Python 源码元数据无效"
+  },
+  "source archive is missing PKG-INFO": {
+    "en": "source archive is missing PKG-INFO",
+    "zh": "源码压缩包缺少 PKG-INFO"
+  },
+  "invalid package metadata header": {
+    "en": "invalid package metadata header",
+    "zh": "软件包元数据标头无效"
+  },
+  "Go module path is not escaped": {
+    "en": "Go module path is not escaped",
+    "zh": "Go 模块路径未正确转义"
+  },
+  "Go module path escape is invalid": {
+    "en": "Go module path escape is invalid",
+    "zh": "Go 模块路径转义无效"
+  },
+  "Cargo crate name is empty": {
+    "en": "Cargo crate name is empty",
+    "zh": "Cargo crate 名称不能为空"
+  },
+  "invalid Cargo crate archive": {
+    "en": "invalid Cargo crate archive",
+    "zh": "Cargo crate 压缩包无效"
+  },
+  "invalid Cargo crate archive path": {
+    "en": "invalid Cargo crate archive path",
+    "zh": "Cargo crate 压缩包路径无效"
+  },
+  "invalid Cargo manifest": {
+    "en": "invalid Cargo manifest",
+    "zh": "Cargo 清单无效"
+  },
+  "Cargo crate has no Cargo.toml": {
+    "en": "Cargo crate has no Cargo.toml",
+    "zh": "Cargo crate 缺少 Cargo.toml"
+  },
+  "Cargo manifest package table is missing": {
+    "en": "Cargo manifest package table is missing",
+    "zh": "Cargo 清单缺少 package 表"
+  },
+  "Cargo package name is missing": {
+    "en": "Cargo package name is missing",
+    "zh": "Cargo 软件包缺少名称"
+  },
+  "Cargo package version is missing": {
+    "en": "Cargo package version is missing",
+    "zh": "Cargo 软件包缺少版本"
+  },
+  "npm package not found": {
+    "en": "npm package not found",
+    "zh": "npm 软件包不存在"
+  },
+  "package version not found": {
+    "en": "package version not found",
+    "zh": "软件包版本不存在"
+  },
+  "Git storage is unavailable; project creation was not completed": {
+    "en": "Git storage is unavailable; project creation was not completed",
+    "zh": "Git 存储暂时不可用，项目未创建成功"
+  },
+  "invalid Maven metadata checksum path": {
+    "en": "invalid Maven metadata checksum path",
+    "zh": "Maven 元数据校验和路径无效"
+  },
+  "unsupported Maven metadata checksum": {
+    "en": "unsupported Maven metadata checksum",
+    "zh": "不支持此 Maven 元数据校验和"
+  },
+  "invalid Maven metadata checksum": {
+    "en": "invalid Maven metadata checksum",
+    "zh": "Maven 元数据校验和无效"
+  }
+}

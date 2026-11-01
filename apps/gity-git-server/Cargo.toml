@@ -1,0 +1,9 @@
+[package]
+name = "gity-git-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-platform = { path = "../../crates/gity-platform", default-features = false }
+anyhow.workspace = true
+tokio.workspace = true

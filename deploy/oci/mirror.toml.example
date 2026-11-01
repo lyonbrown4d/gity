@@ -1,0 +1,21 @@
+# Merge this file with the base config using Angos `-c base -c mirror server`.
+# Replace docker-io and ghcr.io with registry keys from the typed Gity mirror
+# allowlist. Keep credentials in a separate, mounted Angos secret config.
+# The Gity-side allowlist must include each registry authority and each exact
+# HTTPS Bearer-token realm authority used by it (for Docker Hub: auth.docker.io).
+# Blob redirect hosts are unnecessary for manifest resolution and stay denied
+# unless an operator explicitly adds them to the Gity allowlist.
+
+[repository."docker-io"]
+immutable_tags = true
+immutable_tags_exclusions = ["^latest$", "^nightly.*$", "^main$", "^develop$"]
+
+[[repository."docker-io".upstream]]
+url = "https://registry-1.docker.io"
+
+[repository."ghcr.io"]
+immutable_tags = true
+immutable_tags_exclusions = ["^latest$", "^nightly.*$", "^main$", "^develop$"]
+
+[[repository."ghcr.io".upstream]]
+url = "https://ghcr.io"

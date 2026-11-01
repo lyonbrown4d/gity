@@ -1,0 +1,9 @@
+.env
+tls/*
+!tls/.keep
+secrets/*.toml
+!secrets/*.example.toml
+data/
+secrets/git-node-1-token
+secrets/git-node-2-token
+secrets/seaweed-s3.json

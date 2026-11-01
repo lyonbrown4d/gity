@@ -1,0 +1,150 @@
+# syntax=docker/dockerfile:1.7
+# Build one role at a time. CI selects a role and a real base image for each tag.
+ARG GITY_BASE=debian
+ARG BUILDER_IMAGE=rust:1.99.1-bookworm
+ARG RUNTIME_IMAGE=debian:bookworm-slim
+ARG ANGOS_IMAGE=ghcr.io/project-angos/angos@sha256:1b90f6720c43eb143f519aec4c7bb721f180e74536634b64912085e464c65abd
+
+FROM ${ANGOS_IMAGE} AS angos-official
+
+FROM angos-official AS angos-debian
+FROM angos-official AS angos-alpine
+FROM angos-${GITY_BASE} AS angos-engine
+FROM docker:28.5-cli AS docker-client
+
+FROM ${BUILDER_IMAGE} AS toolkit
+ARG GITY_BASE
+RUN --mount=type=cache,id=gity-apk-${GITY_BASE},target=/var/cache/apk,sharing=locked \
+    --mount=type=cache,id=gity-apt-lists-${GITY_BASE},target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,id=gity-apt-archives-${GITY_BASE},target=/var/cache/apt/archives,sharing=locked \
+    if [ "${GITY_BASE}" = alpine ]; then \
+      apk --update-cache add git build-base pkgconf openssl-dev sqlite-dev cmake openssl-libs-static; \
+    else \
+      rm -f /etc/apt/apt.conf.d/docker-clean; \
+      apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git pkg-config libssl-dev libsqlite3-dev; \
+    fi
+
+FROM toolkit AS source
+WORKDIR /src
+COPY Cargo.toml Cargo.lock rust-toolchain.toml rustfmt.toml ./
+COPY apps ./apps
+COPY crates ./crates
+COPY migrations ./migrations
+COPY xtask ./xtask
+ENV RUSTUP_TOOLCHAIN=1.99.1 CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+FROM toolkit AS web-tools
+ARG GITY_BASE
+ENV RUSTUP_TOOLCHAIN=1.99.1
+WORKDIR /src
+RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
+    --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
+    --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
+    rustup target add wasm32-unknown-unknown && \
+    cargo install trunk --version 0.21.14 --locked --root /opt/trunk --target-dir /src/target/trunk-install
+
+FROM source AS builder
+ARG GITY_BASE
+ARG GITY_ROLE
+ARG CARGO_JOBS=4
+RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
+    --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
+    --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
+    set -eu; \
+    case "${GITY_ROLE}" in \
+      standalone) package=gity-standalone; binary=gity-standalone; extras='gity-runner gity-git-hook' ;; \
+      git) package=gity-git-server; binary=gity-git-server; extras='gity-git-hook' ;; \
+      api) package=gity-api; binary=gity-api; extras='' ;; \
+      git-node) package=gity-git-node-app; binary=gity-git-node; extras='gity-git-hook' ;; \
+      gateway) package=gity-gateway-app; binary=gity-gateway; extras='' ;; \
+      registry) package=gity-registry; binary=gity-registry; extras='' ;; \
+      runner) package=gity-runner; binary=gity-runner; extras='' ;; \
+      worker) package=gity-worker; binary=gity-worker; extras='' ;; \
+      *) echo "unsupported GITY_ROLE" >&2; exit 2 ;; \
+    esac; \
+    set --; for extra in ${extras}; do set -- "$@" -p "$extra"; done; \
+    CARGO_BUILD_JOBS="${CARGO_JOBS}" cargo build --release --locked -p "${package}" "$@"; \
+    install -Dm0555 "target/release/${binary}" /out/gity; \
+    for extra in ${extras}; do install -Dm0555 "target/release/${extra}" "/out/${extra}"; done
+
+FROM web-tools AS web
+ARG TARGETARCH
+COPY --from=source /src /src
+WORKDIR /src
+RUN --mount=type=cache,id=gity-trunk-tools-${GITY_BASE}-${TARGETARCH},target=/root/.cache/trunk \
+    --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
+    --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
+    --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
+    cd /src/apps/gity-web && \
+    NO_COLOR=true /opt/trunk/bin/trunk --skip-version-check build --release
+
+FROM ${RUNTIME_IMAGE} AS runtime
+ARG GITY_BASE=debian
+RUN --mount=type=cache,id=gity-apk-${GITY_BASE},target=/var/cache/apk,sharing=locked \
+    --mount=type=cache,id=gity-apt-lists-${GITY_BASE},target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,id=gity-apt-archives-${GITY_BASE},target=/var/cache/apt/archives,sharing=locked \
+    if [ "${GITY_BASE}" = alpine ]; then \
+      apk --update-cache add ca-certificates curl git openssh-client sqlite-libs tzdata libssl3 libcrypto3; \
+      addgroup -g 10001 gity && adduser -D -u 10001 -G gity gity; \
+    else \
+      rm -f /etc/apt/apt.conf.d/docker-clean; \
+      apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl git openssh-client libsqlite3-0 libssl3 tzdata \
+        && groupadd --gid 10001 gity \
+        && useradd --uid 10001 --gid gity --create-home gity; \
+    fi \
+    && mkdir -p /var/lib/gity && chown gity:gity /var/lib/gity
+WORKDIR /var/lib/gity
+USER gity
+
+ARG GITY_ROLE
+FROM runtime AS app
+ARG GITY_ROLE
+COPY --from=builder --chown=10001:10001 /out/gity /usr/local/bin/gity
+ENTRYPOINT ["/usr/local/bin/gity"]
+
+FROM app AS standalone
+EXPOSE 8080 2222 5000
+COPY --from=angos-engine --chmod=0555 /angos /usr/local/bin/angos
+COPY --from=docker-client /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=builder /out/gity-runner /usr/local/bin/gity-runner
+COPY --from=builder /out/gity-git-hook /usr/local/bin/gity-git-hook
+COPY --from=web /src/dist/web /opt/gity/web
+ENV GITY_ANGOS__EXECUTABLE=/usr/local/bin/angos
+ENV GITY_WEB__ROOT=/opt/gity/web GITY_GIT__HOOK=/usr/local/bin/gity-git-hook
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8080/api/health || exit 1
+
+FROM app AS git
+EXPOSE 8080 2222
+COPY --from=builder /out/gity-git-hook /usr/local/bin/gity-git-hook
+COPY --from=web /src/dist/web /opt/gity/web
+ENV GITY_WEB__ROOT=/opt/gity/web GITY_GIT__HOOK=/usr/local/bin/gity-git-hook
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8080/api/health || exit 1
+
+FROM app AS api
+EXPOSE 8080 9100
+COPY --from=web /src/dist/web /opt/gity/web
+ENV GITY_WEB__ROOT=/opt/gity/web
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8080/api/health || exit 1
+
+FROM app AS git-node
+EXPOSE 9101
+RUN mkdir -p /var/lib/gity/repos
+COPY --from=builder /out/gity-git-hook /usr/local/bin/gity-git-hook
+ENV GITY_GIT__HOOK=/usr/local/bin/gity-git-hook
+
+FROM app AS gateway
+EXPOSE 8080 2222
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8080/readyz || exit 1
+
+FROM app AS registry
+EXPOSE 8081 8082
+COPY --from=angos-engine --chmod=0555 /angos /usr/local/bin/angos
+ENV GITY_REGISTRY__ANGOS__EXECUTABLE=/usr/local/bin/angos
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8081/v2/ || exit 1
+
+FROM app AS runner
+COPY --from=docker-client /usr/local/bin/docker /usr/local/bin/docker
+
+FROM app AS worker

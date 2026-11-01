@@ -1,0 +1,14 @@
+[package]
+name = "gity-entities"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+sea-orm.workspace = true
+chrono.workspace = true
+gity-ids = { path = "../gity-ids" }
+
+[dev-dependencies]
+gity-test-support = { path = "../gity-test-support" }
+gity-core = { path = "../gity-core" }
+tokio.workspace = true

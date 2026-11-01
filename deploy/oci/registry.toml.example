@@ -1,0 +1,38 @@
+address = "0.0.0.0:8081"
+request_timeout_seconds = 30
+
+[angos]
+executable = "/usr/local/bin/angos"
+config_files = ["/etc/gity/angos.toml"]
+health_url = "http://127.0.0.1:8000/readyz"
+startup_timeout_seconds = 30
+restart_limit = 5
+shutdown_timeout_seconds = 10
+
+[authority]
+id = "main"
+uri = "https://gity-api.internal:9102"
+# TLS paths contain PEM files. The authority peer token is only read from the
+# GITY_AUTHORITY_PEER_TOKEN environment variable or --authority-peer-token.
+ca_certificate = "/run/secrets/gity-authority-ca.pem"
+client_certificate = "/run/secrets/gity-registry-client.pem"
+client_key = "/run/secrets/gity-registry-client-key.pem"
+
+[oci]
+upstream = "http://127.0.0.1:8000"
+
+[oci.upstream_policy]
+# Used only to validate WWW-Authenticate realms returned from private Angos.
+allowed_hosts = []
+
+[oci.mirror]
+allowed_hosts = ["registry-1.docker.io", "auth.docker.io"]
+
+[oci.mirror.registries.dockerhub]
+host = "registry-1.docker.io"
+credential_secret_ref = "dockerhub-pull"
+
+[mirror_secrets.dockerhub-pull]
+# Values are environment variable names, never usernames or passwords.
+username = "GITY_DOCKERHUB_USERNAME"
+password = "GITY_DOCKERHUB_TOKEN"

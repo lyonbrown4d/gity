@@ -1,0 +1,16 @@
+[server]
+bind_address = "127.0.0.1"
+port = 18000
+
+[global]
+enable_blob_redirect = false
+enable_manifest_redirect = false
+
+[global.access_policy]
+default = "allow"
+
+[blob_store.s3]
+endpoint = "http://seaweed:8333"
+bucket = "gity-oci"
+region = "us-east-1"
+key_prefix = "oci/"

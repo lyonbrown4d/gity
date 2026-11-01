@@ -27,6 +27,13 @@ jobs:
           name: rust-linux-smoke-build
           path: |
             target/release/gity-server
+            target/release/gity-standalone
+            target/release/gity-api
+            target/release/gity-git-server
+            target/release/gity-worker
+            target/release/gity-git-node
+            target/release/gity-registry
+            target/release/gity-gateway
             target/release/gity-runner
             target/release/gity-git-hook
             target/release/gity-search-index
@@ -41,14 +48,16 @@ jobs:
         run: |
           docker compose -f deploy/integration/compose.yaml --profile ci up -d --wait --wait-timeout 180 postgres-test mysql-test s3
           docker compose -f deploy/integration/compose.yaml run --rm s3-init
+      - name: Isolated Testcontainers entity contracts
+        run: cargo test -p gity-entities --test container_databases --locked -- --ignored --test-threads=1
       - name: PostgreSQL API regression
         env:
           GITY_TEST_DATABASE_URL: postgres://gity:gity-test-db-only@localhost:5434/gity
-        run: cargo test -p gity-server --locked -- --test-threads=1
+        run: cargo test -p gity-platform -p gity-server --locked -- --test-threads=1
       - name: MySQL API regression
         env:
           GITY_TEST_DATABASE_URL: mysql://root:gity-test-root-only@localhost:3308/gity
-        run: cargo test -p gity-server --locked -- --test-threads=1
+        run: cargo test -p gity-platform -p gity-server --locked -- --test-threads=1
       - name: SeaweedFS S3 contract
         env:
           GITY_TEST_S3_ENDPOINT: http://localhost:9000

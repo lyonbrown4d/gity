@@ -1,0 +1,14 @@
+http_listen = "0.0.0.0:8080"
+ssh_listen = "0.0.0.0:2222"
+main_http_origin = "http://api:8080"
+package_http_origin = "http://registry:8082"
+# Set https when an external TLS proxy fronts this listener.
+public_scheme = "http"
+main_ssh_address = "git-server:2222"
+allow_insecure_private_network = true
+request_timeout_seconds = 300
+ssh_connect_timeout_seconds = 10
+ssh_session_timeout_seconds = 86400
+shutdown_timeout_seconds = 10
+max_http_requests = 1024
+max_ssh_sessions = 256

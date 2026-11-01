@@ -1,0 +1,65 @@
+services:
+  postgres:
+    extends:
+      file: ./distributed-infrastructure.compose.yaml
+      service: postgres
+  seaweed:
+    extends:
+      file: ./distributed-infrastructure.compose.yaml
+      service: seaweed
+  seaweed-buckets:
+    extends:
+      file: ./distributed-infrastructure.compose.yaml
+      service: seaweed-buckets
+  git-node:
+    extends:
+      file: ./distributed-git-nodes.compose.yaml
+      service: git-node
+  git-node-2:
+    extends:
+      file: ./distributed-git-nodes.compose.yaml
+      service: git-node-2
+  migrate:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: migrate
+  api:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: api
+  git-server:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: git-server
+  worker:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: worker
+  gateway:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: gateway
+  registry:
+    extends:
+      file: ./distributed-components.compose.yaml
+      service: registry
+  docker:
+    extends:
+      file: ./distributed-runner.compose.yaml
+      service: docker
+  runner:
+    extends:
+      file: ./distributed-runner.compose.yaml
+      service: runner
+
+volumes:
+  postgres-data:
+  seaweed-data:
+  git-repositories:
+  git-repositories-2:
+  api-data:
+  git-server-data:
+  worker-data:
+  registry-data:
+  docker-data:
+  docker-certs:

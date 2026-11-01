@@ -1,0 +1,123 @@
+{
+  "_version": 2,
+  "CI job tokens cannot delete packages": {
+    "en": "CI job tokens cannot delete packages",
+    "zh": "CI 作业令牌不能删除软件包"
+  },
+  "invalid mirror repository prefix": {
+    "en": "invalid mirror repository prefix",
+    "zh": "镜像仓库前缀无效"
+  },
+  "mirror alias is required": {
+    "en": "mirror alias is required",
+    "zh": "必须填写镜像别名"
+  },
+  "unknown mirror alias": {
+    "en": "unknown mirror alias",
+    "zh": "镜像别名不存在"
+  },
+  "mirror source is not delegated to this project": {
+    "en": "mirror source is not delegated to this project",
+    "zh": "镜像源未授权给此项目"
+  },
+  "unsupported registry credentials": {
+    "en": "unsupported registry credentials",
+    "zh": "不支持此容器仓库凭据"
+  },
+  "token lacks container registry scope": {
+    "en": "token lacks container registry scope",
+    "zh": "令牌缺少容器仓库权限范围"
+  },
+  "CI job tokens cannot delete images": {
+    "en": "CI job tokens cannot delete images",
+    "zh": "CI 作业令牌不能删除镜像"
+  },
+  "catalog disabled": {
+    "en": "catalog disabled",
+    "zh": "镜像目录已禁用"
+  },
+  "mirror repositories are read only": {
+    "en": "mirror repositories are read only",
+    "zh": "镜像仓库为只读"
+  },
+  "mirror source is unavailable": {
+    "en": "mirror source is unavailable",
+    "zh": "镜像源不可用"
+  },
+  "mirror image name is required": {
+    "en": "mirror image name is required",
+    "zh": "必须填写镜像名称"
+  },
+  "administrator permission required": {
+    "en": "administrator permission required",
+    "zh": "需要管理员权限"
+  },
+  "Git cluster is not configured": {
+    "en": "Git cluster is not configured",
+    "zh": "Git 集群尚未配置"
+  },
+  "invalid package credential": {
+    "en": "invalid package credential",
+    "zh": "软件包凭据无效"
+  },
+  "package credential is too large": {
+    "en": "package credential is too large",
+    "zh": "软件包凭据过长"
+  },
+  "package credential rejected": {
+    "en": "package credential rejected",
+    "zh": "软件包凭据已被拒绝"
+  },
+  "package operation forbidden": {
+    "en": "package operation forbidden",
+    "zh": "无权执行此软件包操作"
+  },
+  "package project not found": {
+    "en": "package project not found",
+    "zh": "软件包所属项目不存在"
+  },
+  "invalid package authorization request": {
+    "en": "invalid package authorization request",
+    "zh": "软件包授权请求无效"
+  },
+  "NuGet package version not found": {
+    "en": "NuGet package version not found",
+    "zh": "NuGet 软件包版本不存在"
+  },
+  "npm package version not found": {
+    "en": "npm package version not found",
+    "zh": "npm 软件包版本不存在"
+  },
+  "CI job tokens cannot delete registry metadata": {
+    "en": "CI job tokens cannot delete registry metadata",
+    "zh": "CI 作业令牌不能删除仓库元数据"
+  },
+  "invalid npm dist-tag": {
+    "en": "invalid npm dist-tag",
+    "zh": "npm dist-tag 无效"
+  },
+  "invalid PyPI upload multipart": {
+    "en": "invalid PyPI upload multipart",
+    "zh": "PyPI 上传表单无效"
+  },
+  "failed to read Python package": {
+    "en": "failed to read Python package",
+    "zh": "读取 Python 软件包失败"
+  },
+  "invalid PyPI metadata field": {
+    "en": "invalid PyPI metadata field",
+    "zh": "PyPI 元数据字段无效"
+  },
+  "Python package filename is required": {
+    "en": "Python package filename is required",
+    "zh": "必须提供 Python 软件包文件名"
+  },
+  "Python package file is required": {
+    "en": "Python package file is required",
+    "zh": "必须提供 Python 软件包文件"
+  },
+  "PyPI form metadata does not match the package file": {
+    "en": "PyPI form metadata does not match the package file",
+    "zh": "PyPI 表单元数据与软件包文件不匹配"
+  }
+}

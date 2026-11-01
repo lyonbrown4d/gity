@@ -1,0 +1,20 @@
+[package]
+name = "gity-gateway"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-observability = { path = "../gity-observability" }
+axum.workspace = true
+fluxdi = { version = "=2.0.0", features = ["thread-safe", "lifecycle"] }
+futures-util.workspace = true
+http = "1"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "stream"] }
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+url = "2"
+
+[dev-dependencies]
+tower.workspace = true
+serde_json.workspace = true

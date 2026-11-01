@@ -1,0 +1,54 @@
+//! SeaORM entity mappings generated from the versioned initial schema.
+//! Public API models remain in the HTTP/OpenAPI layer.
+
+pub mod artifact_storage_deletions;
+pub mod audit_revisions;
+pub mod auth_sessions;
+pub mod bootstrap_claim;
+pub mod organization_members;
+pub mod organizations;
+pub mod project_access_tokens;
+pub mod project_audit_events;
+pub mod project_branch_protection_audits;
+pub mod project_branch_protections;
+pub mod project_ci_variable_audits;
+pub mod project_ci_variables;
+pub mod project_deploy_key_audits;
+pub mod project_deploy_keys;
+pub mod project_iid_counters;
+pub mod project_issue_assignees;
+pub mod project_issue_attachments;
+pub mod project_issue_comments;
+pub mod project_issue_labels;
+pub mod project_issues;
+pub mod project_job_artifacts;
+pub mod project_job_logs;
+pub mod project_jobs;
+pub mod project_lfs_locks;
+pub mod project_lfs_objects;
+pub mod project_member_audits;
+pub mod project_members;
+pub mod project_merge_request_approval_rule_audits;
+pub mod project_merge_request_approval_rules;
+pub mod project_merge_request_approvals;
+pub mod project_merge_request_comments;
+pub mod project_merge_request_participants;
+pub mod project_merge_requests;
+pub mod project_npm_dist_tags;
+pub mod project_package_files;
+pub mod project_package_versions;
+pub mod project_packages;
+pub mod project_pipeline_jobs;
+pub mod project_pipelines;
+pub mod project_release_links;
+pub mod project_releases;
+pub mod project_runners;
+pub mod project_todos;
+pub mod project_wiki_pages;
+pub mod projects;
+pub mod user_access_tokens;
+pub mod user_passwords;
+pub mod users;
+
+pub mod git_repository_placements;
+pub mod project_registry_settings;

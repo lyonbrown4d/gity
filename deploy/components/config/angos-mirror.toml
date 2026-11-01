@@ -1,0 +1,4 @@
+# The secret overlay supplies the managed upstream entry for this repository.
+[repository."mirror-dockerhub"]
+immutable_tags = true
+immutable_tags_exclusions = ["^latest$", "^nightly.*$", "^main$", "^develop$"]

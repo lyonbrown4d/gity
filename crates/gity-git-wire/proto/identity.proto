@@ -1,0 +1,20 @@
+syntax = "proto3";
+package gity.identity.v1;
+
+// Private peer-authenticated authority. User credentials are opaque and never logged.
+service IdentityAuthority {
+  rpc AuthorizeOci(AuthorizeOciRequest) returns (AuthorizeOciResponse);
+  rpc AuthorizePackage(AuthorizePackageRequest) returns (AuthorizePackageResponse);
+}
+message AuthorizeOciRequest {
+  bytes request_json = 1;
+  optional string authorization = 2;
+}
+message AuthorizeOciResponse { bytes decision_json = 1; }
+
+message AuthorizePackageRequest {
+  int64 project_id = 1;
+  string action = 2;
+  map<string, string> credentials = 3;
+}
+message AuthorizePackageResponse { bytes actor_json = 1; }

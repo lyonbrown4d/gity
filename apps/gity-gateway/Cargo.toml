@@ -1,0 +1,23 @@
+[package]
+name = "gity-gateway-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "gity-gateway"
+path = "src/main.rs"
+
+[dependencies]
+gity-observability = { path = "../../crates/gity-observability" }
+gity-runtime = { path = "../../crates/gity-runtime" }
+anyhow.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+config = { version = "0.15", default-features = false, features = ["toml", "yaml"] }
+fluxdi.workspace = true
+gity-gateway = { path = "../../crates/gity-gateway" }
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

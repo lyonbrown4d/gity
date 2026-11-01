@@ -1,0 +1,69 @@
+[http]
+address = "0.0.0.0:8080"
+base_url = "http://localhost:8080"
+
+[database]
+dsn = "sqlite://data/gity.db?mode=rwc"
+driver = "sqlite"
+node_id = 1
+
+[git]
+repo_root = "/var/lib/gity/repos"
+bin = "git"
+hook = "/usr/local/bin/gity-git-hook"
+
+[ssh]
+enabled = true
+address = "0.0.0.0:2222"
+host_key = "/var/lib/gity/ssh_host_ed25519"
+max_connections = 64
+operation_timeout_seconds = 900
+
+[storage]
+driver = "local"
+root = "/var/lib/gity/storage"
+s3_region = "us-east-1"
+s3_use_path_style = true
+
+[web]
+root = "/opt/gity/web"
+
+[search]
+index_enabled = true
+index_root = "/var/lib/gity/search-index"
+refresh_interval_seconds = 300
+max_files_per_project = 5000
+max_file_size_bytes = 524288
+
+[observability]
+service_name = "gity-standalone"
+log_format = "json"
+log_level = "gity=info,tower_http=info"
+metrics_enabled = true
+metrics_address = "127.0.0.1:9090"
+
+[components]
+standalone = true
+
+[components.authority]
+enabled = true
+address = "127.0.0.1:9100"
+token = "<overridden-by-compose-secret>"
+
+[components.registry]
+enabled = true
+address = "0.0.0.0:5000"
+engine_url = "http://127.0.0.1:18000"
+engine_binary = "/usr/local/bin/angos"
+allowed_upstream_authorities = ["registry-1.docker.io", "auth.docker.io"]
+
+[components.registry.mirrors.dockerhub]
+host = "registry-1.docker.io"
+allow_all_projects = true
+
+[components.runner]
+enabled = true
+executable = "/usr/local/bin/gity-runner"
+token_directory = "/var/lib/gity/data/runner-tokens"
+work_root = "/var/lib/gity/data/runner"
+container_bin = "/usr/local/bin/docker"

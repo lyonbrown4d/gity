@@ -1,0 +1,18 @@
+# Angos is bound to a private endpoint and is reached only through Gity's OCI
+# gateway. Do not publish this port or expose the Angos Web UI.
+[server]
+bind_address = "127.0.0.1"
+port = 18000
+
+[blob_store.fs]
+root_dir = "/var/lib/gity/oci"
+
+[global]
+max_manifest_size = "5MiB"
+max_blob_size = "100GiB"
+blob_stream_frame_size = "128KiB"
+
+[global.access_policy]
+# Gity authorizes every public OCI operation before forwarding. This private
+# listener must remain inaccessible to untrusted workloads.
+default = "allow"

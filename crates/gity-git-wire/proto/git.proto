@@ -1,0 +1,27 @@
+syntax = "proto3";
+package gity.git.v1;
+
+service GitStorage {
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+  rpc Transfer(stream TransferFrame) returns (stream TransferFrame);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+message ExecuteRequest {
+  string repository_key = 1;
+  bytes operation_json = 2;
+  string operation_id = 3;
+  uint64 epoch = 4;
+}
+message ExecuteResponse { bytes result_json = 1; }
+message TransferFrame {
+  oneof payload {
+    bytes open_json = 1;
+    bytes data = 2;
+    bool input_finished = 3;
+    ExitStatus exit = 4;
+    bytes snapshot_json = 5;
+  }
+}
+message ExitStatus { bool success = 1; string message = 2; }
+message HealthRequest {}
+message HealthResponse { string node_id = 1; bool writable = 2; }

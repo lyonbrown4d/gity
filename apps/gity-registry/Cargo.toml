@@ -1,0 +1,30 @@
+[package]
+name = "gity-registry"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "gity-registry"
+path = "src/main.rs"
+
+[dependencies]
+gity-observability = { path = "../../crates/gity-observability" }
+gity-ids = { path = "../../crates/gity-ids" }
+gity-core = { path = "../../crates/gity-core" }
+gity-artifacts = { path = "../../crates/gity-artifacts" }
+gity-package-registry = { path = "../../crates/gity-package-registry" }
+anyhow.workspace = true
+async-trait.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+config = { version = "0.15", default-features = false, features = ["toml", "yaml"] }
+fluxdi.workspace = true
+gity-authority = { path = "../../crates/gity-authority" }
+gity-git-wire = { path = "../../crates/gity-git-wire" }
+gity-oci = { path = "../../crates/gity-oci" }
+gity-runtime = { path = "../../crates/gity-runtime" }
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

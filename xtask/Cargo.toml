@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+zip.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 sha2 = "0.10"
@@ -14,3 +15,7 @@ reqwest = { version = "0.13", features = ["blocking", "json"] }
 url = "2"
 serde_json.workspace = true
 libc = "0.2"
+uuid.workspace = true
+tempfile.workspace = true
+dotenvy = "0.15"
+base64 = "0.22"

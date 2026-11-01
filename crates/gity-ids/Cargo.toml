@@ -1,0 +1,11 @@
+[package]
+name = "gity-ids"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+chrono.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

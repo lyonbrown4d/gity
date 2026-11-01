@@ -1,0 +1,25 @@
+# Angos v1.12.4 pinned config shape for SeaweedFS S3. Runtime should render
+# credentials from the secret provider into a mode-0600 config file.
+[server]
+bind_address = "127.0.0.1"
+port = 18000
+
+[blob_store.s3]
+endpoint = "http://seaweed-s3:8333"
+bucket = "gity-oci"
+region = "us-east-1"
+access_key_id = "<secret-provider:seaweed-access-key-id>"
+secret_key = "<secret-provider:seaweed-secret-key>"
+
+# Angos uses the blob-store S3 backend for metadata when metadata_store is
+# omitted. Its v1.12.4 S3 client always builds path-style URLs; there is no
+# force_path_style config key in the approved revision.
+[global.access_policy]
+default = "allow"
+
+# Render credentials from the managed secret reference. Keep them out of the
+# static base config. Repeat one upstream entry per managed registry alias.
+[[repository."mirror-docker-io".upstream]]
+url = "https://registry-1.docker.io"
+username = "<secret-provider:dockerhub-username>"
+password = "<secret-provider:dockerhub-password>"

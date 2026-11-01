@@ -31,7 +31,7 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: |
           mkdir -p package/dist
-          cp target/release/gity-server target/release/gity-runner target/release/gity-git-hook target/release/gity-search-index package/
+          cp target/release/gity-server target/release/gity-standalone target/release/gity-api target/release/gity-git-server target/release/gity-worker target/release/gity-git-node target/release/gity-registry target/release/gity-gateway target/release/gity-runner target/release/gity-git-hook target/release/gity-search-index package/
           cp -R dist/web package/dist/web
           cp LICENSE package/
           tar -czf "gity-${GITHUB_REF_NAME}-${PLATFORM}.tar.gz" -C package .
@@ -58,6 +58,18 @@ jobs:
   images:
     needs: verify
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [standalone, git, api, git-node, gateway, registry, runner, worker]
+        base: [debian, alpine]
+        include:
+          - base: debian
+            builder: rust:1.99.1-bookworm
+            runtime: debian:bookworm-slim
+          - base: alpine
+            builder: rust:1.99.1-alpine
+            runtime: alpine:3.22
     permissions:
       contents: read
       packages: write
@@ -73,24 +85,15 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: build/package/Dockerfile
-          target: server
+          file: build/package/Dockerfile.variants
+          target: ${{ matrix.role }}
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            GITY_ROLE=${{ matrix.role }}
+            GITY_BASE=${{ matrix.base }}
+            BUILDER_IMAGE=${{ matrix.builder }}
+            RUNTIME_IMAGE=${{ matrix.runtime }}
+          cache-from: type=gha,scope=${{ matrix.role }}-${{ matrix.base }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.role }}-${{ matrix.base }}
           push: true
-          tags: ghcr.io/${{ github.repository }}-server:${{ github.ref_name }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: build/package/Dockerfile
-          target: runner
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository }}-runner:${{ github.ref_name }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: build/package/Dockerfile
-          target: search-index
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository }}-search-index:${{ github.ref_name }}
+          tags: ghcr.io/${{ github.repository }}-${{ matrix.role }}:${{ github.ref_name }}-${{ matrix.base }}

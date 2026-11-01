@@ -1,0 +1,51 @@
+x-outbound-proxy-environment: &outbound-proxy-environment
+  HTTP_PROXY: ${GITY_OUTBOUND_HTTP_PROXY:-}
+  HTTPS_PROXY: ${GITY_OUTBOUND_HTTPS_PROXY:-}
+  NO_PROXY: ${GITY_OUTBOUND_NO_PROXY:-localhost,127.0.0.1,::1,gity,api,git-server,git-node,git-node-2,gateway,registry,worker,runner,seaweed,postgres,docker}
+
+services:
+  git-node:
+    image: ${GITY_GIT_NODE_IMAGE:?Set the Git node image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: git-node
+      args:
+        GITY_ROLE: git-node
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/git-node.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_GIT_NODE_TOKEN: ${GIT_NODE_1_PEER_TOKEN:?Set a random Git node 1 peer token}
+    volumes:
+      - git-repositories:/var/lib/gity/repos
+      - ./config/git-node.toml:/etc/gity/git-node.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-node-1-server.crt:/run/tls/git-node-1-server.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-node-1-server.key:/run/tls/git-node-1-server.key:ro
+    restart: unless-stopped
+
+  git-node-2:
+    image: ${GITY_GIT_NODE_IMAGE:?Set the Git node image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: git-node
+      args:
+        GITY_ROLE: git-node
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/git-node.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_GIT_NODE_TOKEN: ${GIT_NODE_2_PEER_TOKEN:?Set a random Git node 2 peer token}
+    volumes:
+      - git-repositories-2:/var/lib/gity/repos
+      - ./config/git-node-2.toml:/etc/gity/git-node.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-node-2-server.crt:/run/tls/git-node-2-server.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-node-2-server.key:/run/tls/git-node-2-server.key:ro
+    restart: unless-stopped

@@ -1,0 +1,28 @@
+[package]
+name = "gity-git-cluster"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-core = { path = "../gity-core" }
+gity-entities = { path = "../gity-entities" }
+gity-git-wire = { path = "../gity-git-wire" }
+gity-ids = { path = "../gity-ids" }
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+fluxdi.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+gity-git = { path = "../gity-git" }
+gity-git-node = { path = "../gity-git-node" }
+tonic.workspace = true
+tokio-stream.workspace = true
+tempfile.workspace = true

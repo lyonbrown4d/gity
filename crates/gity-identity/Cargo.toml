@@ -1,0 +1,10 @@
+[package]
+name = "gity-identity"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-entities = { path = "../gity-entities" }
+sea-orm.workspace = true
+chrono.workspace = true
+fluxdi.workspace = true

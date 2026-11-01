@@ -1,0 +1,43 @@
+{
+  "_version": 2,
+  "Checking package availability…": {
+    "en": "Checking package availability…",
+    "zh": "正在检查包仓库是否可用…"
+  },
+  "Package availability is unknown": {
+    "en": "Package availability is unknown",
+    "zh": "尚未确认包仓库是否可用"
+  },
+  "Package features are disabled": {
+    "en": "Package features are disabled",
+    "zh": "包仓库功能已停用"
+  },
+  "Package registry is unavailable in this deployment.": {
+    "en": "Package registry is unavailable in this deployment.",
+    "zh": "当前部署未提供包仓库。"
+  },
+  "Published package registry": {
+    "en": "Published package registry",
+    "zh": "已发布的包"
+  },
+  "Published versions": {
+    "en": "Published versions",
+    "zh": "已发布版本"
+  },
+  "The server did not confirm package support. Browsing and publishing are unavailable until it can be verified.": {
+    "en": "The server did not confirm package support. Browsing and publishing are unavailable until it can be verified.",
+    "zh": "服务端尚未确认是否支持包仓库，确认前无法浏览或发布包。"
+  },
+  "This deployment does not provide package browsing or publishing.": {
+    "en": "This deployment does not provide package browsing or publishing.",
+    "zh": "当前部署不支持浏览或发布包。"
+  },
+  "View packages": {
+    "en": "View packages",
+    "zh": "查看包"
+  },
+  "View releases": {
+    "en": "View releases",
+    "zh": "查看发行版"
+  }
+}

@@ -1,0 +1,10 @@
+server_url = "http://gateway:8080"
+token_directory = "/var/lib/gity/data/runner-tokens"
+executor = "container"
+container_bin = "/usr/local/bin/docker"
+image = "alpine:3.22"
+work_root = "/tmp/gity-runner-work"
+poll_seconds = 3
+memory_mb = 1024
+cpus = 2
+pids_limit = 256

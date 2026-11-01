@@ -1,0 +1,252 @@
+x-outbound-proxy-environment: &outbound-proxy-environment
+  HTTP_PROXY: ${GITY_OUTBOUND_HTTP_PROXY:-}
+  HTTPS_PROXY: ${GITY_OUTBOUND_HTTPS_PROXY:-}
+  NO_PROXY: ${GITY_OUTBOUND_NO_PROXY:-localhost,127.0.0.1,::1,gity,api,git-server,git-node,git-node-2,gateway,registry,worker,runner,seaweed,postgres,docker}
+
+services:
+  migrate:
+    image: ${GITY_API_IMAGE:?Set the API image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: api
+      args:
+        GITY_ROLE: api
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/gity.toml", "migrate"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_DATABASE__DRIVER: postgres
+      GITY_DATABASE__NODE_ID: "1"
+      GITY_STORAGE__DRIVER: s3
+      GITY_STORAGE__S3_ACCESS_KEY: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      GITY_STORAGE__S3_SECRET_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+      GITY_COMPONENTS__AUTHORITY__TOKEN: ${AUTHORITY_PEER_TOKEN:?Set a random authority peer token}
+    volumes:
+      - ./config/distributed-api.toml:/etc/gity/gity.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/api-client.crt:/run/tls/api-client.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/api-client.key:/run/tls/api-client.key:ro
+      - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweed-buckets:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    image: ${GITY_API_IMAGE:?Set the API image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: api
+      args:
+        GITY_ROLE: api
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/gity.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_DATABASE__DRIVER: postgres
+      GITY_DATABASE__NODE_ID: "1"
+      GITY_STORAGE__DRIVER: s3
+      GITY_STORAGE__S3_ACCESS_KEY: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      GITY_STORAGE__S3_SECRET_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+      GITY_COMPONENTS__AUTHORITY__TOKEN: ${AUTHORITY_PEER_TOKEN:?Set a random authority peer token}
+    volumes:
+      - api-data:/var/lib/gity
+      - ./config/distributed-api.toml:/etc/gity/gity.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/api-server.crt:/run/tls/api-server.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/api-server.key:/run/tls/api-server.key:ro
+      - ${GITY_TLS_DIR:-./tls}/api-client.crt:/run/tls/api-client.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/api-client.key:/run/tls/api-client.key:ro
+      - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      git-node:
+        condition: service_started
+      git-node-2:
+        condition: service_started
+      seaweed:
+        condition: service_healthy
+      seaweed-buckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  git-server:
+    image: ${GITY_GIT_IMAGE:?Set the Git server image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: git
+      args:
+        GITY_ROLE: git
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/gity.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_DATABASE__DRIVER: postgres
+      GITY_DATABASE__NODE_ID: "2"
+      GITY_HTTP__ADDRESS: 0.0.0.0:8081
+      GITY_STORAGE__DRIVER: s3
+      GITY_STORAGE__S3_ACCESS_KEY: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      GITY_STORAGE__S3_SECRET_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+    volumes:
+      - git-server-data:/var/lib/gity
+      - ./config/distributed-git.toml:/etc/gity/gity.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-client.crt:/run/tls/git-client.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/git-client.key:/run/tls/git-client.key:ro
+      - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      git-node:
+        condition: service_started
+      git-node-2:
+        condition: service_started
+      seaweed:
+        condition: service_healthy
+      seaweed-buckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8081/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    image: ${GITY_WORKER_IMAGE:?Set the worker image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: worker
+      args:
+        GITY_ROLE: worker
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/gity.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_DATABASE__DRIVER: postgres
+      GITY_DATABASE__NODE_ID: "3"
+      GITY_STORAGE__DRIVER: s3
+      GITY_STORAGE__S3_ACCESS_KEY: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      GITY_STORAGE__S3_SECRET_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+    volumes:
+      - worker-data:/var/lib/gity
+      - ./config/distributed-worker.toml:/etc/gity/gity.toml:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/worker-client.crt:/run/tls/worker-client.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/worker-client.key:/run/tls/worker-client.key:ro
+      - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      git-node:
+        condition: service_started
+      git-node-2:
+        condition: service_started
+      seaweed-buckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  gateway:
+    image: ${GITY_GATEWAY_IMAGE:?Set the edge gateway image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: gateway
+      args:
+        GITY_ROLE: gateway
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/gateway.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+    ports:
+      - "${GITY_HTTP_PORT:-8080}:8080"
+      - "${GITY_SSH_PORT:-2222}:2222"
+    volumes:
+      - ./config/gateway.toml:/etc/gity/gateway.toml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+      git-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  registry:
+    image: ${GITY_REGISTRY_IMAGE:?Set the registry image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: registry
+      args:
+        GITY_ROLE: registry
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command: ["--config", "/etc/gity/registry.toml"]
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_REGISTRY_PACKAGES__DATABASE_DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_REGISTRY_PACKAGES__STORAGE__S3_ACCESS_KEY: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      GITY_REGISTRY_PACKAGES__STORAGE__S3_SECRET_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+      GITY_AUTHORITY_PEER_TOKEN: ${AUTHORITY_PEER_TOKEN:?Set a random authority peer token}
+      GITY_DOCKERHUB_USERNAME: ${GITY_DOCKERHUB_USERNAME:-}
+      GITY_DOCKERHUB_TOKEN: ${GITY_DOCKERHUB_TOKEN:-}
+    ports:
+      - "${GITY_OCI_PORT:-5000}:8081"
+    volumes:
+      - registry-data:/var/lib/gity
+      - ./config/registry.toml:/etc/gity/registry.toml:ro
+      - ./config/angos-s3.toml:/etc/gity/angos-s3.toml:ro
+      - ./config/angos-mirror.toml:/etc/gity/angos-mirror.toml:ro
+      - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
+      - ${GITY_TLS_DIR:-./tls}/ca.crt:/run/tls/ca.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/client.crt:/run/tls/client.crt:ro
+      - ${GITY_TLS_DIR:-./tls}/client.key:/run/tls/client.key:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      seaweed:
+        condition: service_healthy
+      seaweed-buckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8081/v2/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 60s

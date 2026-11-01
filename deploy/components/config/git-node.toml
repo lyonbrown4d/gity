@@ -1,0 +1,12 @@
+id = "git-1"
+address = "0.0.0.0:9101"
+repo_root = "/var/lib/gity/repos"
+git_bin = "git"
+hook_executable = "/usr/local/bin/gity-git-hook"
+token = ""
+read_only = false
+replica_max_bytes = 10737418240
+replica_timeout_secs = 3600
+tls_certificate = "/run/tls/git-node-1-server.crt"
+tls_key = "/run/tls/git-node-1-server.key"
+client_ca = "/run/tls/ca.crt"

@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:18.1-alpine
+    environment:
+      POSTGRES_DB: gity
+      POSTGRES_USER: gity
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random database password}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gity -d gity"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  seaweed:
+    image: chrislusf/seaweedfs:4.51
+    command: ["mini", "-dir=/data", "-ip=seaweed", "-s3", "-s3.config=/etc/seaweedfs/s3.json"]
+    volumes:
+      - seaweed-data:/data
+      - ${GITY_SECRETS_DIR:-./secrets}/seaweed-s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "-T", "3", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  seaweed-buckets:
+    image: amazon/aws-cli:2.27.41
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        for bucket in gity-artifacts gity-oci; do
+          if ! aws --endpoint-url http://seaweed:8333 s3api head-bucket --bucket "$$bucket" >/dev/null 2>&1; then
+            aws --endpoint-url http://seaweed:8333 s3api create-bucket --bucket "$$bucket";
+          fi;
+        done
+    environment:
+      AWS_ACCESS_KEY_ID: ${SEAWEED_ACCESS_KEY_ID:?Set the SeaweedFS access key}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEED_SECRET_KEY:?Set the SeaweedFS secret key}
+      AWS_DEFAULT_REGION: us-east-1
+    depends_on:
+      seaweed:
+        condition: service_healthy
+    restart: "no"

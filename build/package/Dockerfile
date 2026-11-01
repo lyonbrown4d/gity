@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1
 ARG RUST_VERSION=1.99.1
+
+# Reuse the signed upstream binary from the exact Angos release and commit
+# approved for Gity; this stage does not copy or build the upstream source tree.
+FROM ghcr.io/project-angos/angos@sha256:1b90f6720c43eb143f519aec4c7bb721f180e74536634b64912085e464c65abd AS angos-engine
+
 FROM rust:${RUST_VERSION}-bookworm AS native
 ARG RUST_VERSION
 ARG TARGETARCH
@@ -54,3 +59,8 @@ EXPOSE 8080 2222
 HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8080/api/health || exit 1
 ENTRYPOINT ["gity-server"]
 CMD ["standalone"]
+
+# Consumers use this base only for the registry and full standalone targets.
+# The regular server, API, git-node and runner images do not ship Angos.
+FROM runtime AS runtime-with-angos
+COPY --from=angos-engine --chmod=0555 /angos /usr/local/bin/angos

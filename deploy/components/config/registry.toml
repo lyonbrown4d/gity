@@ -1,0 +1,50 @@
+address = "0.0.0.0:8081"
+request_timeout_seconds = 300
+
+[angos]
+executable = "/usr/local/bin/angos"
+config_files = [
+  "/etc/gity/angos-s3.toml",
+  "/etc/gity/angos-mirror.toml",
+  "/run/secrets/angos-s3.toml",
+  "/run/secrets/angos-mirror.toml",
+]
+health_url = "http://127.0.0.1:18000/readyz"
+startup_timeout_seconds = 60
+restart_limit = 3
+shutdown_timeout_seconds = 15
+
+[authority]
+id = "main"
+uri = "https://api:9100"
+ca_certificate = "/run/tls/ca.crt"
+client_certificate = "/run/tls/client.crt"
+client_key = "/run/tls/client.key"
+
+[oci]
+upstream = "http://127.0.0.1:18000"
+
+[oci.upstream_policy]
+allowed_hosts = ["registry-1.docker.io", "auth.docker.io"]
+
+[oci.mirror]
+allowed_hosts = ["registry-1.docker.io", "auth.docker.io"]
+
+[oci.mirror.registries.dockerhub]
+host = "registry-1.docker.io"
+# Public pulls work without upstream credentials. Add a credential reference
+# and matching [mirror_secrets.<name>] block to enable authenticated upstreams.
+
+[packages]
+enabled = true
+address = "0.0.0.0:8082"
+database_dsn = "postgres://gity:replace-me@postgres:5432/gity"
+database_node_id = 5
+
+[packages.storage]
+driver = "s3"
+root = "/var/lib/gity/package-storage"
+s3_bucket = "gity-artifacts"
+s3_region = "us-east-1"
+s3_endpoint = "http://seaweed:8333"
+s3_use_path_style = true

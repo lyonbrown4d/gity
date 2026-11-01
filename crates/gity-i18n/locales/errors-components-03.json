@@ -1,0 +1,19 @@
+{
+  "_version": 2,
+  "content_base64 is required": {
+    "en": "content_base64 is required",
+    "zh": "必须提供 content_base64"
+  },
+  "type is required": {
+    "en": "type is required",
+    "zh": "必须提供类型"
+  },
+  "name is required": {
+    "en": "name is required",
+    "zh": "必须提供名称"
+  },
+  "version is required": {
+    "en": "version is required",
+    "zh": "必须提供版本"
+  }
+}

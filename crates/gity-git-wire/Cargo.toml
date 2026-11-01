@@ -1,0 +1,22 @@
+[package]
+name = "gity-git-wire"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+anyhow.workspace = true
+gity-ids = { path = "../gity-ids" }
+async-trait.workspace = true
+sha2.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tonic.workspace = true
+tonic-prost.workspace = true
+prost.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+protoc-bin-vendored = "3"

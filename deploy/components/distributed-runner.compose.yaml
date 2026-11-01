@@ -1,0 +1,63 @@
+x-outbound-proxy-environment: &outbound-proxy-environment
+  HTTP_PROXY: ${GITY_OUTBOUND_HTTP_PROXY:-}
+  HTTPS_PROXY: ${GITY_OUTBOUND_HTTPS_PROXY:-}
+  NO_PROXY: ${GITY_OUTBOUND_NO_PROXY:-localhost,127.0.0.1,::1,gity,api,git-server,git-node,git-node-2,gateway,registry,worker,runner,seaweed,postgres,docker}
+
+services:
+  docker:
+    profiles: ["runner"]
+    image: docker:28.5-dind
+    privileged: true
+    environment:
+      <<: *outbound-proxy-environment
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - docker-data:/var/lib/docker
+      - docker-certs:/certs
+      - type: bind
+        source: ${GITY_RUNNER_HOST_WORK_ROOT:?Create a host work directory and set its absolute path}
+        target: ${GITY_RUNNER_HOST_WORK_ROOT:?Create a host work directory and set its absolute path}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  runner:
+    profiles: ["runner"]
+    image: ${GITY_RUNNER_IMAGE:?Set the Runner image name}
+    build:
+      context: ../..
+      dockerfile: build/package/Dockerfile.variants
+      target: runner
+      args:
+        GITY_ROLE: runner
+        GITY_BASE: ${GITY_BASE:-debian}
+        BUILDER_IMAGE: ${GITY_BUILDER_IMAGE:-rust:1.99.1-bookworm}
+        RUNTIME_IMAGE: ${GITY_RUNTIME_IMAGE:-debian:bookworm-slim}
+    command:
+      - "--config"
+      - "/etc/gity/runner.toml"
+      - "--server"
+      - "http://gateway:8080"
+      - "--work-root"
+      - ${GITY_RUNNER_HOST_WORK_ROOT:?Create a host work directory and set its absolute path}
+    environment:
+      <<: *outbound-proxy-environment
+      GITY_RUNNER__TOKEN: ${GITY_DISTRIBUTED_RUNNER_TOKEN:-}
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+    volumes:
+      - docker-certs:/certs:ro
+      - type: bind
+        source: ${GITY_RUNNER_HOST_WORK_ROOT:?Create a host work directory and set its absolute path}
+        target: ${GITY_RUNNER_HOST_WORK_ROOT:?Create a host work directory and set its absolute path}
+      - ./config/runner.toml:/etc/gity/runner.toml:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+      docker:
+        condition: service_healthy
+    restart: unless-stopped

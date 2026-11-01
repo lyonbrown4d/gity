@@ -4,7 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+gity-observability = { path = "../gity-observability" }
 gity-i18n = { path = "../gity-i18n" }
+gity-ids = { path = "../gity-ids" }
 axum.workspace = true
 chrono.workspace = true
 sea-orm.workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "gity-git-node-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "gity-git-node"
+path = "src/main.rs"
+
+[dependencies]
+gity-observability = { path = "../../crates/gity-observability" }
+gity-runtime = { path = "../../crates/gity-runtime" }
+gity-git-node = { path = "../../crates/gity-git-node" }
+anyhow.workspace = true
+fluxdi.workspace = true
+tokio.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+config = { version = "0.15", default-features = false, features = ["toml", "yaml"] }
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

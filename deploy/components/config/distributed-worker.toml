@@ -1,0 +1,77 @@
+[http]
+address = "0.0.0.0:8082"
+base_url = "http://localhost:8080"
+
+[database]
+dsn = "postgres://gity:replace-me@postgres:5432/gity"
+driver = "postgres"
+node_id = 3
+
+[git]
+repo_root = "/var/lib/gity/repos"
+bin = "git"
+hook = "/usr/local/bin/gity-git-hook"
+
+[git.cluster]
+replicas = 2
+replication_interval_seconds = 5
+
+[[git.cluster.nodes]]
+id = "git-1"
+endpoint = "https://git-node:9101"
+token_file = "/run/secrets/git-node-1-token"
+ca_file = "/run/tls/ca.crt"
+client_certificate_file = "/run/tls/worker-client.crt"
+client_key_file = "/run/tls/worker-client.key"
+
+[[git.cluster.nodes]]
+id = "git-2"
+endpoint = "https://git-node-2:9101"
+token_file = "/run/secrets/git-node-2-token"
+ca_file = "/run/tls/ca.crt"
+client_certificate_file = "/run/tls/worker-client.crt"
+client_key_file = "/run/tls/worker-client.key"
+
+[ssh]
+enabled = false
+address = "0.0.0.0:2222"
+host_key = "/var/lib/gity/ssh_host_ed25519"
+max_connections = 64
+operation_timeout_seconds = 900
+
+[storage]
+driver = "s3"
+root = "/var/lib/gity/storage"
+s3_bucket = "gity-artifacts"
+s3_region = "us-east-1"
+s3_endpoint = "http://seaweed:8333"
+s3_use_path_style = true
+
+[web]
+root = "/opt/gity/web"
+
+[search]
+index_enabled = true
+index_root = "/var/lib/gity/search-index"
+refresh_interval_seconds = 300
+max_files_per_project = 5000
+max_file_size_bytes = 524288
+
+[observability]
+service_name = "gity-worker"
+log_format = "json"
+log_level = "gity=info,tower_http=info"
+metrics_enabled = true
+metrics_address = "127.0.0.1:9090"
+
+[components]
+standalone = false
+
+[components.authority]
+enabled = false
+
+[components.registry]
+enabled = false
+
+[components.runner]
+enabled = false
