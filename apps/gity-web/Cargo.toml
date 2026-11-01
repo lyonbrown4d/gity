@@ -1,0 +1,25 @@
+[package]
+name = "gity-web"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+leptos = { version = "0.8.22", features = ["csr"] }
+leptos_router = "0.8.17"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Document", "Storage", "Location", "HtmlFormElement", "HtmlInputElement", "HtmlTextAreaElement", "FormData", "Event", "SubmitEvent", "UrlSearchParams", "Element", "HtmlElement", "File", "Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "MediaQueryList", "Navigator", "Clipboard"] }
+js-sys = "0.3"
+gloo-net = "0.6"
+serde_json = "1"
+serde.workspace = true
+base64 = "0.22"
+send_wrapper = "0.6"
+futures = "0.3"
+thaw = { version = "=0.5.0-beta", features = ["csr"] }
+leptos-use-clipboard = "=0.20.0"
+icondata_lu = "=0.1.0"
+pulldown-cmark = "=0.13.5"
+ammonia = "4.1"
+regex = "1"
+gity-i18n = { path = "../../crates/gity-i18n" }

@@ -1,240 +1,61 @@
 name: CI
-
 on:
   push:
-    branches:
-      - main
+    branches: [main, codex/rust-full-migration]
   pull_request:
-
+  workflow_call:
 permissions:
   contents: read
-
+env:
+  CARGO_TERM_COLOR: always
 jobs:
-  go-test:
-    name: Go test
+  rust:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/checkout@v6
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo xtask source-check
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo check -p gity-web --target wasm32-unknown-unknown --locked
+      - run: cargo install trunk --version 0.21.14 --locked
+      - run: cargo xtask release
+      - uses: actions/upload-artifact@v4
         with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Test
-        run: go test ./...
-
-  go-lint:
-    name: Go lint
+          name: rust-linux-smoke-build
+          path: |
+            target/release/gity-server
+            target/release/gity-runner
+            target/release/gity-git-hook
+            target/release/gity-search-index
+            dist/web
+  integration:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12.2
-          args: ./...
-
-  web-build:
-    name: Web build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Set up Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-  web-e2e:
-    name: Web E2E
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Set up Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run Playwright E2E
-        run: pnpm test:e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: .tmp-e2e/playwright-report
-          if-no-files-found: ignore
-
-      - name: Upload Playwright traces
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results
-          path: .tmp-e2e/playwright-results
-          if-no-files-found: ignore
-
-  web-blackbox-e2e:
-    name: Web blackbox E2E
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Set up Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: web
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        working-directory: web
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Build runner binary
+      - uses: actions/checkout@v6
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: Start disposable database and S3 services
         run: |
-          mkdir -p .tmp-e2e/bin
-          go build -o .tmp-e2e/bin/gity-runner-e2e ./cmd/runner
-
-      - name: Start blackbox stack
-        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml up -d --build
-
-      - name: Wait for blackbox gateway
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:18080/api/health >/dev/null && curl -fsS http://127.0.0.1:18080/ >/dev/null; then
-              exit 0
-            fi
-            docker compose -p gity-blackbox -f docker-compose.blackbox.yaml ps
-            sleep 2
-          done
-          docker compose -p gity-blackbox -f docker-compose.blackbox.yaml logs --no-color
-          exit 1
-
-      - name: Run blackbox Playwright E2E
-        working-directory: web
+          docker compose -f deploy/integration/compose.yaml --profile ci up -d --wait --wait-timeout 180 postgres-test mysql-test s3
+          docker compose -f deploy/integration/compose.yaml run --rm s3-init
+      - name: PostgreSQL API regression
         env:
-          E2E_WEB_BASE_URL: http://127.0.0.1:18080
-          E2E_API_BASE_URL: http://127.0.0.1:18080/api/v1
-          GITY_E2E_ROOT: ${{ github.workspace }}/.tmp-e2e/blackbox
-          GITY_E2E_RUNNER_BIN: ${{ github.workspace }}/.tmp-e2e/bin/gity-runner-e2e
-          GITY_E2E_REPO_ROOT: ""
-        run: pnpm test:e2e:blackbox
-
-      - name: Dump blackbox logs
+          GITY_TEST_DATABASE_URL: postgres://gity:gity-test-db-only@localhost:5434/gity
+        run: cargo test -p gity-server --locked -- --test-threads=1
+      - name: MySQL API regression
+        env:
+          GITY_TEST_DATABASE_URL: mysql://root:gity-test-root-only@localhost:3308/gity
+        run: cargo test -p gity-server --locked -- --test-threads=1
+      - name: SeaweedFS S3 contract
+        env:
+          GITY_TEST_S3_ENDPOINT: http://localhost:9000
+        run: cargo test -p gity-core seaweedfs_s3_contract --locked
+      - name: Integration service logs
         if: failure()
-        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml logs --no-color
-
-      - name: Upload blackbox Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: blackbox-playwright-report
-          path: .tmp-e2e/blackbox-playwright-report
-          if-no-files-found: ignore
-
-      - name: Upload blackbox Playwright traces
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: blackbox-playwright-results
-          path: .tmp-e2e/blackbox-playwright-results
-          if-no-files-found: ignore
-
-      - name: Stop blackbox stack
+        run: docker compose -f deploy/integration/compose.yaml --profile ci logs --no-color --tail=100
+      - name: Remove disposable integration data
         if: always()
-        run: docker compose -p gity-blackbox -f docker-compose.blackbox.yaml down -v
-  release-config:
-    name: GoReleaser package snapshot
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          install-only: true
-
-      - name: Install UPX
-        uses: crazy-max/ghaction-upx@v3
-        with:
-          install-only: true
-
-      - name: Check GoReleaser config
-        run: goreleaser check
-
-      - name: Build release packages
-        run: goreleaser release --snapshot --clean --skip=publish,docker
+        run: docker compose -f deploy/integration/compose.yaml --profile ci down --volumes

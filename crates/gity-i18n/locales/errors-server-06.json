@@ -1,0 +1,63 @@
+{
+  "_version": 2,
+  "invalid pagination": {
+    "en": "invalid pagination",
+    "zh": "分页参数无效"
+  },
+  "database schema is not managed by this version; use an empty database": {
+    "en": "database schema is not managed by this version; use an empty database",
+    "zh": "当前版本无法管理此数据库结构，请使用空数据库"
+  },
+  "migration history is invalid; use an empty database": {
+    "en": "migration history is invalid; use an empty database",
+    "zh": "数据库迁移记录无效，请使用空数据库"
+  },
+  "database contains an untracked schema; use an empty database": {
+    "en": "database contains an untracked schema; use an empty database",
+    "zh": "数据库包含未登记的结构，请使用空数据库"
+  },
+  "migration history exists without the application schema": {
+    "en": "migration history exists without the application schema",
+    "zh": "数据库存在迁移记录，但缺少应用数据表"
+  },
+  "migration history does not match this version; use an empty database": {
+    "en": "migration history does not match this version; use an empty database",
+    "zh": "数据库迁移记录与当前版本不一致，请使用空数据库"
+  },
+  "The user directory could not be loaded. Try again.": {
+    "en": "The user directory could not be loaded. Try again.",
+    "zh": "无法加载用户列表，请重试。"
+  },
+  "The user directory changed while loading. Refresh and try again.": {
+    "en": "The user directory changed while loading. Refresh and try again.",
+    "zh": "用户列表在加载期间发生了变化，请刷新后重试。"
+  },
+  "Failed to copy setup command": {
+    "en": "Failed to copy setup command",
+    "zh": "复制客户端设置命令失败"
+  },
+  "organization member already exists": {
+    "en": "organization member already exists",
+    "zh": "组织成员已存在"
+  },
+  "organization member not found": {
+    "en": "organization member not found",
+    "zh": "找不到组织成员"
+  },
+  "organization must retain at least one owner": {
+    "en": "organization must retain at least one owner",
+    "zh": "组织必须保留至少一位所有者"
+  },
+  "Use SSH public keys for project-scoped clone, pull and optional push.": {
+    "en": "Use SSH public keys for project-scoped clone, pull and optional push.",
+    "zh": "使用 SSH 公钥执行项目范围内的克隆、拉取和可选推送。"
+  },
+  "Deploy keys authenticate SSH Git access on the configured SSH port. Read-only keys can clone and pull; can-push keys can also push within project branch protection.": {
+    "en": "Deploy keys authenticate SSH Git access on the configured SSH port. Read-only keys can clone and pull; can-push keys can also push within project branch protection.",
+    "zh": "部署密钥用于在配置的 SSH 端口上认证 Git 访问。只读密钥可以克隆和拉取；允许推送的密钥还可在项目分支保护规则内推送。"
+  },
+  "Token name and scopes are required.": {
+    "en": "Token name and scopes are required.",
+    "zh": "令牌名称和权限范围不能为空。"
+  }
+}

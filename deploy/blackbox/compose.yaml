@@ -1,0 +1,96 @@
+# Overlay: docker compose -f docker-compose.blackbox.yaml -f deploy/blackbox/compose.yaml ...
+services:
+  gity:
+    image: ${GITY_BLACKBOX_IMAGE:-gity-rust:blackbox}
+    pull_policy: never
+    cpus: ${GITY_BLACKBOX_CPUS:-2.0}
+    mem_limit: ${GITY_BLACKBOX_MEMORY:-1g}
+    pids_limit: 512
+    environment:
+      GITY_DATABASE__DRIVER: postgres
+      GITY_DATABASE__DSN: postgres://gity:gity-blackbox-local-only@postgres:5432/gity
+      GITY_STORAGE__DRIVER: s3
+      GITY_STORAGE__S3_BUCKET: gity
+      GITY_STORAGE__S3_ENDPOINT: http://s3:8333
+      GITY_STORAGE__S3_REGION: us-east-1
+      GITY_STORAGE__S3_ACCESS_KEY: gitylocal
+      GITY_STORAGE__S3_SECRET_KEY: gity-storage-local-only
+      GITY_STORAGE__S3_USE_PATH_STYLE: "true"
+      GITY_SEARCH__INDEX_ENABLED: "true"
+      GITY_SSH__ENABLED: "true"
+      GITY_SSH__ADDRESS: 0.0.0.0:2222
+      GITY_SSH__HOST_KEY: /var/lib/gity/ssh_host_ed25519
+      GITY_OBSERVABILITY__METRICS_ENABLED: "true"
+      GITY_OBSERVABILITY__METRICS_ADDRESS: 0.0.0.0:9090
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: localhost,127.0.0.1,::1,gity,postgres,s3
+    ports:
+      - "127.0.0.1:${GITY_BLACKBOX_SSH_PORT:-12223}:2222"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3-init:
+        condition: service_completed_successfully
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "2"
+  postgres:
+    image: postgres:18
+    cpus: 1.0
+    mem_limit: 512m
+    environment:
+      POSTGRES_DB: gity
+      POSTGRES_USER: gity
+      POSTGRES_PASSWORD: gity-blackbox-local-only
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U gity -d gity]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  s3:
+    image: chrislusf/seaweedfs:4.51
+    cpus: 1.0
+    mem_limit: 1g
+    command: [mini, -dir=/data, -ip=s3]
+    environment:
+      AWS_ACCESS_KEY_ID: gitylocal
+      AWS_SECRET_ACCESS_KEY: gity-storage-local-only
+      S3_BUCKET: gity
+    volumes:
+      - seaweed:/data
+  s3-init:
+    image: amazon/aws-cli:2.31.0
+    depends_on: [s3]
+    environment:
+      AWS_ENDPOINT_URL: http://s3:8333
+      AWS_ACCESS_KEY_ID: gitylocal
+      AWS_SECRET_ACCESS_KEY: gity-storage-local-only
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      NO_PROXY: s3
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        attempt=0
+        until aws s3api head-bucket --bucket gity; do
+          attempt=$$((attempt + 1))
+          test "$$attempt" -lt 30
+          aws s3api create-bucket --bucket gity || true
+          sleep 2
+        done
+    restart: "no"
+volumes:
+  postgres:
+  seaweed:

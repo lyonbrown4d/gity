@@ -1,0 +1,83 @@
+{
+  "_version": 2,
+  "No jobs in this pipeline": {
+    "en": "No jobs in this pipeline",
+    "zh": "此流水线暂无作业"
+  },
+  "Select a pipeline": {
+    "en": "Select a pipeline",
+    "zh": "请选择一个流水线"
+  },
+  "Blocked": {
+    "en": "Blocked",
+    "zh": "受阻"
+  },
+  "Artifacts expected": {
+    "en": "Artifacts expected",
+    "zh": "预期产物"
+  },
+  "Failures": {
+    "en": "Failures",
+    "zh": "失败数"
+  },
+  "Queued": {
+    "en": "Queued",
+    "zh": "排队"
+  },
+  "No trace captured yet": {
+    "en": "No trace captured yet",
+    "zh": "尚未记录日志"
+  },
+  "No artifacts available": {
+    "en": "No artifacts available",
+    "zh": "暂无可用产物"
+  },
+  "Rules": {
+    "en": "Rules",
+    "zh": "规则"
+  },
+  "Branch scoped": {
+    "en": "Branch scoped",
+    "zh": "按分支限定"
+  },
+  "Reviewers": {
+    "en": "Reviewers",
+    "zh": "审阅者"
+  },
+  "Any source branch": {
+    "en": "Any source branch",
+    "zh": "全部来源分支"
+  },
+  "Any target branch": {
+    "en": "Any target branch",
+    "zh": "全部目标分支"
+  },
+  "Pipeline": {
+    "en": "Pipeline",
+    "zh": "流水线"
+  },
+  "Source commit": {
+    "en": "Source commit",
+    "zh": "来源提交"
+  },
+  "Protected target": {
+    "en": "Protected target",
+    "zh": "受保护目标"
+  },
+  "Pipeline required": {
+    "en": "Pipeline required",
+    "zh": "要求流水线成功"
+  },
+  "Merge request required": {
+    "en": "Merge request required",
+    "zh": "要求合并请求"
+  },
+  "Pipeline status": {
+    "en": "Pipeline status",
+    "zh": "流水线状态"
+  },
+  "Variables": {
+    "en": "Variables",
+    "zh": "变量"
+  }
+}

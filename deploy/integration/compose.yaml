@@ -1,0 +1,125 @@
+name: gity-integration
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: gity
+      POSTGRES_USER: gity
+      POSTGRES_PASSWORD: ${INTEGRATION_DB_PASSWORD:-gity-local-only}
+    ports: ["127.0.0.1:${INTEGRATION_POSTGRES_PORT:-5433}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gity -d gity"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes: ["postgres:/var/lib/postgresql"]
+  mysql:
+    profiles: [mysql]
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: gity
+      MYSQL_USER: gity
+      MYSQL_PASSWORD: ${INTEGRATION_DB_PASSWORD:-gity-local-only}
+      MYSQL_ROOT_PASSWORD: ${INTEGRATION_MYSQL_ROOT_PASSWORD:-gity-root-local-only}
+    ports: ["127.0.0.1:${INTEGRATION_MYSQL_PORT:-3307}:3306"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ugity -p$${MYSQL_PASSWORD} --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    volumes: ["mysql:/var/lib/mysql"]
+  s3:
+    image: chrislusf/seaweedfs:4.51
+    command: [mini, -dir=/data, -ip=s3]
+    environment:
+      AWS_ACCESS_KEY_ID: ${INTEGRATION_S3_USER:-gitylocal}
+      AWS_SECRET_ACCESS_KEY: ${INTEGRATION_S3_PASSWORD:-gity-storage-local-only}
+      S3_BUCKET: gity
+    ports: ["127.0.0.1:9000:8333", "127.0.0.1:9001:12535"]
+    volumes: ["seaweed:/data"]
+  mysql-test:
+    profiles: [ci]
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: gity
+      MYSQL_ROOT_PASSWORD: gity-test-root-only
+    ports: ["127.0.0.1:${INTEGRATION_MYSQL_TEST_PORT:-3308}:3306"]
+    # Disposable schema regressions use RAM; normal mysql retains its data volume.
+    tmpfs: ["/var/lib/mysql:rw,size=1073741824"]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+  postgres-test:
+    profiles: [ci]
+    image: postgres:18
+    environment:
+      POSTGRES_DB: gity
+      POSTGRES_USER: gity
+      POSTGRES_PASSWORD: gity-test-db-only
+    ports: ["127.0.0.1:${INTEGRATION_POSTGRES_TEST_PORT:-5434}:5432"]
+    tmpfs: ["/var/lib/postgresql:rw,size=1073741824"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gity -d gity"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  s3-init:
+    image: amazon/aws-cli:2.31.0
+    depends_on: [s3]
+    environment:
+      AWS_ENDPOINT_URL: http://s3:8333
+      AWS_ACCESS_KEY_ID: ${INTEGRATION_S3_USER:-gitylocal}
+      AWS_SECRET_ACCESS_KEY: ${INTEGRATION_S3_PASSWORD:-gity-storage-local-only}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        attempt=0
+        until aws s3api head-bucket --bucket gity; do
+          attempt=$$((attempt + 1))
+          test "$$attempt" -lt 30
+          aws s3api create-bucket --bucket gity || true
+          sleep 2
+        done
+    restart: "no"
+  otel:
+    profiles: [observability]
+    image: otel/opentelemetry-collector-contrib:0.140.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes: ["./otel.yaml:/etc/otel/config.yaml:ro"]
+    ports: ["127.0.0.1:4318:4318", "127.0.0.1:13133:13133"]
+    depends_on: [tempo]
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:2.9.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes: ["./tempo.yaml:/etc/tempo.yaml:ro", "traces:/var/tempo"]
+    ports: ["127.0.0.1:3200:3200"]
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.8.0
+    command: ["--config.file=/etc/prometheus/prometheus.yaml"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes: ["./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro", "./alerts.yaml:/etc/prometheus/gity-alerts.yaml:ro", "metrics:/prometheus"]
+    ports: ["127.0.0.1:9091:9090"]
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:12.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: gity
+      GF_SECURITY_ADMIN_PASSWORD: ${INTEGRATION_GRAFANA_PASSWORD:-gity-observability-local-only}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes: ["./datasources.yaml:/etc/grafana/provisioning/datasources/gity.yaml:ro", "grafana:/var/lib/grafana"]
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [prometheus, tempo]
+volumes:
+  postgres:
+  mysql:
+  seaweed:
+  traces:
+  metrics:
+  grafana:

@@ -1,0 +1,29 @@
+format = 1
+monaco_version = "0.55.1"
+milkdown_version = "7.22.2"
+provenance = "Upstream npm distributions; export-only precompiled aggregate"
+update_policy = "Import reviewed precompiled ESM distribution, preserve licenses, regenerate SHA-256 with Rust xtask vendor tooling. No JavaScript build toolchain is required."
+
+[[files]]
+path = "editors.css"
+sha256 = "3af97eb607d80b9ad57e2732e186f81a0d6413917b2e7bde75249e6e659992c5"
+
+[[files]]
+path = "editors.js"
+sha256 = "bb0acfb99ec9b9b7496edde58477c099cd02f322decee74958625a63aeef8805"
+
+[[files]]
+path = "markdown-TGF7r5jx.mjs"
+sha256 = "089dfa034105524a9458ee3a829b9ec44cca715b07f3ae2b2bae9eebcb0b38c4"
+
+[[files]]
+path = "rust-CoVfq9Sb.mjs"
+sha256 = "15326c0a0f13791d27208923d06a1f3f7ddc6dbbdaca6a38d411887b28776c86"
+
+[[files]]
+path = "toggleHighContrast-D1SNNEEF.mjs"
+sha256 = "066cbbdc29028ba652c5ad26350659f08aa6897601346c4f97e468fbe4bdf7b9"
+
+[[files]]
+path = "yaml-B4Sh2dP6.mjs"
+sha256 = "fe4956265bff4d9e2d286e321ffff2a9c18d1f6aa26963fe24d91fead43651ba"

@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Search title, branch, or description": {
+    "en": "Search title, branch, or description",
+    "zh": "搜索标题、分支或描述"
+  },
+  "Showing": {
+    "en": "Showing",
+    "zh": "显示"
+  },
+  "of": {
+    "en": "of",
+    "zh": "共"
+  },
+  "merge requests": {
+    "en": "merge requests",
+    "zh": "个合并请求"
+  },
+  "updated": {
+    "en": "updated",
+    "zh": "已更新"
+  },
+  "No approvals required": {
+    "en": "No approvals required",
+    "zh": "无需审批"
+  },
+  "Merge readiness": {
+    "en": "Merge readiness",
+    "zh": "合并就绪状态"
+  },
+  "GitLab-style merge gate summary for reviewers and maintainers.": {
+    "en": "GitLab-style merge gate summary for reviewers and maintainers.",
+    "zh": "为审阅者和维护者汇总合并前置条件。"
+  },
+  "No assignee": {
+    "en": "No assignee",
+    "zh": "未指派负责人"
+  },
+  "assignee(s)": {
+    "en": "assignee(s)",
+    "zh": "位负责人"
+  },
+  "comment(s)": {
+    "en": "comment(s)",
+    "zh": "条评论"
+  },
+  "Merge checks": {
+    "en": "Merge checks",
+    "zh": "合并检查"
+  },
+  "Branch policy and pipeline state for this merge request.": {
+    "en": "Branch policy and pipeline state for this merge request.",
+    "zh": "此合并请求的分支策略和流水线状态。"
+  },
+  "Reload checks": {
+    "en": "Reload checks",
+    "zh": "刷新检查"
+  },
+  "Blocking reasons": {
+    "en": "Blocking reasons",
+    "zh": "阻止原因"
+  },
+  "Runner trust and matching": {
+    "en": "Runner trust and matching",
+    "zh": "Runner 信任与匹配"
+  },
+  "Trusted host": {
+    "en": "Trusted host",
+    "zh": "受信主机"
+  },
+  "Runtime": {
+    "en": "Runtime",
+    "zh": "运行环境"
+  },
+  "Tag matching": {
+    "en": "Tag matching",
+    "zh": "标签匹配"
+  },
+  "Masking and protection": {
+    "en": "Masking and protection",
+    "zh": "脱敏与保护"
+  },
+  "Masked": {
+    "en": "Masked",
+    "zh": "已脱敏"
+  },
+  "No runners registered": {
+    "en": "No runners registered",
+    "zh": "尚未注册 Runner"
+  },
+  "Register first runner": {
+    "en": "Register first runner",
+    "zh": "注册首个 Runner"
+  },
+  "Runner admin required": {
+    "en": "Runner admin required",
+    "zh": "需要 Runner 管理权限"
+  },
+  "Last heartbeat": {
+    "en": "Last heartbeat",
+    "zh": "上次心跳"
+  },
+  "No tags configured; tagged jobs will not match this runner.": {
+    "en": "No tags configured; tagged jobs will not match this runner.",
+    "zh": "未配置标签；带标签的作业不会匹配此 Runner。"
+  },
+  "Runtime health": {
+    "en": "Runtime health",
+    "zh": "运行健康状态"
+  },
+  "CI variables": {
+    "en": "CI variables",
+    "zh": "CI 变量"
+  },
+  "No CI variables configured": {
+    "en": "No CI variables configured",
+    "zh": "尚未配置 CI 变量"
+  },
+  "Example": {
+    "en": "Example",
+    "zh": "示例"
+  },
+  "Value is hidden after save": {
+    "en": "Value is hidden after save",
+    "zh": "保存后隐藏变量值"
+  },
+  "Key": {
+    "en": "Key",
+    "zh": "键名"
+  },
+  "Value": {
+    "en": "Value",
+    "zh": "值"
+  },
+  "No email": {
+    "en": "No email",
+    "zh": "未设置邮箱"
+  },
+  "Remove project member?": {
+    "en": "Remove project member?",
+    "zh": "移除项目成员？"
+  },
+  "Deploy key title and public key are required.": {
+    "en": "Deploy key title and public key are required.",
+    "zh": "请输入部署密钥名称和公钥。"
+  },
+  "Title": {
+    "en": "Title",
+    "zh": "标题"
+  },
+  "Build server": {
+    "en": "Build server",
+    "zh": "构建服务器"
+  },
+  "Public key": {
+    "en": "Public key",
+    "zh": "公钥"
+  },
+  "Can push": {
+    "en": "Can push",
+    "zh": "允许推送"
+  },
+  "No deploy keys yet.": {
+    "en": "No deploy keys yet.",
+    "zh": "暂无部署密钥。"
+  },
+  "Delete deploy key?": {
+    "en": "Delete deploy key?",
+    "zh": "删除部署密钥？"
+  },
+  "Expires at": {
+    "en": "Expires at",
+    "zh": "到期时间"
+  },
+  "Last used": {
+    "en": "Last used",
+    "zh": "上次使用"
+  },
+  "Revoke token?": {
+    "en": "Revoke token?",
+    "zh": "撤销令牌？"
+  },
+  "Revoke": {
+    "en": "Revoke",
+    "zh": "撤销"
+  },
+  "Never": {
+    "en": "Never",
+    "zh": "从未"
+  },
+  "Name": {
+    "en": "Name",
+    "zh": "名称"
+  },
+  "deploy-production": {
+    "en": "deploy-production",
+    "zh": "deploy-production"
+  },
+  "Create token": {
+    "en": "Create token",
+    "zh": "创建令牌"
+  }
+}

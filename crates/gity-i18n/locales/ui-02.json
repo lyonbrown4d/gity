@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Admin Overview": {
+    "en": "Admin Overview",
+    "zh": "管理概览"
+  },
+  "Monitor organizations, repositories, and current control-plane baseline.": {
+    "en": "Monitor organizations, repositories, and current control-plane baseline.",
+    "zh": "监控组织、仓库以及当前控制平面基线。"
+  },
+  "Monitor organizations, projects, and current control-plane baseline.": {
+    "en": "Monitor organizations, projects, and current control-plane baseline.",
+    "zh": "监控组织、项目以及当前控制平面基线。"
+  },
+  "Baseline": {
+    "en": "Baseline",
+    "zh": "基线"
+  },
+  "System Composition": {
+    "en": "System Composition",
+    "zh": "系统组成"
+  },
+  "Current baseline aligns route auth with role-scoped layouts and CRUD pages.": {
+    "en": "Current baseline aligns route auth with role-scoped layouts and CRUD pages.",
+    "zh": "当前基线已实现路由鉴权与按角色划分的 CRUD 页面。"
+  },
+  "Organization Snapshot": {
+    "en": "Organization Snapshot",
+    "zh": "组织快照"
+  },
+  "Quick view of organizations and role mapping.": {
+    "en": "Quick view of organizations and role mapping.",
+    "zh": "快速查看组织及角色映射。"
+  },
+  "No organizations available.": {
+    "en": "No organizations available.",
+    "zh": "暂无组织。"
+  },
+  "Total organizations visible to admin.": {
+    "en": "Total organizations visible to admin.",
+    "zh": "当前管理员可见的组织总数。"
+  },
+  "Repositories under the primary organization.": {
+    "en": "Repositories under the primary organization.",
+    "zh": "主组织下的仓库数量。"
+  },
+  "Projects under the primary organization.": {
+    "en": "Projects under the primary organization.",
+    "zh": "主组织下的项目数量。"
+  },
+  "Organizations visible to current user": {
+    "en": "Organizations visible to current user",
+    "zh": "当前用户可见组织"
+  },
+  "User accounts in current admin scope.": {
+    "en": "User accounts in current admin scope.",
+    "zh": "当前管理员范围内的用户账号。"
+  },
+  "User Directory": {
+    "en": "User Directory",
+    "zh": "用户目录"
+  },
+  "Identity, status, and privilege level.": {
+    "en": "Identity, status, and privilege level.",
+    "zh": "身份、状态与权限级别。"
+  },
+  "total": {
+    "en": "total",
+    "zh": "总计"
+  },
+  "active": {
+    "en": "active",
+    "zh": "激活"
+  },
+  "No users found.": {
+    "en": "No users found.",
+    "zh": "暂无用户。"
+  },
+  "New User": {
+    "en": "New User",
+    "zh": "新建用户"
+  },
+  "Create User": {
+    "en": "Create User",
+    "zh": "创建用户"
+  },
+  "Failed to create user": {
+    "en": "Failed to create user",
+    "zh": "创建用户失败"
+  },
+  "super-admin": {
+    "en": "super-admin",
+    "zh": "超级管理员"
+  },
+  "Unknown User": {
+    "en": "Unknown User",
+    "zh": "未知用户"
+  },
+  "Unknown Email": {
+    "en": "Unknown Email",
+    "zh": "未知邮箱"
+  },
+  "Username": {
+    "en": "Username",
+    "zh": "用户名"
+  },
+  "Email": {
+    "en": "Email",
+    "zh": "邮箱"
+  },
+  "Cancel": {
+    "en": "Cancel",
+    "zh": "取消"
+  },
+  "Create": {
+    "en": "Create",
+    "zh": "创建"
+  },
+  "Creating...": {
+    "en": "Creating...",
+    "zh": "创建中..."
+  },
+  "Save Changes": {
+    "en": "Save Changes",
+    "zh": "保存修改"
+  },
+  "Edit Profile": {
+    "en": "Edit Profile",
+    "zh": "编辑个人资料"
+  },
+  "Current account information and access status.": {
+    "en": "Current account information and access status.",
+    "zh": "当前账号信息与访问状态。"
+  },
+  "Update username, email, and optionally change your password.": {
+    "en": "Update username, email, and optionally change your password.",
+    "zh": "更新用户名、邮箱，并可选修改密码。"
+  },
+  "New Password (Optional)": {
+    "en": "New Password (Optional)",
+    "zh": "新密码（可选）"
+  },
+  "Save": {
+    "en": "Save",
+    "zh": "保存"
+  },
+  "Profile updated.": {
+    "en": "Profile updated.",
+    "zh": "资料更新成功。"
+  },
+  "My Account": {
+    "en": "My Account",
+    "zh": "我的账号"
+  },
+  "My Organizations": {
+    "en": "My Organizations",
+    "zh": "我的组织"
+  },
+  "Overview of your account, organizations, and repository workspace.": {
+    "en": "Overview of your account, organizations, and repository workspace.",
+    "zh": "账号、组织和仓库工作区概览。"
+  },
+  "Overview of your account, organizations, and project workspace.": {
+    "en": "Overview of your account, organizations, and project workspace.",
+    "zh": "账号、组织和项目工作区概览。"
+  },
+  "Open Repositories": {
+    "en": "Open Repositories",
+    "zh": "打开仓库"
+  },
+  "Open Projects": {
+    "en": "Open Projects",
+    "zh": "打开项目"
+  },
+  "Go Admin": {
+    "en": "Go Admin",
+    "zh": "进入管理端"
+  },
+  "Memberships available in your scope.": {
+    "en": "Memberships available in your scope.",
+    "zh": "你当前权限范围内的组织成员关系。"
+  },
+  "Total repositories visible to you.": {
+    "en": "Total repositories visible to you.",
+    "zh": "你当前可见的仓库总数。"
+  },
+  "Total projects visible to you.": {
+    "en": "Total projects visible to you.",
+    "zh": "你当前可见的项目总数。"
+  },
+  "Access role": {
+    "en": "Access role",
+    "zh": "访问角色"
+  }
+}

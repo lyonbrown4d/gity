@@ -1,0 +1,14 @@
+[package]
+name = "gity-search-index"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+gity-core = { path = "../../crates/gity-core" }
+gity-git = { path = "../../crates/gity-git" }
+gity-search = { path = "../../crates/gity-search" }
+clap = { version = "4", features = ["derive"] }
+fluxdi.workspace = true
+tokio.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Search members": {
+    "en": "Search members",
+    "zh": "搜索成员"
+  },
+  "Role filter": {
+    "en": "Role filter",
+    "zh": "角色筛选"
+  },
+  "All roles": {
+    "en": "All roles",
+    "zh": "全部角色"
+  },
+  "Change role": {
+    "en": "Change role",
+    "zh": "更改角色"
+  },
+  "Home": {
+    "en": "Home",
+    "zh": "首页"
+  },
+  "Admin": {
+    "en": "Admin",
+    "zh": "管理"
+  },
+  "LFS lock path is required": {
+    "en": "LFS lock path is required",
+    "zh": "请输入 LFS 文件锁路径"
+  },
+  "File locks": {
+    "en": "File locks",
+    "zh": "文件锁"
+  },
+  "Lock path": {
+    "en": "Lock path",
+    "zh": "锁定路径"
+  },
+  "Loading LFS locks...": {
+    "en": "Loading LFS locks...",
+    "zh": "正在加载 LFS 文件锁…"
+  },
+  "Unknown owner": {
+    "en": "Unknown owner",
+    "zh": "未知所有者"
+  },
+  "Unlock": {
+    "en": "Unlock",
+    "zh": "解锁"
+  },
+  "Unlock \"{path}\"?": {
+    "en": "Unlock \"%{path}\"?",
+    "zh": "解锁“%{path}”？"
+  },
+  "Client setup": {
+    "en": "Client setup",
+    "zh": "客户端配置"
+  },
+  "Use standard Git LFS clients against the project clone URL.": {
+    "en": "Use standard Git LFS clients against the project clone URL.",
+    "zh": "使用标准 Git LFS 客户端连接项目克隆地址。"
+  },
+  "Stored objects": {
+    "en": "Stored objects",
+    "zh": "已存储的对象"
+  },
+  "OID": {
+    "en": "OID",
+    "zh": "OID"
+  },
+  "Size": {
+    "en": "Size",
+    "zh": "大小"
+  },
+  "Updated": {
+    "en": "Updated",
+    "zh": "更新时间"
+  },
+  "Loading LFS objects...": {
+    "en": "Loading LFS objects...",
+    "zh": "正在加载 LFS 对象…"
+  },
+  "No LFS objects stored yet.": {
+    "en": "No LFS objects stored yet.",
+    "zh": "尚未存储 LFS 对象。"
+  },
+  "disabled": {
+    "en": "disabled",
+    "zh": "已禁用"
+  },
+  "Edit": {
+    "en": "Edit",
+    "zh": "编辑"
+  },
+  "Cannot read file": {
+    "en": "Cannot read file",
+    "zh": "无法读取文件"
+  },
+  "Package type": {
+    "en": "Package type",
+    "zh": "软件包类型"
+  },
+  "Package file": {
+    "en": "Package file",
+    "zh": "软件包文件"
+  },
+  "Selected file content will be uploaded as base64.": {
+    "en": "Selected file content will be uploaded as base64.",
+    "zh": "所选文件内容将使用 Base64 上传。"
+  },
+  "Inline file content fallback": {
+    "en": "Inline file content fallback",
+    "zh": "备用文件文本内容"
+  },
+  "Reload detail": {
+    "en": "Reload detail",
+    "zh": "刷新详情"
+  },
+  "No package versions found.": {
+    "en": "No package versions found.",
+    "zh": "暂无软件包版本。"
+  },
+  "Upload a package file to create the first version for this package.": {
+    "en": "Upload a package file to create the first version for this package.",
+    "zh": "上传文件以创建此软件包的首个版本。"
+  },
+  "Path": {
+    "en": "Path",
+    "zh": "路径"
+  },
+  "Actions": {
+    "en": "Actions",
+    "zh": "操作"
+  },
+  "No files in this version.": {
+    "en": "No files in this version.",
+    "zh": "此版本暂无文件。"
+  },
+  "Content": {
+    "en": "Content",
+    "zh": "内容"
+  },
+  "Wiki page content": {
+    "en": "Wiki page content",
+    "zh": "Wiki 页面内容"
+  },
+  "Empty wiki page.": {
+    "en": "Empty wiki page.",
+    "zh": "Wiki 页面为空。"
+  },
+  "No pipelines yet": {
+    "en": "No pipelines yet",
+    "zh": "暂无流水线"
+  },
+  "Create first pipeline": {
+    "en": "Create first pipeline",
+    "zh": "创建首个流水线"
+  },
+  "CI write permission required": {
+    "en": "CI write permission required",
+    "zh": "需要 CI 写入权限"
+  },
+  "Pipeline diagnostics": {
+    "en": "Pipeline diagnostics",
+    "zh": "流水线诊断"
+  },
+  "YAML CI config": {
+    "en": "YAML CI config",
+    "zh": "YAML CI 配置"
+  },
+  "Pipeline status summary": {
+    "en": "Pipeline status summary",
+    "zh": "流水线状态摘要"
+  },
+  "Not updated": {
+    "en": "Not updated",
+    "zh": "尚未更新"
+  },
+  "Trace and artifacts": {
+    "en": "Trace and artifacts",
+    "zh": "日志与产物"
+  },
+  "No stored job output": {
+    "en": "No stored job output",
+    "zh": "暂无已保存的作业输出"
+  },
+  "Tags": {
+    "en": "Tags",
+    "zh": "标签"
+  },
+  "No tags yet.": {
+    "en": "No tags yet.",
+    "zh": "暂无 Git 标签。"
+  },
+  "Tags created for releases will appear here.": {
+    "en": "Tags created for releases will appear here.",
+    "zh": "发布所创建的 Git 标签将在此显示。"
+  },
+  "Selected release assets": {
+    "en": "Selected release assets",
+    "zh": "所选发布的资源"
+  }
+}

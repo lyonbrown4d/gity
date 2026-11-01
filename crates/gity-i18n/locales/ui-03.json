@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Identity and quick navigation.": {
+    "en": "Identity and quick navigation.",
+    "zh": "身份信息与快捷入口。"
+  },
+  "Organizations you can operate in.": {
+    "en": "Organizations you can operate in.",
+    "zh": "你可操作的组织列表。"
+  },
+  "Create, clone, and manage repositories in your organizations.": {
+    "en": "Create, clone, and manage repositories in your organizations.",
+    "zh": "在组织内创建、克隆并管理仓库。"
+  },
+  "Create, clone, and manage projects in your organizations.": {
+    "en": "Create, clone, and manage projects in your organizations.",
+    "zh": "在组织内创建、克隆并管理项目。"
+  },
+  "Open": {
+    "en": "Open",
+    "zh": "打开"
+  },
+  "Code": {
+    "en": "Code",
+    "zh": "代码"
+  },
+  "Commits": {
+    "en": "Commits",
+    "zh": "提交"
+  },
+  "Branches": {
+    "en": "Branches",
+    "zh": "分支"
+  },
+  "Settings": {
+    "en": "Settings",
+    "zh": "设置"
+  },
+  "Back to repositories": {
+    "en": "Back to repositories",
+    "zh": "返回仓库列表"
+  },
+  "Back to projects": {
+    "en": "Back to projects",
+    "zh": "返回项目列表"
+  },
+  "No description provided.": {
+    "en": "No description provided.",
+    "zh": "暂无描述。"
+  },
+  "Repository source view and clone information.": {
+    "en": "Repository source view and clone information.",
+    "zh": "仓库源码视图与克隆信息。"
+  },
+  "Project source view and clone information.": {
+    "en": "Project source view and clone information.",
+    "zh": "项目源码视图与克隆信息。"
+  },
+  "Quick clone": {
+    "en": "Quick clone",
+    "zh": "快速克隆"
+  },
+  "File tree preview is not available yet. You can clone the repository locally.": {
+    "en": "File tree preview is not available yet. You can clone the repository locally.",
+    "zh": "暂不支持在线文件树预览，你可以先将仓库克隆到本地。"
+  },
+  "Up": {
+    "en": "Up",
+    "zh": "返回上级"
+  },
+  "Loading files...": {
+    "en": "Loading files...",
+    "zh": "文件加载中..."
+  },
+  "No files found.": {
+    "en": "No files found.",
+    "zh": "没有文件。"
+  },
+  "Search in project": {
+    "en": "Search in project",
+    "zh": "在项目中搜索"
+  },
+  "README Preview": {
+    "en": "README Preview",
+    "zh": "README 预览"
+  },
+  "View README source": {
+    "en": "View README source",
+    "zh": "查看 README 源码"
+  },
+  "Create file and commit": {
+    "en": "Create file and commit",
+    "zh": "创建文件并提交"
+  },
+  "Commit and create file": {
+    "en": "Commit and create file",
+    "zh": "提交并创建文件"
+  },
+  "Committing...": {
+    "en": "Committing...",
+    "zh": "提交中..."
+  },
+  "File path": {
+    "en": "File path",
+    "zh": "文件路径"
+  },
+  "File content": {
+    "en": "File content",
+    "zh": "文件内容"
+  },
+  "Commit message": {
+    "en": "Commit message",
+    "zh": "提交信息"
+  },
+  "Add new file": {
+    "en": "Add new file",
+    "zh": "新增文件"
+  },
+  "Branch is required": {
+    "en": "Branch is required",
+    "zh": "分支不能为空"
+  },
+  "File path is required": {
+    "en": "File path is required",
+    "zh": "文件路径不能为空"
+  },
+  "Commit message is required": {
+    "en": "Commit message is required",
+    "zh": "提交信息不能为空"
+  },
+  "README not found. Select a source file from the left to open in Monaco.": {
+    "en": "README not found. Select a source file from the left to open in Monaco.",
+    "zh": "未找到 README。可从左侧选择源码文件并在 Monaco 中查看。"
+  },
+  "README is binary and cannot be rendered.": {
+    "en": "README is binary and cannot be rendered.",
+    "zh": "README 是二进制内容，无法渲染。"
+  },
+  "This file is binary and cannot be shown in Monaco.": {
+    "en": "This file is binary and cannot be shown in Monaco.",
+    "zh": "该文件是二进制内容，无法在 Monaco 中展示。"
+  },
+  "This project is empty": {
+    "en": "This project is empty",
+    "zh": "该项目为空"
+  },
+  "Create a new project on the command line": {
+    "en": "Create a new project on the command line",
+    "zh": "在命令行创建新项目"
+  },
+  "Push an existing project from the command line": {
+    "en": "Push an existing project from the command line",
+    "zh": "从命令行推送现有项目"
+  },
+  "This action cannot be undone.": {
+    "en": "This action cannot be undone.",
+    "zh": "该操作不可撤销。"
+  },
+  "Languages": {
+    "en": "Languages",
+    "zh": "语言统计"
+  },
+  "Refresh": {
+    "en": "Refresh",
+    "zh": "刷新"
+  },
+  "Loading language statistics...": {
+    "en": "Loading language statistics...",
+    "zh": "语言统计加载中..."
+  },
+  "Language statistics are being computed...": {
+    "en": "Language statistics are being computed...",
+    "zh": "语言统计计算中..."
+  },
+  "No language statistics yet.": {
+    "en": "No language statistics yet.",
+    "zh": "暂无语言统计。"
+  },
+  "Total size": {
+    "en": "Total size",
+    "zh": "总大小"
+  },
+  "Last analyzed": {
+    "en": "Last analyzed",
+    "zh": "最近分析"
+  },
+  "Issues": {
+    "en": "Issues",
+    "zh": "议题"
+  },
+  "Merge Requests": {
+    "en": "Merge Requests",
+    "zh": "合并请求"
+  }
+}

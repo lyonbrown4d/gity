@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Pipelines": {
+    "en": "Pipelines",
+    "zh": "流水线"
+  },
+  "Jobs": {
+    "en": "Jobs",
+    "zh": "任务"
+  },
+  "Track bugs, tasks, and discussions for this repository.": {
+    "en": "Track bugs, tasks, and discussions for this repository.",
+    "zh": "跟踪该仓库中的缺陷、任务和讨论。"
+  },
+  "Track bugs, tasks, and discussions for this project.": {
+    "en": "Track bugs, tasks, and discussions for this project.",
+    "zh": "跟踪该项目中的缺陷、任务和讨论。"
+  },
+  "Review branch changes and merge them into protected targets.": {
+    "en": "Review branch changes and merge them into protected targets.",
+    "zh": "审查分支变更并合并到目标分支。"
+  },
+  "Track CI pipelines triggered by pushes and merge requests.": {
+    "en": "Track CI pipelines triggered by pushes and merge requests.",
+    "zh": "跟踪由推送和合并请求触发的 CI 流水线。"
+  },
+  "Inspect and enqueue project background jobs.": {
+    "en": "Inspect and enqueue project background jobs.",
+    "zh": "查看并创建项目后台任务。"
+  },
+  "Status": {
+    "en": "Status",
+    "zh": "状态"
+  },
+  "Open issues": {
+    "en": "Open issues",
+    "zh": "打开的议题"
+  },
+  "Closed issues": {
+    "en": "Closed issues",
+    "zh": "已关闭的议题"
+  },
+  "All issues": {
+    "en": "All issues",
+    "zh": "全部议题"
+  },
+  "Search issues": {
+    "en": "Search issues",
+    "zh": "搜索议题"
+  },
+  "Recently updated": {
+    "en": "Recently updated",
+    "zh": "最近更新"
+  },
+  "Recently created": {
+    "en": "Recently created",
+    "zh": "最近创建"
+  },
+  "Newest number": {
+    "en": "Newest number",
+    "zh": "编号从新到旧"
+  },
+  "Oldest number": {
+    "en": "Oldest number",
+    "zh": "编号从旧到新"
+  },
+  "Reload": {
+    "en": "Reload",
+    "zh": "重新加载"
+  },
+  "Total": {
+    "en": "Total",
+    "zh": "总数"
+  },
+  "New issue": {
+    "en": "New issue",
+    "zh": "新建议题"
+  },
+  "Hide new issue form": {
+    "en": "Hide new issue form",
+    "zh": "收起新建议题表单"
+  },
+  "Issue title": {
+    "en": "Issue title",
+    "zh": "议题标题"
+  },
+  "Describe the issue (optional)": {
+    "en": "Describe the issue (optional)",
+    "zh": "议题描述（可选）"
+  },
+  "Assignee user ID (optional)": {
+    "en": "Assignee user ID (optional)",
+    "zh": "指派用户 ID（可选）"
+  },
+  "Creating issue...": {
+    "en": "Creating issue...",
+    "zh": "创建议题中..."
+  },
+  "Create issue": {
+    "en": "Create issue",
+    "zh": "创建议题"
+  },
+  "Loading issues...": {
+    "en": "Loading issues...",
+    "zh": "议题加载中..."
+  },
+  "No issues found.": {
+    "en": "No issues found.",
+    "zh": "暂无议题。"
+  },
+  "Pending": {
+    "en": "Pending",
+    "zh": "等待中"
+  },
+  "Running": {
+    "en": "Running",
+    "zh": "运行中"
+  },
+  "Succeeded": {
+    "en": "Succeeded",
+    "zh": "成功"
+  },
+  "Failed": {
+    "en": "Failed",
+    "zh": "失败"
+  },
+  "New job": {
+    "en": "New job",
+    "zh": "新建任务"
+  },
+  "Hide new job form": {
+    "en": "Hide new job form",
+    "zh": "收起新建任务表单"
+  },
+  "Job kind": {
+    "en": "Job kind",
+    "zh": "任务类型"
+  },
+  "Max attempts": {
+    "en": "Max attempts",
+    "zh": "最大尝试次数"
+  },
+  "Payload JSON": {
+    "en": "Payload JSON",
+    "zh": "负载 JSON"
+  },
+  "Max attempts must be a positive number": {
+    "en": "Max attempts must be a positive number",
+    "zh": "最大尝试次数必须为正数"
+  },
+  "Enqueueing job...": {
+    "en": "Enqueueing job...",
+    "zh": "任务入队中..."
+  },
+  "Enqueue job": {
+    "en": "Enqueue job",
+    "zh": "任务入队"
+  },
+  "Loading jobs...": {
+    "en": "Loading jobs...",
+    "zh": "任务加载中..."
+  },
+  "No jobs found.": {
+    "en": "No jobs found.",
+    "zh": "暂无任务。"
+  },
+  "Your current project role can inspect jobs, but cannot enqueue or cancel them.": {
+    "en": "Your current project role can inspect jobs, but cannot enqueue or cancel them.",
+    "zh": "你当前的项目角色可以查看任务，但不能创建或取消任务。"
+  },
+  "Attempts": {
+    "en": "Attempts",
+    "zh": "尝试次数"
+  },
+  "Worker": {
+    "en": "Worker",
+    "zh": "Worker"
+  },
+  "Cancel job": {
+    "en": "Cancel job",
+    "zh": "取消任务"
+  },
+  "Loading pipelines...": {
+    "en": "Loading pipelines...",
+    "zh": "流水线加载中..."
+  },
+  "No pipelines found.": {
+    "en": "No pipelines found.",
+    "zh": "暂无流水线。"
+  },
+  "Your current project role can inspect CI, but cannot create or mutate pipelines.": {
+    "en": "Your current project role can inspect CI, but cannot create or mutate pipelines.",
+    "zh": "你当前的项目角色可以查看 CI，但不能创建或变更流水线。"
+  }
+}

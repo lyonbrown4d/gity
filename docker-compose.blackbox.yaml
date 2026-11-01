@@ -1,26 +1,9 @@
 services:
-  traefik:
-    image: traefik:v3
-    command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
-      - --api.dashboard=false
-      - --log.level=INFO
-    ports:
-      - "${GITY_BLACKBOX_WEB_PORT:-18080}:80"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on:
-      backend:
-        condition: service_healthy
-      web:
-        condition: service_started
-
-  backend:
+  gity:
     build:
       context: .
-      dockerfile: build/blackbox/backend.Dockerfile
+      dockerfile: build/package/Dockerfile
+      target: server
     environment:
       GITY_APP__ENVIRONMENT: production
       GITY_HTTP__ADDRESS: 0.0.0.0:8080
@@ -33,38 +16,17 @@ services:
       GITY_STORAGE__DRIVER: local
       GITY_STORAGE__ROOT: /var/lib/gity/storage
       GITY_SEARCH__INDEX_ENABLED: "false"
+      GITY_WEB__ROOT: /opt/gity/web
+    ports:
+      - "127.0.0.1:${GITY_BLACKBOX_WEB_PORT:-18080}:8080"
     volumes:
-      - blackbox_backend_data:/var/lib/gity
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.gity-blackbox-api.rule: PathPrefix(`/api`)
-      traefik.http.routers.gity-blackbox-api.entrypoints: web
-      traefik.http.routers.gity-blackbox-api.priority: "100"
-      traefik.http.routers.gity-blackbox-api.service: gity-blackbox-api
-      traefik.http.routers.gity-blackbox-git.rule: PathRegexp(`^/.+\.git(/.*)?$`)
-      traefik.http.routers.gity-blackbox-git.entrypoints: web
-      traefik.http.routers.gity-blackbox-git.priority: "200"
-      traefik.http.routers.gity-blackbox-git.service: gity-blackbox-api
-      traefik.http.services.gity-blackbox-api.loadbalancer.server.port: "8080"
+      - blackbox_data:/var/lib/gity
+    command: [standalone]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null"]
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8080/api/health"]
       interval: 5s
       timeout: 3s
       retries: 30
 
-  web:
-    build:
-      context: web
-      dockerfile: ../build/blackbox/web.Dockerfile
-    depends_on:
-      backend:
-        condition: service_healthy
-    labels:
-      traefik.enable: "true"
-      traefik.http.routers.gity-blackbox-web.rule: PathPrefix(`/`)
-      traefik.http.routers.gity-blackbox-web.entrypoints: web
-      traefik.http.routers.gity-blackbox-web.priority: "1"
-      traefik.http.services.gity-blackbox-web.loadbalancer.server.port: "8080"
-
 volumes:
-  blackbox_backend_data:
+  blackbox_data:

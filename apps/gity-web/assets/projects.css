@@ -1,0 +1,32 @@
+.project-directory-page { display:flex; flex-direction:column; gap:16px; }
+.scope-status { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.scope-status>div { display:flex; align-items:center; gap:12px; padding:12px 20px; border-right:1px solid hsl(var(--border)/.7); }
+.scope-status>div:last-child { border:0; }
+.scope-status svg { width:16px; height:16px; color:var(--quiet); }
+.scope-status small { display:block; font-size:12px; color:var(--quiet); }
+.scope-status strong { display:block; font-size:14px; font-weight:600; line-height:20px; }
+.project-directory-columns { display:grid; grid-template-columns:260px minmax(0,1fr); gap:16px; }
+.project-directory-columns>.panel { margin:0; align-self:start; }
+.organization-scope .panel-heading { padding:16px; }
+.scope-content { display:flex; flex-direction:column; gap:16px; padding:16px; }
+.scope-content label { font-size:14px; gap:8px; }
+.scope-content select { height:36px; width:100%; }
+.scope-content dl { margin:0; border-top:1px solid hsl(var(--border)/.7); border-bottom:1px solid hsl(var(--border)/.7); }
+.scope-content dl>div { display:flex; align-items:center; justify-content:space-between; padding:12px 0; font-size:12px; border-bottom:1px solid hsl(var(--border)/.7); }
+.scope-content dl>div:last-child { border:0; }
+.scope-content dd { margin:0; }
+.directory-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(260px,.75fr) auto; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid hsl(var(--border)/.7); }
+.directory-row:last-child { border:0; }
+.directory-row:hover { background:hsl(var(--muted)/.3); }
+.directory-identity { display:flex; min-width:0; gap:12px; }
+.directory-identity>svg { flex-shrink:0; width:16px; height:16px; margin-top:2px; color:var(--quiet); }
+.directory-identity a { display:inline-block; font-size:14px; font-weight:600; color:var(--text); margin-right:8px; }
+.directory-identity p { margin:4px 0 0; font-size:12px; color:var(--quiet); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.directory-identity p:last-child { font-size:14px; }
+.directory-clone { min-width:0; padding-left:16px; border-left:1px solid hsl(var(--border)/.7); }
+.directory-clone p { margin:0 0 4px; font-size:12px; color:var(--quiet); }
+.directory-clone code { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; color:var(--quiet); }
+.directory-clone button { margin-top:6px; }
+.directory-actions { display:flex; align-items:center; gap:6px; }
+.composer.embedded { padding:0; border:0; }
+.composer.embedded>summary { display:none; }

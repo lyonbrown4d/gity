@@ -1,0 +1,31 @@
+.packages-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 12px;
+}
+.packages-composer label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.packages-composer input, .packages-composer select, .packages-composer textarea {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 400;
+}
+.packages-composer textarea {
+  min-height: 128px;
+}
+.packages-upload-identity, .packages-upload-file {
+  display: grid;
+  gap: 12px;
+}
+.packages-submit {
+  display: flex;
+  justify-content: flex-end;
+}

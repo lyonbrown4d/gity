@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Hide pipeline form": {
+    "en": "Hide pipeline form",
+    "zh": "收起流水线表单"
+  },
+  "New pipeline": {
+    "en": "New pipeline",
+    "zh": "新建流水线"
+  },
+  "Commit SHA": {
+    "en": "Commit SHA",
+    "zh": "提交 SHA"
+  },
+  "Optional": {
+    "en": "Optional",
+    "zh": "可选"
+  },
+  "Config source": {
+    "en": "Config source",
+    "zh": "配置来源"
+  },
+  "Plano CI config": {
+    "en": "Plano CI config",
+    "zh": "Plano CI 配置"
+  },
+  "CI config content is required": {
+    "en": "CI config content is required",
+    "zh": "CI 配置内容不能为空"
+  },
+  "Pipeline ref is required": {
+    "en": "Pipeline ref is required",
+    "zh": "流水线引用不能为空"
+  },
+  "Linting...": {
+    "en": "Linting...",
+    "zh": "校验中..."
+  },
+  "Lint config": {
+    "en": "Lint config",
+    "zh": "校验配置"
+  },
+  "Creating pipeline...": {
+    "en": "Creating pipeline...",
+    "zh": "流水线创建中..."
+  },
+  "Create pipeline": {
+    "en": "Create pipeline",
+    "zh": "创建流水线"
+  },
+  "Select a pipeline to inspect jobs.": {
+    "en": "Select a pipeline to inspect jobs.",
+    "zh": "选择一条流水线查看任务。"
+  },
+  "Reload pipeline": {
+    "en": "Reload pipeline",
+    "zh": "重新加载流水线"
+  },
+  "Refreshing...": {
+    "en": "Refreshing...",
+    "zh": "刷新中..."
+  },
+  "Refresh state": {
+    "en": "Refresh state",
+    "zh": "刷新状态"
+  },
+  "Cancel pipeline": {
+    "en": "Cancel pipeline",
+    "zh": "取消流水线"
+  },
+  "Cancelling...": {
+    "en": "Cancelling...",
+    "zh": "取消中..."
+  },
+  "Retry pipeline": {
+    "en": "Retry pipeline",
+    "zh": "重试流水线"
+  },
+  "Retrying...": {
+    "en": "Retrying...",
+    "zh": "重试中..."
+  },
+  "Source": {
+    "en": "Source",
+    "zh": "来源"
+  },
+  "Ref": {
+    "en": "Ref",
+    "zh": "引用"
+  },
+  "Commit": {
+    "en": "Commit",
+    "zh": "提交"
+  },
+  "Config": {
+    "en": "Config",
+    "zh": "配置"
+  },
+  "Started": {
+    "en": "Started",
+    "zh": "开始时间"
+  },
+  "Finished": {
+    "en": "Finished",
+    "zh": "结束时间"
+  },
+  "Pipeline jobs": {
+    "en": "Pipeline jobs",
+    "zh": "流水线任务"
+  },
+  "No pipeline jobs found.": {
+    "en": "No pipeline jobs found.",
+    "zh": "暂无流水线任务。"
+  },
+  "Needs": {
+    "en": "Needs",
+    "zh": "依赖"
+  },
+  "Artifacts": {
+    "en": "Artifacts",
+    "zh": "产物"
+  },
+  "blocked": {
+    "en": "blocked",
+    "zh": "阻塞中"
+  },
+  "pending": {
+    "en": "pending",
+    "zh": "等待中"
+  },
+  "running": {
+    "en": "running",
+    "zh": "运行中"
+  },
+  "succeeded": {
+    "en": "succeeded",
+    "zh": "成功"
+  },
+  "failed": {
+    "en": "failed",
+    "zh": "失败"
+  },
+  "cancelled": {
+    "en": "cancelled",
+    "zh": "已取消"
+  },
+  "web": {
+    "en": "web",
+    "zh": "网页"
+  },
+  "manual": {
+    "en": "manual",
+    "zh": "手动"
+  },
+  "push": {
+    "en": "push",
+    "zh": "推送"
+  },
+  "merge_request": {
+    "en": "merge_request",
+    "zh": "合并请求"
+  },
+  "Closed": {
+    "en": "Closed",
+    "zh": "已关闭"
+  },
+  "Merged": {
+    "en": "Merged",
+    "zh": "已合并"
+  },
+  "Open merge requests": {
+    "en": "Open merge requests",
+    "zh": "打开的合并请求"
+  },
+  "Merged merge requests": {
+    "en": "Merged merge requests",
+    "zh": "已合并的合并请求"
+  },
+  "Closed merge requests": {
+    "en": "Closed merge requests",
+    "zh": "已关闭的合并请求"
+  },
+  "All merge requests": {
+    "en": "All merge requests",
+    "zh": "全部合并请求"
+  },
+  "Search merge requests": {
+    "en": "Search merge requests",
+    "zh": "搜索合并请求"
+  },
+  "New merge request": {
+    "en": "New merge request",
+    "zh": "新建合并请求"
+  }
+}

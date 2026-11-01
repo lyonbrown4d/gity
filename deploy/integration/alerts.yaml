@@ -1,0 +1,35 @@
+groups:
+  - name: gity
+    rules:
+      - alert: GityMetricsUnavailable
+        expr: up{job="gity-server"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gity 指标端点不可访问
+          description: 检查应用进程、独立指标监听端口和采集网络。
+      - alert: GityServerErrors
+        expr: sum(rate(gity_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(gity_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gity 服务端错误比例持续超过 5%
+          description: 根据请求 ID 检查应用结构化日志与链路，重点检查数据库和对象存储。
+      - alert: GitySchedulerFailing
+        expr: sum(increase(gity_scheduler_ticks_total{result="failure"}[5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gity 流水线调度持续失败
+          description: 检查数据库、任务租约与调度日志。
+      - alert: GitySearchRefreshFailing
+        expr: sum(increase(gity_search_refresh_total{result="failure"}[15m])) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Gity 搜索索引刷新失败
+          description: 检查日志中的项目 ID、仓库路径和索引目录，陈旧索引会回退到 Git 扫描。

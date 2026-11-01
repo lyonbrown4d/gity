@@ -1,0 +1,183 @@
+{
+  "_version": 2,
+  "invalid wiki page slug": {
+    "en": "invalid wiki page slug",
+    "zh": "Wiki 页面路径标识无效"
+  },
+  "issue state must be opened or closed": {
+    "en": "issue state must be opened or closed",
+    "zh": "议题状态必须为 opened 或 closed"
+  },
+  "job dependency must be in the same or an earlier stage": {
+    "en": "job dependency must be in the same or an earlier stage",
+    "zh": "任务只能依赖当前或之前阶段的任务"
+  },
+  "job lease changed": {
+    "en": "job lease changed",
+    "zh": "任务租约已变更"
+  },
+  "job timeout must be 1–86400 seconds": {
+    "en": "job timeout must be 1–86400 seconds",
+    "zh": "任务超时必须在 1 至 86400 秒之间"
+  },
+  "lfs endpoint not found": {
+    "en": "lfs endpoint not found",
+    "zh": "未找到 LFS 接口"
+  },
+  "lfs lock is owned by another user": {
+    "en": "lfs lock is owned by another user",
+    "zh": "LFS 锁属于其他用户"
+  },
+  "lfs object SHA256 does not match oid": {
+    "en": "lfs object SHA256 does not match oid",
+    "zh": "LFS 对象的 SHA256 与 OID 不匹配"
+  },
+  "lfs object not found": {
+    "en": "lfs object not found",
+    "zh": "未找到 LFS 对象"
+  },
+  "lfs objects are required": {
+    "en": "lfs objects are required",
+    "zh": "必须提供 LFS 对象"
+  },
+  "lfs oid must be a 64-character hex string": {
+    "en": "lfs oid must be a 64-character hex string",
+    "zh": "LFS OID 必须是 64 位十六进制字符串"
+  },
+  "lock owner not found": {
+    "en": "lock owner not found",
+    "zh": "未找到锁的所有者"
+  },
+  "masked ci variable value must be at least 8 characters": {
+    "en": "masked ci variable value must be at least 8 characters",
+    "zh": "需要掩码的 CI 变量值至少为 8 个字符"
+  },
+  "maven package path is invalid": {
+    "en": "maven package path is invalid",
+    "zh": "Maven 软件包路径无效"
+  },
+  "max_attempts must be 1–10": {
+    "en": "max_attempts must be 1–10",
+    "zh": "最大尝试次数必须在 1 至 10 次之间"
+  },
+  "merge request branch not found": {
+    "en": "merge request branch not found",
+    "zh": "未找到合并请求的分支"
+  },
+  "merge request is not opened": {
+    "en": "merge request is not opened",
+    "zh": "合并请求未处于打开状态"
+  },
+  "merged merge requests cannot be reopened": {
+    "en": "merged merge requests cannot be reopened",
+    "zh": "已合并的请求不能重新打开"
+  },
+  "npm package attachment is invalid": {
+    "en": "npm package attachment is invalid",
+    "zh": "npm 软件包附件无效"
+  },
+  "npm package attachment is required": {
+    "en": "npm package attachment is required",
+    "zh": "必须提供 npm 软件包附件"
+  },
+  "npm package name and version are required": {
+    "en": "npm package name and version are required",
+    "zh": "必须提供 npm 软件包名称和版本"
+  },
+  "object storage operation failed": {
+    "en": "object storage operation failed",
+    "zh": "对象存储操作失败"
+  },
+  "object_key is required": {
+    "en": "object_key is required",
+    "zh": "必须提供对象键"
+  },
+  "observability.log_format must be json or text": {
+    "en": "observability.log_format must be json or text",
+    "zh": "日志格式必须为 json 或 text"
+  },
+  "only failed or canceled jobs can be retried": {
+    "en": "only failed or canceled jobs can be retried",
+    "zh": "只能重试已失败或取消的任务"
+  },
+  "owner role required": {
+    "en": "owner role required",
+    "zh": "需要所有者权限"
+  },
+  "package file not found": {
+    "en": "package file not found",
+    "zh": "未找到软件包文件"
+  },
+  "package not found": {
+    "en": "package not found",
+    "zh": "未找到软件包"
+  },
+  "password hashing failed": {
+    "en": "password hashing failed",
+    "zh": "密码加密失败"
+  },
+  "password must contain 8–1024 bytes": {
+    "en": "password must contain 8–1024 bytes",
+    "zh": "密码长度必须为 8 至 1024 字节"
+  },
+  "password must contain at least 8 bytes": {
+    "en": "password must contain at least 8 bytes",
+    "zh": "密码至少为 8 字节"
+  },
+  "password not configured; administrator must run set-password": {
+    "en": "password not configured; administrator must run set-password",
+    "zh": "尚未配置密码，请联系管理员执行 set-password"
+  },
+  "password verification failed": {
+    "en": "password verification failed",
+    "zh": "密码校验失败"
+  },
+  "personal token name required": {
+    "en": "personal token name required",
+    "zh": "必须提供个人令牌名称"
+  },
+  "pipeline must be terminal before retry": {
+    "en": "pipeline must be terminal before retry",
+    "zh": "流水线结束后才能重试"
+  },
+  "pipeline not found": {
+    "en": "pipeline not found",
+    "zh": "未找到流水线"
+  },
+  "positive identifier required": {
+    "en": "positive identifier required",
+    "zh": "标识必须为正整数"
+  },
+  "project delete confirmation does not match full path": {
+    "en": "project delete confirmation does not match full path",
+    "zh": "删除确认内容与项目完整路径不匹配"
+  },
+  "project token does not permit this repository operation": {
+    "en": "project token does not permit this repository operation",
+    "zh": "项目令牌不允许执行此仓库操作"
+  },
+  "project token is inactive": {
+    "en": "project token is inactive",
+    "zh": "项目令牌未启用或已失效"
+  },
+  "project token not found": {
+    "en": "project token not found",
+    "zh": "未找到项目令牌"
+  },
+  "project token scope does not permit this operation": {
+    "en": "project token scope does not permit this operation",
+    "zh": "项目令牌的权限范围不允许此操作"
+  },
+  "protected branch cannot be deleted": {
+    "en": "protected branch cannot be deleted",
+    "zh": "不能删除受保护的分支"
+  },
+  "protected branch requires a merge request": {
+    "en": "protected branch requires a merge request",
+    "zh": "受保护分支必须通过合并请求更新"
+  },
+  "protected branch role requirement not met": {
+    "en": "protected branch role requirement not met",
+    "zh": "角色不满足受保护分支的要求"
+  }
+}

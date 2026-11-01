@@ -1,0 +1,28 @@
+[package]
+name = "gity-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-i18n = { path = "../gity-i18n" }
+axum.workspace = true
+chrono.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+sha2 = "0.10"
+hex = "0.4"
+dotenvy = "0.15"
+rust-embed = "8"
+bytes.workspace = true
+object_store = { version = "0.14", features = ["aws"] }
+futures-util = "0.3"
+config = { version = "0.15", default-features = false, features = ["toml", "yaml"] }
+regex = "1"
+
+[dev-dependencies]
+tempfile.workspace = true

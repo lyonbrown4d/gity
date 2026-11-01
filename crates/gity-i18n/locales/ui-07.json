@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Assignees": {
+    "en": "Assignees",
+    "zh": "指派人"
+  },
+  "No assignees assigned.": {
+    "en": "No assignees assigned.",
+    "zh": "暂无指派人。"
+  },
+  "Labels": {
+    "en": "Labels",
+    "zh": "标签"
+  },
+  "No labels assigned.": {
+    "en": "No labels assigned.",
+    "zh": "暂无标签。"
+  },
+  "Label name": {
+    "en": "Label name",
+    "zh": "标签名称"
+  },
+  "Label color": {
+    "en": "Label color",
+    "zh": "标签颜色"
+  },
+  "Issue label name is required": {
+    "en": "Issue label name is required",
+    "zh": "议题标签名称不能为空"
+  },
+  "No users available": {
+    "en": "No users available",
+    "zh": "暂无可选用户"
+  },
+  "Select user": {
+    "en": "Select user",
+    "zh": "选择用户"
+  },
+  "Saving...": {
+    "en": "Saving...",
+    "zh": "保存中..."
+  },
+  "Write": {
+    "en": "Write",
+    "zh": "编写"
+  },
+  "Preview": {
+    "en": "Preview",
+    "zh": "预览"
+  },
+  "Upload files": {
+    "en": "Upload files",
+    "zh": "上传文件"
+  },
+  "Uploading...": {
+    "en": "Uploading...",
+    "zh": "上传中..."
+  },
+  "Rendering preview...": {
+    "en": "Rendering preview...",
+    "zh": "渲染预览中..."
+  },
+  "Select an issue to view details and comments.": {
+    "en": "Select an issue to view details and comments.",
+    "zh": "选择一个议题以查看详情与评论。"
+  },
+  "Issue title is required": {
+    "en": "Issue title is required",
+    "zh": "议题标题不能为空"
+  },
+  "Your current project role can inspect issues, but cannot create them.": {
+    "en": "Your current project role can inspect issues, but cannot create them.",
+    "zh": "你当前的项目角色可以查看议题，但不能创建议题。"
+  },
+  "Your current project role can inspect issues, but cannot comment on them.": {
+    "en": "Your current project role can inspect issues, but cannot comment on them.",
+    "zh": "你当前的项目角色可以查看议题，但不能评论。"
+  },
+  "Comment content is required": {
+    "en": "Comment content is required",
+    "zh": "评论内容不能为空"
+  },
+  "Recent commit activity in this repository.": {
+    "en": "Recent commit activity in this repository.",
+    "zh": "该仓库最近的提交活动。"
+  },
+  "Recent commit activity in this project.": {
+    "en": "Recent commit activity in this project.",
+    "zh": "该项目最近的提交活动。"
+  },
+  "Branch": {
+    "en": "Branch",
+    "zh": "分支"
+  },
+  "All branches": {
+    "en": "All branches",
+    "zh": "所有分支"
+  },
+  "Loading commits...": {
+    "en": "Loading commits...",
+    "zh": "提交加载中..."
+  },
+  "No commits found.": {
+    "en": "No commits found.",
+    "zh": "暂无提交。"
+  },
+  "Manage repository branches and protections.": {
+    "en": "Manage repository branches and protections.",
+    "zh": "管理仓库分支与保护策略。"
+  },
+  "Manage project branches and protections.": {
+    "en": "Manage project branches and protections.",
+    "zh": "管理项目分支与保护策略。"
+  },
+  "Your current project role can inspect branches, but cannot change them.": {
+    "en": "Your current project role can inspect branches, but cannot change them.",
+    "zh": "你当前的项目角色可以查看分支，但不能修改分支。"
+  },
+  "New branch name": {
+    "en": "New branch name",
+    "zh": "新分支名称"
+  },
+  "Create branch": {
+    "en": "Create branch",
+    "zh": "创建分支"
+  },
+  "Loading branches...": {
+    "en": "Loading branches...",
+    "zh": "分支加载中..."
+  },
+  "Last commit": {
+    "en": "Last commit",
+    "zh": "最近提交"
+  },
+  "Protected": {
+    "en": "Protected",
+    "zh": "已保护"
+  },
+  "Unprotected": {
+    "en": "Unprotected",
+    "zh": "未保护"
+  },
+  "Unprotect": {
+    "en": "Unprotect",
+    "zh": "取消保护"
+  },
+  "Protect": {
+    "en": "Protect",
+    "zh": "保护"
+  },
+  "Default": {
+    "en": "Default",
+    "zh": "默认"
+  },
+  "Push": {
+    "en": "Push",
+    "zh": "推送"
+  },
+  "no_one": {
+    "en": "no_one",
+    "zh": "禁止"
+  },
+  "guest": {
+    "en": "guest",
+    "zh": "访客"
+  },
+  "reporter": {
+    "en": "reporter",
+    "zh": "报告者"
+  },
+  "developer": {
+    "en": "developer",
+    "zh": "开发者"
+  },
+  "maintainer": {
+    "en": "maintainer",
+    "zh": "维护者"
+  },
+  "unknown": {
+    "en": "unknown",
+    "zh": "未知"
+  },
+  "Deletion allowed": {
+    "en": "Deletion allowed",
+    "zh": "允许删除"
+  },
+  "Deletion blocked": {
+    "en": "Deletion blocked",
+    "zh": "禁止删除"
+  },
+  "Delete branch \"{name}\"?": {
+    "en": "Delete branch \"%{name}\"?",
+    "zh": "确认删除分支“%{name}”？"
+  }
+}

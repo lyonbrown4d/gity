@@ -1,0 +1,143 @@
+{
+  "_version": 2,
+  "Add a README to turn this project home into a useful landing page for contributors.": {
+    "en": "Add a README to turn this project home into a useful landing page for contributors.",
+    "zh": "添加 README，为贡献者提供实用的项目首页。"
+  },
+  "Add masked variables for tokens, deployment keys, and environment values that jobs need at runtime. Use protected variables for release credentials and re-run the pipeline after saving.": {
+    "en": "Add masked variables for tokens, deployment keys, and environment values that jobs need at runtime. Use protected variables for release credentials and re-run the pipeline after saving.",
+    "zh": "为作业运行所需的令牌、部署密钥和环境值添加脱敏变量。发布凭据请使用受保护变量，保存后重新运行流水线。"
+  },
+  "Artifacts are produced by CI script jobs. If none appear, confirm the pipeline job declares artifact paths and the script reaches upload.": {
+    "en": "Artifacts are produced by CI script jobs. If none appear, confirm the pipeline job declares artifact paths and the script reaches upload.",
+    "zh": "产物由 CI 脚本作业生成。如果没有产物，请确认作业声明了产物路径，且脚本执行到了上传步骤。"
+  },
+  "Browse organization namespaces, open project repositories, and copy clone URLs from one workspace.": {
+    "en": "Browse organization namespaces, open project repositories, and copy clone URLs from one workspace.",
+    "zh": "在同一工作区浏览组织命名空间、打开项目仓库并复制克隆地址。"
+  },
+  "Create a manual pipeline to validate CI config, or push commits to let pipelines appear here automatically.": {
+    "en": "Create a manual pipeline to validate CI config, or push commits to let pipelines appear here automatically.",
+    "zh": "手动创建流水线以验证 CI 配置，或推送提交以自动触发流水线。"
+  },
+  "Create a project in this organization to get started.": {
+    "en": "Create a project in this organization to get started.",
+    "zh": "在此组织中创建项目以开始使用。"
+  },
+  "Create the first issue to start triage for this project.": {
+    "en": "Create the first issue to start triage for this project.",
+    "zh": "创建第一个议题，开始处理项目事项。"
+  },
+  "Deployments using this key will no longer be trusted by this project.": {
+    "en": "Deployments using this key will no longer be trusted by this project.",
+    "zh": "此项目将不再信任使用该密钥的部署。"
+  },
+  "Describe user-facing changes, upgrade notes, and known limitations.": {
+    "en": "Describe user-facing changes, upgrade notes, and known limitations.",
+    "zh": "描述用户可见的变化、升级说明和已知限制。"
+  },
+  "Enqueue a manual job to validate runner connectivity, or wait for a pipeline to create jobs automatically.": {
+    "en": "Enqueue a manual job to validate runner connectivity, or wait for a pipeline to create jobs automatically.",
+    "zh": "添加手动作业以验证 Runner 连接，或等待流水线自动创建作业。"
+  },
+  "Existing automation using this token will stop working immediately.": {
+    "en": "Existing automation using this token will stop working immediately.",
+    "zh": "使用此令牌的现有自动化任务将立即停止工作。"
+  },
+  "Install runners only on machines allowed to read repository workspaces and injected variables.": {
+    "en": "Install runners only on machines allowed to read repository workspaces and injected variables.",
+    "zh": "仅在获准读取仓库工作区和注入变量的主机上安装 Runner。"
+  },
+  "Manage repository tags, release notes, and external release asset links.": {
+    "en": "Manage repository tags, release notes, and external release asset links.",
+    "zh": "管理仓库标签、发布说明和外部发布资源链接。"
+  },
+  "Masked values are hidden after save and redacted from job logs, but jobs can still read them at runtime.": {
+    "en": "Masked values are hidden after save and redacted from job logs, but jobs can still read them at runtime.",
+    "zh": "脱敏值在保存后隐藏，并从作业日志中遮蔽，但作业运行时仍可读取。"
+  },
+  "Masked variables are injected into script jobs and redacted from logs.": {
+    "en": "Masked variables are injected into script jobs and redacted from logs.",
+    "zh": "脱敏变量会注入脚本作业，并从日志中遮蔽。"
+  },
+  "Offline runner. Check the runner process, trusted host network, and token configuration.": {
+    "en": "Offline runner. Check the runner process, trusted host network, and token configuration.",
+    "zh": "Runner 已离线。请检查进程、受信主机网络和令牌配置。"
+  },
+  "Online, but no heartbeat timestamp is available. Verify runtime toolchains if jobs are still failing.": {
+    "en": "Online, but no heartbeat timestamp is available. Verify runtime toolchains if jobs are still failing.",
+    "zh": "Runner 在线，但没有心跳时间。如果作业仍失败，请检查运行环境工具链。"
+  },
+  "Pending jobs need an active runner whose tags satisfy the job tags declared in the CI config.": {
+    "en": "Pending jobs need an active runner whose tags satisfy the job tags declared in the CI config.",
+    "zh": "待处理作业需要处于启用状态、且标签符合 CI 配置要求的 Runner。"
+  },
+  "Project activity, organization scope, and account access in one workspace.": {
+    "en": "Project activity, organization scope, and account access in one workspace.",
+    "zh": "在同一工作区查看项目动态、组织范围和账户访问权限。"
+  },
+  "Protected marks secrets intended for protected refs or release jobs; keep deployment credentials protected and scoped.": {
+    "en": "Protected marks secrets intended for protected refs or release jobs; keep deployment credentials protected and scoped.",
+    "zh": "将用于受保护引用或发布作业的秘密标记为受保护变量；部署凭据应保持保护并限定范围。"
+  },
+  "Register a project runner on a trusted host before pipelines can claim CI jobs on this repository. Add tags that match your CI config, then verify the runner sends heartbeats.": {
+    "en": "Register a project runner on a trusted host before pipelines can claim CI jobs on this repository. Add tags that match your CI config, then verify the runner sends heartbeats.",
+    "zh": "在受信主机上注册项目 Runner 后，才可领取此仓库的 CI 作业。添加与 CI 配置匹配的标签，并确认 Runner 发送心跳。"
+  },
+  "Repository, CI, and collaboration activity will appear here after events are emitted.": {
+    "en": "Repository, CI, and collaboration activity will appear here after events are emitted.",
+    "zh": "事件产生后，仓库、CI 和协作动态将在此显示。"
+  },
+  "Review project activity that needs your attention, then clear it from the queue.": {
+    "en": "Review project activity that needs your attention, then clear it from the queue.",
+    "zh": "查看需要关注的项目动态，处理后将其移出队列。"
+  },
+  "Select a source file from the left to open in Monaco.": {
+    "en": "Select a source file from the left to open in Monaco.",
+    "zh": "从左侧选择源文件，在 Monaco 中打开。"
+  },
+  "The runner host provides shell tools, containers, caches, and network access; keep that runtime patched and scoped.": {
+    "en": "The runner host provides shell tools, containers, caches, and network access; keep that runtime patched and scoped.",
+    "zh": "Runner 主机提供 Shell 工具、容器、缓存和网络访问；请及时更新运行环境并限制访问范围。"
+  },
+  "This file is binary cannot be shown in Monaco.": {
+    "en": "This file is binary cannot be shown in Monaco.",
+    "zh": "此文件为二进制文件，无法在 Monaco 中显示。"
+  },
+  "This force-unlocks the file for the project.": {
+    "en": "This force-unlocks the file for the project.",
+    "zh": "这将强制解除此项目中的文件锁。"
+  },
+  "This removes only the project-specific role. Organization membership is not changed.": {
+    "en": "This removes only the project-specific role. Organization membership is not changed.",
+    "zh": "仅移除此项目中的角色，组织成员关系保持不变。"
+  },
+  "Track bugs, tasks, ownership, labels, and discussions for this project.": {
+    "en": "Track bugs, tasks, ownership, labels, and discussions for this project.",
+    "zh": "跟踪此项目的缺陷、任务、负责人、标签和讨论。"
+  },
+  "Tracked large files will appear here after the first LFS push.": {
+    "en": "Tracked large files will appear here after the first LFS push.",
+    "zh": "首次通过 LFS 推送后，受跟踪的大文件将在此显示。"
+  },
+  "Treat runner tokens like deployment secrets. Runners execute repository scripts and can receive CI variables, so install them only on hosts you trust and can patch.": {
+    "en": "Treat runner tokens like deployment secrets. Runners execute repository scripts and can receive CI variables, so install them only on hosts you trust and can patch.",
+    "zh": "请像保护部署凭据一样保护 Runner 令牌。Runner 会执行仓库脚本并接收 CI 变量，因此仅应安装在受信且可维护更新的主机上。"
+  },
+  "Your current project role can inspect approval rules, but cannot change them.": {
+    "en": "Your current project role can inspect approval rules, but cannot change them.",
+    "zh": "当前项目角色可以查看审批规则，但不能修改。"
+  },
+  "Your current project role can inspect members, but cannot change project membership.": {
+    "en": "Your current project role can inspect members, but cannot change project membership.",
+    "zh": "当前项目角色可以查看成员，但不能更改项目成员关系。"
+  },
+  "Your current project role can inspect releases, but cannot change them.": {
+    "en": "Your current project role can inspect releases, but cannot change them.",
+    "zh": "当前项目角色可以查看发布，但不能修改。"
+  },
+  "Your current project role can inspect runners, but cannot change CI variables.": {
+    "en": "Your current project role can inspect runners, but cannot change CI variables.",
+    "zh": "当前项目角色可以查看 Runner，但不能修改 CI 变量。"
+  }
+}

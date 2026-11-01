@@ -1,0 +1,20 @@
+[package]
+name = "gity-runner"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+base64.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+reqwest = { version = "0.13", features = ["json"] }
+clap = { version = "4", features = ["derive", "env"] }
+dotenvy = "0.15"
+tempfile.workspace = true
+zip = { version = "2.6", default-features = false, features = ["deflate"] }
+libc = "0.2"
+
+[dev-dependencies]
+axum.workspace = true

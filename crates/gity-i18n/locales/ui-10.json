@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Create local tag": {
+    "en": "Create local tag",
+    "zh": "创建本地 tag"
+  },
+  "Push tag": {
+    "en": "Push tag",
+    "zh": "推送 tag"
+  },
+  "Publish package artifact": {
+    "en": "Publish package artifact",
+    "zh": "发布包产物"
+  },
+  "Attach release asset": {
+    "en": "Attach release asset",
+    "zh": "关联 release 资产"
+  },
+  "Dismiss": {
+    "en": "Dismiss",
+    "zh": "关闭"
+  },
+  "read_repository": {
+    "en": "read_repository",
+    "zh": "读取仓库"
+  },
+  "write_repository": {
+    "en": "write_repository",
+    "zh": "写入仓库"
+  },
+  "read_package": {
+    "en": "read_package",
+    "zh": "读取包"
+  },
+  "write_package": {
+    "en": "write_package",
+    "zh": "写入包"
+  },
+  "read_api": {
+    "en": "read_api",
+    "zh": "读取 API"
+  },
+  "write_api": {
+    "en": "write_api",
+    "zh": "写入 API"
+  },
+  "Delete": {
+    "en": "Delete",
+    "zh": "删除"
+  },
+  "No repositories available.": {
+    "en": "No repositories available.",
+    "zh": "暂无仓库。"
+  },
+  "No projects available.": {
+    "en": "No projects available.",
+    "zh": "暂无项目。"
+  },
+  "repos": {
+    "en": "repos",
+    "zh": "个仓库"
+  },
+  "projects": {
+    "en": "projects",
+    "zh": "个项目"
+  },
+  "N/A": {
+    "en": "N/A",
+    "zh": "无"
+  },
+  "Please select an organization first.": {
+    "en": "Please select an organization first.",
+    "zh": "请先选择一个组织。"
+  },
+  "Failed to create repository": {
+    "en": "Failed to create repository",
+    "zh": "创建仓库失败"
+  },
+  "Failed to delete repository": {
+    "en": "Failed to delete repository",
+    "zh": "删除仓库失败"
+  },
+  "Failed to create project": {
+    "en": "Failed to create project",
+    "zh": "创建项目失败"
+  },
+  "Failed to delete project": {
+    "en": "Failed to delete project",
+    "zh": "删除项目失败"
+  },
+  "Failed to copy clone URL": {
+    "en": "Failed to copy clone URL",
+    "zh": "复制克隆地址失败"
+  },
+  "Delete repository \"{name}\"?": {
+    "en": "Delete repository \"%{name}\"?",
+    "zh": "确认删除仓库“%{name}”？"
+  },
+  "Delete project \"{name}\"?": {
+    "en": "Delete project \"%{name}\"?",
+    "zh": "确认删除项目“%{name}”？"
+  },
+  "Delete organization \"{name}\"?": {
+    "en": "Delete organization \"%{name}\"?",
+    "zh": "确认删除组织“%{name}”？"
+  },
+  "Create Repository": {
+    "en": "Create Repository",
+    "zh": "创建仓库"
+  },
+  "Create Project": {
+    "en": "Create Project",
+    "zh": "创建项目"
+  },
+  "Owner": {
+    "en": "Owner",
+    "zh": "所属者"
+  },
+  "Repository key": {
+    "en": "Repository key",
+    "zh": "仓库标识"
+  },
+  "Repository name": {
+    "en": "Repository name",
+    "zh": "仓库名称"
+  },
+  "Repository Name": {
+    "en": "Repository Name",
+    "zh": "仓库名称"
+  },
+  "Project key": {
+    "en": "Project key",
+    "zh": "项目标识"
+  },
+  "Project name": {
+    "en": "Project name",
+    "zh": "项目名称"
+  },
+  "Project Name": {
+    "en": "Project Name",
+    "zh": "项目名称"
+  },
+  "Description": {
+    "en": "Description",
+    "zh": "描述"
+  },
+  "Description (optional)": {
+    "en": "Description (optional)",
+    "zh": "描述（可选）"
+  },
+  "Default branch": {
+    "en": "Default branch",
+    "zh": "默认分支"
+  },
+  "Visibility": {
+    "en": "Visibility",
+    "zh": "可见性"
+  },
+  "Add .gitignore": {
+    "en": "Add .gitignore",
+    "zh": "添加 .gitignore"
+  },
+  "Add license": {
+    "en": "Add license",
+    "zh": "添加 license"
+  },
+  "None": {
+    "en": "None",
+    "zh": "不添加"
+  },
+  "Rust": {
+    "en": "Rust",
+    "zh": "Rust"
+  },
+  "Node": {
+    "en": "Node",
+    "zh": "Node"
+  },
+  "Python": {
+    "en": "Python",
+    "zh": "Python"
+  },
+  "Go": {
+    "en": "Go",
+    "zh": "Go"
+  },
+  "Java": {
+    "en": "Java",
+    "zh": "Java"
+  },
+  "MIT License": {
+    "en": "MIT License",
+    "zh": "MIT 许可证"
+  }
+}

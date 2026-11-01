@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Select a release.": {
+    "en": "Select a release.",
+    "zh": "请选择一个发布。"
+  },
+  "Release asset links are shown for the selected release.": {
+    "en": "Release asset links are shown for the selected release.",
+    "zh": "此处显示所选发布的资源链接。"
+  },
+  "No asset links.": {
+    "en": "No asset links.",
+    "zh": "暂无资源链接。"
+  },
+  "Delete tag": {
+    "en": "Delete tag",
+    "zh": "删除 Git 标签"
+  },
+  "Delete tag \"{name}\"?": {
+    "en": "Delete tag \"%{name}\"?",
+    "zh": "删除 Git 标签“%{name}”？"
+  },
+  "Deleting a Git tag can affect release consumers.": {
+    "en": "Deleting a Git tag can affect release consumers.",
+    "zh": "删除 Git 标签可能影响使用该发布的用户。"
+  },
+  "Delete asset link": {
+    "en": "Delete asset link",
+    "zh": "删除资源链接"
+  },
+  "Select a release first.": {
+    "en": "Select a release first.",
+    "zh": "请先选择一个发布。"
+  },
+  "Release link name and URL are required.": {
+    "en": "Release link name and URL are required.",
+    "zh": "请输入发布资源链接的名称和地址。"
+  },
+  "Link name": {
+    "en": "Link name",
+    "zh": "链接名称"
+  },
+  "URL": {
+    "en": "URL",
+    "zh": "URL"
+  },
+  "Link type": {
+    "en": "Link type",
+    "zh": "链接类型"
+  },
+  "Add link": {
+    "en": "Add link",
+    "zh": "添加链接"
+  },
+  "Tag name is required.": {
+    "en": "Tag name is required.",
+    "zh": "请输入 Git 标签名称。"
+  },
+  "Tag name": {
+    "en": "Tag name",
+    "zh": "Git 标签名称"
+  },
+  "Source ref": {
+    "en": "Source ref",
+    "zh": "来源引用"
+  },
+  "Create tag": {
+    "en": "Create tag",
+    "zh": "创建 Git 标签"
+  },
+  "Yes": {
+    "en": "Yes",
+    "zh": "是"
+  },
+  "No": {
+    "en": "No",
+    "zh": "否"
+  },
+  "Release name": {
+    "en": "Release name",
+    "zh": "发布名称"
+  },
+  "Release notes": {
+    "en": "Release notes",
+    "zh": "发布说明"
+  },
+  "No releases yet.": {
+    "en": "No releases yet.",
+    "zh": "暂无发布。"
+  },
+  "Missing tag": {
+    "en": "Missing tag",
+    "zh": "缺少 Git 标签"
+  },
+  "No release notes.": {
+    "en": "No release notes.",
+    "zh": "暂无发布说明。"
+  },
+  "No release time": {
+    "en": "No release time",
+    "zh": "未设置发布时间"
+  },
+  "Edit release": {
+    "en": "Edit release",
+    "zh": "编辑发布"
+  },
+  "Delete release": {
+    "en": "Delete release",
+    "zh": "删除发布"
+  },
+  "Delete release \"{name}\"?": {
+    "en": "Delete release \"%{name}\"?",
+    "zh": "删除发布“%{name}”？"
+  },
+  "This removes release metadata but keeps the Git tag.": {
+    "en": "This removes release metadata but keeps the Git tag.",
+    "zh": "此操作删除发布信息并保留 Git 标签。"
+  },
+  "Loading": {
+    "en": "Loading",
+    "zh": "正在加载"
+  },
+  "Rule name": {
+    "en": "Rule name",
+    "zh": "规则名称"
+  },
+  "Maintainer approval": {
+    "en": "Maintainer approval",
+    "zh": "维护者审批"
+  },
+  "Required": {
+    "en": "Required",
+    "zh": "必需"
+  },
+  "Eligible users": {
+    "en": "Eligible users",
+    "zh": "可审批用户"
+  },
+  "Any approver can satisfy this rule.": {
+    "en": "Any approver can satisfy this rule.",
+    "zh": "任意审批人均可满足此规则。"
+  },
+  "Remove": {
+    "en": "Remove",
+    "zh": "移除"
+  },
+  "Select eligible user": {
+    "en": "Select eligible user",
+    "zh": "选择可审批用户"
+  },
+  "Add user": {
+    "en": "Add user",
+    "zh": "添加用户"
+  },
+  "Cancel edit": {
+    "en": "Cancel edit",
+    "zh": "取消编辑"
+  },
+  "Approval rules": {
+    "en": "Approval rules",
+    "zh": "审批规则"
+  },
+  "Configure branch scoped approvals and CODEOWNERS requirements.": {
+    "en": "Configure branch scoped approvals and CODEOWNERS requirements.",
+    "zh": "按分支配置审批规则和 CODEOWNERS 要求。"
+  },
+  "Rule": {
+    "en": "Rule",
+    "zh": "规则"
+  },
+  "Scope": {
+    "en": "Scope",
+    "zh": "范围"
+  },
+  "Approvers": {
+    "en": "Approvers",
+    "zh": "审批人"
+  },
+  "Requirement": {
+    "en": "Requirement",
+    "zh": "要求"
+  },
+  "No approval rules configured.": {
+    "en": "No approval rules configured.",
+    "zh": "尚未配置审批规则。"
+  },
+  "CODEOWNERS": {
+    "en": "CODEOWNERS",
+    "zh": "CODEOWNERS"
+  },
+  "approval(s)": {
+    "en": "approval(s)",
+    "zh": "项审批"
+  },
+  "Reviewers and assignees": {
+    "en": "Reviewers and assignees",
+    "zh": "审阅者与负责人"
+  },
+  "Assign people who should review or own this merge request.": {
+    "en": "Assign people who should review or own this merge request.",
+    "zh": "指定负责审阅或处理此合并请求的人员。"
+  }
+}

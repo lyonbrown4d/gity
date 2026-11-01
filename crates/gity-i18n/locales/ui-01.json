@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Type {path} to confirm deletion.": {
+    "en": "Type %{path} to confirm deletion.",
+    "zh": "输入 %{path} 以确认删除。"
+  },
+  "Welcome back": {
+    "en": "Welcome back",
+    "zh": "欢迎回来"
+  },
+  "Sign in to manage repositories and organizations.": {
+    "en": "Sign in to manage repositories and organizations.",
+    "zh": "登录后可管理仓库与组织。"
+  },
+  "Sign in to manage projects and organizations.": {
+    "en": "Sign in to manage projects and organizations.",
+    "zh": "登录后可管理项目与组织。"
+  },
+  "Username / Email": {
+    "en": "Username / Email",
+    "zh": "用户名 / 邮箱"
+  },
+  "Password": {
+    "en": "Password",
+    "zh": "密码"
+  },
+  "Sign in": {
+    "en": "Sign in",
+    "zh": "登录"
+  },
+  "Signing in...": {
+    "en": "Signing in...",
+    "zh": "登录中..."
+  },
+  "Gity Standalone": {
+    "en": "Gity Standalone",
+    "zh": "Gity 独立版"
+  },
+  "Unified workspace for auth, organization management, and repository operations.": {
+    "en": "Unified workspace for auth, organization management, and repository operations.",
+    "zh": "统一的认证、组织管理与仓库操作工作台。"
+  },
+  "Unified workspace for auth, organization management, and project operations.": {
+    "en": "Unified workspace for auth, organization management, and project operations.",
+    "zh": "统一的认证、组织管理与项目操作工作台。"
+  },
+  "Refine Admin": {
+    "en": "Refine Admin",
+    "zh": "Refine 管理端"
+  },
+  "Gity Console": {
+    "en": "Gity Console",
+    "zh": "Gity 控制台"
+  },
+  "Overview": {
+    "en": "Overview",
+    "zh": "概览"
+  },
+  "Organizations": {
+    "en": "Organizations",
+    "zh": "组织"
+  },
+  "Repositories": {
+    "en": "Repositories",
+    "zh": "仓库"
+  },
+  "Users": {
+    "en": "Users",
+    "zh": "用户"
+  },
+  "Admin Side": {
+    "en": "Admin Side",
+    "zh": "管理侧"
+  },
+  "Refine-driven routing and auth flow": {
+    "en": "Refine-driven routing and auth flow",
+    "zh": "基于 refine 的路由与认证流程"
+  },
+  "Super Admin": {
+    "en": "Super Admin",
+    "zh": "超级管理员"
+  },
+  "Privilege level": {
+    "en": "Privilege level",
+    "zh": "权限级别"
+  },
+  "Regular user": {
+    "en": "Regular user",
+    "zh": "普通用户"
+  },
+  "Logout": {
+    "en": "Logout",
+    "zh": "退出登录"
+  },
+  "User Workspace": {
+    "en": "User Workspace",
+    "zh": "用户工作台"
+  },
+  "Workspace": {
+    "en": "Workspace",
+    "zh": "工作台"
+  },
+  "Dashboard": {
+    "en": "Dashboard",
+    "zh": "仪表盘"
+  },
+  "My Repositories": {
+    "en": "My Repositories",
+    "zh": "我的仓库"
+  },
+  "My Projects": {
+    "en": "My Projects",
+    "zh": "我的项目"
+  },
+  "Repository": {
+    "en": "Repository",
+    "zh": "仓库"
+  },
+  "Project": {
+    "en": "Project",
+    "zh": "项目"
+  },
+  "Project workspace": {
+    "en": "Project workspace",
+    "zh": "项目工作台"
+  },
+  "Profile": {
+    "en": "Profile",
+    "zh": "个人资料"
+  },
+  "Admin Dashboard": {
+    "en": "Admin Dashboard",
+    "zh": "管理面板"
+  },
+  "User Portal": {
+    "en": "User Portal",
+    "zh": "用户门户"
+  },
+  "Switch theme": {
+    "en": "Switch theme",
+    "zh": "切换主题"
+  },
+  "Switch language": {
+    "en": "Switch language",
+    "zh": "切换语言"
+  },
+  "Loading...": {
+    "en": "Loading...",
+    "zh": "加载中..."
+  },
+  "Login failed": {
+    "en": "Login failed",
+    "zh": "登录失败"
+  },
+  "Organization": {
+    "en": "Organization",
+    "zh": "组织"
+  },
+  "New Repository": {
+    "en": "New Repository",
+    "zh": "新建仓库"
+  },
+  "New Project": {
+    "en": "New Project",
+    "zh": "新建项目"
+  },
+  "Account Status": {
+    "en": "Account Status",
+    "zh": "账号状态"
+  },
+  "User": {
+    "en": "User",
+    "zh": "用户"
+  },
+  "organization selected": {
+    "en": "organization selected",
+    "zh": "已选择组织"
+  },
+  "no organization": {
+    "en": "no organization",
+    "zh": "未选择组织"
+  },
+  "Loading repositories...": {
+    "en": "Loading repositories...",
+    "zh": "仓库加载中..."
+  },
+  "Loading projects...": {
+    "en": "Loading projects...",
+    "zh": "项目加载中..."
+  },
+  "User ID": {
+    "en": "User ID",
+    "zh": "用户 ID"
+  }
+}

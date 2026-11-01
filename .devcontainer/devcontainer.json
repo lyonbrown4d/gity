@@ -1,27 +1,16 @@
 {
-  "name": "Go & TypeScript",
-  "image": "ghcr.io/prulloac/base:bookworm",
+  "name": "Gity Rust",
+  "build": { "dockerfile": "Dockerfile" },
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.27.1"
-    },
-    "ghcr.io/prulloac/devcontainer-features/bun:1": {},
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
+  "forwardPorts": [8080, 2222, 5173],
   "customizations": {
-    "jetbrains": {
-      "backend": "GoLand"
-    },
     "vscode": {
       "settings": {
-        "go.toolsManagement.checkForUpdates": "local",
-        "go.useLanguageServer": true
+        "rust-analyzer.check.command": "clippy"
       },
-      "extensions": [
-        "golang.Go",
-        "dbaeumer.vscode-eslint"
-      ]
+      "extensions": ["rust-lang.rust-analyzer", "tamasfe.even-better-toml"]
     }
   }
 }

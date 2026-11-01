@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Issue sidebar": {
+    "en": "Issue sidebar",
+    "zh": "议题侧栏"
+  },
+  "GitLab-style triage fields for this issue.": {
+    "en": "GitLab-style triage fields for this issue.",
+    "zh": "此议题的分类与处理字段。"
+  },
+  "Breadcrumb": {
+    "en": "Breadcrumb",
+    "zh": "面包屑导航"
+  },
+  "Opened by": {
+    "en": "Opened by",
+    "zh": "创建者"
+  },
+  "revoked": {
+    "en": "revoked",
+    "zh": "已撤销"
+  },
+  "read only": {
+    "en": "read only",
+    "zh": "只读"
+  },
+  "can push": {
+    "en": "can push",
+    "zh": "允许推送"
+  },
+  "Markdown content": {
+    "en": "Markdown content",
+    "zh": "Markdown 内容"
+  },
+  "Refresh languages": {
+    "en": "Refresh languages",
+    "zh": "刷新编程语言"
+  },
+  "Search text": {
+    "en": "Search text",
+    "zh": "搜索文本"
+  },
+  "Path (optional)": {
+    "en": "Path (optional)",
+    "zh": "路径（可选）"
+  },
+  "Commit new file": {
+    "en": "Commit new file",
+    "zh": "提交新文件"
+  },
+  "Confirmation": {
+    "en": "Confirmation",
+    "zh": "确认"
+  },
+  "Issue status": {
+    "en": "Issue status",
+    "zh": "议题状态"
+  },
+  "Label": {
+    "en": "Label",
+    "zh": "标签"
+  },
+  "Sort issues": {
+    "en": "Sort issues",
+    "zh": "议题排序"
+  },
+  "Objects": {
+    "en": "Objects",
+    "zh": "对象"
+  },
+  "Storage": {
+    "en": "Storage",
+    "zh": "存储"
+  },
+  "Locks": {
+    "en": "Locks",
+    "zh": "文件锁"
+  },
+  "Recent": {
+    "en": "Recent",
+    "zh": "最近"
+  },
+  "Queues": {
+    "en": "Queues",
+    "zh": "队列"
+  },
+  "Pending Todos": {
+    "en": "Pending Todos",
+    "zh": "待处理待办"
+  },
+  "Current scope": {
+    "en": "Current scope",
+    "zh": "当前范围"
+  },
+  "Project details": {
+    "en": "Project details",
+    "zh": "项目详情"
+  },
+  "Events": {
+    "en": "Events",
+    "zh": "事件"
+  },
+  "Actors": {
+    "en": "Actors",
+    "zh": "操作者"
+  },
+  "Target types": {
+    "en": "Target types",
+    "zh": "目标类型"
+  },
+  "Versions": {
+    "en": "Versions",
+    "zh": "版本"
+  },
+  "Files": {
+    "en": "Files",
+    "zh": "文件"
+  },
+  "No packages published yet.": {
+    "en": "No packages published yet.",
+    "zh": "尚未发布软件包。"
+  },
+  "Select or upload a package.": {
+    "en": "Select or upload a package.",
+    "zh": "选择或上传软件包。"
+  },
+  "Search projects or pages": {
+    "en": "Search projects or pages",
+    "zh": "搜索项目或页面"
+  },
+  "Loading todos": {
+    "en": "Loading todos",
+    "zh": "正在加载待办"
+  },
+  "Clone": {
+    "en": "Clone",
+    "zh": "克隆"
+  },
+  "Offline runners": {
+    "en": "Offline runners",
+    "zh": "离线 Runner"
+  },
+  "Asset links": {
+    "en": "Asset links",
+    "zh": "资源链接"
+  },
+  "Latest commit": {
+    "en": "Latest commit",
+    "zh": "最新提交"
+  },
+  "Read-only CI access": {
+    "en": "Read-only CI access",
+    "zh": "CI 只读权限"
+  },
+  "Project members": {
+    "en": "Project members",
+    "zh": "项目成员"
+  },
+  "Project-specific roles override organization membership for this repository.": {
+    "en": "Project-specific roles override organization membership for this repository.",
+    "zh": "为此仓库设置项目成员角色。"
+  },
+  "Direct members": {
+    "en": "Direct members",
+    "zh": "直接成员"
+  },
+  "Maintainers/Owners": {
+    "en": "Maintainers/Owners",
+    "zh": "维护者/所有者"
+  },
+  "Developers": {
+    "en": "Developers",
+    "zh": "开发者"
+  },
+  "Primary navigation": {
+    "en": "Primary navigation",
+    "zh": "主导航"
+  },
+  "No file locks.": {
+    "en": "No file locks.",
+    "zh": "暂无文件锁。"
+  },
+  "Package name": {
+    "en": "Package name",
+    "zh": "软件包名称"
+  },
+  "Version": {
+    "en": "Version",
+    "zh": "版本"
+  },
+  "File name": {
+    "en": "File name",
+    "zh": "文件名"
+  },
+  "File path optional": {
+    "en": "File path optional",
+    "zh": "文件路径（可选）"
+  },
+  "Content type": {
+    "en": "Content type",
+    "zh": "内容类型"
+  }
+}

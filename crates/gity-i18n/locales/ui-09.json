@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Deploy key status": {
+    "en": "Deploy key status",
+    "zh": "部署密钥状态"
+  },
+  "Package automation command": {
+    "en": "Package automation command",
+    "zh": "包自动化命令"
+  },
+  "Clone and fetch repository contents.": {
+    "en": "Clone and fetch repository contents.",
+    "zh": "克隆和拉取仓库内容。"
+  },
+  "Push commits and branches.": {
+    "en": "Push commits and branches.",
+    "zh": "推送提交和分支。"
+  },
+  "Download package files and install dependencies.": {
+    "en": "Download package files and install dependencies.",
+    "zh": "下载包文件并安装依赖。"
+  },
+  "Publish or upload package files.": {
+    "en": "Publish or upload package files.",
+    "zh": "发布或上传包文件。"
+  },
+  "Read project API data for automation.": {
+    "en": "Read project API data for automation.",
+    "zh": "读取项目 API 数据用于自动化。"
+  },
+  "Write project API data for automation.": {
+    "en": "Write project API data for automation.",
+    "zh": "写入项目 API 数据用于自动化。"
+  },
+  "Project access tokens can also use read_api/write_api for issue, merge request, wiki, job and runner automation.": {
+    "en": "Project access tokens can also use read_api/write_api for issue, merge request, wiki, job and runner automation.",
+    "zh": "项目访问令牌还可使用 read_api/write_api 自动化议题、合并请求、Wiki、任务和 Runner。"
+  },
+  "Deploy tokens are best for CI/CD and production deploys that only need repository or package access.": {
+    "en": "Deploy tokens are best for CI/CD and production deploys that only need repository or package access.",
+    "zh": "部署令牌适合只需要仓库或包访问权限的 CI/CD 与生产部署流程。"
+  },
+  "Use read_repository for clone/fetch; add write_repository for push.": {
+    "en": "Use read_repository for clone/fetch; add write_repository for push.",
+    "zh": "克隆/拉取使用 read_repository；需要推送时增加 write_repository。"
+  },
+  "Use read_package/write_package for package pull/publish automation.": {
+    "en": "Use read_package/write_package for package pull/publish automation.",
+    "zh": "包拉取/发布自动化使用 read_package/write_package。"
+  },
+  "Deploy keys can be stored and marked read-only or can-push. HTTP clone uses tokens today; SSH clone transport is not enabled yet.": {
+    "en": "Deploy keys can be stored and marked read-only or can-push. HTTP clone uses tokens today; SSH clone transport is not enabled yet.",
+    "zh": "部署密钥当前可以保存并标记为只读或可推送。HTTP 克隆目前使用令牌；SSH 克隆传输尚未启用。"
+  },
+  "When Git asks for credentials, enter the token username as the username and the token as the password.": {
+    "en": "When Git asks for credentials, enter the token username as the username and the token as the password.",
+    "zh": "Git 询问凭据时，用户名填写令牌用户名，密码填写令牌值。"
+  },
+  "Token created. Copy it now because it will not be shown again.": {
+    "en": "Token created. Copy it now because it will not be shown again.",
+    "zh": "令牌已创建。请立即复制，它之后不会再次显示。"
+  },
+  "Token username": {
+    "en": "Token username",
+    "zh": "令牌用户名"
+  },
+  "Token": {
+    "en": "Token",
+    "zh": "令牌"
+  },
+  "Copy token": {
+    "en": "Copy token",
+    "zh": "复制令牌"
+  },
+  "Git clone with token": {
+    "en": "Git clone with token",
+    "zh": "带令牌的 Git 克隆"
+  },
+  "Git remote with token": {
+    "en": "Git remote with token",
+    "zh": "带令牌的 Git remote"
+  },
+  "Package API with token": {
+    "en": "Package API with token",
+    "zh": "带令牌的包 API"
+  },
+  "Copy authenticated clone command": {
+    "en": "Copy authenticated clone command",
+    "zh": "复制认证克隆命令"
+  },
+  "Copy authenticated remote command": {
+    "en": "Copy authenticated remote command",
+    "zh": "复制认证 remote 命令"
+  },
+  "Copy package command": {
+    "en": "Copy package command",
+    "zh": "复制包命令"
+  },
+  "Store tokens in CI secrets or local credential helpers instead of committing them to repository files.": {
+    "en": "Store tokens in CI secrets or local credential helpers instead of committing them to repository files.",
+    "zh": "请将令牌存入 CI Secret 或本地凭据助手，不要提交到仓库文件中。"
+  },
+  "Failed to copy command.": {
+    "en": "Failed to copy command.",
+    "zh": "复制命令失败。"
+  },
+  "Failed to copy token.": {
+    "en": "Failed to copy token.",
+    "zh": "复制令牌失败。"
+  },
+  "Copied": {
+    "en": "Copied",
+    "zh": "已复制"
+  },
+  "Registry setup guide": {
+    "en": "Registry setup guide",
+    "zh": "Registry 设置指南"
+  },
+  "Copy publish and install commands for the selected package protocol. Use a project access token or deploy token with package scopes.": {
+    "en": "Copy publish and install commands for the selected package protocol. Use a project access token or deploy token with package scopes.",
+    "zh": "复制当前包协议的发布和安装命令。请使用带包权限的项目访问令牌或部署令牌。"
+  },
+  "Package protocol": {
+    "en": "Package protocol",
+    "zh": "包协议"
+  },
+  "Endpoint": {
+    "en": "Endpoint",
+    "zh": "端点"
+  },
+  "Publish": {
+    "en": "Publish",
+    "zh": "发布"
+  },
+  "Install": {
+    "en": "Install",
+    "zh": "安装"
+  },
+  "Install or consume": {
+    "en": "Install or consume",
+    "zh": "安装或消费"
+  },
+  "Upload arbitrary build artifacts through the generic registry endpoint.": {
+    "en": "Upload arbitrary build artifacts through the generic registry endpoint.",
+    "zh": "通过 generic registry 端点上传任意构建产物。"
+  },
+  "Use the npm endpoint for package metadata and publish payloads.": {
+    "en": "Use the npm endpoint for package metadata and publish payloads.",
+    "zh": "使用 npm 端点读取包元数据并发布 payload。"
+  },
+  "Upload Maven artifacts by repository-relative artifact path.": {
+    "en": "Upload Maven artifacts by repository-relative artifact path.",
+    "zh": "按仓库相对 artifact 路径上传 Maven 产物。"
+  },
+  "Expose a simple Python package index and upload distribution files.": {
+    "en": "Expose a simple Python package index and upload distribution files.",
+    "zh": "暴露 Python simple index，并上传发行文件。"
+  },
+  "Use the NuGet v3 service index and raw package upload endpoint.": {
+    "en": "Use the NuGet v3 service index and raw package upload endpoint.",
+    "zh": "使用 NuGet v3 service index 和原始包上传端点。"
+  },
+  "Release readiness": {
+    "en": "Release readiness",
+    "zh": "发布准备度"
+  },
+  "Use this checklist to connect Git tags, package artifacts, and release links into one consumable delivery flow.": {
+    "en": "Use this checklist to connect Git tags, package artifacts, and release links into one consumable delivery flow.",
+    "zh": "使用该清单把 Git tag、包产物和 release 链接串成一个可消费的交付流程。"
+  },
+  "Package handoff": {
+    "en": "Package handoff",
+    "zh": "包产物交接"
+  },
+  "Git tag exists": {
+    "en": "Git tag exists",
+    "zh": "Git tag 已存在"
+  },
+  "Release notes are written": {
+    "en": "Release notes are written",
+    "zh": "Release notes 已填写"
+  },
+  "At least one asset link is attached": {
+    "en": "At least one asset link is attached",
+    "zh": "至少已关联一个资产链接"
+  },
+  "Package artifact is published": {
+    "en": "Package artifact is published",
+    "zh": "包产物已发布"
+  },
+  "Publish the build output to the package registry first, then add the package download URL or external artifact URL as a release asset link.": {
+    "en": "Publish the build output to the package registry first, then add the package download URL or external artifact URL as a release asset link.",
+    "zh": "先把构建产物发布到 package registry，再把包下载地址或外部产物地址作为 release asset link 添加。"
+  }
+}
