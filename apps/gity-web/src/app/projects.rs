@@ -1,6 +1,7 @@
 use super::project::CloneUrl;
 use crate::{api, catalog, ui::*};
 use leptos::prelude::*;
+use leptos_router::components::A;
 use serde_json::{Value, json};
 #[component]
 pub(super) fn Projects() -> impl IntoView {
@@ -143,6 +144,11 @@ pub(super) fn Projects() -> impl IntoView {
                           open.set(true)
                       }>{crate::i18n::t("＋ New Project")}</thaw::Button>
                   </div>
+                  <Show when=move || {
+                      projects.loading.get() && projects.data.get().is_null()
+                  }>
+                      <SkeletonRows rows=5 />
+                  </Show>
                   {move || {
                       api::list(&projects.data.get())
                           .into_iter()
@@ -210,12 +216,13 @@ fn DirectoryRow(project: Value, refresh: RwSignal<u64>) -> impl IntoView {
     api::text(&project, "organization_id"),
     api::text(&project, "id")
   );
+  let name = api::text(&project, "name");
   view! {
       <article class="directory-row" aria-label=api::text(&project, "name")>
           <div class="directory-identity">
               <thaw::Icon icon=icondata_lu::LuFolderGit2 />
               <div>
-                  <a href=path.clone()>{api::text(&project, "name")}</a>
+                  <A href=path.clone()>{name}</A>
                   <span class="badge">{api::text(&project, "visibility")}</span>
                   <p>{api::text(&project, "full_path")}</p>
                   <p>
@@ -235,9 +242,9 @@ fn DirectoryRow(project: Value, refresh: RwSignal<u64>) -> impl IntoView {
               />
           </div>
           <div class="directory-actions">
-              <a class="button" href=path>
+              <A href={path} {..} class="button">
                   {crate::i18n::t("Open →")}
-              </a>
+              </A>
               <Action
                   label="Delete".into()
                   path=format!("/projects/{}", api::text(&project, "id"))

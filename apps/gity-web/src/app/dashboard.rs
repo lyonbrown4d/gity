@@ -1,5 +1,6 @@
 use crate::{api, ui::*};
 use leptos::prelude::*;
+use leptos_router::components::A;
 #[component]
 pub(super) fn Dashboard(#[prop(default = false)] admin: bool) -> impl IntoView {
   let user = query("/users/me".into());
@@ -31,15 +32,15 @@ pub(super) fn Dashboard(#[prop(default = false)] admin: bool) -> impl IntoView {
                       </p>
                   </div>
                   <div class="toolbar">
-                      <a class="button primary" href="/app/projects">
+                      <A href="/app/projects" {..} class="button primary">
                           {crate::i18n::t("Open Projects")}
-                      </a>
-                      <a class="button" href="/app/todos">
+                      </A>
+                      <A href="/app/todos" {..} class="button">
                           {crate::i18n::t("Open Inbox")}
-                      </a>
-                      <a class="button" href="/app/profile">
+                      </A>
+                      <A href="/app/profile" {..} class="button">
                           {crate::i18n::t("Edit Profile")}
-                      </a>
+                      </A>
                   </div>
               </div>
               <div class="dashboard-status">
@@ -93,23 +94,29 @@ pub(super) fn Dashboard(#[prop(default = false)] admin: bool) -> impl IntoView {
                               {crate::i18n::t("Fast access to the repositories you can operate.")}
                           </p>
                       </div>
-                      <a class="button ghost" href="/app/projects">
+                      <A href="/app/projects" {..} class="button ghost">
                           {crate::i18n::t("View all →")}
-                      </a>
+                      </A>
                   </div>
+                  <Show when=move || {
+                      projects.loading.get() && projects.data.get().is_null()
+                  }>
+                      <SkeletonRows rows=4 />
+                  </Show>
                   {move || {
                       api::list(&projects.data.get())
                           .into_iter()
                           .take(5)
                           .map(|p| {
                               view! {
-                                  <a
-                                      class="recent-project"
+                                  <A
                                       href=format!(
                                           "/app/projects/{}/{}",
                                           api::text(&p, "organization_id"),
                                           api::text(&p, "id"),
                                       )
+                                      {..}
+                                      class="recent-project"
                                   >
                                       <thaw::Icon icon=icondata_lu::LuFolderGit2 />
                                       <span>
@@ -120,7 +127,7 @@ pub(super) fn Dashboard(#[prop(default = false)] admin: bool) -> impl IntoView {
                                           </small>
                                       </span>
                                       <span class="badge">{api::text(&p, "visibility")}</span>
-                                  </a>
+                                  </A>
                               }
                           })
                           .collect_view()

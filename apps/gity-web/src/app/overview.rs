@@ -1,6 +1,7 @@
 use super::project::CloneUrl;
 use crate::{api, markdown::Markdown, ui::*};
 use leptos::prelude::*;
+use leptos_router::components::A;
 use serde_json::Value;
 #[component]
 pub(super) fn Overview(
@@ -76,9 +77,9 @@ pub(super) fn Overview(
               </div>
               <div class="toolbar">
                   <CloneUrl value=api::text(&project, "clone_http_url") />
-                  <a class="button primary" href=code.clone()>
+                  <A href=code.clone() {..} class="button primary">
                       {crate::i18n::t("‹› Browse code")}
-                  </a>
+                  </A>
               </div>
           </div>
           <div class="repository-facts">
@@ -128,9 +129,9 @@ pub(super) fn Overview(
                           <strong>{crate::i18n::t("▤ README")}</strong>
                           <small>{move || api::text(&readme.data.get(), "path")}</small>
                       </div>
-                      <a class="button ghost" href=code.clone()>
+                      <A href=code.clone() {..} class="button ghost">
                           {crate::i18n::t("View source →")}
-                      </a>
+                      </A>
                   </div>
                   <div class="readme-content">
                       <Status q=readme />
@@ -146,9 +147,9 @@ pub(super) fn Overview(
                                               "Add a README to turn this project home into a useful landing page for contributors.",
                                           )}
                                       </p>
-                                      <a class="button" href=code.clone()>
+                                      <A href=code.clone() {..} class="button">
                                           {crate::i18n::t("Open repository files")}
-                                      </a>
+                                      </A>
                                   </div>
                               }
                                   .into_any()
@@ -177,9 +178,10 @@ pub(super) fn Overview(
                       .map(|(path, title, detail, action, q)| {
                           let tab = if path == "wiki/pages" { "wiki" } else { path };
                           view! {
-                              <a
-                                  class="pulse-row"
+                              <A
                                   href=format!("{base}?tab={tab}")
+                                  {..}
+                                  class="pulse-row"
                                   aria-label=action
                               >
                                   <span>
@@ -187,33 +189,33 @@ pub(super) fn Overview(
                                       <small>{crate::i18n::t(detail)}</small>
                                   </span>
                                   <b>{move || api::list(&q.data.get()).len()}</b>
-                              </a>
+                              </A>
                           }
                       })
                       .collect_view()}
                   <Show when=move || {
                       capabilities.data.get()["package_registry"].as_bool() == Some(true)
                   }>
-                      <a class="pulse-row" href=packages_link.clone() aria-label="View packages">
+                      <A href=packages_link.clone() {..} class="pulse-row" aria-label="View packages">
                           <span>
                               <strong>{crate::i18n::t("Packages")}</strong>
                               <small>{crate::i18n::t("Published package registry")}</small>
                           </span>
                           <b>{move || api::list(&packages.data.get()).len()}</b>
-                      </a>
+                      </A>
                   </Show>
-                  <a class="pulse-row" href=releases_link.clone() aria-label="View releases">
+                  <A href=releases_link.clone() {..} class="pulse-row" aria-label="View releases">
                       <span>
                           <strong>{crate::i18n::t("Releases")}</strong>
                           <small>{crate::i18n::t("Published versions")}</small>
                       </span>
                       <b>{move || api::list(&releases.data.get()).len()}</b>
-                  </a>
+                  </A>
                   <div class="workspace-strip">
                       <strong>{crate::i18n::t("Recent commits")}</strong>
-                      <a class="button ghost" href=all_commits.clone()>
+                      <A href=all_commits.clone() {..} class="button ghost">
                           {crate::i18n::t("View all")}
-                      </a>
+                      </A>
                   </div>
                   {move || {
                       api::list(&commits.data.get())
@@ -221,7 +223,7 @@ pub(super) fn Overview(
                           .take(5)
                           .map(|commit| {
                               view! {
-                                  <a class="commit-summary" href=all_commits.clone()>
+                                  <A href=all_commits.clone() {..} class="commit-summary">
                                       <span class="badge outline mono">
                                           {api::text(&commit, "commit_sha")
                                               .chars()
@@ -240,7 +242,7 @@ pub(super) fn Overview(
                                           {api::text(&commit, "author_user_id")}" · "
                                           {api::text(&commit, "created_at")}
                                       </p>
-                                  </a>
+                                  </A>
                               }
                           })
                           .collect_view()

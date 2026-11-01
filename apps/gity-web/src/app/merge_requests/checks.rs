@@ -1,4 +1,5 @@
 use super::{detail::Review, *};
+use leptos_router::components::A;
 
 #[component]
 pub(super) fn Checks(review: Review) -> impl IntoView {
@@ -212,7 +213,7 @@ fn Blocker(blocker: Value) -> impl IntoView {
               <li>{api::text(&blocker, "message")}</li>
               {hints.into_iter().map(|hint| view! { <li>{t(hint)}</li> }).collect_view()}
           </ul>
-          {action.map(|(href, label)| view! { <a href=href>{t(label)}</a> })}
+          {action.map(|(href, label)| view! { <A href=href>{t(label)}</A> })}
       </div>
   }
 }

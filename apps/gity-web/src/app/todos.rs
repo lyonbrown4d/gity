@@ -1,5 +1,6 @@
 use crate::{api, i18n::t, ui::query};
 use leptos::prelude::*;
+use leptos_router::components::A;
 use serde_json::{Value, json};
 
 mod presentation;
@@ -75,20 +76,22 @@ pub(super) fn Todos(search: String) -> impl IntoView {
           </section>
           <div class="inbox-controls">
               <nav class="inbox-tabs" aria-label=t("Todo state")>
-                  <a
+                  <A
                       href=state_url("pending")
+                      {..}
                       class:active=!done
                       aria-current=if done { None } else { Some("page") }
                   >
                       {t("Pending")}
-                  </a>
-                  <a
+                  </A>
+                  <A
                       href=state_url("done")
+                      {..}
                       class:active=done
                       aria-current=if done { Some("page") } else { None }
                   >
                       {t("Done")}
-                  </a>
+                  </A>
               </nav>
               <button
                   disabled=move || q.loading.get()
@@ -202,10 +205,10 @@ fn TodoCard(todo: Value, active: RwSignal<String>, mark_done: Callback<String>) 
                   )>{format_time(&api::text(&todo, "created_at"))}</time>
               </div>
               <div class="todo-actions">
-                  <a class="button" href=action_url(&todo)>
+                  <A href=action_url(&todo) {..} class="button">
                       {t("Open")}
                       <thaw::Icon icon=icondata_lu::LuArrowUpRight width="16px" height="16px" />
-                  </a>
+                  </A>
                   {if done {
                       None
                   } else {

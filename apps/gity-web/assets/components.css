@@ -162,3 +162,27 @@ dd {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.gity-skeleton {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+.gity-skeleton.grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.gity-skeleton-line {
+  height: 12px;
+  border-radius: 6px;
+}
+.gity-skeleton-line.short {
+  width: 42%;
+}
+.gity-skeleton-card {
+  height: 104px;
+  border-radius: 10px;
+}
+.gity-skeleton-row {
+  height: 38px;
+  border-radius: 8px;
+}

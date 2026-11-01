@@ -52,15 +52,36 @@ use theme::ui_theme;
 pub fn App() -> impl IntoView {
   let theme = RwSignal::new(ui_theme());
   provide_context(theme);
+  Pending::provide();
   view! {
       <thaw::ConfigProvider theme=theme>
-          <Router>
-              <Routes fallback=|| view! { <p>{crate::i18n::t("Page not found")}</p> }>
-                  <Route path=path!("/*any") view=Shell />
-              </Routes>
-          </Router>
+          <thaw::LoadingBarProvider>
+              <RouteLoadingBar />
+              <Router>
+                  <Routes fallback=|| view! { <p>{crate::i18n::t("Page not found")}</p> }>
+                      <Route path=path!("/*any") view=Shell />
+                  </Routes>
+              </Router>
+          </thaw::LoadingBarProvider>
       </thaw::ConfigProvider>
   }
+}
+/// Drives the thaw top progress bar from the shared in-flight request counter.
+#[component]
+fn RouteLoadingBar() -> impl IntoView {
+  let pending = Pending::from_context();
+  let bar = thaw::LoadingBarInjection::expect_context();
+  Effect::new(move |previous: Option<usize>| {
+    let count = pending.count().get();
+    let previous = previous.unwrap_or(0);
+    if previous == 0 && count > 0 {
+      bar.start();
+    } else if previous > 0 && count == 0 {
+      bar.finish();
+    }
+    count
+  });
+  ()
 }
 #[component]
 pub(super) fn Shell() -> impl IntoView {

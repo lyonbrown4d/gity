@@ -1,6 +1,7 @@
 use super::{assignees, labels};
 use crate::{api, ui::Query};
 use leptos::prelude::*;
+use leptos_router::components::A;
 use serde_json::Value;
 fn user_name(users: Query, id: &str) -> String {
   api::list(&users.data.get())
@@ -17,7 +18,7 @@ pub(super) fn IssueRow(issue: Value, base: String, users: Query) -> impl IntoVie
     .collect::<Vec<_>>()
     .join(", ");
   view! {
-      <a class="issue-row" href=format!("{base}/issues/{}", api::text(&issue, "number"))>
+      <A href=format!("{base}/issues/{}", api::text(&issue, "number")) {..} class="issue-row">
           <div>
               <div>
                   <strong>"#"{api::text(&issue, "number")}" "{api::text(&issue, "title")}</strong>
@@ -47,6 +48,6 @@ pub(super) fn IssueRow(issue: Value, base: String, users: Query) -> impl IntoVie
                       .into_any()
               }}
           </footer>
-      </a>
+      </A>
   }
 }

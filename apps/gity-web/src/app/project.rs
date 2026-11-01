@@ -2,6 +2,7 @@ use super::capabilities::PackageAvailabilityGate;
 use super::overview::Overview;
 use crate::{api, source::Source, ui::*};
 use leptos::prelude::*;
+use leptos_router::components::A;
 #[component]
 pub(super) fn Project(project_path: String, base: String, tab: String) -> impl IntoView {
   let q = query(project_path.clone());
@@ -11,7 +12,7 @@ pub(super) fn Project(project_path: String, base: String, tab: String) -> impl I
   let content_path = project_path.clone();
   view! {
       <div class="repository-breadcrumb">
-          <a href="/app/projects">{crate::i18n::t("Projects")}</a>
+          <A href="/app/projects">{crate::i18n::t("Projects")}</A>
           <span>{crate::i18n::t("›")}</span>
           <span>
               {move || {
@@ -35,7 +36,11 @@ pub(super) fn Project(project_path: String, base: String, tab: String) -> impl I
               view! {
                   {move || {
                       if q.loading.get() {
-                          ().into_any()
+                          view! {
+                              <SkeletonLines lines=2 />
+                              <SkeletonCards cards=3 />
+                          }
+                              .into_any()
                       } else {
                           view! {
                               <Overview
@@ -55,10 +60,7 @@ pub(super) fn Project(project_path: String, base: String, tab: String) -> impl I
               view! {
                   {move || {
                       if q.loading.get() {
-                          return view! {
-                              <p role="status">{crate::i18n::t("Loading project…")}</p>
-                          }
-                              .into_any();
+                          return view! { <SkeletonRows rows=6 /> }.into_any();
                       }
                       let b = api::text(&q.data.get(), "default_branch");
                       view! {
@@ -264,10 +266,10 @@ fn ProjectHeader(project: serde_json::Value, permissions: serde_json::Value) -> 
                       api::text(&permissions, "role")
                   }}
               </span>
-              <a class="button" href="/app/projects">
+              <A href="/app/projects" {..} class="button">
                   <thaw::Icon icon=icondata_lu::LuArrowLeft width="14px" height="14px" />
                   {crate::i18n::t("Projects")}
-              </a>
+              </A>
               <CloneUrl
                   value=api::text(&project, "clone_http_url")
                   label="Clone".into()

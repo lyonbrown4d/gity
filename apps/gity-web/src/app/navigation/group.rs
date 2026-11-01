@@ -1,5 +1,6 @@
 use super::NavigationIcon;
 use leptos::prelude::*;
+use leptos_router::components::A;
 #[component]
 pub(super) fn ContextGroup(
   label: String,
@@ -19,10 +20,10 @@ pub(super) fn ContextGroup(
                   .into_iter()
                   .map(|(label, url)| {
                       view! {
-                          <a class:active=url == active href=url>
+                          <A href=url.clone() {..} class:active=url == active>
                               <NavigationIcon title=label.clone() />
                               {crate::i18n::t(&label)}
-                          </a>
+                          </A>
                       }
                   })
                   .collect_view()}

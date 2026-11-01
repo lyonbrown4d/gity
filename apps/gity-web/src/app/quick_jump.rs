@@ -1,5 +1,6 @@
 use crate::{api, ui::*};
 use leptos::prelude::*;
+use leptos_router::components::A;
 #[component]
 pub(super) fn QuickJump() -> impl IntoView {
   let open = RwSignal::new(false);
@@ -46,9 +47,9 @@ pub(super) fn QuickJump() -> impl IntoView {
                                   })
                                   .map(|(label, url)| {
                                       view! {
-                                          <a href=url on:click=move |_| open.set(false)>
+                                          <A href={url} {..} on:click=move |_| open.set(false)>
                                               {label}
-                                          </a>
+                                          </A>
                                       }
                                   })
                                   .collect_view()
@@ -64,16 +65,17 @@ pub(super) fn QuickJump() -> impl IntoView {
                                   .take(12)
                                   .map(|p| {
                                       view! {
-                                          <a
+                                          <A
                                               href=format!(
                                                   "/app/projects/{}/{}",
                                                   api::text(&p, "organization_id"),
                                                   api::text(&p, "id"),
                                               )
+                                              {..}
                                               on:click=move |_| open.set(false)
                                           >
                                               {api::text(&p, "name")}
-                                          </a>
+                                          </A>
                                       }
                                   })
                                   .collect_view()

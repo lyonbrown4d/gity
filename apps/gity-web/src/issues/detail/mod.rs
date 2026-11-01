@@ -7,6 +7,7 @@ use crate::{api, i18n::t, ui::*};
 use collaboration::Collaboration;
 use comments::Comments;
 use leptos::prelude::*;
+use leptos_router::components::A;
 use markdown::IssueMarkdown;
 use model::{IssueQueries, relative_time, user_label};
 use serde_json::json;
@@ -54,11 +55,11 @@ pub fn IssueDetail(project_path: String, number: String, base: String) -> impl I
   view! {
       <div class="issue-detail-page page-enter">
           <nav class="issue-detail-breadcrumb" aria-label=t("Breadcrumb")>
-              <a href="/app/projects">{t("My Projects")}</a>
+              <A href="/app/projects">{t("My Projects")}</A>
               <span>"/"</span>
-              <a href=base.clone()>{t("Project")}</a>
+              <A href=base.clone()>{t("Project")}</A>
               <span>"/"</span>
-              <a href=format!("{base}?tab=issues")>{t("Issues")}</a>
+              <A href=format!("{base}?tab=issues")>{t("Issues")}</A>
           </nav>
           <Show when=move || q.issue.loading.get() && !q.issue.data.get().is_object()>
               <p class="muted" role="status">
@@ -194,9 +195,9 @@ fn IssueHeader(
                       },
                   )}
               </button>
-              <a class="button" href=back>
+              <A href={back} {..} class="button">
                   {t("Back")}
-              </a>
+              </A>
           </div>
           <Show when=move || !mutation.error.get().is_empty()>
               <p class="error" role="alert">

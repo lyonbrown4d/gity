@@ -4,14 +4,18 @@ use serde_json::Value;
 mod actions;
 mod fields;
 mod form;
+mod loading;
 mod mutation;
 mod permissions;
+mod skeleton;
 mod time;
 pub use actions::Action;
 pub use fields::{Field, field};
 pub use form::EditorForm;
+pub use loading::Pending;
 pub use mutation::Mutation;
 pub use permissions::{allowed, role_label};
+pub use skeleton::{SkeletonCards, SkeletonLines, SkeletonRows};
 pub use time::{format_timestamp, relative_time};
 #[derive(Clone, Copy)]
 pub struct Query {
@@ -47,6 +51,7 @@ fn query_with(
     q.loading.set(false);
     return q;
   }
+  let pending = Pending::from_context();
   let sequence = RwSignal::new(0u64);
   Effect::new(move |_| {
     q.refresh.get();
@@ -59,6 +64,7 @@ fn query_with(
       q.loading.set(false);
       return;
     }
+    pending.start();
     wasm_bindgen_futures::spawn_local(async move {
       let result = if all_pages {
         api::list_all_pages(&path, move || {
@@ -68,6 +74,7 @@ fn query_with(
       } else {
         api::request("GET", &path, None).await
       };
+      pending.finish();
       if q.data.is_disposed() || sequence.get_untracked() != request_id {
         return;
       }

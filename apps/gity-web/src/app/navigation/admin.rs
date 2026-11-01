@@ -1,6 +1,7 @@
 use super::NavigationIcon;
 use crate::{api, app::account::LogoutButton, i18n::t, ui::Query};
 use leptos::prelude::*;
+use leptos_router::components::A;
 
 const ADMIN_LINKS: [(&str, &str); 4] = [
   ("/admin", "Overview"),
@@ -25,11 +26,11 @@ pub(super) fn AdminSidebar(path: String, me: Query) -> impl IntoView {
               .into_iter()
               .map(|(url, label)| {
                   view! {
-                      <a class:active=path == url href=url>
+                      <A href={url} {..} class:active=path == url>
                           <NavigationIcon title=label.to_string() admin=true />
                           <span>{t(label)}</span>
                           <i class="admin-nav-active-dot" aria-hidden="true"></i>
-                      </a>
+                      </A>
                   }
               })
               .collect_view()}
@@ -61,10 +62,10 @@ pub(in crate::app) fn AdminMobileNavigation(path: String) -> impl IntoView {
                   .into_iter()
                   .map(|(url, label)| {
                       view! {
-                          <a class:active=path == url href=url>
+                          <A href={url} {..} class:active=path == url>
                               <NavigationIcon title=label.to_string() admin=true />
                               {t(label)}
-                          </a>
+                          </A>
                       }
                   })
                   .collect_view()
