@@ -6,6 +6,7 @@ use std::{path::PathBuf, process::Command};
 mod blackbox;
 mod container_stats;
 mod docs;
+mod docs_mermaid;
 mod git_stress;
 mod k6;
 mod sources;
@@ -27,6 +28,13 @@ enum Task {
   Docs {
     #[arg(long)]
     serve: bool,
+  },
+  /// Internal mdBook preprocessor endpoint; mdBook invokes it, not users.
+  #[command(hide = true)]
+  DocsPreprocess {
+    /// Arguments mdBook appends, such as `supports html`.
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    args: Vec<String>,
   },
   GitStress(git_stress::GitStressArgs),
   K6(k6::K6Args),
@@ -50,6 +58,7 @@ fn main() -> Result<()> {
   std::env::set_current_dir(&root)?;
   match Cli::parse().command.unwrap_or(Task::Check) {
     Task::Docs { serve } => docs::run(&root, serve)?,
+    Task::DocsPreprocess { args } => docs_mermaid::run(&args)?,
     Task::VendorCheck => verify_vendor(&root)?,
     Task::SourceCheck => sources::check(&root)?,
     Task::GitStress(args) => git_stress::run(&root, args)?,

@@ -23,4 +23,5 @@ level = 1
 [preprocessor]
 
 [preprocessor.mermaid]
-command = "mdbook-mermaid"
+# Provided by the xtask package, so no global `mdbook-mermaid` install is needed.
+command = "cargo -q xtask docs-preprocess"

@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+mdbook-mermaid = "=0.17.1"
+mdbook-preprocessor = "=0.5.4"
 zip.workspace = true
 anyhow.workspace = true
 serde.workspace = true

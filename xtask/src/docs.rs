@@ -2,6 +2,9 @@ use anyhow::{Context, Result, ensure};
 use sha2::{Digest, Sha256};
 use std::{path::Path, process::Command};
 
+/// The manual is built by this mdBook release; keep it in step with CI.
+const MDBOOK_VERSION: &str = "0.5.4";
+
 #[derive(serde::Deserialize)]
 struct Assets {
   files: Vec<Asset>,
@@ -14,23 +17,7 @@ struct Asset {
 }
 
 pub fn run(root: &Path, serve: bool) -> Result<()> {
-  for (tool, version) in [("mdbook", "0.5.4"), ("mdbook-mermaid", "0.17.1")] {
-    let install = format!("cargo install {tool} --version {version} --locked");
-    let output = Command::new(tool)
-      .arg("--version")
-      .output()
-      .with_context(|| format!("install documentation tool: {install}"))?;
-    let reported = String::from_utf8_lossy(&output.stdout);
-    let actual = reported
-      .trim()
-      .strip_prefix(tool)
-      .map(str::trim)
-      .map(|value| value.trim_start_matches('v'));
-    ensure!(
-      output.status.success() && actual == Some(version),
-      "use the pinned documentation tool: {install}"
-    );
-  }
+  require_mdbook()?;
   verify_assets(root)?;
   let mut command = Command::new("mdbook");
   command.current_dir(root);
@@ -40,6 +27,27 @@ pub fn run(root: &Path, serve: bool) -> Result<()> {
     command.arg("build");
   }
   ensure!(command.status()?.success(), "mdBook command failed");
+  Ok(())
+}
+
+/// The mermaid preprocessor is a workspace package, so only mdBook itself has
+/// to exist on `PATH`.
+fn require_mdbook() -> Result<()> {
+  let install = format!("cargo install mdbook --version {MDBOOK_VERSION} --locked");
+  let output = Command::new("mdbook")
+    .arg("--version")
+    .output()
+    .with_context(|| format!("install the documentation tool: {install}"))?;
+  let reported = String::from_utf8_lossy(&output.stdout);
+  let actual = reported
+    .trim()
+    .strip_prefix("mdbook")
+    .map(str::trim)
+    .map(|value| value.trim_start_matches('v'));
+  ensure!(
+    output.status.success() && actual == Some(MDBOOK_VERSION),
+    "use the pinned documentation tool: {install}"
+  );
   Ok(())
 }
 

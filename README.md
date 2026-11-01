@@ -10,7 +10,6 @@ Gity is a Rust Git hosting and collaboration platform with Web, repositories, is
 
 ```sh
 cargo install mdbook --version 0.5.4 --locked
-cargo install mdbook-mermaid --version 0.17.1 --locked
 cargo xtask docs
 cargo xtask docs --serve
 ```

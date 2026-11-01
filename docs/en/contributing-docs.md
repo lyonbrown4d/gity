@@ -4,7 +4,7 @@
 
 # Documentation maintenance
 
-The current manual uses mdBook. Chinese chapters live in `docs/zh/`, English chapters in `docs/en/`, with a shared root `book.toml` and `docs/SUMMARY.md`. Diagrams are Mermaid blocks in the chapters, rendered by a pinned mdbook-mermaid preprocessor. Assets in `docs/shared/vendor/` require no CDN or Node build.
+The current manual uses mdBook. Chinese chapters live in `docs/zh/`, English chapters in `docs/en/`, with a shared root `book.toml` and `docs/SUMMARY.md`. Diagrams are Mermaid blocks in the chapters, rendered by a pinned mdbook-mermaid preprocessor that the workspace `xtask` package provides, so no separate install is needed. Assets in `docs/shared/vendor/` require no CDN or Node build.
 
 ## Build and preview
 
@@ -12,12 +12,11 @@ Run from the repository root:
 
 ```sh
 cargo install mdbook --version 0.5.4 --locked
-cargo install mdbook-mermaid --version 0.17.1 --locked
 cargo xtask docs
 cargo xtask docs --serve
 ```
 
-Output is `target/book/`. Preview listens on `http://127.0.0.1:3000`, with Chinese at `/zh/index.html` and English at `/en/index.html`. Direct `mdbook build` and `mdbook serve --hostname 127.0.0.1` also work.
+Output is `target/book/`. Preview listens on `http://127.0.0.1:3000`, with Chinese at `/zh/index.html` and English at `/en/index.html`. Direct `mdbook build` and `mdbook serve --hostname 127.0.0.1` also work; mdBook reaches the preprocessor through `cargo` and builds the workspace on first use.
 
 CI builds the manual and retains HTML artifacts; this does not imply public hosting.
 

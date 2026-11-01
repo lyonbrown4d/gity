@@ -4,7 +4,7 @@
 
 # 文档维护
 
-当前手册统一使用 mdBook，中文正文在 `docs/zh/`，英文正文在 `docs/en/`，共用根目录 `book.toml` 和 `docs/SUMMARY.md`。图表直接使用章节中的 Mermaid 代码块，通过固定版本 mdbook-mermaid 渲染。本地资源在 `docs/shared/vendor/`，不依赖 CDN 或 Node 构建。
+当前手册统一使用 mdBook，中文正文在 `docs/zh/`，英文正文在 `docs/en/`，共用根目录 `book.toml` 和 `docs/SUMMARY.md`。图表直接使用章节中的 Mermaid 代码块，由固定版本 mdbook-mermaid 渲染；预处理器由 workspace 的 `xtask` 包提供，不需要单独安装。本地资源在 `docs/shared/vendor/`，不依赖 CDN 或 Node 构建。
 
 ## 构建和预览
 
@@ -12,12 +12,11 @@
 
 ```sh
 cargo install mdbook --version 0.5.4 --locked
-cargo install mdbook-mermaid --version 0.17.1 --locked
 cargo xtask docs
 cargo xtask docs --serve
 ```
 
-输出为 `target/book/`。预览监听 `http://127.0.0.1:3000`，中文入口 `/zh/index.html`，英文入口 `/en/index.html`。也可以直接运行 `mdbook build` 或 `mdbook serve --hostname 127.0.0.1`。
+输出为 `target/book/`。预览监听 `http://127.0.0.1:3000`，中文入口 `/zh/index.html`，英文入口 `/en/index.html`。也可以直接运行 `mdbook build` 或 `mdbook serve --hostname 127.0.0.1`；此时 mdBook 通过 `cargo` 调用 `xtask` 中的预处理器，首次会编译 workspace。
 
 CI 构建文档并保存 HTML 产物；这不代表已部署公共站点。
 
