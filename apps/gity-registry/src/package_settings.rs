@@ -34,7 +34,7 @@ impl PackageSettings {
       self.database_node_id < 1024,
       "package database node ID must be 0–1023"
     );
-    gity_ids::configure_node(self.database_node_id);
+    gity_ids::install(gity_ids::IdGenerator::new(self.database_node_id)?)?;
     let db = gity_core::Db::connect(&self.database_dsn).await?;
     db.migrate().await?;
     let storage = gity_core::Storage::from_config(&self.storage)?;

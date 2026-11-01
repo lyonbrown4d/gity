@@ -12,7 +12,7 @@ pub use database::Db;
 pub use database::audit_context;
 pub use database::sql_value;
 pub use error::{AppError, externalize, ok};
-pub use ids::{new_id, now};
+pub use ids::{IdError, IdGenerator, install, new_id, now, try_new_id};
 pub use storage::{Storage, StorageMeta};
 
 #[derive(Clone, Debug, serde::Serialize)]

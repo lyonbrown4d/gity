@@ -48,7 +48,7 @@ Web is a Leptos/WASM static bundle served by the platform HTTP service. Monaco a
 | Composition | FluxDI registration, resolution, and module lifecycle |
 | HTTP / concurrency | Axum and Tokio, with streaming transfer paths |
 | Persistence | SeaORM entities, ActiveModels and transactions; some platform repositories use the existing common interface |
-| Entity identifiers | Application-generated Snowflake IDs; unique node ID per distributed writer; string IDs in public JSON |
+| Entity identifiers | Snowflake via `ferroid` (41/10/12 layout); the generator is installed from the unique node ID during assembly and inserts assign IDs in `before_save`; string IDs in public JSON |
 | Operation identifiers | UUID v7; cryptographically random secrets |
 | Configuration | Code defaults < file < environment < explicit CLI |
 | Observability | Tracing, Prometheus and optional OTLP, initialized per process |

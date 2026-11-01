@@ -1,19 +1,33 @@
 use gity_core::{Db, new_id};
 use gity_entities::{bootstrap_claim, project_iid_counters, project_member_audits, users};
-use sea_orm::{ActiveModelBehavior, ActiveModelTrait, ActiveValue};
+use sea_orm::{ActiveModelBehavior, ActiveModelTrait, ActiveValue, Set};
 
-#[test]
-fn active_model_default_generates_only_entity_ids() {
-  let user: users::ActiveModel = Default::default();
-  let ActiveValue::Set(user_id) = user.id else {
-    panic!("users default must set a Snowflake id");
-  };
-  assert!(user_id > 0);
+#[tokio::test]
+async fn before_save_assigns_ids_only_on_insert_without_one() {
+  let db = Db::connect("sqlite::memory:").await.unwrap();
+  let connection = &db.connection;
 
   let blank = <users::ActiveModel as ActiveModelTrait>::default();
   assert!(matches!(blank.id, ActiveValue::NotSet));
-  let behavior_created = <users::ActiveModel as ActiveModelBehavior>::new();
-  assert!(matches!(behavior_created.id, ActiveValue::Set(id) if id > 0));
+
+  let inserted = <users::ActiveModel as ActiveModelBehavior>::before_save(blank, connection, true)
+    .await
+    .unwrap();
+  assert!(matches!(inserted.id, ActiveValue::Set(id) if id > 0));
+
+  let mut preset: users::ActiveModel = Default::default();
+  preset.id = Set(42);
+  let kept = <users::ActiveModel as ActiveModelBehavior>::before_save(preset, connection, true)
+    .await
+    .unwrap();
+  assert!(matches!(kept.id, ActiveValue::Set(42)));
+
+  let untouched: users::ActiveModel = Default::default();
+  let updated =
+    <users::ActiveModel as ActiveModelBehavior>::before_save(untouched, connection, false)
+      .await
+      .unwrap();
+  assert!(matches!(updated.id, ActiveValue::NotSet));
 
   let audit = <project_member_audits::ActiveModel as ActiveModelTrait>::default();
   assert!(matches!(audit.revision_id, ActiveValue::NotSet));

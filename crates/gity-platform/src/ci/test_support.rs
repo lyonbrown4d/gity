@@ -122,6 +122,7 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
     address: "127.0.0.1:0".into(),
     base_url: "http://localhost".into(),
     database_url: "sqlite::memory:".into(),
+    database_node_id: 1,
     repo_root: root,
     git_bin: "git".into(),
     git_hook: None,

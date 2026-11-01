@@ -1,6 +1,9 @@
 //! SeaORM entity mappings generated from the versioned initial schema.
 //! Public API models remain in the HTTP/OpenAPI layer.
 
+mod application_id;
+pub(crate) use application_id::application_ids;
+
 pub mod artifact_storage_deletions;
 pub mod audit_revisions;
 pub mod auth_sessions;
@@ -52,3 +55,45 @@ pub mod users;
 
 pub mod git_repository_placements;
 pub mod project_registry_settings;
+
+application_ids!(
+  artifact_storage_deletions,
+  audit_revisions,
+  organization_members,
+  organizations,
+  project_access_tokens,
+  project_audit_events,
+  project_branch_protections,
+  project_ci_variables,
+  project_deploy_keys,
+  project_issue_assignees,
+  project_issue_attachments,
+  project_issue_comments,
+  project_issue_labels,
+  project_issues,
+  project_job_artifacts,
+  project_job_logs,
+  project_jobs,
+  project_lfs_locks,
+  project_lfs_objects,
+  project_members,
+  project_merge_request_approval_rules,
+  project_merge_request_approvals,
+  project_merge_request_comments,
+  project_merge_request_participants,
+  project_merge_requests,
+  project_npm_dist_tags,
+  project_package_files,
+  project_package_versions,
+  project_packages,
+  project_pipeline_jobs,
+  project_pipelines,
+  project_release_links,
+  project_releases,
+  project_runners,
+  project_todos,
+  project_wiki_pages,
+  projects,
+  user_access_tokens,
+  users
+);

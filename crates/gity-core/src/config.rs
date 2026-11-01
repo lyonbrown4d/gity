@@ -17,6 +17,7 @@ pub struct Settings {
   pub address: String,
   pub base_url: String,
   pub database_url: String,
+  pub database_node_id: u16,
   pub repo_root: PathBuf,
   pub git_bin: PathBuf,
   pub git_hook: Option<PathBuf>,
@@ -210,13 +211,13 @@ impl Settings {
         "database.driver and DSN scheme do not match",
       ));
     }
-    crate::ids::configure_node(raw.database.node_id);
     Ok(Self {
       git_cluster: raw.git.cluster,
       components: raw.components,
       address,
       base_url: raw.http.base_url,
       database_url,
+      database_node_id: raw.database.node_id,
       repo_root: raw.git.repo_root,
       git_bin: raw.git.bin,
       git_hook: raw.git.hook,

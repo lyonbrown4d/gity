@@ -66,6 +66,7 @@ axum = { version = "0.8", features = ["multipart", "macros"] }
 base64 = "0.22"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
+ferroid = { version = "2", default-features = false, features = ["snowflake", "lock"] }
 git2 = "0.21"
 sea-orm = { version = "2", default-features = false, features = ["macros", "sqlx-sqlite", "sqlx-postgres", "sqlx-mysql", "runtime-tokio-rustls", "with-json", "with-chrono"] }
 serde = { version = "1", features = ["derive"] }

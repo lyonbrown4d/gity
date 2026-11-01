@@ -2458,6 +2458,7 @@ dependencies = [
 name = "gity-entities"
 version = "0.2.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "gity-core",
  "gity-ids",
@@ -2649,8 +2650,8 @@ dependencies = [
 name = "gity-ids"
 version = "0.2.0"
 dependencies = [
- "chrono",
- "tokio",
+ "ferroid",
+ "tracing",
  "uuid",
 ]
 

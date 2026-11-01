@@ -4,8 +4,6 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-chrono.workspace = true
+ferroid.workspace = true
+tracing.workspace = true
 uuid.workspace = true
-
-[dev-dependencies]
-tokio.workspace = true

@@ -6,10 +6,15 @@ pub struct ArtifactBindings {
   #[cfg(feature = "packages")]
   service: Shared<ArtifactService>,
 }
-use gity_core::{Db, Settings, Storage};
+use gity_core::{Db, IdGenerator, Settings, Storage, install};
 use gity_git::GitService;
 use gity_identity::{IdentityModule, IdentityRepository};
 use gity_search::{Limits, SearchIndex};
+fn id_generator(settings: Shared<Settings>) -> Result<Shared<IdGenerator>, fluxdi::Error> {
+  IdGenerator::new(settings.database_node_id)
+    .map(Shared::new)
+    .map_err(|error| fluxdi::Error::factory_failed("IdGenerator", &error.to_string()))
+}
 fn search(
   settings: Shared<Settings>,
   git: Shared<GitService>,
@@ -87,6 +92,8 @@ static_module! {
         backend:Backend=backend(settings,database);
         #[scope(root)]
         search:SearchIndex=search(settings,git);
+        #[scope(root)]
+        id_generator:IdGenerator=id_generator(settings);
         external settings:Settings;
         external database:Db;
         external storage:Storage;
@@ -116,6 +123,8 @@ pub async fn compose(settings: Settings) -> anyhow::Result<(RuntimeModule, AppSt
     storage,
     artifacts,
   );
+  // Install the container's own generator first so entity hooks and the injector share one sequence.
+  install((*module.id_generator()?).clone())?;
   let state = (*module.state()?).clone();
   Ok((module, state))
 }

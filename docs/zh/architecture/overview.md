@@ -48,7 +48,7 @@ Web 是编译后的静态资源，由平台 HTTP 服务提供，不是独立的 
 | 装配 | FluxDI 注册、解析和 module 生命周期 |
 | HTTP / 并发 | Axum、Tokio；传输路径保留流式读写 |
 | 持久化 | SeaORM Entity、ActiveModel、事务；部分平台仓储使用现有通用接口 |
-| 实体标识 | 固定 Snowflake；各分布式写入进程配置唯一 node ID；对外 JSON 主键用字符串 |
+| 实体标识 | Snowflake（ferroid，41/10/12 位）；装配阶段按唯一 node ID 安装生成器，插入时由 `before_save` 赋值；对外 JSON 主键用字符串 |
 | 操作标识 | UUID v7；秘密凭据使用密码学随机数 |
 | 配置 | 代码默认值 < 文件 < 环境变量 < 显式 CLI |
 | 可观测性 | Tracing、Prometheus、可选 OTLP；各进程分别初始化 |

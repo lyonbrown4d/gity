@@ -17,12 +17,3 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
-
-impl ActiveModelBehavior for ActiveModel {
-  fn new() -> Self {
-    Self {
-      id: sea_orm::ActiveValue::Set(gity_ids::new_id()),
-      ..<Self as ActiveModelTrait>::default()
-    }
-  }
-}
