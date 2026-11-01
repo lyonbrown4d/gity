@@ -29,14 +29,14 @@ CI 配置使用带类型校验的 YAML，仓库内默认文件为 `.gity-ci.yml`
 
 ## 发布验收状态
 
-Rust 代码替换、遗留代码清理和 Linux x86_64 本机验收已完成。`codex/rust-full-migration` 尚未合并主分支或发布。
+Rust 代码替换、遗留代码清理和 Linux x86_64 本机验收已完成。`main` 已统一使用 Rust；正式发布仍以发布工作流的实际结果为准。
 
 截至 2026-11-01，本机已验证 PostgreSQL 18 与 SeaweedFS 4.51 集成环境、真实 Git/SSH 双克隆操作、Runner 容器任务及产物链路；Rust Releases/Runners 页面和原版代表页面视觉对照已完成。各项范围、最终复跑状态和限制见[Rust 迁移与验证记录](docs/rust-migration.md)。
 
 发布前仍需完成：
 
 - Linux x86_64 本机和冻结源码 server/Runner 镜像复验均已通过；正式发布前仍须由 tag 触发的 release workflow 验证发布架构。
-- 推送迁移分支后通过 Linux x86 GitHub CI；Linux arm64 等平台由 tag 触发的 release workflow 构建验证，不能以分支 push CI 代替。
+- 主分支变更通过 Linux x86 GitHub CI；Linux arm64 等平台由 tag 触发的 release workflow 构建验证，不能以分支 push CI 代替。
 - 完成完整生产备份与恢复流程验证。其他架构及 PowerShell 发布脚本尚未实测。
 
 压力测试已取消，不作为迁移或发布门槛；没有吞吐量或性能曲线实测结果。

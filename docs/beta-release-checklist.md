@@ -1,6 +1,6 @@
 # Rust Beta 发布清单
 
-`codex/rust-full-migration` 已完成 Rust 替换、遗留代码清理和 Linux x86_64 本机验收。该分支尚未合并或发布。推送后先通过 Linux x86 CI；发布工作流由 tag 触发，须在打正式发布 tag 前确认目标架构构建成功。
+`main` 已统一使用 Rust，整体替换、遗留代码清理和 Linux x86_64 本机验收已完成。正式发布仍需通过 Linux x86 CI，以及由 tag 触发的目标架构构建与发布校验。
 
 ## 本机发布检查
 
@@ -19,7 +19,7 @@
 
 `.github/workflows/ci.yml` 在分支推送时运行 Linux x86 CI；它不验证 ARM64。`.github/workflows/release.yml` 由 tag 触发，构建 Linux amd64/arm64 归档及 server、runner、search-index 镜像，并发布校验和。ARM64 等其他架构的验证须以发布工作流的实际结果为准。
 
-迁移分支尚未合并主分支或发布。主分支仍保留迁移前实现；不得把分支 push CI 说成 ARM64 发布通过。
+后续开发以 Rust 主线为准。主线合并不代表正式发布，不得把分支 push CI 说成 ARM64 发布通过。
 
 ## 发布门槛
 
@@ -29,7 +29,7 @@
 - [x] 使用 SeaweedFS 验证 S3 认证、对象字节、Range 和分段上传。
 - [x] 清理旧 Go/React 实现及旧构建发布配置；清理后 workspace 为 149 passed、0 failed、1 ignored，Runner Docker 用例单独 1 passed。
 - [x] 清理后 `cargo xtask release`、源码检查、vendor 检查、格式及 native/WASM 严格 Clippy 通过。
-- [ ] 推送迁移分支，通过 Linux x86 CI；tag 触发的发布工作流通过后再合并或发布。
+- [ ] 主分支通过 Linux x86 CI；正式发布 tag 触发的发布工作流须通过全部构建与校验。
 - [ ] 在真实环境验证完整生产备份与恢复流程。
 
 压力测试已取消，不作为发布门槛；未执行吞吐量或性能曲线测试。Linux x86_64 以外平台和 PowerShell 发布脚本尚未实测。

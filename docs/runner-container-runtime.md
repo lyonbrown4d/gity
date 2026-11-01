@@ -1,6 +1,6 @@
 # Runner 执行与容器运行
 
-本文对应 `codex/rust-full-migration` 工作区中的 Rust Runner。流水线 YAML、任务依赖和变量规则见 [CI YAML](ci-yaml.md)。服务端负责调度；独立的 `gity-runner` 进程领取并执行项目任务。
+本文对应 `main` 中的 Rust Runner。流水线 YAML、任务依赖和变量规则见 [CI YAML](ci-yaml.md)。服务端负责调度；独立的 `gity-runner` 进程领取并执行项目任务。
 
 ## 启动与配置
 

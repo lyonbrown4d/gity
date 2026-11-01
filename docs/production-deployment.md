@@ -1,6 +1,6 @@
 # Rust 部署
 
-本页对应 `codex/rust-full-migration` 分支上的 Rust 部署。Rust 替换及 Linux x86_64 本机验收已完成；该分支尚未合并或发布。其他架构、PowerShell 发布脚本和完整生产备份恢复流程尚未实测。
+本页对应 `main` 的 Rust 部署。Rust 替换、遗留清理及 Linux x86_64 本机验收已完成；正式发布仍以发布工作流的实际结果为准。其他架构、PowerShell 发布脚本和完整生产备份恢复流程尚未实测。
 
 ## 构建与启动
 

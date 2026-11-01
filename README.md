@@ -1,8 +1,8 @@
 # Gity
 
-Gity 是轻量 Git 托管与协作平台。`codex/rust-full-migration` 分支已完成服务端、Runner 和 Web 的 Rust 替换，并在 Linux x86_64 完成本机验收。主分支仍保留迁移前实现；迁移分支尚未合并或发布。
+Gity 是轻量 Git 托管与协作平台。`main` 已统一为 Rust 服务端、Runner 和 Web，后续开发以 Rust 主线为准；Linux x86_64 本机验收已完成。
 
-原版代表页面的视觉与功能核对已完成。迁移分支已清理旧 Go、React 实现和旧构建配置，并完成清理后的 Linux x86_64 本机复验；其他架构、PowerShell 发布脚本及完整生产备份恢复流程尚未实测。
+原版代表页面的视觉与功能核对已完成。主分支已清理旧 Go、React 实现和旧构建配置，并完成清理后的 Linux x86_64 本机复验；其他架构、PowerShell 发布脚本及完整生产备份恢复流程尚未实测。
 
 ## 技术与目录
 

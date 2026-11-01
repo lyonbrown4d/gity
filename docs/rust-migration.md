@@ -2,7 +2,7 @@
 
 ## 迁移边界
 
-当前分支为 `codex/rust-full-migration`。Rust 服务端、Runner 和 Web 替换已完成，旧 Go/React 实现及构建遗留已清理，原版代表页面的视觉与功能验收已完成。主分支仍保留迁移前实现；合并和发布仍须按仓库流程完成。
+Rust 整体替换已合入 `main`，后续开发以 Rust 主线为准。旧 Go/React 实现及构建遗留已清理，原版代表页面的视觉与功能验收已完成。迁移前版本保留在 Git 历史中，正式发布仍须执行发布工作流。
 
 当前为 Web 交付：Rust/Axum/SeaORM 服务端、Leptos/WASM Web、独立 Runner、Git 钩子和搜索 CLI。常规 Git 操作通过 git2/libgit2；原生 Git 承担智能 HTTP/SSH Git 协议和必要维护；SSH 由 russh 独立监听可配置端口。
 
@@ -26,11 +26,11 @@
 
 功能验收后的单次空闲 `docker stats` 快照中，Rust server 为 0.16% CPU、151.7 MiB 内存，限制为 2 CPU/1 GiB；PostgreSQL 为 111.5 MiB，SeaweedFS 为 253 MiB，分别计量。该快照不是压力测试或持续容量测量。
 
-Linux x86_64 本机以外的平台、PowerShell 发布脚本和完整生产备份恢复流程尚未实测。迁移完成不等于已合并、已发布或这些未测项目已通过。
+Linux x86_64 本机以外的平台、PowerShell 发布脚本和完整生产备份恢复流程尚未实测。主线合并不代表已正式发布或这些未测项目已通过。
 
-## 合并与发布前仍须处理
+## 正式发布前仍须处理
 
-1. 将迁移分支推送并通过 `.github/workflows/ci.yml` 的 Linux x86 CI；`.github/workflows/release.yml` 由 tag 触发，负责 Linux amd64/arm64 发布构建。发布工作流通过后再按流程打 tag 发布。
+1. 主分支变更通过 `.github/workflows/ci.yml` 的 Linux x86 CI；`.github/workflows/release.yml` 由 tag 触发，负责 Linux amd64/arm64 发布构建。正式发布 tag 触发该工作流，构建和校验通过后发布产物。
 2. 生产备份恢复、其他架构及 PowerShell 发布脚本仍待各自环境验证。
 
 ## 重现入口
