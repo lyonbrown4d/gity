@@ -1,0 +1,31 @@
+{
+  "_version": 2,
+  "wiki page already exists": {
+    "en": "wiki page already exists",
+    "zh": "Wiki 页面已存在"
+  },
+  "wiki page format must be markdown": {
+    "en": "wiki page format must be markdown",
+    "zh": "Wiki 页面格式必须为 Markdown"
+  },
+  "wiki page not found": {
+    "en": "wiki page not found",
+    "zh": "未找到 Wiki 页面"
+  },
+  "pipeline configuration differs from the source commit": {
+    "en": "pipeline configuration differs from the source commit",
+    "zh": "流水线配置与源提交中的配置不一致"
+  },
+  "push pipelines are created by accepted Git updates": {
+    "en": "push pipelines are created by accepted Git updates",
+    "zh": "push 流水线只能由已接受的 Git 更新创建"
+  },
+  "invalid profile": {
+    "en": "invalid profile",
+    "zh": "个人资料格式无效"
+  },
+  "database.driver and DSN scheme do not match": {
+    "en": "database.driver and DSN scheme do not match",
+    "zh": "数据库驱动与 DSN 协议不匹配"
+  }
+}

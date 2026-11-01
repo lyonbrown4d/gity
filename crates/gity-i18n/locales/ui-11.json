@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Apache License 2.0": {
+    "en": "Apache License 2.0",
+    "zh": "Apache 2.0 许可证"
+  },
+  "GNU GPLv3": {
+    "en": "GNU GPLv3",
+    "zh": "GNU GPLv3 许可证"
+  },
+  "private": {
+    "en": "private",
+    "zh": "私有"
+  },
+  "internal": {
+    "en": "internal",
+    "zh": "内部"
+  },
+  "public": {
+    "en": "public",
+    "zh": "公开"
+  },
+  "Admin can view and delete repositories. New repository creation is handled in user workspace.": {
+    "en": "Admin can view and delete repositories. New repository creation is handled in user workspace.",
+    "zh": "管理员可查看与删除仓库，仓库创建由用户侧完成。"
+  },
+  "Admin can view and delete projects. New project creation is handled in user workspace.": {
+    "en": "Admin can view and delete projects. New project creation is handled in user workspace.",
+    "zh": "管理员可查看与删除项目，项目创建由用户侧完成。"
+  },
+  "No repositories in this organization.": {
+    "en": "No repositories in this organization.",
+    "zh": "该组织下暂无仓库。"
+  },
+  "No projects in this organization.": {
+    "en": "No projects in this organization.",
+    "zh": "该组织下暂无项目。"
+  },
+  "Failed to create organization": {
+    "en": "Failed to create organization",
+    "zh": "创建组织失败"
+  },
+  "Failed to update organization": {
+    "en": "Failed to update organization",
+    "zh": "更新组织失败"
+  },
+  "Failed to delete organization": {
+    "en": "Failed to delete organization",
+    "zh": "删除组织失败"
+  },
+  "Failed to add member": {
+    "en": "Failed to add member",
+    "zh": "添加成员失败"
+  },
+  "Full CRUD for organizations and member management entry.": {
+    "en": "Full CRUD for organizations and member management entry.",
+    "zh": "组织完整 CRUD 与成员管理入口。"
+  },
+  "New Organization": {
+    "en": "New Organization",
+    "zh": "新建组织"
+  },
+  "Selected Organization": {
+    "en": "Selected Organization",
+    "zh": "当前组织"
+  },
+  "Edit Organization": {
+    "en": "Edit Organization",
+    "zh": "编辑组织"
+  },
+  "Delete Organization": {
+    "en": "Delete Organization",
+    "zh": "删除组织"
+  },
+  "Add Member": {
+    "en": "Add Member",
+    "zh": "添加成员"
+  },
+  "Members": {
+    "en": "Members",
+    "zh": "成员"
+  },
+  "Members of the selected organization.": {
+    "en": "Members of the selected organization.",
+    "zh": "当前组织的成员列表。"
+  },
+  "No members found.": {
+    "en": "No members found.",
+    "zh": "暂无成员。"
+  },
+  "No repositories found.": {
+    "en": "No repositories found.",
+    "zh": "暂无仓库。"
+  },
+  "No projects found.": {
+    "en": "No projects found.",
+    "zh": "暂无项目。"
+  },
+  "Create Organization": {
+    "en": "Create Organization",
+    "zh": "创建组织"
+  },
+  "Organization key": {
+    "en": "Organization key",
+    "zh": "组织标识"
+  },
+  "Organization name": {
+    "en": "Organization name",
+    "zh": "组织名称"
+  },
+  "Add Organization Member": {
+    "en": "Add Organization Member",
+    "zh": "添加组织成员"
+  },
+  "Role": {
+    "en": "Role",
+    "zh": "角色"
+  },
+  "member": {
+    "en": "member",
+    "zh": "成员"
+  },
+  "owner": {
+    "en": "owner",
+    "zh": "所有者"
+  },
+  "default:": {
+    "en": "default:",
+    "zh": "默认分支:"
+  },
+  "default branch:": {
+    "en": "default branch:",
+    "zh": "默认分支:"
+  },
+  "Update failed": {
+    "en": "Update failed",
+    "zh": "更新失败"
+  },
+  "Platform": {
+    "en": "Platform",
+    "zh": "平台"
+  },
+  "Projects": {
+    "en": "Projects",
+    "zh": "项目"
+  },
+  "Plan": {
+    "en": "Plan",
+    "zh": "计划"
+  },
+  "CI/CD": {
+    "en": "CI/CD",
+    "zh": "CI/CD"
+  },
+  "Operate": {
+    "en": "Operate",
+    "zh": "运维"
+  },
+  "More": {
+    "en": "More",
+    "zh": "更多"
+  },
+  "View Project": {
+    "en": "View Project",
+    "zh": "查看项目"
+  },
+  "Share Project": {
+    "en": "Share Project",
+    "zh": "分享项目"
+  },
+  "Delete Project": {
+    "en": "Delete Project",
+    "zh": "删除项目"
+  },
+  "Toggle": {
+    "en": "Toggle",
+    "zh": "切换"
+  },
+  "Toggle Sidebar": {
+    "en": "Toggle Sidebar",
+    "zh": "切换侧边栏"
+  },
+  "Sidebar": {
+    "en": "Sidebar",
+    "zh": "侧边栏"
+  },
+  "Displays the mobile sidebar.": {
+    "en": "Displays the mobile sidebar.",
+    "zh": "显示移动端侧边栏。"
+  },
+  "Close": {
+    "en": "Close",
+    "zh": "关闭"
+  }
+}

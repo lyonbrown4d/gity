@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "Hide new merge request form": {
+    "en": "Hide new merge request form",
+    "zh": "收起新建合并请求表单"
+  },
+  "Your current project role can inspect merge requests, but cannot create them.": {
+    "en": "Your current project role can inspect merge requests, but cannot create them.",
+    "zh": "你当前的项目角色可以查看合并请求，但不能创建合并请求。"
+  },
+  "Merge request title": {
+    "en": "Merge request title",
+    "zh": "合并请求标题"
+  },
+  "Describe the merge request (optional)": {
+    "en": "Describe the merge request (optional)",
+    "zh": "合并请求描述（可选）"
+  },
+  "Source branch": {
+    "en": "Source branch",
+    "zh": "源分支"
+  },
+  "Target branch": {
+    "en": "Target branch",
+    "zh": "目标分支"
+  },
+  "Select source branch": {
+    "en": "Select source branch",
+    "zh": "选择源分支"
+  },
+  "Select target branch": {
+    "en": "Select target branch",
+    "zh": "选择目标分支"
+  },
+  "Creating merge request...": {
+    "en": "Creating merge request...",
+    "zh": "合并请求创建中..."
+  },
+  "Create merge request": {
+    "en": "Create merge request",
+    "zh": "创建合并请求"
+  },
+  "Loading merge requests...": {
+    "en": "Loading merge requests...",
+    "zh": "合并请求加载中..."
+  },
+  "No merge requests found.": {
+    "en": "No merge requests found.",
+    "zh": "暂无合并请求。"
+  },
+  "Select a merge request to inspect the diff.": {
+    "en": "Select a merge request to inspect the diff.",
+    "zh": "选择一个合并请求查看 diff。"
+  },
+  "Reload diff": {
+    "en": "Reload diff",
+    "zh": "重新加载 diff"
+  },
+  "Close merge request": {
+    "en": "Close merge request",
+    "zh": "关闭合并请求"
+  },
+  "Reopen merge request": {
+    "en": "Reopen merge request",
+    "zh": "重新打开合并请求"
+  },
+  "Merging...": {
+    "en": "Merging...",
+    "zh": "合并中..."
+  },
+  "Merge": {
+    "en": "Merge",
+    "zh": "合并"
+  },
+  "Diff": {
+    "en": "Diff",
+    "zh": "Diff"
+  },
+  "Loading diff...": {
+    "en": "Loading diff...",
+    "zh": "Diff 加载中..."
+  },
+  "No diff available.": {
+    "en": "No diff available.",
+    "zh": "暂无 Diff。"
+  },
+  "Approvals": {
+    "en": "Approvals",
+    "zh": "审批"
+  },
+  "Approve": {
+    "en": "Approve",
+    "zh": "批准"
+  },
+  "Unapprove": {
+    "en": "Unapprove",
+    "zh": "取消批准"
+  },
+  "Track reviewers who approved this merge request.": {
+    "en": "Track reviewers who approved this merge request.",
+    "zh": "跟踪已批准该合并请求的评审者。"
+  },
+  "No approvals yet.": {
+    "en": "No approvals yet.",
+    "zh": "暂无审批。"
+  },
+  "Review conversation for this merge request.": {
+    "en": "Review conversation for this merge request.",
+    "zh": "查看该合并请求的评审讨论。"
+  },
+  "Add a merge request comment": {
+    "en": "Add a merge request comment",
+    "zh": "添加合并请求评论"
+  },
+  "Merge request title is required": {
+    "en": "Merge request title is required",
+    "zh": "合并请求标题不能为空"
+  },
+  "Source and target branches are required": {
+    "en": "Source and target branches are required",
+    "zh": "源分支和目标分支不能为空"
+  },
+  "Source and target branches must differ": {
+    "en": "Source and target branches must differ",
+    "zh": "源分支和目标分支不能相同"
+  },
+  "Author": {
+    "en": "Author",
+    "zh": "作者"
+  },
+  "Assignee": {
+    "en": "Assignee",
+    "zh": "指派给"
+  },
+  "Close issue": {
+    "en": "Close issue",
+    "zh": "关闭议题"
+  },
+  "Reopen issue": {
+    "en": "Reopen issue",
+    "zh": "重新打开议题"
+  },
+  "Comments": {
+    "en": "Comments",
+    "zh": "评论"
+  },
+  "Loading comments...": {
+    "en": "Loading comments...",
+    "zh": "评论加载中..."
+  },
+  "No comments yet.": {
+    "en": "No comments yet.",
+    "zh": "暂无评论。"
+  },
+  "Add a comment": {
+    "en": "Add a comment",
+    "zh": "添加评论"
+  },
+  "Comment with markdown, mention #123, or upload files...": {
+    "en": "Comment with markdown, mention #123, or upload files...",
+    "zh": "使用 Markdown 发表评论，可引用 #123，或上传文件…"
+  },
+  "Commenting...": {
+    "en": "Commenting...",
+    "zh": "评论提交中..."
+  },
+  "Comment": {
+    "en": "Comment",
+    "zh": "评论"
+  },
+  "Discussion": {
+    "en": "Discussion",
+    "zh": "讨论"
+  },
+  "Back": {
+    "en": "Back",
+    "zh": "返回"
+  },
+  "Loading issue...": {
+    "en": "Loading issue...",
+    "zh": "议题加载中..."
+  },
+  "Invalid issue number": {
+    "en": "Invalid issue number",
+    "zh": "议题编号无效"
+  },
+  "Issue collaboration": {
+    "en": "Issue collaboration",
+    "zh": "议题协作"
+  },
+  "Manage issue assignees and labels.": {
+    "en": "Manage issue assignees and labels.",
+    "zh": "管理议题指派人和标签。"
+  }
+}

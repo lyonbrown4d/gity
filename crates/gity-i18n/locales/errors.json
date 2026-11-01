@@ -1,0 +1,67 @@
+{
+  "_version": 2,
+  "authentication required": {
+    "en": "authentication required",
+    "zh": "需要登录"
+  },
+  "invalid credentials": {
+    "en": "invalid credentials",
+    "zh": "用户名或密码错误"
+  },
+  "access denied": {
+    "en": "access denied",
+    "zh": "没有访问权限"
+  },
+  "forbidden": {
+    "en": "forbidden",
+    "zh": "没有访问权限"
+  },
+  "resource not found": {
+    "en": "resource not found",
+    "zh": "资源不存在"
+  },
+  "not found": {
+    "en": "not found",
+    "zh": "未找到"
+  },
+  "internal server error": {
+    "en": "internal server error",
+    "zh": "服务器内部错误"
+  },
+  "request timed out": {
+    "en": "request timed out",
+    "zh": "请求超时"
+  },
+  "invalid request": {
+    "en": "invalid request",
+    "zh": "请求无效"
+  },
+  "invalid token": {
+    "en": "invalid token",
+    "zh": "令牌无效"
+  },
+  "token expired": {
+    "en": "token expired",
+    "zh": "登录已过期"
+  },
+  "project not found": {
+    "en": "project not found",
+    "zh": "项目不存在"
+  },
+  "organization not found": {
+    "en": "organization not found",
+    "zh": "组织不存在"
+  },
+  "user not found": {
+    "en": "user not found",
+    "zh": "用户不存在"
+  },
+  "insufficient permissions": {
+    "en": "insufficient permissions",
+    "zh": "权限不足"
+  },
+  "conflict": {
+    "en": "conflict",
+    "zh": "数据冲突"
+  }
+}

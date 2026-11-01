@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Packages": {
+    "en": "Packages",
+    "zh": "软件包"
+  },
+  "Job diagnostics guide": {
+    "en": "Job diagnostics guide",
+    "zh": "作业诊断指南"
+  },
+  "pipeline job detail": {
+    "en": "pipeline job detail",
+    "zh": "流水线作业详情"
+  },
+  "download after upload": {
+    "en": "download after upload",
+    "zh": "上传完成后可下载"
+  },
+  "Empty logs": {
+    "en": "Empty logs",
+    "zh": "日志为空"
+  },
+  "not claimed, not flushed, or no stored output": {
+    "en": "not claimed, not flushed, or no stored output",
+    "zh": "尚未领取、尚未写入或没有已保存的输出"
+  },
+  "No jobs in the queue": {
+    "en": "No jobs in the queue",
+    "zh": "队列中暂无作业"
+  },
+  "Enqueue first job": {
+    "en": "Enqueue first job",
+    "zh": "添加首个作业"
+  },
+  "Read-only role": {
+    "en": "Read-only role",
+    "zh": "只读角色"
+  },
+  "Project UUID": {
+    "en": "Project UUID",
+    "zh": "项目 UUID"
+  },
+  "Page not found": {
+    "en": "Page not found",
+    "zh": "页面不存在"
+  },
+  "›": {
+    "en": "›",
+    "zh": "›"
+  },
+  "Inbox": {
+    "en": "Inbox",
+    "zh": "收件箱"
+  },
+  "Edit User": {
+    "en": "Edit User",
+    "zh": "编辑用户"
+  },
+  "Quick jump": {
+    "en": "Quick jump",
+    "zh": "快速跳转"
+  },
+  "Ctrl K": {
+    "en": "Ctrl K",
+    "zh": "Ctrl K"
+  },
+  "Personal queue": {
+    "en": "Personal queue",
+    "zh": "个人待办队列"
+  },
+  "Items in this view": {
+    "en": "Items in this view",
+    "zh": "当前视图条目"
+  },
+  "Todo state": {
+    "en": "Todo state",
+    "zh": "待办状态"
+  },
+  "Done": {
+    "en": "Done",
+    "zh": "已完成"
+  },
+  "Try again": {
+    "en": "Try again",
+    "zh": "重试"
+  },
+  "Loading…": {
+    "en": "Loading…",
+    "zh": "正在加载…"
+  },
+  "Gity": {
+    "en": "Gity",
+    "zh": "Gity"
+  },
+  "Code Canvas": {
+    "en": "Code Canvas",
+    "zh": "代码画布"
+  },
+  "Loading project…": {
+    "en": "Loading project…",
+    "zh": "正在加载项目…"
+  },
+  "Heartbeat received recently": {
+    "en": "Heartbeat received recently",
+    "zh": "最近已收到心跳"
+  },
+  "Needs runner attention": {
+    "en": "Needs runner attention",
+    "zh": "Runner 需要检查"
+  },
+  "Eligible to claim jobs": {
+    "en": "Eligible to claim jobs",
+    "zh": "可领取作业"
+  },
+  "Runner token generated": {
+    "en": "Runner token generated",
+    "zh": "已生成 Runner 令牌"
+  },
+  "Releases": {
+    "en": "Releases",
+    "zh": "发布"
+  },
+  "Release management is read-only": {
+    "en": "Release management is read-only",
+    "zh": "发布管理为只读"
+  },
+  "Page": {
+    "en": "Page",
+    "zh": "页码"
+  },
+  "Page size": {
+    "en": "Page size",
+    "zh": "每页条数"
+  },
+  "Prev": {
+    "en": "Prev",
+    "zh": "上一页"
+  },
+  "Next": {
+    "en": "Next",
+    "zh": "下一页"
+  },
+  "Repository workspace": {
+    "en": "Repository workspace",
+    "zh": "仓库工作区"
+  },
+  "‹› Browse code": {
+    "en": "‹› Browse code",
+    "zh": "‹› 浏览代码"
+  },
+  "▤ README": {
+    "en": "▤ README",
+    "zh": "▤ README"
+  },
+  "View source →": {
+    "en": "View source →",
+    "zh": "查看源码 →"
+  },
+  "No README found": {
+    "en": "No README found",
+    "zh": "未找到 README"
+  },
+  "Open repository files": {
+    "en": "Open repository files",
+    "zh": "打开仓库文件"
+  },
+  "Repository pulse": {
+    "en": "Repository pulse",
+    "zh": "仓库动态"
+  },
+  "Current project activity": {
+    "en": "Current project activity",
+    "zh": "当前项目动态"
+  },
+  "8": {
+    "en": "8",
+    "zh": "8"
+  },
+  "Recent commits": {
+    "en": "Recent commits",
+    "zh": "最近提交"
+  },
+  "View all": {
+    "en": "View all",
+    "zh": "查看全部"
+  },
+  "◇": {
+    "en": "◇",
+    "zh": "◇"
+  },
+  "Loading permissions…": {
+    "en": "Loading permissions…",
+    "zh": "正在加载权限…"
+  },
+  "Administrator access is required.": {
+    "en": "Administrator access is required.",
+    "zh": "需要管理员权限。"
+  },
+  "Select a user before adding a project member.": {
+    "en": "Select a user before adding a project member.",
+    "zh": "请先选择要添加的项目成员。"
+  }
+}

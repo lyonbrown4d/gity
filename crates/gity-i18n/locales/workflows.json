@@ -1,0 +1,31 @@
+{
+  "_version": 2,
+  "Loading configuration…": {
+    "en": "Loading configuration…",
+    "zh": "正在加载配置…"
+  },
+  "Protected CI variables are available only when this configuration matches .gity-ci.yml at the pinned protected branch or tag.": {
+    "en": "Protected CI variables are available only when this configuration matches .gity-ci.yml at the pinned protected branch or tag.",
+    "zh": "仅当配置与指定受保护分支或标签提交中的 .gity-ci.yml 完全一致时，才会注入受保护的 CI 变量。"
+  },
+  "No repository configuration loaded; edit the YAML template before running.": {
+    "en": "No repository configuration loaded; edit the YAML template before running.",
+    "zh": "未加载仓库配置；请编辑 YAML 模板后运行。"
+  },
+  "Pipeline editor · .gity-ci.yml": {
+    "en": "Pipeline editor · .gity-ci.yml",
+    "zh": "流水线编辑器 · .gity-ci.yml"
+  },
+  "Validate YAML": {
+    "en": "Validate YAML",
+    "zh": "校验 YAML"
+  },
+  "Rust routing and authentication": {
+    "en": "Rust routing and authentication",
+    "zh": "Rust 路由与认证"
+  },
+  "Themed Rust components": {
+    "en": "Themed Rust components",
+    "zh": "适配主题的 Rust 组件"
+  }
+}

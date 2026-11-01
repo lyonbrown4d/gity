@@ -1,0 +1,183 @@
+{
+  "_version": 2,
+  "CI YAML must use UTF-8": {
+    "en": "CI YAML must use UTF-8",
+    "zh": "CI YAML 必须使用 UTF-8 编码"
+  },
+  "CI configuration exceeds 1 MiB": {
+    "en": "CI configuration exceeds 1 MiB",
+    "zh": "CI 配置不能超过 1 MiB"
+  },
+  "CI configuration requires 1–200 jobs": {
+    "en": "CI configuration requires 1–200 jobs",
+    "zh": "CI 配置必须包含 1 至 200 个任务"
+  },
+  "CI resource not found": {
+    "en": "CI resource not found",
+    "zh": "未找到 CI 资源"
+  },
+  "CI stages must be nonempty and unique": {
+    "en": "CI stages must be nonempty and unique",
+    "zh": "CI 阶段名称不能为空或重复"
+  },
+  "CI supports .gity-ci.yml YAML only": {
+    "en": "CI supports .gity-ci.yml YAML only",
+    "zh": "CI 仅支持 .gity-ci.yml YAML 配置"
+  },
+  "Git input missing": {
+    "en": "Git input missing",
+    "zh": "缺少 Git 输入流"
+  },
+  "Git update command limit exceeded": {
+    "en": "Git update command limit exceeded",
+    "zh": "Git 更新命令超出限制"
+  },
+  "administrator required": {
+    "en": "administrator required",
+    "zh": "需要管理员权限"
+  },
+  "artifact exceeds 64 MiB": {
+    "en": "artifact exceeds 64 MiB",
+    "zh": "产物不能超过 64 MiB"
+  },
+  "artifact file_name must be a single safe filename": {
+    "en": "artifact file_name must be a single safe filename",
+    "zh": "产物名称必须是安全的单个文件名"
+  },
+  "artifact not found": {
+    "en": "artifact not found",
+    "zh": "未找到产物"
+  },
+  "artifact paths must be relative without traversal or wildcards": {
+    "en": "artifact paths must be relative without traversal or wildcards",
+    "zh": "产物必须使用相对路径，不能包含路径跳转或通配符"
+  },
+  "attachment exceeds 15 MiB": {
+    "en": "attachment exceeds 15 MiB",
+    "zh": "附件不能超过 15 MiB"
+  },
+  "attachment file_name and content are required": {
+    "en": "attachment file_name and content are required",
+    "zh": "必须提供附件文件名和内容"
+  },
+  "attachment not found": {
+    "en": "attachment not found",
+    "zh": "未找到附件"
+  },
+  "branch name required": {
+    "en": "branch name required",
+    "zh": "必须提供分支名称"
+  },
+  "cannot access another user's credentials": {
+    "en": "cannot access another user's credentials",
+    "zh": "不能访问其他用户的凭据"
+  },
+  "cannot change another user": {
+    "en": "cannot change another user",
+    "zh": "不能修改其他用户"
+  },
+  "cannot delete default branch": {
+    "en": "cannot delete default branch",
+    "zh": "不能删除默认分支"
+  },
+  "ci variable key is invalid": {
+    "en": "ci variable key is invalid",
+    "zh": "CI 变量名称无效"
+  },
+  "ci variable value is too large": {
+    "en": "ci variable value is too large",
+    "zh": "CI 变量值过大"
+  },
+  "counter missing": {
+    "en": "counter missing",
+    "zh": "缺少编号计数器"
+  },
+  "cyclic CI job dependencies": {
+    "en": "cyclic CI job dependencies",
+    "zh": "CI 任务依赖存在循环"
+  },
+  "database has already been adopted or migrated": {
+    "en": "database has already been adopted or migrated",
+    "zh": "数据库已经接管或迁移"
+  },
+  "database.node_id must be 0–1023": {
+    "en": "database.node_id must be 0–1023",
+    "zh": "database.node_id 必须在 0 至 1023 之间"
+  },
+  "deploy key public key is invalid": {
+    "en": "deploy key public key is invalid",
+    "zh": "部署密钥的公钥无效"
+  },
+  "each CI job requires a name and nonempty script": {
+    "en": "each CI job requires a name and nonempty script",
+    "zh": "每个 CI 任务必须提供名称和非空脚本"
+  },
+  "endpoint not found": {
+    "en": "endpoint not found",
+    "zh": "未找到接口"
+  },
+  "existing Go database detected; use migrate --adopt-go after backup and schema verification": {
+    "en": "existing Go database detected; use migrate --adopt-go after backup and schema verification",
+    "zh": "检测到已有 Go 数据库，请备份并核对结构后使用 migrate --adopt-go"
+  },
+  "file is required": {
+    "en": "file is required",
+    "zh": "必须提供文件"
+  },
+  "file_name is required": {
+    "en": "file_name is required",
+    "zh": "必须提供文件名"
+  },
+  "http.address must be an IP address and port": {
+    "en": "http.address must be an IP address and port",
+    "zh": "http.address 必须包含 IP 地址和端口"
+  },
+  "insufficient organization permissions": {
+    "en": "insufficient organization permissions",
+    "zh": "组织权限不足"
+  },
+  "insufficient project permissions": {
+    "en": "insufficient project permissions",
+    "zh": "项目权限不足"
+  },
+  "integer required": {
+    "en": "integer required",
+    "zh": "必须提供整数"
+  },
+  "invalid CI container image": {
+    "en": "invalid CI container image",
+    "zh": "CI 容器镜像无效"
+  },
+  "invalid CI field": {
+    "en": "invalid CI field",
+    "zh": "CI 字段无效"
+  },
+  "invalid CI integer": {
+    "en": "invalid CI integer",
+    "zh": "CI 整数字段无效"
+  },
+  "invalid CI row": {
+    "en": "invalid CI row",
+    "zh": "CI 数据记录无效"
+  },
+  "invalid CI variable key": {
+    "en": "invalid CI variable key",
+    "zh": "CI 变量名称无效"
+  },
+  "invalid CODEOWNERS content": {
+    "en": "invalid CODEOWNERS content",
+    "zh": "CODEOWNERS 内容无效"
+  },
+  "invalid CODEOWNERS encoding": {
+    "en": "invalid CODEOWNERS encoding",
+    "zh": "CODEOWNERS 编码无效"
+  },
+  "invalid Git content type": {
+    "en": "invalid Git content type",
+    "zh": "Git 请求的内容类型无效"
+  },
+  "invalid artifact base64": {
+    "en": "invalid artifact base64",
+    "zh": "产物的 Base64 编码无效"
+  }
+}

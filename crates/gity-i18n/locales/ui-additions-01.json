@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Attach a file": {
+    "en": "Attach a file",
+    "zh": "添加附件"
+  },
+  "File": {
+    "en": "File",
+    "zh": "文件"
+  },
+  "Upload attachment": {
+    "en": "Upload attachment",
+    "zh": "上传附件"
+  },
+  "Paste this link into your comment:": {
+    "en": "Paste this link into your comment:",
+    "zh": "将此链接粘贴到评论中："
+  },
+  "◇ Repository pulse": {
+    "en": "◇ Repository pulse",
+    "zh": "◇ 仓库动态"
+  },
+  "▥ Languages": {
+    "en": "▥ Languages",
+    "zh": "▥ 编程语言"
+  },
+  "↻": {
+    "en": "↻",
+    "zh": "↻"
+  },
+  "Match case": {
+    "en": "Match case",
+    "zh": "区分大小写"
+  },
+  "Regular expression": {
+    "en": "Regular expression",
+    "zh": "正则表达式"
+  },
+  "Search": {
+    "en": "Search",
+    "zh": "搜索"
+  },
+  "‹›": {
+    "en": "‹›",
+    "zh": "‹›"
+  },
+  "Source workspace": {
+    "en": "Source workspace",
+    "zh": "代码工作区"
+  },
+  "＋ Create file": {
+    "en": "＋ Create file",
+    "zh": "＋ 新建文件"
+  },
+  "▤ Project files": {
+    "en": "▤ Project files",
+    "zh": "▤ 项目文件"
+  },
+  "README not found.": {
+    "en": "README not found.",
+    "zh": "未找到 README。"
+  },
+  "Create file": {
+    "en": "Create file",
+    "zh": "新建文件"
+  },
+  "Saved successfully.": {
+    "en": "Saved successfully.",
+    "zh": "保存成功。"
+  },
+  "Type ": {
+    "en": "Type ",
+    "zh": "输入 "
+  },
+  " to confirm": {
+    "en": " to confirm",
+    "zh": " 以确认"
+  },
+  "Select…": {
+    "en": "Select…",
+    "zh": "请选择…"
+  },
+  "No labels": {
+    "en": "No labels",
+    "zh": "暂无标签"
+  },
+  "Any label": {
+    "en": "Any label",
+    "zh": "全部标签"
+  },
+  "Unlabeled": {
+    "en": "Unlabeled",
+    "zh": "无标签"
+  },
+  "Any assignee": {
+    "en": "Any assignee",
+    "zh": "全部负责人"
+  },
+  "Unassigned": {
+    "en": "Unassigned",
+    "zh": "未指派"
+  },
+  "Clear filters": {
+    "en": "Clear filters",
+    "zh": "清除筛选"
+  },
+  "Create an issue": {
+    "en": "Create an issue",
+    "zh": "创建议题"
+  },
+  "Assign to user (optional)": {
+    "en": "Assign to user (optional)",
+    "zh": "指派用户（可选）"
+  },
+  "Git LFS": {
+    "en": "Git LFS",
+    "zh": "Git LFS"
+  },
+  "Inspect stored LFS objects and manage project file locks.": {
+    "en": "Inspect stored LFS objects and manage project file locks.",
+    "zh": "查看已存储的 LFS 对象并管理项目文件锁。"
+  },
+  "LFS locks are read-only": {
+    "en": "LFS locks are read-only",
+    "zh": "LFS 文件锁为只读"
+  },
+  "LFS endpoint": {
+    "en": "LFS endpoint",
+    "zh": "LFS 地址"
+  },
+  "G_": {
+    "en": "G_",
+    "zh": "G_"
+  },
+  "ADMIN SIDE": {
+    "en": "ADMIN SIDE",
+    "zh": "管理端"
+  },
+  "PLATFORM": {
+    "en": "PLATFORM",
+    "zh": "平台"
+  },
+  "Wiki is read-only": {
+    "en": "Wiki is read-only",
+    "zh": "Wiki 为只读"
+  },
+  "Open Inbox": {
+    "en": "Open Inbox",
+    "zh": "打开收件箱"
+  },
+  "Recent Projects": {
+    "en": "Recent Projects",
+    "zh": "最近项目"
+  },
+  "Fast access to the repositories you can operate.": {
+    "en": "Fast access to the repositories you can operate.",
+    "zh": "快速访问你有权限操作的仓库。"
+  },
+  "View all →": {
+    "en": "View all →",
+    "zh": "查看全部 →"
+  },
+  "Workspace / My Projects": {
+    "en": "Workspace / My Projects",
+    "zh": "工作区 / 我的项目"
+  },
+  "＋ New Project": {
+    "en": "＋ New Project",
+    "zh": "＋ 新建项目"
+  },
+  "Choose the namespace that owns the projects.": {
+    "en": "Choose the namespace that owns the projects.",
+    "zh": "选择项目所属的命名空间。"
+  },
+  "Namespace key": {
+    "en": "Namespace key",
+    "zh": "命名空间标识"
+  },
+  "Available projects": {
+    "en": "Available projects",
+    "zh": "可用项目"
+  },
+  "Project directory": {
+    "en": "Project directory",
+    "zh": "项目目录"
+  },
+  "Open →": {
+    "en": "Open →",
+    "zh": "打开 →"
+  },
+  "Package Registry": {
+    "en": "Package Registry",
+    "zh": "软件包注册表"
+  },
+  "Publish generic project artifacts and inspect package versions.": {
+    "en": "Publish generic project artifacts and inspect package versions.",
+    "zh": "发布通用项目产物并查看软件包版本。"
+  },
+  "Package registry is read-only": {
+    "en": "Package registry is read-only",
+    "zh": "软件包注册表为只读"
+  }
+}

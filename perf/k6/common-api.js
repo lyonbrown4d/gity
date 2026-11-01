@@ -1,25 +1,15 @@
 import http from 'k6/http';
-import { check, group, sleep } from 'k6';
+import { group, sleep } from 'k6';
+import { request, expect, unwrapJSON, asArray, nestedStringField, nestedField, stringField, numericField, uniqueKey, int64 } from './api-support.js';
+import { createFile, identityAndProjectReads, repositoryReads, collaborationReads, contentRegistryReads, ciRunnerReads, lfsAuditReads, lightWrites } from './api-groups.js';
+import { CI_CONFIG } from './api-config.js';
 
 const BASE_URL = (__ENV.GITY_K6_BASE_URL || __ENV.K6_BASE_URL || 'http://127.0.0.1:18080').replace(/\/+$/, '');
-const API_URL = `${BASE_URL}/api/v1`;
 const VUS = Number(__ENV.GITY_K6_VUS || __ENV.K6_VUS || 8);
 const DURATION = __ENV.GITY_K6_DURATION || __ENV.K6_DURATION || '30s';
 const P95_MS = Number(__ENV.GITY_K6_P95_MS || __ENV.K6_P95_MS || 1000);
 const WRITE_PERCENT = Number(__ENV.GITY_K6_WRITE_PERCENT || __ENV.K6_WRITE_PERCENT || 12);
-const DEBUG_FAILURES = (__ENV.GITY_K6_DEBUG_FAILURES || __ENV.K6_DEBUG_FAILURES || '').toLowerCase() === 'true';
 
-const CI_CONFIG = `pipeline {
-  name = "perf"
-}
-
-stage smoke {
-  tags = ["linux"]
-  run {
-    shell("echo perf")
-  }
-}
-`;
 
 export const options = {
   scenarios: {
@@ -48,8 +38,8 @@ export function setup() {
   }));
   const token = stringField(session, 'token');
   const username = stringField(session, 'username') || `${marker}-owner`;
-  const userID = numericField(session, 'user_id', 'id');
-  if (!token || userID <= 0) {
+  const userID = stringField(session, 'user_id', 'id');
+  if (!token || !/^\d+$/.test(userID)) {
     throw new Error(`login did not return token/user_id: ${JSON.stringify(session)}`);
   }
 
@@ -58,7 +48,6 @@ export function setup() {
     organization = unwrapJSON(request('POST', '/orgs', token, 'POST /api/v1/orgs', {
       key: `${marker}-org`,
       path_key: `${marker}-org`,
-      owner_user_id: userID,
       name: `Perf ${marker}`,
       description: 'Created by k6 performance setup',
       visibility: 'private',
@@ -70,7 +59,7 @@ export function setup() {
   }
 
   const project = unwrapJSON(request('POST', '/projects', token, 'POST /api/v1/projects', {
-    organization_id: organizationID,
+    organization_id: int64(organizationID),
     key: `${marker}-project`,
     path_key: `${marker}-project`,
     name: `Perf ${marker}`,
@@ -112,7 +101,7 @@ export function setup() {
     description: 'Merge request seeded by k6 performance setup',
     source_branch: mrBranch,
     target_branch: defaultBranch,
-    author_user_id: userID,
+    author_user_id: int64(userID),
   }));
   const mergeIID = numericField(mergeRequest, 'iid', 'number') || 1;
   request('POST', `/projects/${projectID}/merge-requests/${mergeIID}/comments`, token, 'POST /api/v1/projects/:id/merge-requests/:iid/comments', {
@@ -125,7 +114,7 @@ export function setup() {
     title: 'Home',
     content: `# ${marker}\n\nWiki page seeded by k6.\n`,
     format: 'markdown',
-    author_user_id: userID,
+    author_user_id: int64(userID),
   });
 
   const packageFile = unwrapJSON(request('POST', `/projects/${projectID}/packages/files`, token, 'POST /api/v1/projects/:id/packages/files', {
@@ -198,7 +187,6 @@ export function setup() {
     runnerToken,
   };
 }
-
 export default function (data) {
   const roll = Math.random() * 100;
   if (roll < 16) {
@@ -219,201 +207,4 @@ export default function (data) {
     expect(http.get(`${data.baseURL}/api/health`, { tags: { name: 'GET /api/health' } }), 'GET /api/health', [200]);
   }
   sleep(0.1 + Math.random() * 0.7);
-}
-
-function identityAndProjectReads(data) {
-  request('GET', '/users/me', data.token, 'GET /api/v1/users/me');
-  request('GET', '/users', data.token, 'GET /api/v1/users');
-  request('GET', '/orgs', data.token, 'GET /api/v1/orgs');
-  request('GET', `/orgs/${data.organizationID}`, data.token, 'GET /api/v1/orgs/:id');
-  request('GET', `/orgs/${data.organizationID}/members`, data.token, 'GET /api/v1/orgs/:id/members');
-  request('GET', '/projects', data.token, 'GET /api/v1/projects');
-  request('GET', `/projects/${data.projectID}`, data.token, 'GET /api/v1/projects/:id');
-  request('GET', `/projects/${data.projectID}/permissions`, data.token, 'GET /api/v1/projects/:id/permissions');
-  request('GET', `/projects/${data.projectID}/members`, data.token, 'GET /api/v1/projects/:id/members');
-}
-
-function repositoryReads(data) {
-  const branch = encodeURIComponent(data.defaultBranch);
-  request('GET', `/projects/${data.projectID}/repository/branches`, data.token, 'GET /api/v1/projects/:id/repository/branches');
-  request('GET', `/projects/${data.projectID}/repository/branch-protections`, data.token, 'GET /api/v1/projects/:id/repository/branch-protections');
-  request('GET', `/projects/${data.projectID}/repository/commits?branch_name=${branch}&limit=20`, data.token, 'GET /api/v1/projects/:id/repository/commits');
-  request('GET', `/projects/${data.projectID}/repository/tree?branch_name=${branch}&limit=50`, data.token, 'GET /api/v1/projects/:id/repository/tree');
-  request('GET', `/projects/${data.projectID}/repository/blob?branch_name=${branch}&path=README.md`, data.token, 'GET /api/v1/projects/:id/repository/blob');
-  request('GET', `/projects/${data.projectID}/repository/readme?branch_name=${branch}`, data.token, 'GET /api/v1/projects/:id/repository/readme');
-  request('GET', `/projects/${data.projectID}/repository/search?branch_name=${branch}&query=perf&limit=20`, data.token, 'GET /api/v1/projects/:id/repository/search');
-  request('GET', `/projects/${data.projectID}/languages?branch_name=${branch}`, data.token, 'GET /api/v1/projects/:id/languages');
-}
-
-function collaborationReads(data) {
-  request('GET', `/projects/${data.projectID}/issues`, data.token, 'GET /api/v1/projects/:id/issues');
-  request('GET', `/projects/${data.projectID}/issues/${data.issueIID}`, data.token, 'GET /api/v1/projects/:id/issues/:iid');
-  request('GET', `/projects/${data.projectID}/issues/${data.issueIID}/comments`, data.token, 'GET /api/v1/projects/:id/issues/:iid/comments');
-  request('GET', `/projects/${data.projectID}/issues/${data.issueIID}/assignees`, data.token, 'GET /api/v1/projects/:id/issues/:iid/assignees');
-  request('GET', `/projects/${data.projectID}/issues/${data.issueIID}/labels`, data.token, 'GET /api/v1/projects/:id/issues/:iid/labels');
-  request('GET', `/projects/${data.projectID}/merge-requests`, data.token, 'GET /api/v1/projects/:id/merge-requests');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}/diff`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid/diff');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}/checks`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid/checks');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}/participants`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid/participants');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}/comments`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid/comments');
-  request('GET', `/projects/${data.projectID}/merge-requests/${data.mergeIID}/approvals`, data.token, 'GET /api/v1/projects/:id/merge-requests/:iid/approvals');
-  request('GET', `/projects/${data.projectID}/merge-request-approval-rules`, data.token, 'GET /api/v1/projects/:id/merge-request-approval-rules');
-}
-
-function contentRegistryReads(data) {
-  request('GET', `/projects/${data.projectID}/wiki/pages`, data.token, 'GET /api/v1/projects/:id/wiki/pages');
-  request('GET', `/projects/${data.projectID}/wiki/pages/${encodeURIComponent(data.wikiSlug)}`, data.token, 'GET /api/v1/projects/:id/wiki/pages/:slug');
-  request('GET', `/projects/${data.projectID}/packages`, data.token, 'GET /api/v1/projects/:id/packages');
-  if (data.packageID) request('GET', `/projects/${data.projectID}/packages/${data.packageID}`, data.token, 'GET /api/v1/projects/:id/packages/:package_id');
-  if (data.packageFileID) {
-    request('GET', `/projects/${data.projectID}/packages/files/${data.packageFileID}`, data.token, 'GET /api/v1/projects/:id/packages/files/:file_id');
-    request('GET', `/projects/${data.projectID}/packages/files/${data.packageFileID}/download`, data.token, 'GET /api/v1/projects/:id/packages/files/:file_id/download');
-  }
-  request('GET', `/projects/${data.projectID}/packages/generic/${data.genericPackageName}/0.1.0/data.txt`, data.token, 'GET /api/v1/projects/:id/packages/generic/:name/:version/:file');
-  request('GET', `/projects/${data.projectID}/packages/pypi/simple`, data.token, 'GET /api/v1/projects/:id/packages/pypi/simple');
-  request('GET', `/projects/${data.projectID}/packages/nuget/index.json`, data.token, 'GET /api/v1/projects/:id/packages/nuget/index.json');
-}
-
-function ciRunnerReads(data) {
-  request('GET', `/projects/${data.projectID}/pipelines`, data.token, 'GET /api/v1/projects/:id/pipelines');
-  if (data.pipelineID) {
-    request('GET', `/projects/${data.projectID}/pipelines/${data.pipelineID}`, data.token, 'GET /api/v1/projects/:id/pipelines/:pipeline_id');
-    request('GET', `/projects/${data.projectID}/pipelines/${data.pipelineID}/jobs`, data.token, 'GET /api/v1/projects/:id/pipelines/:pipeline_id/jobs');
-  }
-  request('GET', `/projects/${data.projectID}/jobs`, data.token, 'GET /api/v1/projects/:id/jobs');
-  const jobID = data.pipelineJobID || data.manualJobID;
-  if (jobID) {
-    request('GET', `/projects/${data.projectID}/jobs/${jobID}`, data.token, 'GET /api/v1/projects/:id/jobs/:job_id');
-    request('GET', `/projects/${data.projectID}/jobs/${jobID}/trace?offset=0&limit=4096`, data.token, 'GET /api/v1/projects/:id/jobs/:job_id/trace');
-    request('GET', `/projects/${data.projectID}/jobs/${jobID}/artifacts`, data.token, 'GET /api/v1/projects/:id/jobs/:job_id/artifacts');
-  }
-  request('GET', `/projects/${data.projectID}/runners`, data.token, 'GET /api/v1/projects/:id/runners');
-  request('GET', `/projects/${data.projectID}/ci/variables`, data.token, 'GET /api/v1/projects/:id/ci/variables');
-  if (data.runnerToken) {
-    request('POST', '/runners/heartbeat', null, 'POST /api/v1/runners/heartbeat', { token: data.runnerToken });
-    request('POST', '/runners/jobs/claim', null, 'POST /api/v1/runners/jobs/claim', { token: data.runnerToken, lease_seconds: 30 });
-  }
-}
-
-function lfsAuditReads(data) {
-  request('GET', `/projects/${data.projectID}/lfs/objects?limit=20`, data.token, 'GET /api/v1/projects/:id/lfs/objects');
-  request('GET', `/projects/${data.projectID}/lfs/locks?limit=20`, data.token, 'GET /api/v1/projects/:id/lfs/locks');
-  request('GET', `/projects/${data.projectID}/audit-events?limit=20`, data.token, 'GET /api/v1/projects/:id/audit-events');
-}
-
-function lightWrites(data) {
-  const suffix = uniqueKey(`vu${__VU}-it${__ITER}`);
-  request('POST', `/projects/${data.projectID}/issues`, data.token, 'POST /api/v1/projects/:id/issues', {
-    title: `Perf write ${suffix}`,
-    description: 'Issue created by k6 light write workload',
-  });
-  request('POST', `/projects/${data.projectID}/issues/${data.issueIID}/comments`, data.token, 'POST /api/v1/projects/:id/issues/:iid/comments', { body: `Perf comment ${suffix}` });
-  request('PATCH', `/projects/${data.projectID}/wiki/pages/${encodeURIComponent(data.wikiSlug)}`, data.token, 'PATCH /api/v1/projects/:id/wiki/pages/:slug', {
-    title: 'Home',
-    content: `# Home\n\nUpdated by ${suffix}.\n`,
-    editor_user_id: data.userID,
-  });
-  request('POST', `/projects/${data.projectID}/ci/lint`, data.token, 'POST /api/v1/projects/:id/ci/lint', { config_content: CI_CONFIG });
-  request('POST', `/projects/${data.projectID}/lfs/locks`, data.token, 'POST /api/v1/projects/:id/lfs/locks', { path: `assets/${suffix}.bin` });
-}
-
-function createFile(token, projectID, branchName, filePath, content, username) {
-  request('POST', `/projects/${projectID}/repository/files`, token, 'POST /api/v1/projects/:id/repository/files', {
-    branch_name: branchName,
-    path: filePath,
-    content,
-    message: `Add ${filePath}`,
-    author_name: username,
-    author_email: `${username}@local.gity`,
-  });
-}
-
-function request(method, path, token, name, body, expectedStatuses = [200, 201, 204], extraHeaders = {}) {
-  const requestBody = body == null ? null : typeof body === 'string' ? body : JSON.stringify(body);
-  const headers = Object.assign({}, extraHeaders);
-  if (!headers['Content-Type'] && body != null) headers['Content-Type'] = 'application/json';
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = http.request(method, `${API_URL}${path}`, requestBody, { headers, tags: { name } });
-  expect(response, name, expectedStatuses);
-  return response;
-}
-
-function expect(response, name, expectedStatuses) {
-  const ok = expectedStatuses.indexOf(response.status) >= 0;
-  check(response, { [`${name} status`]: () => ok });
-  if (!ok && DEBUG_FAILURES) console.error(`${name} failed with ${response.status}: ${String(response.body || '').slice(0, 500)}`);
-}
-
-function unwrapJSON(response) {
-  return unwrap(parseJSON(response));
-}
-
-function parseJSON(response) {
-  try {
-    return response.json();
-  } catch (_) {
-    return null;
-  }
-}
-
-function unwrap(value) {
-  let current = value;
-  for (let index = 0; index < 4; index += 1) {
-    if (!current || typeof current !== 'object') return current;
-    if ('data' in current && ('code' in current || 'message' in current)) {
-      current = current.data;
-      continue;
-    }
-    if ('body' in current) {
-      current = current.body;
-      continue;
-    }
-    if ('Body' in current) {
-      current = current.Body;
-      continue;
-    }
-    return current;
-  }
-  return current;
-}
-
-function asArray(value) {
-  if (Array.isArray(value)) return value;
-  if (!value || typeof value !== 'object') return [];
-  for (const key of ['items', 'projects', 'organizations', 'users', 'packages', 'jobs', 'pipelines', 'runners', 'variables', 'rules']) {
-    if (Array.isArray(value[key])) return value[key];
-  }
-  return [];
-}
-
-function nestedField(value, path) {
-  let current = value;
-  for (const key of path) {
-    if (!current || typeof current !== 'object') return undefined;
-    current = current[key];
-  }
-  return current;
-}
-
-function nestedStringField(value, path) {
-  const item = nestedField(value, path);
-  return item === undefined || item === null ? '' : String(item);
-}
-
-function stringField(value, ...names) {
-  if (!value || typeof value !== 'object') return '';
-  for (const name of names) {
-    if (value[name] !== undefined && value[name] !== null && value[name] !== '') return String(value[name]);
-  }
-  return '';
-}
-
-function numericField(value, ...names) {
-  const parsed = Number(stringField(value, ...names));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function uniqueKey(prefix) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

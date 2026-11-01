@@ -1,0 +1,195 @@
+{
+  "_version": 2,
+  "split user/admin": {
+    "en": "split user/admin",
+    "zh": "用户/管理分离"
+  },
+  "Adding...": {
+    "en": "Adding...",
+    "zh": "添加中..."
+  },
+  "Wiki": {
+    "en": "Wiki",
+    "zh": "维基"
+  },
+  "Maintain project wiki pages with markdown content.": {
+    "en": "Maintain project wiki pages with markdown content.",
+    "zh": "维护项目 Wiki 页面和 Markdown 内容。"
+  },
+  "Your current project role can inspect wiki pages, but cannot edit them.": {
+    "en": "Your current project role can inspect wiki pages, but cannot edit them.",
+    "zh": "你当前的项目角色可以查看 Wiki 页面，但不能编辑。"
+  },
+  "Wiki pages": {
+    "en": "Wiki pages",
+    "zh": "Wiki 页面"
+  },
+  "Selected page": {
+    "en": "Selected page",
+    "zh": "当前页面"
+  },
+  "Format": {
+    "en": "Format",
+    "zh": "格式"
+  },
+  "New wiki page": {
+    "en": "New wiki page",
+    "zh": "新建 Wiki 页面"
+  },
+  "Hide new wiki page form": {
+    "en": "Hide new wiki page form",
+    "zh": "收起新建 Wiki 页面表单"
+  },
+  "Wiki page title": {
+    "en": "Wiki page title",
+    "zh": "Wiki 页面标题"
+  },
+  "Getting Started": {
+    "en": "Getting Started",
+    "zh": "快速开始"
+  },
+  "Slug optional": {
+    "en": "Slug optional",
+    "zh": "Slug（可选）"
+  },
+  "Author user ID": {
+    "en": "Author user ID",
+    "zh": "作者用户 ID"
+  },
+  "Wiki page title is required": {
+    "en": "Wiki page title is required",
+    "zh": "Wiki 页面标题不能为空"
+  },
+  "Author user ID is required": {
+    "en": "Author user ID is required",
+    "zh": "作者用户 ID 不能为空"
+  },
+  "Creating wiki page...": {
+    "en": "Creating wiki page...",
+    "zh": "Wiki 页面创建中..."
+  },
+  "Create wiki page": {
+    "en": "Create wiki page",
+    "zh": "创建 Wiki 页面"
+  },
+  "Loading wiki pages...": {
+    "en": "Loading wiki pages...",
+    "zh": "Wiki 页面加载中..."
+  },
+  "No wiki pages found.": {
+    "en": "No wiki pages found.",
+    "zh": "暂无 Wiki 页面。"
+  },
+  "Not edited yet": {
+    "en": "Not edited yet",
+    "zh": "尚未编辑"
+  },
+  "Last edited by": {
+    "en": "Last edited by",
+    "zh": "最后编辑者"
+  },
+  "Editor user ID": {
+    "en": "Editor user ID",
+    "zh": "编辑者用户 ID"
+  },
+  "Editor user ID must be a positive number": {
+    "en": "Editor user ID must be a positive number",
+    "zh": "编辑者用户 ID 必须为正数"
+  },
+  "Saving wiki page...": {
+    "en": "Saving wiki page...",
+    "zh": "Wiki 页面保存中..."
+  },
+  "Save wiki page": {
+    "en": "Save wiki page",
+    "zh": "保存 Wiki 页面"
+  },
+  "Select or create a wiki page.": {
+    "en": "Select or create a wiki page.",
+    "zh": "请选择或创建 Wiki 页面。"
+  },
+  "Delete wiki page \"{title}\"?": {
+    "en": "Delete wiki page \"%{title}\"?",
+    "zh": "确认删除 Wiki 页面“%{title}”？"
+  },
+  "Runners": {
+    "en": "Runners",
+    "zh": "运行器"
+  },
+  "Register external runners and inspect project runner health.": {
+    "en": "Register external runners and inspect project runner health.",
+    "zh": "注册外部 Runner 并查看项目 Runner 健康状态。"
+  },
+  "Registered runners": {
+    "en": "Registered runners",
+    "zh": "已注册 Runner"
+  },
+  "Online runners": {
+    "en": "Online runners",
+    "zh": "在线 Runner"
+  },
+  "Active runners": {
+    "en": "Active runners",
+    "zh": "启用 Runner"
+  },
+  "Runner token": {
+    "en": "Runner token",
+    "zh": "Runner Token"
+  },
+  "Copy this token now. It is only shown after registration.": {
+    "en": "Copy this token now. It is only shown after registration.",
+    "zh": "请立即复制该 token，它只会在注册后显示一次。"
+  },
+  "Register runner": {
+    "en": "Register runner",
+    "zh": "注册 Runner"
+  },
+  "Hide runner form": {
+    "en": "Hide runner form",
+    "zh": "收起 Runner 表单"
+  },
+  "Runner name": {
+    "en": "Runner name",
+    "zh": "Runner 名称"
+  },
+  "Runner tags": {
+    "en": "Runner tags",
+    "zh": "Runner 标签"
+  },
+  "Runner description optional": {
+    "en": "Runner description optional",
+    "zh": "Runner 描述（可选）"
+  },
+  "Runner name is required": {
+    "en": "Runner name is required",
+    "zh": "Runner 名称不能为空"
+  },
+  "Registering runner...": {
+    "en": "Registering runner...",
+    "zh": "Runner 注册中..."
+  },
+  "Loading runners...": {
+    "en": "Loading runners...",
+    "zh": "Runner 加载中..."
+  },
+  "No runners registered.": {
+    "en": "No runners registered.",
+    "zh": "暂无 Runner。"
+  },
+  "Your current project role can inspect runners, but cannot register or delete them.": {
+    "en": "Your current project role can inspect runners, but cannot register or delete them.",
+    "zh": "你当前的项目角色可以查看 Runner，但不能注册或删除 Runner。"
+  },
+  "No heartbeat yet": {
+    "en": "No heartbeat yet",
+    "zh": "尚无心跳"
+  },
+  "Delete runner \"{name}\"?": {
+    "en": "Delete runner \"%{name}\"?",
+    "zh": "确认删除 Runner “%{name}”？"
+  },
+  "Runner protocol": {
+    "en": "Runner protocol",
+    "zh": "Runner 协议"
+  }
+}

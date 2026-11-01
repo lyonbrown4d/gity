@@ -1,0 +1,183 @@
+{
+  "_version": 2,
+  "invalid artifact storage key": {
+    "en": "invalid artifact storage key",
+    "zh": "产物存储键无效"
+  },
+  "invalid attachment object key": {
+    "en": "invalid attachment object key",
+    "zh": "附件对象键无效"
+  },
+  "invalid baseline table": {
+    "en": "invalid baseline table",
+    "zh": "迁移基准表无效"
+  },
+  "invalid branch pattern": {
+    "en": "invalid branch pattern",
+    "zh": "分支匹配规则无效"
+  },
+  "invalid configuration; check configuration field types and required settings": {
+    "en": "invalid configuration; check configuration field types and required settings",
+    "zh": "配置无效，请检查字段类型和必填项"
+  },
+  "invalid content_base64": {
+    "en": "invalid content_base64",
+    "zh": "content_base64 编码无效"
+  },
+  "invalid counter": {
+    "en": "invalid counter",
+    "zh": "计数器类型无效"
+  },
+  "invalid cursor": {
+    "en": "invalid cursor",
+    "zh": "分页游标无效"
+  },
+  "invalid expires_at": {
+    "en": "invalid expires_at",
+    "zh": "过期时间无效"
+  },
+  "invalid field": {
+    "en": "invalid field",
+    "zh": "字段无效"
+  },
+  "invalid file": {
+    "en": "invalid file",
+    "zh": "文件无效"
+  },
+  "invalid id": {
+    "en": "invalid id",
+    "zh": "标识无效"
+  },
+  "invalid issue_id": {
+    "en": "invalid issue_id",
+    "zh": "议题标识无效"
+  },
+  "invalid job variable key": {
+    "en": "invalid job variable key",
+    "zh": "任务变量名称无效"
+  },
+  "invalid lfs JSON": {
+    "en": "invalid lfs JSON",
+    "zh": "LFS JSON 内容无效"
+  },
+  "invalid lfs request body": {
+    "en": "invalid lfs request body",
+    "zh": "LFS 请求体无效"
+  },
+  "invalid limit": {
+    "en": "invalid limit",
+    "zh": "数量限制无效"
+  },
+  "invalid lock id": {
+    "en": "invalid lock id",
+    "zh": "锁标识无效"
+  },
+  "invalid lock path": {
+    "en": "invalid lock path",
+    "zh": "锁定路径无效"
+  },
+  "invalid membership role": {
+    "en": "invalid membership role",
+    "zh": "成员角色无效"
+  },
+  "invalid migration encoding": {
+    "en": "invalid migration encoding",
+    "zh": "数据库迁移文件编码无效"
+  },
+  "invalid multipart body": {
+    "en": "invalid multipart body",
+    "zh": "分段表单请求体无效"
+  },
+  "invalid or expired credentials": {
+    "en": "invalid or expired credentials",
+    "zh": "凭据无效或已过期"
+  },
+  "invalid organization": {
+    "en": "invalid organization",
+    "zh": "组织无效"
+  },
+  "invalid package modification timestamp": {
+    "en": "invalid package modification timestamp",
+    "zh": "软件包修改时间无效"
+  },
+  "invalid packet length": {
+    "en": "invalid packet length",
+    "zh": "Git 数据包长度无效"
+  },
+  "invalid path_key": {
+    "en": "invalid path_key",
+    "zh": "路径标识无效"
+  },
+  "invalid persisted CI job payload": {
+    "en": "invalid persisted CI job payload",
+    "zh": "已保存的 CI 任务数据无效"
+  },
+  "invalid pipeline dependencies": {
+    "en": "invalid pipeline dependencies",
+    "zh": "流水线依赖无效"
+  },
+  "invalid pipeline id": {
+    "en": "invalid pipeline id",
+    "zh": "流水线标识无效"
+  },
+  "invalid project": {
+    "en": "invalid project",
+    "zh": "项目无效"
+  },
+  "invalid project token": {
+    "en": "invalid project token",
+    "zh": "项目令牌无效"
+  },
+  "invalid protected branch access level": {
+    "en": "invalid protected branch access level",
+    "zh": "受保护分支的访问级别无效"
+  },
+  "invalid refresh token": {
+    "en": "invalid refresh token",
+    "zh": "刷新令牌无效"
+  },
+  "invalid released_at": {
+    "en": "invalid released_at",
+    "zh": "发布时间无效"
+  },
+  "invalid repository path": {
+    "en": "invalid repository path",
+    "zh": "仓库路径无效"
+  },
+  "invalid runner token": {
+    "en": "invalid runner token",
+    "zh": "Runner 令牌无效"
+  },
+  "invalid search refresh interval or index limits": {
+    "en": "invalid search refresh interval or index limits",
+    "zh": "搜索刷新间隔或索引限制无效"
+  },
+  "invalid storage key": {
+    "en": "invalid storage key",
+    "zh": "存储键无效"
+  },
+  "invalid storage path": {
+    "en": "invalid storage path",
+    "zh": "存储路径无效"
+  },
+  "invalid update command": {
+    "en": "invalid update command",
+    "zh": "Git 更新命令无效"
+  },
+  "invalid user": {
+    "en": "invalid user",
+    "zh": "用户无效"
+  },
+  "invalid user identifier": {
+    "en": "invalid user identifier",
+    "zh": "用户标识无效"
+  },
+  "invalid username or password": {
+    "en": "invalid username or password",
+    "zh": "用户名或密码错误"
+  },
+  "invalid visibility": {
+    "en": "invalid visibility",
+    "zh": "可见性设置无效"
+  }
+}

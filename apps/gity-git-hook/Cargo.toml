@@ -1,0 +1,13 @@
+[package]
+name = "gity-git-hook"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+gity-git = { path = "../../crates/gity-git" }
+
+[dev-dependencies]
+tokio.workspace = true
+tempfile.workspace = true

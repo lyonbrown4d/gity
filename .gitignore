@@ -79,7 +79,6 @@ Temporary Items
 .env
 .env.production
 data
-.pnpm-store
 *.log
 .tmp-e2e
 bin/
@@ -88,5 +87,7 @@ coverage.out
 /dist/
 
 node_modules/
-packages/
 .tmp-perf/
+/target/
+/apps/gity-web/dist/
+/deploy/integration/gity.local.toml

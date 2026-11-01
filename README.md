@@ -1,226 +1,74 @@
 # Gity
 
-Gity is a lightweight Git hosting platform moving to a Go-first backend with a TypeScript frontend.
+Gity 是轻量 Git 托管与协作平台。`main` 已统一为 Rust 服务端、Runner 和 Web，后续开发以 Rust 主线为准；Linux x86_64 本机验收已完成。
 
-This repository now uses a single Go module for the backend runtime and keeps the frontend in the existing TypeScript stack.
+原版代表页面的视觉与功能核对已完成。主分支已清理旧 Go、React 实现和旧构建配置，并完成清理后的 Linux x86_64 本机复验；其他架构、PowerShell 发布脚本及完整生产备份恢复流程尚未实测。
 
-## Current Backend Baseline
+## 技术与目录
 
-- Go backend runtime with `arcgolabs/dix`
-- Typed HTTP surface with `arcgolabs/httpx` + Fiber + Swagger/OpenAPI
-- Authentication foundation through `arcgolabs/authx`
-- Configuration loading through `arcgolabs/configx`
-- Logging through `arcgolabs/logx`
-- Application metadata/version through `internal/debug` and injected `dix.AppMeta`
-- Database foundation through `arcgolabs/dbx` repository mode
-- Snowflake `int64` IDs generated through `dbx`
-- Dedicated migration runtime with versioned schema tracking in `schema_migrations`
-- Git process boundary through native `git` subprocesses
-- Git read model through `go-git`
-- Current business chains online:
-  - `organization -> project -> project member`
-  - `project -> repository -> branch/protection/commit/tree/blob`
-  - `project -> issue -> comment/attachment/assignee/label`
-  - `project -> merge request -> reviewer/assignee/approval/comment/check`
-  - `project -> pipeline -> job -> trace/artifact/runner`
-  - `project -> package/wiki/release/LFS/credential/audit`
+- `apps/gity-server`：Axum HTTP 服务、Clap 命令行、FluxDI 依赖装配、Swagger UI。
+- `apps/gity-web`：Leptos WebAssembly 页面，Cargo/Trunk 构建。
+- `apps/gity-runner`：独立 Runner，支持容器和本机 Shell 执行。
+- `apps/gity-git-hook`：原生 Git 更新钩子适配器。
+- `apps/gity-search-index`：持久化仓库索引构建工具。
+- `crates/gity-core`：类型化配置、数据库迁移、存储、ID 和请求语言上下文。
+- `crates/gity-git`：git2/libgit2 仓库操作与原生 Git 流式协议。
+- `crates/gity-search`：Tantivy 索引与提交版本校验。
+- `crates/gity-i18n`：前后端共享的中英文资产。
+- `migrations`：SQLite、PostgreSQL、MySQL 版本化 SQL。
+- `xtask`：Rust 构建、第三方资产校验与源码规模检查。
 
-The old Rust backend has been removed so the repository can move forward on one backend stack.
+Web 应用逻辑使用 Rust，Monaco 和 Milkdown 作为带许可证与校验值的本地第三方静态资产复用，不依赖生产 CDN 或 Node 构建链。
 
-## Repository Layout
+## 本机运行
 
-| Path | Responsibility |
-| --- | --- |
-| `cmd/server` | API server entrypoint |
-| `cmd/migration` | database migration entrypoint |
-| `cmd/search-index` | offline repository code search index rebuild utility |
-| `cmd/worker` | background worker entrypoint |
-| `cmd/runner` | external project runner agent entrypoint |
-| `cmd/standalone` | single-process migration + server + worker entrypoint using `dix` subapps |
-| `internal/config` | runtime settings and config loading |
-| `internal/debug` | build metadata and dix app meta provider |
-| `internal/domain` | domain models and events |
-| `internal/application` | application services and ports |
-| `internal/infrastructure` | auth, db, persistence, storage, logging, worker, and git adapters |
-| `internal/interfaces/http` | HTTP endpoint modules |
-| `internal/layout` | reusable `dix` application composition for server, worker, and standalone |
-| `web` | frontend app |
+需要 `rust-toolchain.toml` 指定的 Rust 工具链、原生 Git 和 Trunk：
 
-## Quick Start
-
-### 1. Prerequisites
-
-- Go 1.27.1+
-- Git
-- Docker Desktop or a compatible Docker runtime
-- Node.js + pnpm for the frontend
-
-### 2. Configure environment
-
-```bash
-cp .env.example .env
+```sh
+rustup show
+cargo install trunk --version 0.21.14 --locked
+cargo xtask web
+cargo run -p gity-server -- standalone
 ```
 
-The current backend defaults to sqlite for the rewrite bootstrap, so Docker is optional for now.
-`GITY_DATABASE__NODE_ID` controls the Snowflake node id used by `dbx`.
-`GITY_STORAGE__ROOT` controls where issue attachments are stored on local disk.
+打开 `http://localhost:8080`。Swagger UI 为 `/docs`，OpenAPI JSON 为 `/openapi.json`，进程健康检查为 `/api/health`。
 
-### 3. Run database migrations
+默认使用本地 SQLite 和对象目录。`standalone` 先迁移数据库，再启动 HTTP 服务及后台调度；分开执行时使用 `migrate`、`serve` 和 `worker` 子命令。`serve` 本身也包含后台调度，不需要额外 worker 才能运行流水线。
 
-Separate server and worker processes do not manage schema. Run migrations explicitly before starting them:
+配置优先级为内置默认值、可选 `config/gity.toml`、`--config` 指定文件、`GITY_*` 环境变量。支持 TOML 和 YAML，示例见 [config/gity.example.yaml](config/gity.example.yaml) 与 [.env.example](.env.example)。
 
-```bash
-go run ./cmd/migration
+```sh
+cargo run -p gity-server -- --config config/gity.example.yaml standalone
 ```
 
-For local single-process usage, `cmd/standalone` runs migration first and then starts server and worker:
+## Docker 与数据库支持
 
-```bash
-go run ./cmd/standalone
+[集成环境](deploy/integration/README.md)提供 PostgreSQL、MySQL、SeaweedFS S3 及可选 Prometheus、Tempo、Grafana、OTLP Collector。
+
+数据结构以最新 Rust schema 为准，需要空数据库初始化，不提供旧 Go 数据库接管或旧存储格式兼容。
+
+```sh
+docker compose up -d
 ```
 
-After initial data load or bulk repository imports, refresh code search indexes with:
+生产部署入口见[部署说明](docs/production-deployment.md)。Dockerfile 使用 Rust 多阶段构建，并提供 server、runner、search-index 三个目标。
 
-```bash
-go run ./cmd/search-index
-go run ./cmd/search-index --project-id 123
+## 验证
+
+```sh
+cargo xtask source-check
+cargo xtask vendor-check
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo check -p gity-web --target wasm32-unknown-unknown --locked
+cargo xtask release
 ```
 
-### 4. Run the backend
+原版代表页面的浏览器视觉与功能对照已完成。压力测试已取消，未执行吞吐量或性能曲线测试。迁移状态及平台边界见[迁移与验证](docs/rust-migration.md)。
 
-```bash
-go run ./cmd/server
-```
+## CI 与共享语言资产
 
-Current backend defaults:
+流水线只读取 `.gity-ci.yml`，不再使用自定义 DSL。配置示例见 [CI YAML](docs/ci-yaml.md)。
 
-- API: `http://localhost:8080/api`
-- Health: `http://localhost:8080/api/health`
-- Swagger UI: `http://localhost:8080/docs`
-- OpenAPI: `http://localhost:8080/openapi.json`
-- Database: local sqlite file from `GITY_DATABASE__DSN`
-
-If you run into `curl ...:8080` connection-refused immediately after seeing `server started`, check `GITY_HTTP__ADDRESS`:
-
-- For local host execution, `127.0.0.1:8080` is fine.
-- For containerized or cross-shell execution, prefer `:8080` so the process binds all interfaces.
-
-### 5. Run the frontend
-
-```bash
-cp web/.env.example web/.env
-pnpm -C web install
-pnpm -C web dev
-```
-
-## Current API Scaffold
-
-Base URL: `http://localhost:8080/api`
-
-System:
-- `GET /health`
-- `GET /v1/rewrite/info`
-
-Users:
-- `GET /v1/users`
-- `GET /v1/users/{id}`
-- `POST /v1/users`
-- `GET /v1/users/{id}/tokens`
-- `POST /v1/users/{id}/tokens`
-
-Organizations:
-- `GET /v1/orgs`
-- `GET /v1/orgs/{id}`
-- `POST /v1/orgs`
-- `GET /v1/orgs/{id}/members`
-- `POST /v1/orgs/{id}/members`
-
-Projects:
-- `GET /v1/projects`
-- `GET /v1/projects/{id}`
-- `POST /v1/projects`
-- `GET /v1/projects/{id}/repository/branches`
-- `GET /v1/projects/{id}/repository/commits`
-- `GET /v1/projects/{id}/repository/tree`
-- `GET /v1/projects/{id}/repository/blob`
-- `GET /v1/projects/{id}/repository/readme`
-
-Issues:
-- `GET /v1/projects/{id}/issues`
-- `GET /v1/projects/{id}/issues/{issue_iid}`
-- `POST /v1/projects/{id}/issues`
-- `PATCH /v1/projects/{id}/issues/{issue_iid}`
-- `GET /v1/projects/{id}/issues/{issue_iid}/comments`
-- `POST /v1/projects/{id}/issues/{issue_iid}/comments`
-- `GET /v1/projects/{id}/issues/{issue_iid}/attachments`
-- `POST /v1/projects/{id}/issues/{issue_iid}/attachments`
-- `GET /v1/projects/{id}/issues/{issue_iid}/attachments/{attachment_id}`
-
-Git Smart HTTP:
-- `/<organization>/<project>.git/info/refs?service=git-upload-pack`
-- `/<organization>/<project>.git/git-upload-pack`
-- `/<organization>/<project>.git/info/refs?service=git-receive-pack`
-- `/<organization>/<project>.git/git-receive-pack`
-
-## Development Notes
-
-Useful checks:
-
-```bash
-go test ./...
-```
-
-Architecture notes for the Go rewrite live in [docs/GO_REWRITE_ARCHITECTURE.md](docs/GO_REWRITE_ARCHITECTURE.md).
-The product domain target lives in [docs/gitlab-like-domain-model.md](docs/gitlab-like-domain-model.md).
-
-## Beta Release
-
-GitHub Actions runs CI on `main` and pull requests. A release is created only when a SemVer tag is pushed:
-
-Before tagging, run the beta release gate:
-
-```powershell
-.\scripts\release-check.ps1
-```
-
-If GoReleaser or UPX is not installed locally, run the backend and frontend checks locally and let GitHub Actions run the package snapshot:
-
-```powershell
-.\scripts\release-check.ps1 -SkipGoReleaser
-```
-
-```bash
-git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
-```
-
-The release workflow uses GoReleaser to publish GitHub Release artifacts, per-component Linux packages, checksums, and Docker images.
-
-Published binaries:
-
-- `gity-server`
-- `gity-migration`
-- `gity-search-index`
-- `gity-worker`
-- `gity-standalone`
-- `gity-runner`
-
-GitHub Release artifacts include Windows zip archives, macOS tarballs, Linux tarballs, and per-component Linux `deb`/`rpm`/`apk` packages for `gity-server`, `gity-migration`, `gity-search-index`, `gity-worker`, `gity-standalone`, and `gity-runner`. Docker images are published to GHCR as `ghcr.io/lyonbrown4d/gity-server`, `ghcr.io/lyonbrown4d/gity-migration`, `ghcr.io/lyonbrown4d/gity-search-index`, `ghcr.io/lyonbrown4d/gity-worker`, `ghcr.io/lyonbrown4d/gity-standalone`, and `ghcr.io/lyonbrown4d/gity-runner`.
-
-UPX compression is enabled for Linux and Windows release binaries before archives, packages, and Docker images are assembled. macOS binaries are intentionally left uncompressed because UPX does not reliably support modern macOS binaries.
-
-Production Docker deployment templates live in [docs/production-deployment.md](docs/production-deployment.md). Use `docker-compose.prod.yaml` with `.env.production` for split `migration/server/worker` deployments or standalone single-process deployments.
-
-Local beta smoke validation lives in [docs/beta-smoke.md](docs/beta-smoke.md).
-
-The beta release checklist lives in [docs/beta-release-checklist.md](docs/beta-release-checklist.md).
-
-Runner runtime modes and security notes are documented in [docs/runner-container-runtime.md](docs/runner-container-runtime.md).
-
-## Roadmap
-
-Detailed product and engineering planning lives in [ROADMAP.md](ROADMAP.md). It tracks the repository bootstrap, collaboration, CI/CD, package/release, and operations loops required for beta readiness.
-
-## API Examples
-
-- API interface examples (project members, MR approval rules, CI variables): [docs/api-examples.md](docs/api-examples.md)
+语言资产统一放在 `crates/gity-i18n/locales`。Web 保存用户语言偏好并发送 `Accept-Language`；服务端按请求协商语言，不修改进程全局语言。详细规则见[国际化](docs/i18n.md)。

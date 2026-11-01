@@ -1,0 +1,203 @@
+{
+  "_version": 2,
+  "Locks enabled": {
+    "en": "Locks enabled",
+    "zh": "可创建文件锁"
+  },
+  "Read only": {
+    "en": "Read only",
+    "zh": "只读"
+  },
+  "Editing enabled": {
+    "en": "Editing enabled",
+    "zh": "可编辑"
+  },
+  "Create the first wiki page to document this project.": {
+    "en": "Create the first wiki page to document this project.",
+    "zh": "创建第一个 Wiki 页面，记录项目文档。"
+  },
+  "Wiki pages will appear here after maintainers create them.": {
+    "en": "Wiki pages will appear here after maintainers create them.",
+    "zh": "维护者创建 Wiki 页面后将在此显示。"
+  },
+  "Create a wiki page or select one from the list to edit markdown content.": {
+    "en": "Create a wiki page or select one from the list to edit markdown content.",
+    "zh": "创建 Wiki 页面，或从列表选择页面以编辑 Markdown 内容。"
+  },
+  "Select a wiki page from the list to preview its content.": {
+    "en": "Select a wiki page from the list to preview its content.",
+    "zh": "从列表选择 Wiki 页面以预览内容。"
+  },
+  "Latest 100": {
+    "en": "Latest 100",
+    "zh": "最近 100 条"
+  },
+  "Upload enabled": {
+    "en": "Upload enabled",
+    "zh": "可上传"
+  },
+  "Hide upload form": {
+    "en": "Hide upload form",
+    "zh": "收起上传表单"
+  },
+  "Upload package file": {
+    "en": "Upload package file",
+    "zh": "上传软件包文件"
+  },
+  "No completed todos yet.": {
+    "en": "No completed todos yet.",
+    "zh": "暂无已完成的待办事项。"
+  },
+  "You're all caught up.": {
+    "en": "You're all caught up.",
+    "zh": "所有待办事项均已处理。"
+  },
+  "Completed items remain available for reference.": {
+    "en": "Completed items remain available for reference.",
+    "zh": "已完成事项仍可查看。"
+  },
+  "New project activity will appear here.": {
+    "en": "New project activity will appear here.",
+    "zh": "新的项目动态将在此显示。"
+  },
+  "done": {
+    "en": "done",
+    "zh": "已完成"
+  },
+  "Marking done...": {
+    "en": "Marking done...",
+    "zh": "正在标记完成…"
+  },
+  "Mark done": {
+    "en": "Mark done",
+    "zh": "标记完成"
+  },
+  "Available to this project": {
+    "en": "Available to this project",
+    "zh": "此项目可用"
+  },
+  "No capacity yet": {
+    "en": "No capacity yet",
+    "zh": "暂无可用执行资源"
+  },
+  "Admin actions enabled": {
+    "en": "Admin actions enabled",
+    "zh": "可执行管理操作"
+  },
+  "Hide release form": {
+    "en": "Hide release form",
+    "zh": "收起发布表单"
+  },
+  "New release": {
+    "en": "New release",
+    "zh": "新建发布"
+  },
+  "Hide link form": {
+    "en": "Hide link form",
+    "zh": "收起链接表单"
+  },
+  "Add asset link": {
+    "en": "Add asset link",
+    "zh": "添加资源链接"
+  },
+  "Add member": {
+    "en": "Add member",
+    "zh": "添加成员"
+  },
+  "Locking...": {
+    "en": "Locking...",
+    "zh": "正在锁定…"
+  },
+  "Create lock": {
+    "en": "Create lock",
+    "zh": "创建文件锁"
+  },
+  "Create a lock to reserve an LFS-managed path before editing.": {
+    "en": "Create a lock to reserve an LFS-managed path before editing.",
+    "zh": "编辑前创建文件锁，预留由 LFS 管理的路径。"
+  },
+  "Active file locks will appear here.": {
+    "en": "Active file locks will appear here.",
+    "zh": "生效中的文件锁将在此显示。"
+  },
+  "Password (optional)": {
+    "en": "Password (optional)",
+    "zh": "密码（可选）"
+  },
+  "Uploading package file...": {
+    "en": "Uploading package file...",
+    "zh": "正在上传软件包文件…"
+  },
+  "Upload file": {
+    "en": "Upload file",
+    "zh": "上传文件"
+  },
+  "Waiting for a runner": {
+    "en": "Waiting for a runner",
+    "zh": "等待 Runner"
+  },
+  "Queue is clear": {
+    "en": "Queue is clear",
+    "zh": "队列已清空"
+  },
+  "Currently executing": {
+    "en": "Currently executing",
+    "zh": "正在执行"
+  },
+  "No active jobs": {
+    "en": "No active jobs",
+    "zh": "暂无执行中的作业"
+  },
+  "Completed successfully": {
+    "en": "Completed successfully",
+    "zh": "已成功完成"
+  },
+  "No successful jobs yet": {
+    "en": "No successful jobs yet",
+    "zh": "暂无成功的作业"
+  },
+  "Needs attention": {
+    "en": "Needs attention",
+    "zh": "需要关注"
+  },
+  "No failures": {
+    "en": "No failures",
+    "zh": "暂无失败"
+  },
+  "Deleting...": {
+    "en": "Deleting...",
+    "zh": "正在删除…"
+  },
+  "Add an asset link for downloadable artifacts or runbooks.": {
+    "en": "Add an asset link for downloadable artifacts or runbooks.",
+    "zh": "添加资源链接，提供可下载产物或操作手册。"
+  },
+  "Asset links will appear here after they are added.": {
+    "en": "Asset links will appear here after they are added.",
+    "zh": "添加资源链接后将在此显示。"
+  },
+  "Saving release...": {
+    "en": "Saving release...",
+    "zh": "正在保存发布…"
+  },
+  "Update release": {
+    "en": "Update release",
+    "zh": "更新发布"
+  },
+  "Create release": {
+    "en": "Create release",
+    "zh": "创建发布"
+  },
+  "Create a release from an existing tag or source ref.": {
+    "en": "Create a release from an existing tag or source ref.",
+    "zh": "从现有标签或源引用创建发布。"
+  },
+  "Releases will appear here after maintainers publish them.": {
+    "en": "Releases will appear here after maintainers publish them.",
+    "zh": "维护者发布后将在此显示。"
+  },
+  "CODEOWNERS required": {
+    "en": "CODEOWNERS required",
+    "zh": "要求 CODEOWNERS 审批"
+  }
+}

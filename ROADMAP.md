@@ -1,225 +1,44 @@
-# Gity Roadmap
+# Gity 产品路线与验收状态
 
-Last updated: 2026-06-27
+## 产品方向
 
-This document tracks the active Go-first product and engineering plan. The old Rust, Java, SeaORM, and JWT rewrite notes are no longer part of the active roadmap.
+Gity 面向小团队和自托管场景，提供 Git 托管与协作能力。产品目标是让用户通过 Web 页面和常规 Git 工具完成主要工作流，而不是只提供 API。
 
-## Product Direction
+当前交付范围为 Web：服务端使用 Rust、Axum、Tokio、SeaORM，Web 使用 Rust、Leptos 和 WebAssembly；FluxDI 负责服务端组合装配。Runner、Git hook 和搜索工具也是 Rust 应用。当前不交付桌面端。
 
-Gity is a lightweight GitLab-like Git hosting platform for small teams and self-hosted deployments.
+CI 配置使用带类型校验的 YAML，仓库内默认文件为 `.gity-ci.yml`。数据库以当前 Rust 版本的版本化迁移为准；迁移程序只接受空数据库或迁移历史和校验值均匹配的 Rust 数据库，不接管旧 Go 数据库，也不转换历史 schema。
 
-- Go backend using `arcgolabs/dix`, `httpx`, `authx`, `configx`, `dbx`, and related arcgolabs libraries.
-- TypeScript frontend using refine, React, Vite, and shadcn/ui components.
-- SQL migration scripts per database dialect.
-- Git data plane backed by native Git subprocesses where protocol correctness matters.
-- Repository collaboration model based on organization, project, project member, issue, merge request, CI, package, LFS, wiki, release, credential, runner, and audit domains.
+## 产品工作流目标
 
-The product target is not API surface completeness alone. The beta target is that a human user can complete the common Git platform loops without direct API calls.
+以下是产品核心工作流。Rust 替换已完成，代表页面的视觉与功能核验已完成；各流程的已验证范围和协议边界见迁移记录：
 
-## Current Baseline
+1. **仓库起步**：创建或导入项目、配置凭据、克隆、推送，并浏览 README、代码、分支和提交。
+2. **协作**：创建 Issue、分配和标记工作、创建分支和 Merge Request、评审审批、合并并查看审计记录。
+3. **CI**：编辑并校验 YAML、创建流水线、由项目范围内 Runner 执行、查看日志和产物，并取消或重试任务。
+4. **包与发布**：发布并查看包、版本、Git 标签、Release 和关联资产。
+5. **运维**：管理用户、项目、Runner、存储和审计，并验证升级与数据恢复流程。
 
-Available now:
+## 当前实现边界
 
-- Split binaries: `gity-server`, `gity-migration`, `gity-search-index`, `gity-worker`, `gity-standalone`, `gity-runner`.
-- Standalone mode runs migration, server, and worker in one process through `dix` subapps.
-- SQL migrations for sqlite, postgres, and mysql dialect folders.
-- User, organization, organization member, project, and project member models.
-- Project-level permissions with project member override and organization member fallback.
-- Git Smart HTTP fetch/push endpoints.
-- Repository browsing: branches, commits, tree, blobs, README, language stats, and code search.
-- Branch protection with push/merge access levels, force-push/delete controls, MR requirement, and pipeline requirement.
-- Issues with comments, labels, assignees, and attachments.
-- Merge requests with diff, comments, reviewers, assignees, approvals, merge checks, and merge execution.
-- MR approval rules with branch scope, eligible approvers, and CODEOWNERS-backed ownership checks.
-- Wiki pages.
-- Git LFS object and lock management.
-- Package registry baseline with common protocol endpoints in progress.
-- Release and Git tag management with release asset links.
-- CI pipeline/job lifecycle using Plano DSL.
-- Runner registration, heartbeat, job claim, trace, artifact upload, source archive download, tag matching, masked variables, and project-scoped variables.
-- Project access tokens, deploy tokens, and deploy key storage.
-- Audit logging through asynchronous events and dbx row audit support for sensitive project operations.
-- Frontend workflows for repository overview, code, branches, issues, merge requests, wiki, packages, LFS, pipelines, jobs, runners, audit, settings, members, approval rules, CI variables, releases, and credentials.
-- GitHub Actions and GoReleaser beta release pipeline with GitHub Release artifacts and Docker images.
-- Integration, blackbox, Git client, API, and k6 pressure-test scripts.
+- 权限由服务端执行。项目角色为 `guest`、`reporter`、`developer`、`maintainer`、`owner`；项目有效角色取直接项目成员与所属组织成员角色的较高者。项目令牌按自身 scope 授权，不能借用创建者权限。
+- Git 裸仓库的物理存储名由不可变项目 ID 生成，形如 `{project_id}.git`。组织或项目路径可变，改名会更新 URL 使用的 `full_path`，不移动或重命名 Git 物理仓库。
+- 数据库支持 SQLite、PostgreSQL 和 MySQL 的当前版本迁移。新安装从空库初始化，已有 Rust 数据库须通过迁移历史及校验值验证。
+- Runner 执行来自项目配置的脚本，默认应按可信项目和可信 Runner 主机使用。密钥脱敏是尽力处理，不构成防止秘密泄露的安全边界。
+- 包注册表协议覆盖仍有限；CODEOWNERS 和审批规则并非 GitLab 全量语义。代码搜索索引和增量更新能力仍有边界。
+- 高可用、多节点部署、灾难恢复与备份恢复工具不是当前已验收能力；SSH Git、Runner 隔离也应以对应实现和验证记录为准，不能从产品目标推断完成。
 
-## Product Loops
+## 发布验收状态
 
-These loops define product readiness. A feature is not complete until the loop works from the UI or normal developer tooling.
+Rust 代码替换、遗留代码清理和 Linux x86_64 本机验收已完成。`main` 已统一使用 Rust；正式发布仍以发布工作流的实际结果为准。
 
-1. Repository bootstrap: create or import project -> create credential -> clone -> push -> browse README/code/commits.
-2. Collaboration: create issue -> assign/label -> create branch -> open MR -> review -> approve -> merge -> audit.
-3. CI/CD: register runner -> lint pipeline -> execute job -> inspect live log -> download artifact -> retry/cancel when needed.
-4. Package/release: publish package or release -> view versions/assets -> copy install command -> enforce retention/delete rules.
-5. Operations: admin reviews users/projects/runners/storage/audit -> applies settings -> verifies backup/restore and upgrade path.
+截至 2026-11-01，本机已验证 PostgreSQL 18 与 SeaweedFS 4.51 集成环境、真实 Git/SSH 双克隆操作、Runner 容器任务及产物链路；Rust Releases/Runners 页面和原版代表页面视觉对照已完成。各项范围、最终复跑状态和限制见[Rust 迁移与验证记录](docs/rust-migration.md)。
 
-## Beta Boundary
+发布前仍需完成：
 
-The beta target is self-hosted single-node usage with sqlite or a configured SQL database.
+- Linux x86_64 本机和冻结源码 server/Runner 镜像复验均已通过；正式发布前仍须由 tag 触发的 release workflow 验证发布架构。
+- 主分支变更通过 Linux x86 GitHub CI；Linux arm64 等平台由 tag 触发的 release workflow 构建验证，不能以分支 push CI 代替。
+- 完成完整生产备份与恢复流程验证。其他架构及 PowerShell 发布脚本尚未实测。
 
-Expected beta quality:
+压力测试已取消，不作为迁移或发布门槛；没有吞吐量或性能曲线实测结果。
 
-- Core Git fetch/push works through HTTP.
-- Project permissions are enforced on repository, issue, MR, CI, package, wiki, release, audit, credential, and settings APIs.
-- SQL migrations are the only schema management path.
-- Server and worker do not auto-manage schema; `gity-migration` or `gity-standalone` owns migration execution.
-- CI runner is usable for trusted projects and trusted runner hosts.
-- Frontend supports the normal repository collaboration workflow without requiring direct API calls for common tasks.
-- Empty states teach the next action instead of only saying no data exists.
-
-Explicit beta limitations:
-
-- Runner execution is trusted-host by default; container runtimes are supported as a baseline but not a complete hostile-code sandbox.
-- Firecracker support is experimental and not a complete VM runner yet.
-- Runner secret masking is best-effort string redaction, not a formal secret-leak prevention boundary.
-- CODEOWNERS support covers practical path matching, section ignoring, and last-match ownership, but not every GitLab edge case.
-- Approval rules are project-level and branch-scoped, not yet group-inherited or per-target policy composed.
-- Package registry protocol coverage is baseline and not fully ecosystem-compatible yet.
-- Code search has an index baseline, but ranking and incremental invalidation are still early.
-- SSH Git transport is not yet a beta requirement; stored deploy keys are preparation for SSH/deploy workflows.
-- HA deployment, backup/restore tooling, and disaster recovery are documented goals, not beta requirements.
-
-## Milestones
-
-### Milestone 1: Beta Stabilization
-
-Status: in progress
-
-Scope:
-
-- Full `go test ./...`, frontend typecheck/build, release check script, and blackbox smoke before beta tag.
-- Smoke data, local beta smoke documentation, and beta release checklist.
-- ROADMAP, README, deployment docs, and API examples aligned with current binaries and SQL migrations.
-- Confirm sqlite local setup, split-process setup, and standalone setup.
-- Fix high-signal lint issues without `nolint` escape hatches.
-- Keep pressure-test scripts cross-platform and runnable through Node/PowerShell.
-
-Exit criteria:
-
-- Local `gity-standalone` can migrate and boot cleanly.
-- A user can create org/project, push repository data, create issue, open MR, approve, merge, run pipeline, and inspect audit events.
-- GitHub release workflow produces expected artifacts from a beta tag.
-
-### Milestone 2: Product Entry and Navigation
-
-Status: in progress
-
-Scope:
-
-- Project overview that summarizes README, clone commands, recent commits, open issues, open MRs, latest pipeline, runners, packages, and audit signals.
-- Global quick jump for projects, files, issues, merge requests, and common settings.
-- First-run and empty-state guidance for creating orgs, projects, credentials, runners, and packages.
-- Credential UX that explains project access tokens, deploy tokens, deploy keys, and clone command usage.
-
-Exit criteria:
-
-- A new user can get from login to first push without reading backend docs.
-- Common project destinations are reachable through one global shortcut.
-- Every empty tab has a next action and a permission-aware explanation.
-
-### Milestone 3: Permission and Collaboration Hardening
-
-Status: in progress
-
-Scope:
-
-- Project member management UI and API workflows.
-- MR approval rule UI and branch-scoped approval operations.
-- CODEOWNERS behavior closer to GitLab semantics.
-- Protected branch merge/push enforcement through HTTP Git transport and API merge path.
-- Audit events for permission-sensitive project operations.
-- Issue filters, saved views, labels, assignees, milestones, and board-ready state transitions.
-- MR discussion model beyond flat comments.
-
-Exit criteria:
-
-- Project-level role can be managed independently of organization role.
-- MR merge status clearly reports branch protection, pipeline, approval, and CODEOWNERS blockers.
-- Frontend exposes common permission-sensitive workflows without manual API calls.
-- Users can triage issue and MR work through project-scoped views.
-
-### Milestone 4: CI Runner Security and Usability
-
-Status: in progress
-
-Scope:
-
-- Runner tag matching and project scope matching.
-- Masked and protected project CI variables.
-- Runner shell allowlist.
-- Workspace cleanup after job execution.
-- Lease expiry checks before trace, artifact, source archive, completion, and failure operations.
-- Pipeline graph, live job trace, retry/cancel controls, artifact browser, and CI lint editor.
-- Runner documentation that clearly states trusted-runner assumptions and runtime isolation choices.
-
-Exit criteria:
-
-- A runner cannot claim jobs outside its project scope.
-- A runner only claims jobs whose tags are satisfied.
-- Masked values are not returned from variable list APIs and are redacted from runner traces.
-- Runner agent refuses non-allowlisted shells by default.
-- Job workspace cleanup is enabled by default for configured runners.
-- Users can diagnose failed pipelines from the UI.
-
-### Milestone 5: Package, Release, and Automation Completeness
-
-Status: planned
-
-Scope:
-
-- More complete package registry protocols and protocol-specific install/publish snippets.
-- Release notes, assets, and tag-oriented project history.
-- Deploy keys, deploy tokens, and project access token workflows.
-- Webhook and notification foundation.
-- Todo/inbox for assigned issues, review requests, mentions, failed pipelines, and approvals needed.
-
-Exit criteria:
-
-- A small team can run common source hosting, CI, package, and release workflows fully inside Gity.
-- Admins can integrate Gity with external automation without sharing personal tokens.
-
-### Milestone 6: Production Operations
-
-Status: planned
-
-Scope:
-
-- Metrics and dashboard guide.
-- Backup and restore commands/guides.
-- Upgrade rehearsal documentation.
-- Retention policies for artifacts, packages, LFS, audit logs, and job traces.
-- Search index rebuild and repair operations.
-- Storage usage, quota, rate limit, and abuse-prevention controls.
-
-Exit criteria:
-
-- Operators have documented recovery procedures.
-- Operational data growth has configurable retention.
-- Upgrades can be rehearsed against a copied database and repository root.
-
-## Near-Term Implementation Plan
-
-High priority:
-
-- Project overview/home experience with workflow status and clone guidance.
-- Global quick jump and search entry point.
-- Credential guidance for project access tokens, deploy tokens, deploy keys, and HTTP clone commands.
-- Issue and MR triage affordances: filters, labels, assignees, merge blockers, and next-action summaries.
-- CI usability: job logs, artifacts, retry/cancel actions, runner health, variable masking explanation.
-- Release-check, integration, blackbox, and k6 pressure-test coverage for the above user loops.
-
-Medium priority:
-
-- Issue milestones and board-ready workflow states.
-- MR discussion threading and resolved/unresolved state.
-- CODEOWNERS parser coverage for escaped spaces and richer pattern edge cases.
-- Package registry protocol-specific smoke tests and install snippets.
-- Search index rebuild command hardening and incremental invalidation strategy.
-
-Deferred:
-
-- Full SSH Git transport.
-- Hostile-code runner sandbox guarantee.
-- Multi-node HA topology.
-- Full GitLab-compatible CODEOWNERS and approval inheritance model.
-- Advanced CI variable scoping by environment/protected refs/tags.
+验证记录应区分源码检查、编译、已运行测试和浏览器/部署验收；不得把某一项成功写成整体发布就绪。

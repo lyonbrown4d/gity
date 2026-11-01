@@ -1,105 +1,115 @@
+name: gity
+x-application: &application
+  image: ${GITY_SERVER_IMAGE:-gity-server:local}
+  build:
+    context: .
+    dockerfile: build/package/Dockerfile
+    target: server
+  user: "10001:10001"
+  environment: &application-env
+    GITY_DATABASE__DRIVER: postgres
+    GITY_DATABASE__DSN: postgres://gity:${GITY_DB_PASSWORD:?Set GITY_DB_PASSWORD}@postgres:5432/gity
+    GITY_HTTP__ADDRESS: 0.0.0.0:8080
+    GITY_HTTP__BASE_URL: ${GITY_BASE_URL:?Set the public GITY_BASE_URL}
+    GITY_GIT__REPO_ROOT: /var/lib/gity/repos
+    GITY_SSH__ENABLED: ${GITY_SSH_ENABLED:-false}
+    GITY_SSH__ADDRESS: 0.0.0.0:2222
+    GITY_SSH__HOST_KEY: /var/lib/gity/ssh_host_ed25519
+    GITY_SEARCH__INDEX_ROOT: /var/lib/gity/search-index
+    GITY_STORAGE__DRIVER: s3
+    GITY_STORAGE__ROOT: /var/lib/gity/storage
+    GITY_STORAGE__S3_ENDPOINT: http://seaweed:8333
+    GITY_STORAGE__S3_BUCKET: gity
+    GITY_STORAGE__S3_ACCESS_KEY: ${GITY_S3_ACCESS_KEY:?Set GITY_S3_ACCESS_KEY}
+    GITY_STORAGE__S3_SECRET_KEY: ${GITY_S3_SECRET_KEY:?Set GITY_S3_SECRET_KEY}
+    GITY_STORAGE__S3_REGION: us-east-1
+    GITY_STORAGE__S3_USE_PATH_STYLE: "true"
+    GITY_OBSERVABILITY__METRICS_ADDRESS: 0.0.0.0:9090
+    GITY_OBSERVABILITY__OTLP_ENDPOINT: ${GITY_OTLP_ENDPOINT:-}
+  volumes:
+    - app_data:/var/lib/gity
+  depends_on:
+    postgres:
+      condition: service_healthy
+    s3-ready:
+      condition: service_completed_successfully
+  restart: unless-stopped
 services:
-  mysql:
-    image: mysql:8.4
-    restart: unless-stopped
+  postgres:
+    image: postgres:18
     environment:
-      MYSQL_DATABASE: gity
-      MYSQL_USER: gity
-      MYSQL_PASSWORD: ${GITY_MYSQL_PASSWORD:-change-me-gity}
-      MYSQL_ROOT_PASSWORD: ${GITY_MYSQL_ROOT_PASSWORD:-change-me-root}
+      POSTGRES_DB: gity
+      POSTGRES_USER: gity
+      POSTGRES_PASSWORD: ${GITY_DB_PASSWORD:?Set GITY_DB_PASSWORD}
+    volumes: ["postgres_data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gity -d gity"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+  seaweed:
+    image: chrislusf/seaweedfs:4.51
+    command: [mini, -dir=/data, -ip=seaweed]
+    environment:
+      AWS_ACCESS_KEY_ID: ${GITY_S3_ACCESS_KEY:?Set GITY_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${GITY_S3_SECRET_KEY:?Set GITY_S3_SECRET_KEY}
+      S3_BUCKET: gity
+    volumes: ["seaweed_data:/data"]
+    restart: unless-stopped
+  s3-ready:
+    image: amazon/aws-cli:2.31.0
+    environment:
+      AWS_ENDPOINT_URL: http://seaweed:8333
+      AWS_ACCESS_KEY_ID: ${GITY_S3_ACCESS_KEY:?Set GITY_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${GITY_S3_SECRET_KEY:?Set GITY_S3_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
+    depends_on: [seaweed]
+    entrypoint: [/bin/sh, -ec]
     command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_0900_ai_ci
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ugity -p$${MYSQL_PASSWORD} --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - mysql_data:/var/lib/mysql
-
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${GITY_STORAGE__S3_ACCESS_KEY:-gity}
-      MINIO_ROOT_PASSWORD: ${GITY_STORAGE__S3_SECRET_KEY:-change-me-minio}
-    volumes:
-      - minio_data:/data
-
-  migration:
-    image: ghcr.io/lyonbrown4d/gity-migration:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
-    profiles: ["migration"]
-    env_file:
-      - .env.production
-    environment:
-      GITY_DATABASE__DSN: gity:${GITY_MYSQL_PASSWORD:-change-me-gity}@tcp(mysql:3306)/gity?parseTime=true&multiStatements=true
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - |
+        attempt=0
+        until aws s3api head-bucket --bucket gity; do
+          attempt=$$((attempt + 1))
+          test "$$attempt" -lt 60
+          sleep 2
+        done
     restart: "no"
-
-  server:
-    image: ghcr.io/lyonbrown4d/gity-server:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
-    restart: unless-stopped
-    env_file:
-      - .env.production
-    environment:
-      GITY_DATABASE__DSN: gity:${GITY_MYSQL_PASSWORD:-change-me-gity}@tcp(mysql:3306)/gity?parseTime=true&multiStatements=true
-    depends_on:
-      mysql:
-        condition: service_healthy
-      minio:
-        condition: service_started
-    ports:
-      - "${GITY_HTTP_PORT:-8080}:8080"
-    volumes:
-      - repo_data:/var/lib/gity/repos
-      - search_index:/var/lib/gity/search-index
+  migration:
+    <<: *application
+    command: [migrate]
+    restart: "no"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/health >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  worker:
-    image: ghcr.io/lyonbrown4d/gity-worker:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
-    restart: unless-stopped
-    env_file:
-      - .env.production
-    environment:
-      GITY_DATABASE__DSN: gity:${GITY_MYSQL_PASSWORD:-change-me-gity}@tcp(mysql:3306)/gity?parseTime=true&multiStatements=true
+      disable: true
+  server:
+    <<: *application
+    command: [serve]
     depends_on:
-      mysql:
-        condition: service_healthy
-      minio:
-        condition: service_started
-    volumes:
-      - repo_data:/var/lib/gity/repos
-      - search_index:/var/lib/gity/search-index
-
-  standalone:
-    image: ghcr.io/lyonbrown4d/gity-standalone:${GITY_IMAGE_TAG:-v0.1.0-beta.2}
-    profiles: ["standalone"]
-    restart: unless-stopped
-    env_file:
-      - .env.production
+      migration:
+        condition: service_completed_successfully
+    ports: ["127.0.0.1:${GITY_HTTP_PORT:-8080}:8080", "${GITY_SSH_BIND:-127.0.0.1}:${GITY_SSH_PORT:-2222}:2222"]
+  runner:
+    profiles: [runner]
+    image: ${GITY_RUNNER_IMAGE:-gity-runner:local}
+    build:
+      context: .
+      dockerfile: build/package/Dockerfile
+      target: runner
     environment:
-      GITY_DATABASE__DSN: gity:${GITY_MYSQL_PASSWORD:-change-me-gity}@tcp(mysql:3306)/gity?parseTime=true&multiStatements=true
+      GITY_RUNNER__SERVER_URL: http://server:8080
+      GITY_RUNNER__TOKEN: ${GITY_RUNNER_TOKEN:-}
+      GITY_RUNNER__EXECUTOR: container
+      GITY_RUNNER__WORK_ROOT: ${GITY_RUNNER_WORK_ROOT:-/srv/gity-runner}
+    # The daemon starts job containers. Mounting its socket grants host authority.
+    group_add: ["${GITY_DOCKER_GID:-999}"]
+    volumes: ["${GITY_RUNNER_WORK_ROOT:-/srv/gity-runner}:${GITY_RUNNER_WORK_ROOT:-/srv/gity-runner}", "/var/run/docker.sock:/var/run/docker.sock"]
     depends_on:
-      mysql:
+      server:
         condition: service_healthy
-      minio:
-        condition: service_started
-    ports:
-      - "${GITY_HTTP_PORT:-8080}:8080"
-    volumes:
-      - repo_data:/var/lib/gity/repos
-      - search_index:/var/lib/gity/search-index
-
+    restart: unless-stopped
 volumes:
-  mysql_data:
-  minio_data:
-  repo_data:
-  search_index:
+  postgres_data:
+  seaweed_data:
+  app_data:

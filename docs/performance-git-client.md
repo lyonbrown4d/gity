@@ -2,30 +2,30 @@
 
 The k6 workload covers REST APIs. Git clone/fetch/push needs a real Git client because Smart HTTP uses Git protocol RPCs over `info/refs`, `git-upload-pack`, and `git-receive-pack`.
 
-`scripts/git-client-stress.mjs` seeds a project through the API, creates a project access token with `read_repository` and `write_repository`, then runs concurrent real `git` subprocesses.
+The `xtask git-stress` command seeds a project through the API, creates a project access token with `read_repository` and `write_repository`, then runs concurrent real `git` subprocesses.
 
 ## Run Against The Blackbox Stack
 
 ```bash
-node scripts/git-client-stress.mjs --build --workers 4 --iterations 24
+cargo run -p xtask -- git-stress --build --workers 4 --iterations 24
 ```
 
-The script starts `docker-compose.blackbox.yaml` and keeps the server stack running. Local temporary Git worktrees are cleaned by default.
+The command starts `docker-compose.blackbox.yaml` and keeps the server stack running. Local temporary Git worktrees are cleaned by default. For a project created by the command, it revokes the access token and marks the project for deletion after the run. The generated account and organization remain in the test database for database-lifecycle cleanup.
 
 ## Run Against An Existing Server
 
 ```bash
-node scripts/git-client-stress.mjs --no-compose --base-url http://127.0.0.1:18080 --workers 8 --iterations 80
+cargo run -p xtask -- git-stress --no-compose --base-url http://127.0.0.1:18080 --workers 8 --iterations 80
 ```
 
 ## Workload Modes
 
 ```bash
-node scripts/git-client-stress.mjs --mode mixed --workers 8 --iterations 100
-node scripts/git-client-stress.mjs --mode clone --workers 4 --iterations 20
-node scripts/git-client-stress.mjs --mode fetch --workers 16 --iterations 200
-node scripts/git-client-stress.mjs --mode push --workers 4 --iterations 40
-node scripts/git-client-stress.mjs --mode ls-remote --workers 32 --iterations 500
+cargo run -p xtask -- git-stress --mode mixed --workers 8 --iterations 100
+cargo run -p xtask -- git-stress --mode clone --workers 4 --iterations 20
+cargo run -p xtask -- git-stress --mode fetch --workers 16 --iterations 200
+cargo run -p xtask -- git-stress --mode push --workers 4 --iterations 40
+cargo run -p xtask -- git-stress --mode ls-remote --workers 32 --iterations 500
 ```
 
 Mixed mode defaults to `clone=20`, `fetch=45`, `push=25`, and `ls-remote=10`. Override with `--clone-percent`, `--fetch-percent`, `--push-percent`, and `--ls-remote-percent`.
@@ -35,14 +35,14 @@ Mixed mode defaults to `clone=20`, `fetch=45`, `push=25`, and `ls-remote=10`. Ov
 If you already have a repository URL and token:
 
 ```bash
-node scripts/git-client-stress.mjs --no-compose --project-url http://127.0.0.1:18080/group/project.git --token <token> --workers 8 --iterations 80
+GITY_GIT_PERF_TOKEN=<token> cargo run -p xtask -- git-stress --no-compose --project-url http://127.0.0.1:18080/group/project.git --workers 8 --iterations 80
 ```
 
-The token is used as the password part of HTTP Basic auth. Override the username with `--token-username` if needed.
+The token is read from `GITY_GIT_PERF_TOKEN` and supplied to Git through a temporary askpass helper. Override its username with `--token-username`. The token is not placed in the repository URL or Git arguments. Existing-repository mode does not delete the supplied project or its remote branches. The askpass helper requires a Unix shell; Windows Git stress execution has not been verified.
 
 ## Proxy And Credential Helpers
 
-For localhost targets, the runner bypasses Git/HTTP proxies and clears Git credential helpers for subprocesses. This keeps blackbox runs independent from machine-level proxy settings such as `HTTP_PROXY` or Git for Windows credential manager configuration.
+For localhost targets, the runner bypasses Git/HTTP proxies and clears Git credential helpers for subprocesses. This keeps blackbox runs independent from machine-level proxy settings such as `HTTP_PROXY` or Git credential manager configuration.
 
 The server must return `WWW-Authenticate: Basic` on Git Smart HTTP authentication failures. Git clients use that challenge before retrying URL credentials for private repositories.
 
@@ -60,4 +60,4 @@ The runner prints per-operation count, failures, avg, p50, p95, and max for:
 - `fetch` for incremental `git-upload-pack` flows.
 - `push` for `git-receive-pack` flows.
 
-`--keep-workdir` preserves local worktrees for debugging. The runner never removes server-side repositories or branches.
+`--keep-workdir` preserves local worktrees for debugging. When the command creates its own project, project deletion is requested and its test token is revoked regardless of this flag. Branches pushed to an existing external project are left in place.

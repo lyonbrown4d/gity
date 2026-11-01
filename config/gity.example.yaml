@@ -1,0 +1,40 @@
+http:
+  address: 0.0.0.0:8080
+  base_url: http://localhost:8080
+database:
+  driver: sqlite
+  dsn: sqlite://data/gity.db?mode=rwc
+  node_id: 1
+git:
+  repo_root: data/repos
+  bin: git
+ssh:
+  enabled: false
+  address: 0.0.0.0:2222
+  host_key: data/ssh_host_ed25519
+  max_connections: 64
+  operation_timeout_seconds: 900
+storage:
+  driver: local
+  root: data/storage
+  s3_bucket: gity
+  s3_endpoint: http://localhost:9000
+  s3_region: us-east-1
+  s3_access_key: ""
+  s3_secret_key: ""
+  s3_use_path_style: true
+web:
+  root: dist/web
+search:
+  index_enabled: true
+  index_root: data/search-index
+  refresh_interval_seconds: 300
+  max_files_per_project: 5000
+  max_file_size_bytes: 524288
+observability:
+  service_name: gity-server
+  log_format: json
+  log_level: gity=info,tower_http=info
+  metrics_enabled: true
+  metrics_address: 127.0.0.1:9090
+  otlp_endpoint: ""

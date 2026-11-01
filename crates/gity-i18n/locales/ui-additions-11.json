@@ -1,0 +1,39 @@
+{
+  "_version": 2,
+  "Member": {
+    "en": "Member",
+    "zh": "成员"
+  },
+  "Can view and comment.": {
+    "en": "Can view and comment.",
+    "zh": "可查看并评论。"
+  },
+  "Can inspect code and issues.": {
+    "en": "Can inspect code and issues.",
+    "zh": "可查看代码和议题。"
+  },
+  "Can push branches and open merge requests.": {
+    "en": "Can push branches and open merge requests.",
+    "zh": "可推送分支并创建合并请求。"
+  },
+  "Can merge and manage repository settings.": {
+    "en": "Can merge and manage repository settings.",
+    "zh": "可合并并管理仓库设置。"
+  },
+  "Full project administration.": {
+    "en": "Full project administration.",
+    "zh": "可执行全部项目管理操作。"
+  },
+  "Project member role.": {
+    "en": "Project member role.",
+    "zh": "项目成员角色。"
+  },
+  "Use deploy tokens for Git and package pull/push flows without granting full user access.": {
+    "en": "Use deploy tokens for Git and package pull/push flows without granting full user access.",
+    "zh": "使用部署令牌执行 Git 和软件包拉取、推送流程，无需授予完整用户访问权限。"
+  },
+  "Use project tokens for API, repository and package automation scoped to this project.": {
+    "en": "Use project tokens for API, repository and package automation scoped to this project.",
+    "zh": "使用项目令牌执行仅限此项目的 API、仓库和软件包自动化任务。"
+  }
+}

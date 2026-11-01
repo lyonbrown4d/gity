@@ -1,0 +1,103 @@
+{
+  "_version": 2,
+  "CODEOWNERS optional": {
+    "en": "CODEOWNERS optional",
+    "zh": "CODEOWNERS 审批可选"
+  },
+  "Update rule": {
+    "en": "Update rule",
+    "zh": "更新规则"
+  },
+  "Create rule": {
+    "en": "Create rule",
+    "zh": "创建规则"
+  },
+  "Add": {
+    "en": "Add",
+    "zh": "添加"
+  },
+  "No merge requests yet.": {
+    "en": "No merge requests yet.",
+    "zh": "暂无合并请求。"
+  },
+  "No merge requests match these filters.": {
+    "en": "No merge requests match these filters.",
+    "zh": "没有符合筛选条件的合并请求。"
+  },
+  "Create a merge request to start branch review and merge triage.": {
+    "en": "Create a merge request to start branch review and merge triage.",
+    "zh": "创建合并请求，开始分支评审和合并处理。"
+  },
+  "Try another state, source branch, target branch, or search term.": {
+    "en": "Try another state, source branch, target branch, or search term.",
+    "zh": "请尝试其他状态、源分支、目标分支或搜索词。"
+  },
+  "You approved": {
+    "en": "You approved",
+    "zh": "你已批准"
+  },
+  "Your approval pending": {
+    "en": "Your approval pending",
+    "zh": "等待你的审批"
+  },
+  "Select branch": {
+    "en": "Select branch",
+    "zh": "选择分支"
+  },
+  "paused": {
+    "en": "paused",
+    "zh": "已暂停"
+  },
+  "Use the form above": {
+    "en": "Use the form above",
+    "zh": "使用上方表单"
+  },
+  "masked": {
+    "en": "masked",
+    "zh": "脱敏"
+  },
+  "visible": {
+    "en": "visible",
+    "zh": "可见"
+  },
+  "protected": {
+    "en": "protected",
+    "zh": "受保护"
+  },
+  "unprotected": {
+    "en": "unprotected",
+    "zh": "未受保护"
+  },
+  "No project-specific members yet.": {
+    "en": "No project-specific members yet.",
+    "zh": "暂无项目专属成员。"
+  },
+  "No members match the current filters.": {
+    "en": "No members match the current filters.",
+    "zh": "没有符合当前筛选条件的成员。"
+  },
+  "Add key": {
+    "en": "Add key",
+    "zh": "添加密钥"
+  },
+  "No deploy tokens yet.": {
+    "en": "No deploy tokens yet.",
+    "zh": "暂无部署令牌。"
+  },
+  "No project access tokens yet.": {
+    "en": "No project access tokens yet.",
+    "zh": "暂无项目访问令牌。"
+  },
+  "Production deploy": {
+    "en": "Production deploy",
+    "zh": "生产部署"
+  },
+  "Release bot": {
+    "en": "Release bot",
+    "zh": "发布机器人"
+  },
+  "open": {
+    "en": "open",
+    "zh": "开放"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "_version": 2,
+  "Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/{id}/complete, and /runners/jobs/{id}/fail.": {
+    "en": "Use the token with /runners/heartbeat, /runners/jobs/claim, /runners/jobs/%{id}/complete, and /runners/jobs/%{id}/fail.",
+    "zh": "使用 token 调用 /runners/heartbeat、/runners/jobs/claim、/runners/jobs/%{id}/complete 和 /runners/jobs/%{id}/fail。"
+  },
+  "online": {
+    "en": "online",
+    "zh": "在线"
+  },
+  "Artifact download is not available.": {
+    "en": "Artifact download is not available.",
+    "zh": "无法下载产物。"
+  },
+  "Your current project role can inspect packages, but cannot upload them.": {
+    "en": "Your current project role can inspect packages, but cannot upload them.",
+    "zh": "你当前的项目角色可以查看包，但不能上传。"
+  },
+  "Your current project role can inspect LFS, but cannot manage locks.": {
+    "en": "Your current project role can inspect LFS, but cannot manage locks.",
+    "zh": "你当前的项目角色可以查看 LFS，但不能管理锁。"
+  },
+  "Logs": {
+    "en": "Logs",
+    "zh": "日志"
+  },
+  "Retry": {
+    "en": "Retry",
+    "zh": "重试"
+  },
+  "Job detail": {
+    "en": "Job detail",
+    "zh": "任务详情"
+  },
+  "Job ID": {
+    "en": "Job ID",
+    "zh": "任务 ID"
+  },
+  "Duration": {
+    "en": "Duration",
+    "zh": "耗时"
+  },
+  "Exit code": {
+    "en": "Exit code",
+    "zh": "退出码"
+  },
+  "Reload job": {
+    "en": "Reload job",
+    "zh": "重新加载任务"
+  },
+  "Trace": {
+    "en": "Trace",
+    "zh": "输出追踪"
+  },
+  "Loading trace...": {
+    "en": "Loading trace...",
+    "zh": "日志加载中..."
+  },
+  "No trace output.": {
+    "en": "No trace output.",
+    "zh": "暂无日志输出。"
+  },
+  "Loading artifacts...": {
+    "en": "Loading artifacts...",
+    "zh": "产物加载中..."
+  },
+  "No artifacts uploaded.": {
+    "en": "No artifacts uploaded.",
+    "zh": "暂无产物。"
+  },
+  "Download": {
+    "en": "Download",
+    "zh": "下载"
+  },
+  "offline": {
+    "en": "offline",
+    "zh": "离线"
+  }
+}

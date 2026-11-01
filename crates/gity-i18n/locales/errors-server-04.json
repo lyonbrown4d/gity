@@ -1,0 +1,183 @@
+{
+  "_version": 2,
+  "protection flags must be booleans": {
+    "en": "protection flags must be booleans",
+    "zh": "分支保护开关必须为布尔值"
+  },
+  "read lfs object failed": {
+    "en": "read lfs object failed",
+    "zh": "读取 LFS 对象失败"
+  },
+  "read package request body failed": {
+    "en": "read package request body failed",
+    "zh": "读取软件包请求体失败"
+  },
+  "reference namespace not writable": {
+    "en": "reference namespace not writable",
+    "zh": "不允许写入此引用命名空间"
+  },
+  "refresh token already used": {
+    "en": "refresh token already used",
+    "zh": "刷新令牌已被使用"
+  },
+  "release already exists for tag": {
+    "en": "release already exists for tag",
+    "zh": "该标签已存在发布版本"
+  },
+  "release link not found": {
+    "en": "release link not found",
+    "zh": "未找到发布链接"
+  },
+  "release link url is invalid": {
+    "en": "release link url is invalid",
+    "zh": "发布链接地址无效"
+  },
+  "release tag not found": {
+    "en": "release tag not found",
+    "zh": "未找到发布标签"
+  },
+  "repository not found": {
+    "en": "repository not found",
+    "zh": "未找到仓库"
+  },
+  "repository operation failed": {
+    "en": "repository operation failed",
+    "zh": "仓库操作失败"
+  },
+  "repository operation not found": {
+    "en": "repository operation not found",
+    "zh": "未找到仓库操作"
+  },
+  "run_after must be RFC3339": {
+    "en": "run_after must be RFC3339",
+    "zh": "计划执行时间必须采用 RFC3339 格式"
+  },
+  "runner does not own a live lease for this job attempt": {
+    "en": "runner does not own a live lease for this job attempt",
+    "zh": "Runner 未持有此任务尝试的有效租约"
+  },
+  "runner name is required": {
+    "en": "runner name is required",
+    "zh": "必须提供 Runner 名称"
+  },
+  "runner token required": {
+    "en": "runner token required",
+    "zh": "必须提供 Runner 令牌"
+  },
+  "scalar field required": {
+    "en": "scalar field required",
+    "zh": "必须提供标量字段"
+  },
+  "script job payload must be JSON": {
+    "en": "script job payload must be JSON",
+    "zh": "脚本任务数据必须为 JSON"
+  },
+  "search indexing is disabled": {
+    "en": "search indexing is disabled",
+    "zh": "搜索索引已关闭"
+  },
+  "source_branch and target_branch must be different": {
+    "en": "source_branch and target_branch must be different",
+    "zh": "源分支和目标分支不能相同"
+  },
+  "storage path escapes root": {
+    "en": "storage path escapes root",
+    "zh": "存储路径超出根目录"
+  },
+  "stored object not found": {
+    "en": "stored object not found",
+    "zh": "未找到存储对象"
+  },
+  "supported job kinds are noop and script": {
+    "en": "supported job kinds are noop and script",
+    "zh": "任务类型仅支持 noop 和 script"
+  },
+  "tag name is required": {
+    "en": "tag name is required",
+    "zh": "必须提供标签名称"
+  },
+  "target branch does not permit merges": {
+    "en": "target branch does not permit merges",
+    "zh": "目标分支不允许合并"
+  },
+  "todo not found": {
+    "en": "todo not found",
+    "zh": "未找到待办"
+  },
+  "token does not permit writes": {
+    "en": "token does not permit writes",
+    "zh": "令牌不允许写入"
+  },
+  "token required": {
+    "en": "token required",
+    "zh": "必须提供令牌"
+  },
+  "token scope is invalid": {
+    "en": "token scope is invalid",
+    "zh": "令牌权限范围无效"
+  },
+  "token scope is required": {
+    "en": "token scope is required",
+    "zh": "必须提供令牌权限范围"
+  },
+  "too many lfs objects": {
+    "en": "too many lfs objects",
+    "zh": "LFS 对象数量过多"
+  },
+  "trace chunk exceeds 1 MiB": {
+    "en": "trace chunk exceeds 1 MiB",
+    "zh": "日志块不能超过 1 MiB"
+  },
+  "type, name, version, and file_name are required": {
+    "en": "type, name, version, and file_name are required",
+    "zh": "必须提供类型、名称、版本和文件名"
+  },
+  "unsupported Git service": {
+    "en": "unsupported Git service",
+    "zh": "不支持的 Git 服务"
+  },
+  "unsupported database": {
+    "en": "unsupported database",
+    "zh": "不支持的数据库"
+  },
+  "unsupported database driver": {
+    "en": "unsupported database driver",
+    "zh": "不支持的数据库驱动"
+  },
+  "unsupported lfs operation": {
+    "en": "unsupported lfs operation",
+    "zh": "不支持的 LFS 操作"
+  },
+  "unsupported storage driver": {
+    "en": "unsupported storage driver",
+    "zh": "不支持的存储驱动"
+  },
+  "unsupported todo state": {
+    "en": "unsupported todo state",
+    "zh": "不支持的待办状态"
+  },
+  "upload size limit exceeded": {
+    "en": "upload size limit exceeded",
+    "zh": "上传内容超出大小限制"
+  },
+  "use merge action to merge a merge request": {
+    "en": "use merge action to merge a merge request",
+    "zh": "请使用合并操作合并请求"
+  },
+  "user id must be positive": {
+    "en": "user id must be positive",
+    "zh": "用户标识必须为正整数"
+  },
+  "user_ids must be an array": {
+    "en": "user_ids must be an array",
+    "zh": "user_ids 必须为数组"
+  },
+  "username must use 1–64 letters, digits, dots, dashes or underscores": {
+    "en": "username must use 1–64 letters, digits, dots, dashes or underscores",
+    "zh": "用户名须为 1 至 64 位字母、数字、点、短横线或下划线"
+  },
+  "username required": {
+    "en": "username required",
+    "zh": "必须提供用户名"
+  }
+}

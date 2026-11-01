@@ -1,99 +1,35 @@
-# Beta Release Checklist
+# Rust Beta 发布清单
 
-This checklist is the release gate for `0.1.x` beta tags.
+`main` 已统一使用 Rust，整体替换、遗留代码清理和 Linux x86_64 本机验收已完成。正式发布仍需通过 Linux x86 CI，以及由 tag 触发的目标架构构建与发布校验。
 
-## Local Verification
+## 本机发布检查
 
-Run the release check script before creating a tag:
+使用固定 Rust 工具链、WASM target、Trunk 和 Docker 执行：
 
 ```powershell
 .\scripts\release-check.ps1
+.\scripts\blackbox-e2e.ps1
 ```
 
-The script runs:
+发布检查包括源码和第三方资产校验、格式、Clippy、workspace 测试、WASM 检查及 Rust/Trunk 发布构建。Docker smoke 检查 Rust server 镜像健康路由、OpenAPI 和 Web 根页面。清理后的 Linux 本机发布构建、workspace、严格 Clippy 及冻结源码 server/Runner 镜像复验均已通过。PowerShell 脚本本身未实测。
 
-- `go test ./...`
-- `golangci-lint run`
-- `pnpm -C web install --frozen-lockfile`
-- `pnpm -C web build`
-- `goreleaser check`
-- `goreleaser release --snapshot --clean --skip=publish,docker`
-- Optional manual beta smoke checklist review from [beta-smoke.md](beta-smoke.md)
+浏览器、SSH、S3 和 Runner 容器任务的实测范围见[迁移验证记录](rust-migration.md)。Release 支持 Release 创建、修改、删除；外部 asset link 支持创建、读取、删除，不支持更新；tag 支持创建、删除，不支持修改。
 
-Local prerequisites for the full script:
+## GitHub Actions 发布流程
 
-- Go from `go.mod`
-- pnpm
-- golangci-lint v2
-- GoReleaser v2
-- UPX
+`.github/workflows/ci.yml` 在分支推送时运行 Linux x86 CI；它不验证 ARM64。`.github/workflows/release.yml` 由 tag 触发，构建 Linux amd64/arm64 归档及 server、runner、search-index 镜像，并发布校验和。ARM64 等其他架构的验证须以发布工作流的实际结果为准。
 
-When GoReleaser or UPX is not installed locally, run the partial check and rely on GitHub Actions for the package snapshot:
+后续开发以 Rust 主线为准。主线合并不代表正式发布，不得把分支 push CI 说成 ARM64 发布通过。
 
-```powershell
-.\scripts\release-check.ps1 -SkipGoReleaser
-```
+## 发布门槛
 
-If golangci-lint is not installed locally, GitHub Actions still runs lint on pushes and tags:
+- [x] 完成代表性产品流程和权限核对。
+- [x] 完成原版代表页面视觉对照及 Release/Runners 浏览器功能验收。
+- [x] 使用真实客户端验证 SSH clone、push、pull、密钥隔离和分支保护。
+- [x] 使用 SeaweedFS 验证 S3 认证、对象字节、Range 和分段上传。
+- [x] 清理旧 Go/React 实现及旧构建发布配置；清理后 workspace 为 149 passed、0 failed、1 ignored，Runner Docker 用例单独 1 passed。
+- [x] 清理后 `cargo xtask release`、源码检查、vendor 检查、格式及 native/WASM 严格 Clippy 通过。
+- [ ] 主分支通过 Linux x86 CI；正式发布 tag 触发的发布工作流须通过全部构建与校验。
+- [ ] 在真实环境验证完整生产备份与恢复流程。
 
-```powershell
-.\scripts\release-check.ps1 -SkipGoLint -SkipGoReleaser
-```
-
-## Beta Gate Checklist (Roadmap Items 1-4)
-
-Before any beta tag:
-
-- [ ] Run `.\\scripts\\release-check.ps1 -SkipBetaSmoke` locally and confirm script exit code `0`.
-- [ ] Complete all steps in [beta-smoke.md](beta-smoke.md), including:
-  - protected branch write policy
-  - MR create -> approval -> merge
-  - pipeline lifecycle and traces
-  - audit event verification
-- [ ] Confirm runner runtime assumptions and security notes are documented in [docs/runner-container-runtime.md](docs/runner-container-runtime.md).
-- [ ] Confirm API usage examples for:
-  - [ ] `project members` lifecycle
-  - [ ] `merge-request approval rules`
-  - [ ] `CI variables` (masked behavior)
-
-## Smoke Verification
-
-Run the sqlite smoke path from [beta-smoke.md](beta-smoke.md) before tagging.
-
-Required manual checks:
-
-- `gity-standalone` runs migration, server, and worker in one process.
-- Split `gity-migration`, `gity-server`, and `gity-worker` can run with the same `.env`.
-- A user can create an organization and project.
-- HTTP Git fetch and push work through the generated project path.
-- A protected branch blocks direct writes when merge requests are required.
-- A merge request can be opened, approved, merged, and audited.
-- A runner can claim a job, append trace, upload artifact, and complete the job.
-
-## Tagging
-
-Create an annotated prerelease tag:
-
-```powershell
-git tag -a v0.1.0-beta.1 -m "v0.1.0-beta.1"
-git push origin v0.1.0-beta.1
-```
-
-GitHub Actions publishes:
-
-- GitHub Release artifacts
-- checksums
-- Linux `deb`, `rpm`, and `apk` packages for each binary
-- GHCR Docker images for `server`, `migration`, `search-index`, `worker`, `standalone`, and `runner`
-
-The release workflow installs UPX and compresses Linux and Windows binaries before packaging.
-
-## Release Notes Boundary
-
-Call this release a beta. The release notes should state these limitations:
-
-- Runner execution is trusted-host by default.
-- Firecracker executor support is experimental and not a complete VM runner yet.
-- Package registry support is a baseline, not every ecosystem protocol.
-- Search indexing is available, but ranking and incremental invalidation are still early.
-- Backup, restore, retention, and HA are not production-complete.
+压力测试已取消，不作为发布门槛；未执行吞吐量或性能曲线测试。Linux x86_64 以外平台和 PowerShell 发布脚本尚未实测。
