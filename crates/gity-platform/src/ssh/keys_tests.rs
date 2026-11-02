@@ -20,3 +20,24 @@ fn host_key_is_persisted_and_reused_without_allowing_public_file_permissions() {
     assert!(host_key(&link).is_err());
   }
 }
+
+#[test]
+fn public_key_parser_canonicalizes_comments_and_rejects_non_public_inputs() {
+  let key = PrivateKey::random(&mut rand::rng(), russh::keys::Algorithm::Ed25519).unwrap();
+  let public = key.public_key().to_openssh().unwrap();
+  let (canonical, fingerprint) = canonical_key(&format!(" {public} workstation ")).unwrap();
+  assert_eq!(canonical, public);
+  assert_eq!(
+    fingerprint,
+    key.public_key().fingerprint(HashAlg::Sha256).to_string()
+  );
+  for invalid in [
+    format!("{public}\n{public}"),
+    format!("command=\"anything\" {public}"),
+    key.to_openssh(LineEnding::LF).unwrap().to_string(),
+    "ssh-ed25519 invalid".into(),
+    "x".repeat(16385),
+  ] {
+    assert!(canonical_key(&invalid).is_err());
+  }
+}

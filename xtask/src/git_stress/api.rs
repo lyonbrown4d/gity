@@ -1,4 +1,4 @@
-use super::{Config, compose_up};
+use super::{Config, Transport, compose_up, transport};
 use anyhow::{Context, Result, bail};
 use reqwest::blocking::{Client, Response};
 use serde_json::{Value, json};
@@ -6,6 +6,8 @@ use std::{path::Path, thread, time::Duration};
 
 #[path = "api/cleanup.rs"]
 mod cleanup;
+#[path = "api/credential.rs"]
+mod credential;
 pub use cleanup::cleanup;
 
 pub struct Repository {
@@ -21,19 +23,28 @@ pub struct CleanupResources {
   organization_id: String,
   project_id: String,
   project_path: String,
-  access_token_id: String,
+  credential: Option<Credential>,
+}
+
+enum Credential {
+  AccessToken(String),
+  DeployKey(String),
 }
 
 pub fn prepare(root: &Path, config: &Config, run_id: &str) -> Result<Repository> {
   if config.compose {
-    compose_up(root, &config.project, port(&config.base_url), config.build)?;
+    compose_up(root, config, port(&config.base_url))?;
     wait_for_server(&config.base_url, &config.project, root)?;
   }
   if !config.project_url.is_empty() {
-    let token = std::env::var(&config.token_env)
-      .with_context(|| format!("set {} for existing repository mode", config.token_env))?;
+    let token = if config.transport == Transport::Ssh {
+      String::new()
+    } else {
+      std::env::var(&config.token_env)
+        .with_context(|| format!("set {} for existing repository mode", config.token_env))?
+    };
     return Ok(Repository {
-      url: clean_url(&config.project_url)?,
+      url: transport::repository_url(&config.project_url, config)?,
       token,
       cleanup: None,
     });
@@ -41,13 +52,16 @@ pub fn prepare(root: &Path, config: &Config, run_id: &str) -> Result<Repository>
 
   let client = Client::builder().timeout(Duration::from_secs(20)).build()?;
   get_ok(&client, &format!("{}/api/health", config.base_url), None)?;
+  use std::io::Read;
+  let mut password = [0_u8; 32];
+  std::fs::File::open("/dev/urandom")?.read_exact(&mut password)?;
   let session = request(
     &client,
     &config.base_url,
     "POST",
     "/auth/login",
     None,
-    Some(json!({"username": format!("{run_id}-owner"), "password": "password"})),
+    Some(json!({"username": format!("{run_id}-owner"), "password": hex::encode(password)})),
   )?;
   let access_token = field(&session, &["token"]);
   let user_id = number(&session, &["user_id", "id"]);
@@ -55,36 +69,11 @@ pub fn prepare(root: &Path, config: &Config, run_id: &str) -> Result<Repository>
     bail!("login response omitted token or user id");
   }
 
-  let organizations = request(
-    &client,
-    &config.base_url,
-    "GET",
-    "/orgs",
-    Some(&access_token),
-    None,
-  )?;
-  let mut organization = array(&organizations).into_iter().next();
-  if organization.is_none() {
-    organization = Some(request(
-      &client,
-      &config.base_url,
-      "POST",
-      "/orgs",
-      Some(&access_token),
-      Some(json!({
-          "key": format!("{run_id}-org"), "path_key": format!("{run_id}-org"),
-          "name": format!("Git Perf {run_id}"),
-          "description": "Created by Rust git client stress setup", "visibility": "private"
-      })),
-    )?);
-  }
-  let organization_id = field(organization.as_ref().unwrap(), &["id"]);
-  if organization_id.is_empty() {
-    bail!("organization response omitted id");
-  }
-  let organization_id_number = organization_id
-    .parse::<i64>()
-    .context("organization ID is not a decimal i64")?;
+  // Automatic login creates a fresh account and its personal organization.
+  // Public/internal organizations may appear first in /orgs; never select them
+  // merely because the account can read them.
+  let organization_id_number = session_organization_id(&session)?;
+  let organization_id = organization_id_number.to_string();
   let project = request(
     &client,
     &config.base_url,
@@ -112,38 +101,40 @@ pub fn prepare(root: &Path, config: &Config, run_id: &str) -> Result<Repository>
   if project_id.is_empty() || project_path.is_empty() || clone_url.ends_with("/.git") {
     bail!("project response omitted id or clone URL");
   }
-  let credential = request(
-    &client,
-    &config.base_url,
-    "POST",
-    &format!("/projects/{project_id}/access-tokens"),
-    Some(&access_token),
-    Some(json!({
-        "name": format!("{run_id}-git-token"), "username": config.token_username,
-        "scopes": ["read_repository", "write_repository"], "created_by_user_id": user_id, "expires_at": ""
-    })),
-  )?;
-  let token = field(&credential, &["token"]);
-  let access_token_id = credential
-    .get("project_token")
-    .map(|value| field(value, &["id"]))
-    .unwrap_or_default();
-  if token.is_empty() || access_token_id.is_empty() {
-    bail!("project access-token response omitted token or token ID");
-  }
-  Ok(Repository {
-    url: clean_url(&clone_url)?,
-    token,
+  let mut repository = Repository {
+    url: String::new(),
+    token: String::new(),
     cleanup: Some(CleanupResources {
       base_url: config.base_url.clone(),
-      api_token: access_token,
+      api_token: access_token.clone(),
       user_id: user_id.to_string(),
       organization_id,
-      project_id,
-      project_path,
-      access_token_id,
+      project_id: project_id.clone(),
+      project_path: project_path.clone(),
+      credential: None,
     }),
-  })
+  };
+  let setup = (|| -> Result<()> {
+    repository.url = transport::project_url(config, &project_path, &clone_url)?;
+    let (token, credential) =
+      credential::issue(&client, config, &project_id, &access_token, user_id, run_id)?;
+    repository.token = token;
+    repository.cleanup.as_mut().unwrap().credential = Some(credential);
+    Ok(())
+  })();
+  if let Err(error) = setup {
+    cleanup(&repository).context("clean partial Git stress project setup")?;
+    return Err(error);
+  }
+  Ok(repository)
+}
+
+fn session_organization_id(session: &Value) -> Result<i64> {
+  field(session, &["organization_id"])
+    .parse::<i64>()
+    .ok()
+    .filter(|id| *id > 0)
+    .context("registration session omitted a positive personal organization ID")
 }
 
 pub fn request(
@@ -225,19 +216,6 @@ fn wait_for_server(base: &str, project: &str, root: &Path) -> Result<()> {
   bail!("blackbox server did not become healthy: {last_error}")
 }
 
-fn clean_url(raw: &str) -> Result<String> {
-  let mut url = url::Url::parse(raw).context("invalid project URL")?;
-  url
-    .set_username("")
-    .map_err(|_| anyhow::anyhow!("invalid URL username"))?;
-  url
-    .set_password(None)
-    .map_err(|_| anyhow::anyhow!("invalid URL password"))?;
-  url.set_query(None);
-  url.set_fragment(None);
-  Ok(url.to_string())
-}
-
 pub fn unwrap(mut value: Value) -> Value {
   for _ in 0..4 {
     if let Some(object) = value.as_object() {
@@ -257,15 +235,6 @@ pub fn unwrap(mut value: Value) -> Value {
   value
 }
 
-pub fn array(value: &Value) -> Vec<Value> {
-  if let Some(values) = value.as_array() {
-    return values.clone();
-  }
-  ["items", "organizations", "projects"]
-    .iter()
-    .find_map(|key| value.get(key)?.as_array().cloned())
-    .unwrap_or_default()
-}
 pub fn field(value: &Value, names: &[&str]) -> String {
   names
     .iter()
@@ -287,3 +256,7 @@ fn port(base: &str) -> u16 {
     .and_then(|v| v.port())
     .unwrap_or(18080)
 }
+
+#[cfg(test)]
+#[path = "api_tests.rs"]
+mod tests;

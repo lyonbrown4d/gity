@@ -1,13 +1,13 @@
 use chrono::{NaiveDateTime, Utc};
 use gity_entities::{
   auth_sessions, bootstrap_claim, organization_members, organizations, user_access_tokens,
-  user_passwords, users,
+  user_passwords, user_ssh_keys, users,
 };
 use sea_orm::{
   ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, Set, TransactionTrait,
 };
 
-use super::IdentityRepository;
+use super::{IdentityRepository, user_lock::lock_user};
 use crate::UserProfileChanges;
 
 impl IdentityRepository {
@@ -179,7 +179,15 @@ impl IdentityRepository {
 
   pub async fn delete_user_and_credentials(&self, user_id: i64) -> Result<bool, DbErr> {
     let transaction = self.connection.begin().await?;
+    if lock_user(&transaction, user_id).await?.is_none() {
+      transaction.rollback().await?;
+      return Ok(false);
+    }
     for result in [
+      user_ssh_keys::Entity::delete_many()
+        .filter(user_ssh_keys::Column::UserId.eq(user_id))
+        .exec(&transaction)
+        .await,
       auth_sessions::Entity::delete_many()
         .filter(auth_sessions::Column::UserId.eq(user_id))
         .exec(&transaction)

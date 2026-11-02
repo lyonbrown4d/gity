@@ -14,6 +14,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     .routes(utoipa_axum::routes!(diff))
     .routes(utoipa_axum::routes!(checks))
     .routes(utoipa_axum::routes!(merge))
+    .routes(utoipa_axum::routes!(execution::abort))
     .routes(utoipa_axum::routes!(
       super::mr_collaboration::comments,
       super::mr_collaboration::comment
@@ -211,70 +212,7 @@ async fn merge(
   Path((p, i)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  let authorization =
-    crate::access::project_action(&s, &h, p, ProjectAction::MergeRequestMerge).await?;
-  let actor = authorization.actor()?;
-  let project = authorization.project;
-  let _guard = lock(p).await;
-  let row = model_value(&s.collaboration.merge_request(p, i).await?);
-  if string(&row, "state") != "opened" {
-    return Err(AppError::conflict("merge request is not opened"));
-  }
-  let checks = super::checks::evaluate(&s, &project, &row).await?;
-  if checks["mergeable"] != true {
-    return Err(AppError::conflict(string(&checks, "blocking_reason")));
-  }
-  if string(&checks, "merge_access_level") == "owner" {
-    crate::access::project(&s, &h, p, 50).await?;
-  }
-  if string(&checks, "merge_access_level") == "no_one" {
-    return Err(AppError::forbidden("target branch does not permit merges"));
-  }
-  let message = if string(&b, "message").is_empty() {
-    format!(
-      "Merge branch '{}' into '{}'",
-      string(&row, "source_branch"),
-      string(&row, "target_branch")
-    )
-  } else {
-    string(&b, "message").to_owned()
-  };
-  s.git
-    .merge_branches(
-      &repository(&project),
-      gity_git::MergeBranchesInput {
-        target_branch: string(&row, "target_branch").into(),
-        source_branch: string(&row, "source_branch").into(),
-        message,
-        author_name: if string(&b, "author_name").is_empty() {
-          actor.username.clone()
-        } else {
-          string(&b, "author_name").into()
-        },
-        author_email: if string(&b, "author_email").is_empty() {
-          format!("{}@gity.local", actor.username)
-        } else {
-          string(&b, "author_email").into()
-        },
-        expected_source_sha: Some(string(&checks, "source_commit_sha").into()),
-      },
-    )
-    .await
-    .map_err(|e| AppError::conflict(e.to_string()))?;
-  // The target tip is the merge commit; without git proof the sha stays unset.
-  let target = string(&row, "target_branch");
-  let default = string(&project, "default_branch");
-  let sha = s
-    .git
-    .resolve_revision(&repository(&project), target, default)
-    .await
-    .map_err(|error| tracing::warn!(project_id=p,error=%error,"merged commit sha unavailable"))
-    .ok();
-  let result = model_value(
-    s.collaboration
-      .mark_merged(p, i, actor.user_id, sha)
-      .await?,
-  );
-  super::merge_events::merged(&s, &project, &row, &actor).await?;
-  response(view(result))
+  execution::merge(&s, &h, p, i, &b).await
 }
+#[path = "merge_execution.rs"]
+mod execution;

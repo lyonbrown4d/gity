@@ -12,7 +12,7 @@ async fn migration_uses_official_history_and_preserves_application_data() {
     )
     .await
     .unwrap();
-  assert_eq!(history.len(), 1);
+  assert_eq!(history.len(), 3);
   assert_eq!(history[0]["version"], "m20261102_000001_latest_schema");
 
   db.insert(
@@ -39,7 +39,7 @@ async fn migration_uses_official_history_and_preserves_application_data() {
     )
     .await
     .unwrap();
-  assert_eq!(history.len(), 1);
+  assert_eq!(history.len(), 3);
 }
 
 #[tokio::test]

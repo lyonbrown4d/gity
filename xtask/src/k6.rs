@@ -7,6 +7,11 @@ use std::{
   time::Duration,
 };
 
+mod summary;
+use summary::SummaryExport;
+
+const K6_IMAGE: &str = "grafana/k6:1.8.2";
+
 #[derive(Clone, Args)]
 pub struct K6Args {
   #[arg(long)]
@@ -29,14 +34,21 @@ pub struct K6Args {
   duration: String,
   #[arg(long, default_value_t = 1000)]
   p95: u32,
-  #[arg(long, default_value_t = 12)]
-  write_percent: u32,
+  #[arg(long)]
+  write_percent: Option<u32>,
+  /// Export a JSON summary to a new file; parent directory must already exist.
+  #[arg(long)]
+  summary_export: Option<PathBuf>,
   #[arg(long, default_value = "perf/k6/common-api.js")]
   script: PathBuf,
 }
 
 pub fn run(root: &Path, args: K6Args) -> Result<()> {
-  if args.vus == 0 || args.duration.is_empty() || args.p95 == 0 || args.write_percent > 100 {
+  if args.vus == 0
+    || args.duration.is_empty()
+    || args.p95 == 0
+    || args.write_percent.is_some_and(|value| value > 100)
+  {
     bail!("vus and p95 must be positive, duration non-empty, and write-percent at most 100");
   }
   let script = if args.script.is_absolute() {
@@ -47,6 +59,18 @@ pub fn run(root: &Path, args: K6Args) -> Result<()> {
   if !script.is_file() {
     bail!("k6 script does not exist: {}", script.display());
   }
+  let write_percent = args.write_percent.unwrap_or(
+    if script.file_name().is_some_and(|name| name == "git-api.js") {
+      20
+    } else {
+      12
+    },
+  );
+  let mut summary = args
+    .summary_export
+    .as_deref()
+    .map(|path| SummaryExport::prepare(root, path))
+    .transpose()?;
   let base = if args.base_url.is_empty() {
     format!("http://127.0.0.1:{}", args.port)
   } else {
@@ -59,19 +83,26 @@ pub fn run(root: &Path, args: K6Args) -> Result<()> {
   let local = !args.docker_k6 && command_exists("k6");
   if local {
     println!("Running k6 against {base}");
-    let status = Command::new("k6")
-      .current_dir(root)
-      .arg("run")
+    let mut command = Command::new("k6");
+    command.current_dir(root).arg("run");
+    if let Some(summary) = &summary {
+      summary.local(&mut command);
+    }
+    let status = command
       .arg(&script)
       .env("GITY_K6_BASE_URL", &base)
       .env("GITY_K6_VUS", args.vus.to_string())
       .env("GITY_K6_DURATION", &args.duration)
       .env("GITY_K6_P95_MS", args.p95.to_string())
-      .env("GITY_K6_WRITE_PERCENT", args.write_percent.to_string())
+      .env("GITY_K6_WRITE_PERCENT", write_percent.to_string())
       .status()
       .context("start k6")?;
+    let exported = summary.as_mut().map(SummaryExport::publish).transpose()?;
     if !status.success() {
       bail!("k6 failed with {status}");
+    }
+    if exported == Some(false) {
+      bail!("k6 produced no JSON summary");
     }
     return Ok(());
   }
@@ -93,20 +124,32 @@ pub fn run(root: &Path, args: K6Args) -> Result<()> {
   if use_host_network {
     docker.arg("--network=host");
   }
-  let status = docker
+  if let Some(summary) = &summary {
+    summary.docker_mount(&mut docker)?;
+  }
+  if std::env::var_os("GITY_K6_CONFLICTS").is_some() {
+    docker.args(["-e", "GITY_K6_CONFLICTS"]);
+  }
+  docker
     .args(["-e", &format!("GITY_K6_BASE_URL={docker_base}")])
     .args(["-e", &format!("GITY_K6_VUS={}", args.vus)])
     .args(["-e", &format!("GITY_K6_DURATION={}", args.duration)])
     .args(["-e", &format!("GITY_K6_P95_MS={}", args.p95)])
-    .args([
-      "-e",
-      &format!("GITY_K6_WRITE_PERCENT={}", args.write_percent),
-    ])
-    .args(["-v", &mount, "grafana/k6", "run", &container_script])
+    .args(["-e", &format!("GITY_K6_WRITE_PERCENT={write_percent}")])
+    .args(["-v", &mount, K6_IMAGE, "run"]);
+  if let Some(summary) = &summary {
+    summary.docker_argument(&mut docker);
+  }
+  let status = docker
+    .arg(&container_script)
     .status()
     .context("start Docker k6")?;
+  let exported = summary.as_mut().map(SummaryExport::publish).transpose()?;
   if !status.success() {
     bail!("Docker k6 failed with {status}");
+  }
+  if exported == Some(false) {
+    bail!("Docker k6 produced no JSON summary");
   }
   Ok(())
 }

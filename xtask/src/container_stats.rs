@@ -3,6 +3,7 @@ use clap::Args;
 use serde::Serialize;
 use serde_json::Value;
 use std::{
+  collections::BTreeSet,
   fs::OpenOptions,
   io::{BufRead, BufReader, Write},
   path::PathBuf,
@@ -16,12 +17,15 @@ const MAX_LINE_BYTES: usize = 1024 * 1024;
 
 #[derive(Args)]
 pub struct ContainerStatsArgs {
-  /// Docker container ID or name (never inspected for environment variables).
-  #[arg(long)]
-  container: String,
+  /// One or more Docker IDs/names, never inspected for environment variables.
+  #[arg(long, required = true, num_args = 1..=64)]
+  container: Vec<String>,
   /// Sampling window in seconds.
   #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u64).range(1..=86400))]
   duration_seconds: u64,
+  /// Stop cleanly when this initially absent file appears.
+  #[arg(long)]
+  stop_file: Option<PathBuf>,
   /// Label attached to every sample.
   #[arg(long, default_value = "idle")]
   label: String,
@@ -33,13 +37,23 @@ pub struct ContainerStatsArgs {
 #[derive(Serialize)]
 struct Sample<'a> {
   timestamp_unix: f64,
+  frame: u64,
   label: &'a str,
   stats: Value,
 }
 
 pub fn run(args: ContainerStatsArgs) -> Result<()> {
-  if args.container.is_empty() || args.container.starts_with('-') {
-    bail!("container must be a non-empty Docker ID or name");
+  if args.container.is_empty()
+    || args
+      .container
+      .iter()
+      .any(|name| name.is_empty() || name.starts_with('-'))
+    || args.container.iter().collect::<BTreeSet<_>>().len() != args.container.len()
+  {
+    bail!("containers must be distinct non-empty Docker IDs or names");
+  }
+  if args.stop_file.as_ref().is_some_and(|path| path.exists()) {
+    bail!("stop-file must not already exist");
   }
   let mut output = OpenOptions::new()
     .write(true)
@@ -53,7 +67,8 @@ pub fn run(args: ContainerStatsArgs) -> Result<()> {
     })?;
 
   let mut child = Command::new("docker")
-    .args(["stats", "--format", "{{json .}}", &args.container])
+    .args(["stats", "--format", "{{json .}}"])
+    .args(&args.container)
     .stdout(Stdio::piped())
     .stderr(Stdio::inherit())
     .spawn()
@@ -80,10 +95,19 @@ pub fn run(args: ContainerStatsArgs) -> Result<()> {
 
   let deadline = std::time::Instant::now() + Duration::from_secs(args.duration_seconds);
   let mut count = 0usize;
+  let mut frame = 0u64;
+  let mut seen = BTreeSet::new();
   let mut failure = None;
-  while std::time::Instant::now() < deadline {
+  while std::time::Instant::now() < deadline
+    && !args.stop_file.as_ref().is_some_and(|path| path.exists())
+  {
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-    match rx.recv_timeout(remaining) {
+    let wait = if args.stop_file.is_some() {
+      remaining.min(Duration::from_secs(1))
+    } else {
+      remaining
+    };
+    match rx.recv_timeout(wait) {
       Ok(Ok(line)) => {
         let line = strip_terminal_controls(&line);
         if line.iter().all(u8::is_ascii_whitespace) {
@@ -96,8 +120,19 @@ pub fn run(args: ContainerStatsArgs) -> Result<()> {
             break;
           }
         };
+        let identity = parsed["ID"].as_str().or_else(|| parsed["Name"].as_str());
+        let Some(identity) = identity else {
+          failure = Some("Docker stats sample has no container identity".into());
+          break;
+        };
+        if !seen.insert(identity.to_owned()) {
+          frame += 1;
+          seen.clear();
+          seen.insert(identity.to_owned());
+        }
         let sample = Sample {
           timestamp_unix: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs_f64(),
+          frame,
           label: &args.label,
           stats: parsed,
         };
@@ -113,7 +148,7 @@ pub fn run(args: ContainerStatsArgs) -> Result<()> {
         failure = Some(error);
         break;
       }
-      Err(RecvTimeoutError::Timeout) => break,
+      Err(RecvTimeoutError::Timeout) => continue,
       Err(RecvTimeoutError::Disconnected) => break,
     }
   }
@@ -121,6 +156,9 @@ pub fn run(args: ContainerStatsArgs) -> Result<()> {
   // End exactly this Docker CLI process and reap it before returning.
   let _ = child.kill();
   let status = child.wait().context("wait for Docker stats process")?;
+  // A reader may be blocked on a full bounded queue when the deadline fires.
+  // Dropping the receiver wakes it before joining.
+  drop(rx);
   let _ = reader.join();
   output.flush().context("flush evidence file")?;
   if let Some(error) = failure {

@@ -86,3 +86,13 @@ impl ProjectAccess {
       || self.effective_role(organization_role, false) != MembershipRole::None
   }
 }
+
+/// Validated public SSH material supplied by the transport adapter.
+#[derive(Clone, Debug)]
+pub struct PersonalSshKeyCommand {
+  pub id: i64,
+  pub user_id: i64,
+  pub title: String,
+  pub public_key: String,
+  pub fingerprint: String,
+}

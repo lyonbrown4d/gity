@@ -1,0 +1,223 @@
+{
+  "mode": "standalone",
+  "base": "debian",
+  "project": "gity-bb-final-sd-debian",
+  "checks": [
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "healthy"
+    },
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "HTTP health returned 200"
+    },
+    {
+      "name": "published-web-static-assets",
+      "status": "pass",
+      "detail": "homepage HTML; 1 JS loader(s), 1 WASM module(s), and 6 vendor assets (Monaco 0.55.1, Milkdown 7.22.2) returned non-empty resources with expected MIME types"
+    },
+    {
+      "name": "swagger-routes",
+      "status": "pass",
+      "detail": "OpenAPI contains 228 routes including tested auth, Git and package operations"
+    },
+    {
+      "name": "registration-and-login",
+      "status": "pass",
+      "detail": "registration, login, and invalid password rejection passed"
+    },
+    {
+      "name": "private-project-and-outsider-denied",
+      "status": "pass",
+      "detail": "created private project 375579657866579968; outsider cannot read it"
+    },
+    {
+      "name": "api-file-commit-read",
+      "status": "pass",
+      "detail": "committed file bytes read back exactly"
+    },
+    {
+      "name": "generic-upload-download-range-sha-conflict-tenant",
+      "status": "pass",
+      "detail": "12582912 bytes; idempotent retry; replacement conflict; exact Range and SHA-256; outsider denied"
+    },
+    {
+      "name": "ci-runner-execution",
+      "status": "pass",
+      "detail": "registered Runner completed pipeline 375579664648769536 at d175df0d8c8e865a6aed2c3186b719de599078c2"
+    },
+    {
+      "name": "http-git-clone-push-pull-outsider-denied",
+      "status": "pass",
+      "detail": "two authenticated HTTP clones exchanged exact file bytes; outsider clone was rejected"
+    },
+    {
+      "name": "ssh-clone-push-pull-bad-key-protected-branch",
+      "status": "pass",
+      "detail": "pinned host key, registered writer, unknown-key rejection, and protected push rejection passed"
+    },
+    {
+      "name": "personal-ssh-clone-push-pull",
+      "status": "pass",
+      "detail": "ordinary non-admin developer exchanged exact bytes through pinned real SSH clients; private project and SSH username isolation passed"
+    },
+    {
+      "name": "personal-ssh-live-roles-and-protection",
+      "status": "pass",
+      "detail": "existing SSH connection obeyed maintainer promotion, reporter downgrade, member removal/restoration, protected min-role, no-force, no-delete and require-MR policies"
+    },
+    {
+      "name": "personal-ssh-existing-connection-revocation",
+      "status": "pass",
+      "detail": "revocation denied a new command on the still-live ControlMaster and denied fresh SSH authentication; cross-account/private-key/cross-mode registration checks passed"
+    },
+    {
+      "name": "collaboration-issue-label-milestone",
+      "status": "pass",
+      "detail": "issue comment, assignee, project label, milestone, close/reopen and outsider denials passed"
+    },
+    {
+      "name": "collaboration-mr-review-and-merge",
+      "status": "pass",
+      "detail": "reviewer assignment, comment, approval gate, successful merge and outsider action isolation passed"
+    },
+    {
+      "name": "merge-git-success-db-failure-restart",
+      "status": "pass",
+      "detail": "project 375579734194524160 MR !2: temporary DB trigger rejected completion after Git commit 1bd30dfeafa3ce67be13b8f7a3bc5fa9c4598a8a; restart recovered that exact SHA while target remained 3550d7c134858fcc5c622dd925c511c0ec3112e7; one audit, notification and completed journal after repeated restart"
+    },
+    {
+      "name": "oci-docker-login",
+      "status": "pass",
+      "detail": "Docker authenticated with an opaque Gity access token"
+    },
+    {
+      "name": "oci-catalog-and-opaque-auth-denials",
+      "status": "pass",
+      "detail": "catalog disabled and invalid token rejected"
+    },
+    {
+      "name": "oci-real-docker-push",
+      "status": "pass",
+      "detail": "Docker pushed manifest and blobs to the Gity registry"
+    },
+    {
+      "name": "oci-project-scoped-mount-acl",
+      "status": "pass",
+      "detail": "inaccessible source fell back to 202 with a new target upload UUID; unauthorized target remained denied; project token explicitly revoked"
+    },
+    {
+      "name": "oci-scopes-revocation-private-mount-acl",
+      "status": "pass",
+      "detail": "private project denied outsider; registry-only token pulled but could not push; package-only and revoked tokens were denied; blob mounts were denied when either source-read or target-write ACL was missing"
+    },
+    {
+      "name": "oci-cold-docker-pull",
+      "status": "pass",
+      "detail": "Docker pulled fixture image sha256:3b3404256597afb4cab02a68a5211ccb58ab91eeed1e0f5738e88f121a1c9810"
+    },
+    {
+      "name": "oci-mirror-cold-pull",
+      "status": "pass",
+      "detail": "Gity resolved and cached the configured Docker Hub image"
+    },
+    {
+      "name": "oci-mirror-repeat-pull",
+      "status": "pass",
+      "detail": "repeat mirror pull returned identical image sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f"
+    },
+    {
+      "name": "oci-mirror-private-and-read-only",
+      "status": "pass",
+      "detail": "outsider pull and authenticated push were denied for the mirror project"
+    },
+    {
+      "name": "native-go-proxy-download",
+      "status": "pass",
+      "detail": "downloaded and built example.com/gity/bb-01a19ba0c96e76008fc85458263710a3@v0.1.0 with Go"
+    },
+    {
+      "name": "native-cargo-publish-install",
+      "status": "pass",
+      "detail": "published and consumed gity-bb-01a19ba0c96e76008fc85458263710a3 with Cargo"
+    },
+    {
+      "name": "native-npm-publish-install",
+      "status": "pass",
+      "detail": "published and consumed @gity-bb-01a19ba0c96e76008fc85458263710a3/fixture with npm"
+    },
+    {
+      "name": "native-pypi-upload-install",
+      "status": "pass",
+      "detail": "uploaded and installed gitybb_01a19ba0c96e76008fc85458263710a3 with Twine and pip"
+    },
+    {
+      "name": "native-maven-deploy-resolve",
+      "status": "pass",
+      "detail": "deployed and resolved org.gity.blackbox:fixture-01a19ba0c96e76008fc85458263710a3:1.0.0 with Maven"
+    },
+    {
+      "name": "native-nuget-push-restore",
+      "status": "pass",
+      "detail": "pushed and restored Gity.Bb01a19ba0c96e76008fc85458263710a3 with the .NET NuGet client"
+    },
+    {
+      "name": "compose-image-platforms",
+      "status": "pass",
+      "detail": "base=debian images=sha256:2a232a42256f70d78e3cc5d2b5d6b3276710a0de0596c145f627ecfae90282ac linux amd64,sha256:693db06c7179c2867a4e35aa5bc94c60c9a88a3a0214b4fd087ee1799fee2646 linux amd64 roles=gity=debian,uid=10001"
+    },
+    {
+      "name": "idle-container-stats",
+      "status": "pass",
+      "detail": "gity-bb-final-sd-debian-gity-1 0.52% 74.18MiB / 30.52GiB 0.24%\ngity-bb-final-sd-debian-docker-1 0.04% 282.5MiB / 30.52GiB 0.90%"
+    },
+    {
+      "name": "offline-backup-complete",
+      "status": "pass",
+      "detail": "all project containers stopped; 3 volume mappings and 2 private bind sources checksummed"
+    },
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "healthy"
+    },
+    {
+      "name": "offline-restore-object-bytes",
+      "status": "pass",
+      "detail": "5 public Generic/mirror manifest/blob reads matched exact pre-backup size/SHA256 using original owner token; outsider denied; 4 hosted OCI manifest/blob objects matched through private Angos administrative reads (public project remains mirror)"
+    },
+    {
+      "name": "offline-restore-roundtrip",
+      "status": "pass",
+      "detail": "new project preserved issue/MR records, attachment/LFS bytes, strict-pinned SSH host identity and exact Git refs; outsider reads and unknown SSH key denied"
+    },
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "healthy"
+    },
+    {
+      "name": "offline-restore-restart-object-bytes",
+      "status": "pass",
+      "detail": "5 public Generic/mirror manifest/blob reads matched exact pre-backup size/SHA256 using original owner token; outsider denied; 4 hosted OCI manifest/blob objects matched through private Angos administrative reads (public project remains mirror)"
+    },
+    {
+      "name": "offline-restore-restart",
+      "status": "pass",
+      "detail": "restored state and auth boundaries survived service restart"
+    },
+    {
+      "name": "offline-restore-fresh-container-ci",
+      "status": "pass",
+      "detail": "restored Runner/DIND executed SSH-pushed new backup-ci-restored commit e716e14201aa3ed97694848272eccf1a0b9bd031; pipeline 375580564016599040, container job 375580564016599041, exact trace marker and exit 0; outsider denied"
+    },
+    {
+      "name": "offline-restore-cleanup",
+      "status": "pass",
+      "detail": "restored target containers, networks and volumes all absent after explicit cleanup"
+    }
+  ],
+  "failure": null
+}

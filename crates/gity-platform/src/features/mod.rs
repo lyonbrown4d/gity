@@ -7,6 +7,7 @@ mod issue_views;
 mod issues;
 mod labels;
 mod merge_events;
+pub(crate) use merge_events::recover as recover_merge_operations;
 mod merge_requests;
 mod merge_views;
 mod milestones;

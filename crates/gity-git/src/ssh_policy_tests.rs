@@ -5,6 +5,7 @@ const ONE: &str = "1111111111111111111111111111111111111111";
 fn policy(rules: Vec<SshBranchRule>) -> SshPolicy {
   SshPolicy {
     default_branch: "main".into(),
+    actor_level: 30,
     rules,
   }
 }
@@ -112,6 +113,12 @@ fn exact_protection_precedes_patterns_and_patterns_use_lexical_order() {
 fn policy_environment_rejects_malformed_oversized_and_invalid_rules() {
   let json = policy(vec![]).to_environment().unwrap();
   assert!(SshPolicy::from_environment(&json).is_ok());
+  let legacy = SshPolicy::from_environment(r#"{"default_branch":"main","rules":[]}"#).unwrap();
+  assert_eq!(legacy.actor_level, 30);
+  assert!(SshPolicy::from_environment(
+    r#"{"default_branch":"main","actor_level":10000,"rules":[]}"#
+  )
+  .is_err());
   for invalid in [
     "",
     "{}",
@@ -183,4 +190,38 @@ fn protected_fast_forwards_use_real_git_ancestry_and_reject_divergence() {
     .contains("force push"));
   protected.allow_force_push = true;
   assert!(check(protected, second, divergent).is_ok());
+}
+
+#[test]
+fn personal_roles_meet_protected_minimum_without_bypassing_hard_rules() {
+  for (role, access, allowed) in [
+    (30, SshPushAccess::Maintainer, false),
+    (40, SshPushAccess::Maintainer, true),
+    (40, SshPushAccess::Owner, false),
+    (50, SshPushAccess::Owner, true),
+    (100, SshPushAccess::Owner, true),
+    (100, SshPushAccess::NoOne, false),
+  ] {
+    let mut grant = policy(vec![rule("main", SshRuleType::Exact, access)]);
+    grant.actor_level = role;
+    assert_eq!(check(&grant, "refs/heads/main", false).is_ok(), allowed);
+    if allowed {
+      grant.rules[0].require_merge_request = true;
+      assert!(check(&grant, "refs/heads/main", false).is_err());
+      assert!(check(&grant, "refs/heads/main", true).is_err());
+    }
+  }
+}
+
+#[test]
+fn managed_hook_always_rejects_server_owned_references_before_policy() {
+  for reference in ["refs/gity/merge-operations/123", "refs/gity/journal/abc"] {
+    assert!(
+      crate::check_update(Path::new("."), Path::new("git"), reference, ZERO, ONE)
+        .unwrap_err()
+        .to_string()
+        .contains("server-owned")
+    );
+    assert!(crate::check_update(Path::new("."), Path::new("git"), reference, ONE, ZERO).is_err());
+  }
 }

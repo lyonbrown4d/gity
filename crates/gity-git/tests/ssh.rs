@@ -71,6 +71,7 @@ async fn ssh_receive_pack_requires_policy_and_managed_hook_and_then_advertises()
     .is_err());
   let policy = SshPolicy {
     default_branch: "main".into(),
+    actor_level: 30,
     rules: vec![],
   };
   assert!(service
@@ -123,4 +124,36 @@ async fn ssh_rejects_invalid_git_protocol_and_repository_traversal() {
     .spawn_ssh("../outside.git", GitRpc::UploadPack, None, None)
     .await
     .is_err());
+}
+
+#[tokio::test]
+async fn ssh_advertisement_hides_server_owned_merge_operation_references() {
+  let (directory, service) = fixture().await;
+  {
+    let repo = git2::Repository::open_bare(directory.path().join("test.git")).unwrap();
+    let tip = repo.head().unwrap().target().unwrap();
+    repo
+      .reference(
+        "refs/gity/merge-operations/private",
+        tip,
+        true,
+        "test private journal",
+      )
+      .unwrap();
+  }
+  let mut process = service
+    .spawn_ssh("test.git", GitRpc::UploadPack, None, None)
+    .await
+    .unwrap();
+  let refs = String::from_utf8(advertisement(&mut process).await).unwrap();
+  assert!(refs.contains("refs/heads/main"));
+  assert!(!refs.contains("refs/gity/"));
+  let mut input = process.take_stdin().unwrap();
+  input.write_all(b"0000").await.unwrap();
+  input.shutdown().await.unwrap();
+  drop(input);
+  tokio::time::timeout(Duration::from_secs(5), process.wait())
+    .await
+    .unwrap()
+    .unwrap();
 }

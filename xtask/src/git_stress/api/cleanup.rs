@@ -1,4 +1,4 @@
-use super::{Repository, request};
+use super::{Credential, Repository, request};
 use anyhow::{Result, bail};
 use reqwest::blocking::Client;
 use serde_json::json;
@@ -9,17 +9,25 @@ pub fn cleanup(repository: &Repository) -> Result<()> {
     return Ok(());
   };
   let client = Client::builder().timeout(Duration::from_secs(20)).build()?;
-  let token_result = request(
-    &client,
-    &resources.base_url,
-    "DELETE",
-    &format!(
-      "/projects/{}/access-tokens/{}",
-      resources.project_id, resources.access_token_id
-    ),
-    Some(&resources.api_token),
-    None,
-  );
+  let credential_path = resources
+    .credential
+    .as_ref()
+    .map(|credential| match credential {
+      Credential::AccessToken(id) => {
+        format!("/projects/{}/access-tokens/{id}", resources.project_id)
+      }
+      Credential::DeployKey(id) => format!("/projects/{}/deploy-keys/{id}", resources.project_id),
+    });
+  let token_result = credential_path.map_or(Ok(serde_json::Value::Null), |path| {
+    request(
+      &client,
+      &resources.base_url,
+      "DELETE",
+      &path,
+      Some(&resources.api_token),
+      None,
+    )
+  });
   let project_result = request(
     &client,
     &resources.base_url,
@@ -39,7 +47,7 @@ pub fn cleanup(repository: &Repository) -> Result<()> {
   let failures = [
     token_result
       .err()
-      .map(|error| format!("token revocation: {error}")),
+      .map(|error| format!("credential revocation: {error}")),
     project_result
       .err()
       .map(|error| format!("project deletion request: {error}")),
@@ -52,8 +60,8 @@ pub fn cleanup(repository: &Repository) -> Result<()> {
   .collect::<Vec<_>>();
   if failures.is_empty() {
     println!(
-      "Marked stress project for deletion and revoked its access token: user_id={} organization_id={} project_id={} token_id={}; the account and organization remain for test-database lifecycle cleanup.",
-      resources.user_id, resources.organization_id, resources.project_id, resources.access_token_id
+      "Marked stress project for deletion and revoked its Git credential: user_id={} organization_id={} project_id={}; the account and organization remain for test-database lifecycle cleanup.",
+      resources.user_id, resources.organization_id, resources.project_id
     );
     Ok(())
   } else {

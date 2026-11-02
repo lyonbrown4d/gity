@@ -1,5 +1,4 @@
-use super::keys;
-use crate::{AppState, projects, repository};
+use crate::{AppState, repository};
 use gity_git::{GitRpc, SshPolicy};
 use russh::{
   Channel,
@@ -10,82 +9,13 @@ use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 pub(super) struct Authorized {
-  project: Value,
-  service: GitRpc,
-  policy: Option<SshPolicy>,
+  pub(super) project: Value,
+  pub(super) service: GitRpc,
+  pub(super) policy: Option<SshPolicy>,
+  pub(super) actor_id: Option<i64>,
   pub protocol: Option<String>,
 }
-pub(super) async fn authorize(
-  state: &AppState,
-  fingerprint: &str,
-  path: &str,
-  service: GitRpc,
-) -> anyhow::Result<Authorized> {
-  let project = state
-    .projects
-    .active_by_path(path)
-    .await?
-    .filter(|project| project.status == "active")
-    .map(gity_persistence::model_value)
-    .ok_or_else(|| anyhow::anyhow!("repository unavailable"))?;
-  let id = projects::id(&project["id"])?;
-  let key = keys::authorized(state, fingerprint)
-    .await?
-    .into_iter()
-    .find(|key| key["project_id"] == project["id"])
-    .ok_or_else(|| anyhow::anyhow!("key is not authorized for this repository"))?;
-  let policy = if service == GitRpc::ReceivePack {
-    anyhow::ensure!(
-      key["can_push"]
-        .as_bool()
-        .unwrap_or_else(|| key["can_push"].as_i64() == Some(1)),
-      "deploy key is read-only"
-    );
-    let mut rules = state
-      .repository_access
-      .protections(id)
-      .await?
-      .into_iter()
-      .map(gity_persistence::model_value)
-      .collect::<Vec<_>>();
-    for rule in &mut rules {
-      for field in ["require_merge_request", "allow_force_push", "allow_delete"] {
-        rule[field] = Value::Bool(
-          rule[field]
-            .as_bool()
-            .unwrap_or_else(|| rule[field].as_i64() == Some(1)),
-        );
-      }
-    }
-    state
-      .git
-      .ensure_update_hook(
-        &repository::repo(&project),
-        state
-          .settings
-          .git_hook
-          .clone()
-          .unwrap_or(std::env::current_exe()?),
-      )
-      .await?;
-    Some(SshPolicy {
-      default_branch: repository::default_branch(&project).into(),
-      rules: serde_json::from_value(Value::Array(rules))?,
-    })
-  } else {
-    None
-  };
-  state
-    .repository_access
-    .touch_deploy_key(projects::id(&key["id"])?)
-    .await?;
-  Ok(Authorized {
-    project,
-    service,
-    policy,
-    protocol: None,
-  })
-}
+pub(super) use super::authorization::authorize;
 #[tracing::instrument(name="git.ssh", skip_all, fields(project_id=authorized.project["id"].as_i64().unwrap_or_default(), service=?authorized.service))]
 pub(super) async fn run(
   state: AppState,

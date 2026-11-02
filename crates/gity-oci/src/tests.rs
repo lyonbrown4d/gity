@@ -45,13 +45,6 @@ fn separates_registry_probe_from_disabled_catalog() {
       .0,
     StatusCode::METHOD_NOT_ALLOWED
   );
-  assert!(
-    MirrorSettings {
-      registries: BTreeMap::new(),
-      allowed_hosts: BTreeSet::new(),
-    }
-    .permits_operation(OciOperation::Probe)
-  );
 }
 
 #[test]
@@ -83,7 +76,7 @@ fn storage_path_mapping_preserves_upload_state_query() {
 }
 
 #[test]
-fn cache_gateway_is_read_only_and_auth_realms_require_allowlisted_hosts() {
+fn mirror_sources_require_allowlisted_hosts_and_valid_mount_requests() {
   let settings = settings(Some(MirrorSettings {
     registries: BTreeMap::from([(
       "dockerhub".into(),

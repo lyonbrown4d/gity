@@ -77,7 +77,10 @@ pub fn run(
   std::fs::create_dir(&build).context("create OCI fixture build context")?;
   std::fs::write(
     build.join("Dockerfile"),
-    "FROM scratch\nCOPY payload.txt /blackbox.txt\n",
+    format!(
+      "FROM scratch\nLABEL org.gity.blackbox={}\nCOPY payload.txt /blackbox.txt\n",
+      scenario.suffix
+    ),
   )?;
   std::fs::write(
     build.join("payload.txt"),
@@ -88,47 +91,56 @@ pub fn run(
     scenario.project_path, scenario.suffix
   );
   let _cleanup = ImageCleanup(tag.clone());
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["build", "--quiet", "--tag", &tag])
       .arg(&build),
     "build task-owned OCI fixture image",
+    reporter,
   )?;
-  process::run_output(
-    Command::new("docker")
-      .arg("--config")
-      .arg(&docker_config)
-      .args(["push", &tag]),
-    "push task-owned OCI fixture image",
-  )?;
+  let pushed = Command::new("docker")
+    .arg("--config")
+    .arg(&docker_config)
+    .args(["push", &tag])
+    .output()
+    .context("push task-owned OCI fixture image")?;
+  if !pushed.status.success() {
+    bail!(
+      "OCI fixture push failed: {}",
+      reporter.redact(&String::from_utf8_lossy(&pushed.stderr))
+    );
+  }
   reporter.pass(
     "oci-real-docker-push",
     "Docker pushed manifest and blobs to the Gity registry",
   );
   auth::check_auth(&client, config, scenario, work, &registry, &tag, reporter)?;
 
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["image", "rm", "--force", &tag]),
     "remove task-owned local OCI image before cold pull",
+    reporter,
   )?;
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["pull", &tag]),
     "pull OCI image from Gity registry",
+    reporter,
   )?;
-  let image_id = process::run_output(
+  let image_id = command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["image", "inspect", "--format", "{{.Id}}", &tag]),
     "inspect pulled OCI fixture image",
+    reporter,
   )?;
   let image_id = String::from_utf8(image_id.stdout)
     .context("Docker image ID is not UTF-8")?
@@ -161,31 +173,34 @@ pub fn run(
   )?;
   let mirror_tag = format!("{registry}/{}:3.22", scenario.project_path);
   let _mirror_cleanup = ImageCleanup(mirror_tag.clone());
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["pull", &mirror_tag]),
     "cold pull through Gity Docker Hub mirror",
+    reporter,
   )?;
   let mirror_image_id = inspect_image(&mirror_tag)?;
   reporter.pass(
     "oci-mirror-cold-pull",
     "Gity resolved and cached the configured Docker Hub image",
   );
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["image", "rm", "--force", &mirror_tag]),
     "remove local mirror image before repeat pull",
+    reporter,
   )?;
-  process::run_output(
+  command_output(
     Command::new("docker")
       .arg("--config")
       .arg(&docker_config)
       .args(["pull", &mirror_tag]),
     "repeat pull through Gity Docker Hub mirror",
+    reporter,
   )?;
   anyhow::ensure!(
     mirror_image_id == inspect_image(&mirror_tag)?,
@@ -253,4 +268,23 @@ fn inspect_image(tag: &str) -> Result<String> {
   let id = String::from_utf8(output.stdout)?.trim().to_owned();
   anyhow::ensure!(id.starts_with("sha256:"), "invalid mirror image ID");
   Ok(id)
+}
+
+fn command_output(
+  command: &mut Command,
+  name: &str,
+  reporter: &Reporter,
+) -> Result<std::process::Output> {
+  let output = command
+    .stdin(std::process::Stdio::null())
+    .output()
+    .with_context(|| format!("start {name}"))?;
+  if !output.status.success() {
+    let detail = String::from_utf8_lossy(&output.stderr)
+      .chars()
+      .take(8192)
+      .collect::<String>();
+    bail!("{name} failed: {}", reporter.redact(&detail));
+  }
+  Ok(output)
 }

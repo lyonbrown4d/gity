@@ -57,13 +57,4 @@ impl CollaborationService {
       .update_merge_request(project, key, changes)
       .await
   }
-  pub async fn mark_merged(
-    &self,
-    project: i64,
-    iid: i64,
-    actor: i64,
-    sha: Option<String>,
-  ) -> Result<entity::Model, AppError> {
-    self.repository.mark_merged(project, iid, actor, sha).await
-  }
 }

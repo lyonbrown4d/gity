@@ -1,0 +1,51 @@
+{
+  "_version": 2,
+  "Personal SSH keys": {
+    "en": "Personal SSH keys",
+    "zh": "个人 SSH 密钥"
+  },
+  "Use your account permissions to clone, pull and push over SSH as git.": {
+    "en": "Use your account permissions to clone, pull and push over SSH as git.",
+    "zh": "使用账户权限，以 git 用户通过 SSH 克隆、拉取和推送。"
+  },
+  "Paste a public key only. Keep your private key on your device.": {
+    "en": "Paste a public key only. Keep your private key on your device.",
+    "zh": "仅粘贴公钥，私钥应保留在你的设备上。"
+  },
+  "No personal SSH keys yet.": {
+    "en": "No personal SSH keys yet.",
+    "zh": "尚无个人 SSH 密钥。"
+  },
+  "Created": {
+    "en": "Created",
+    "zh": "创建时间"
+  },
+  "Delete personal SSH key?": {
+    "en": "Delete personal SSH key?",
+    "zh": "删除个人 SSH 密钥？"
+  },
+  "This key will no longer authenticate new Git commands for your account.": {
+    "en": "This key will no longer authenticate new Git commands for your account.",
+    "zh": "此密钥将无法再为你的账户认证新的 Git 命令。"
+  },
+  "SSH public key is invalid": {
+    "en": "SSH public key is invalid",
+    "zh": "SSH 公钥无效"
+  },
+  "SSH key title must contain 1–255 bytes without control characters": {
+    "en": "SSH key title must contain 1–255 bytes without control characters",
+    "zh": "SSH 密钥标题必须为 1–255 字节且不含控制字符"
+  },
+  "SSH fingerprint already registered": {
+    "en": "SSH fingerprint already registered",
+    "zh": "SSH 指纹已注册"
+  },
+  "SSH fingerprint already registered as a personal key": {
+    "en": "SSH fingerprint already registered as a personal key",
+    "zh": "SSH 指纹已注册为个人密钥"
+  },
+  "SSH key not found": {
+    "en": "SSH key not found",
+    "zh": "未找到 SSH 密钥"
+  }
+}

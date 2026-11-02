@@ -3,6 +3,8 @@ use anyhow::{Context, Result, bail};
 use reqwest::{StatusCode, blocking::Client};
 use std::{path::Path, process::Command};
 
+mod mounts;
+
 pub(super) fn check_auth(
   client: &Client,
   config: &RunConfig,
@@ -146,36 +148,7 @@ pub(super) fn check_auth(
     .context("attempt OCI pull with revoked token")?;
   api::require_denied(revoked_pull.status(), "revoked OCI token pull")?;
 
-  let mount = client
-    .post(format!(
-      "{}/v2/{}/blobs/uploads/?mount=sha256:{}&from={}/source",
-      config.oci_url,
-      scenario.project_path,
-      "a".repeat(64),
-      scenario.outsider_project_path
-    ))
-    .bearer_auth(&scenario.owner_token)
-    .send()
-    .context("attempt cross-project OCI blob mount")?;
-  api::require_denied(
-    mount.status(),
-    "cross-project OCI blob mount without source ACL",
-  )?;
-  let source_denied_mount = client
-    .post(format!(
-      "{}/v2/{}/blobs/uploads/?mount=sha256:{}&from={}/source",
-      config.oci_url,
-      scenario.outsider_project_path,
-      "a".repeat(64),
-      scenario.project_path
-    ))
-    .bearer_auth(&scenario.owner_token)
-    .send()
-    .context("attempt cross-project OCI blob mount without source read ACL")?;
-  api::require_denied(
-    source_denied_mount.status(),
-    "cross-project OCI mount with target ACL but no source ACL",
-  )?;
+  mounts::check(client, config, scenario, reporter)?;
   reporter.pass(
     "oci-scopes-revocation-private-mount-acl",
     "private project denied outsider; registry-only token pulled but could not push; package-only and revoked tokens were denied; blob mounts were denied when either source-read or target-write ACL was missing",

@@ -8,6 +8,7 @@ pub mod artifact_storage_deletions;
 pub mod audit_revisions;
 pub mod auth_sessions;
 pub mod bootstrap_claim;
+pub mod merge_operations;
 pub mod organization_members;
 pub mod organizations;
 pub mod project_access_tokens;
@@ -53,6 +54,7 @@ pub mod project_wiki_pages;
 pub mod projects;
 pub mod user_access_tokens;
 pub mod user_passwords;
+pub mod user_ssh_keys;
 pub mod users;
 
 pub mod git_repository_placements;
@@ -99,5 +101,7 @@ application_ids!(
   project_wiki_pages,
   projects,
   user_access_tokens,
-  users
+  users,
+  user_ssh_keys,
+  merge_operations
 );

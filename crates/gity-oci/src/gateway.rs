@@ -15,10 +15,13 @@ use axum::{
   extract::State,
   http::{HeaderName, HeaderValue, Method, Request, StatusCode},
   response::Response,
-  routing::any,
+  routing::{any, get},
 };
 use futures_util::StreamExt;
 use std::sync::Arc;
+
+#[path = "gateway_health.rs"]
+mod health;
 
 #[derive(Clone)]
 pub struct OciGateway {
@@ -55,7 +58,9 @@ impl OciGateway {
 
 pub fn router(gateway: OciGateway) -> Router {
   Router::new()
+    .route("/readyz", get(health::ready))
     .route("/v2", any(handle))
+    .route("/v2/", any(handle))
     .route("/v2/{*path}", any(handle))
     .with_state(gateway)
     .layer(axum::middleware::from_fn(gity_observability::instrument))
@@ -64,7 +69,20 @@ pub fn router(gateway: OciGateway) -> Router {
 async fn handle(State(gateway): State<OciGateway>, request: Request<Body>) -> Response {
   match forward(gateway, request).await {
     Ok(response) => response,
-    Err((status, message)) => (status, message).into_response(),
+    Err((status, message)) => {
+      let mut response = (status, message).into_response();
+      if status == StatusCode::UNAUTHORIZED {
+        response.headers_mut().insert(
+          http::header::WWW_AUTHENTICATE,
+          HeaderValue::from_static("Basic realm=\"Gity registry\""),
+        );
+        response.headers_mut().insert(
+          "docker-distribution-api-version",
+          HeaderValue::from_static("registry/2.0"),
+        );
+      }
+      response
+    }
   }
 }
 
@@ -78,17 +96,6 @@ async fn forward(
   let uri = request.uri().clone();
   let headers = request.headers().clone();
   let (repo, operation, source, reference) = parse_request(&method, &uri)?;
-  if gateway
-    .settings
-    .mirror
-    .as_ref()
-    .is_some_and(|mirror| !mirror.permits_operation(operation))
-  {
-    return Err((
-      StatusCode::METHOD_NOT_ALLOWED,
-      "mirror registry is read-only",
-    ));
-  }
   let authorization = headers
     .get(http::header::AUTHORIZATION)
     .and_then(|v| v.to_str().ok());
@@ -114,6 +121,19 @@ async fn forward(
         "authorization service unavailable",
       ),
     })?;
+  // Configured mirror sources enable caching alongside hosted repositories.
+  // Only a repository selected as a mirror by the ACL adapter is read-only.
+  if decision.mirror_source.is_some()
+    && matches!(
+      operation,
+      crate::OciOperation::Push | crate::OciOperation::Delete
+    )
+  {
+    return Err((
+      StatusCode::METHOD_NOT_ALLOWED,
+      "mirror registry is read-only",
+    ));
+  }
   if !repo.is_empty() {
     validate_storage_path(&decision.storage_repository)?;
   }
@@ -255,3 +275,11 @@ mod mirror_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "gateway_probe_tests.rs"]
+mod probe_tests;
+
+#[cfg(test)]
+#[path = "docker_handshake_tests.rs"]
+mod docker_handshake_tests;

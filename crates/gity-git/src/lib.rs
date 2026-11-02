@@ -6,6 +6,12 @@ mod content;
 mod hooks;
 mod matcher;
 mod merge;
+mod merge_operation;
+mod merge_operation_model;
+mod merge_operation_receipt;
+mod merge_operation_transport;
+pub use merge_operation_model::{MergeOperationInput, MergeOperationOutcome};
+pub use merge_operation_transport::MergeOperationTransport;
 mod mutations;
 mod process;
 mod protocol;
@@ -119,26 +125,7 @@ pub(crate) fn commit<'a>(
   revision: &str,
   default: &str,
 ) -> Result<Commit<'a>> {
-  let candidates = if revision.trim().is_empty() {
-    vec![format!("refs/heads/{default}"), "HEAD".to_owned()]
-  } else {
-    vec![
-      format!("refs/heads/{revision}"),
-      format!("refs/tags/{revision}"),
-      revision.to_owned(),
-    ]
-  };
-  for candidate in candidates {
-    if let Ok(object) = repo.revparse_single(&candidate) {
-      if let Ok(commit) = object.peel_to_commit() {
-        return Ok(commit);
-      }
-    }
-  }
-  if is_empty(repo)? {
-    bail!("git repository is empty");
-  }
-  bail!("git reference not found")
+  public_revision::resolve(repo, revision, default)
 }
 
 // libgit2's is_empty also compares HEAD with init.defaultBranch, so it
@@ -152,3 +139,5 @@ pub(crate) fn timestamp(seconds: i64) -> String {
     .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string())
     .unwrap_or_default()
 }
+
+mod public_revision;

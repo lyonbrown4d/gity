@@ -1,18 +1,20 @@
-use super::{Config, Stats};
+use super::Config;
+use crate::git_stress::{Transport, transport};
 use anyhow::{Context, Result, bail};
 use std::{
   fs,
   path::{Path, PathBuf},
-  process::{Child, Command, ExitStatus, Stdio},
+  process::{Child, Command, Stdio},
   thread,
-  time::{Duration, Instant},
+  time::Duration,
 };
+use wait_timeout::ChildExt;
 
 #[cfg(test)]
 #[path = "process_tests.rs"]
 mod tests;
 
-pub(super) fn git(
+pub(in crate::git_stress) fn git(
   config: &Config,
   askpass: &Askpass,
   token: &str,
@@ -28,12 +30,47 @@ pub(super) fn git(
     .args(args)
     .env("GIT_TERMINAL_PROMPT", "0")
     .env("GCM_INTERACTIVE", "Never")
-    .env("GIT_ASKPASS", &askpass.path)
-    .env("GIT_ASKPASS_REQUIRE", "force")
-    .env("GITY_GIT_PERF_USERNAME", &config.token_username)
-    .env("GITY_GIT_PERF_TOKEN", token)
+    .env("GIT_CONFIG_NOSYSTEM", "1")
+    .env("GIT_CONFIG_GLOBAL", "/dev/null")
+    .env_remove("GIT_SSH_COMMAND")
+    .env_remove("GIT_SSH")
     .stdout(Stdio::piped())
     .stderr(Stdio::piped());
+  match config.transport {
+    Transport::Http => {
+      command
+        .env("GIT_ASKPASS", &askpass.path)
+        .env("GIT_ASKPASS_REQUIRE", "force")
+        .env("GITY_GIT_PERF_USERNAME", &config.token_username)
+        .env("GITY_GIT_PERF_TOKEN", token);
+    }
+    Transport::Ssh => {
+      let key = config.ssh_key.as_deref().context("SSH key missing")?;
+      let hosts = config
+        .ssh_known_hosts
+        .as_deref()
+        .context("pinned SSH known_hosts missing")?;
+      let wrapper = shlex::try_quote(
+        askpass
+          .path
+          .to_str()
+          .context("SSH wrapper path is not UTF-8")?,
+      )
+      .context("SSH wrapper path contains a NUL byte")?;
+      command
+        .env("GIT_SSH_COMMAND", wrapper.as_ref())
+        .env("GIT_SSH_VARIANT", "ssh")
+        .env("GITY_GIT_PERF_SSH_KEY", key)
+        .env(
+          "GITY_GIT_PERF_KNOWN_HOSTS_OPTION",
+          transport::known_hosts_option(hosts)?,
+        )
+        .env_remove("GIT_ASKPASS")
+        .env_remove("SSH_ASKPASS")
+        .env_remove("GIT_ASKPASS_REQUIRE")
+        .env_remove("GITY_GIT_PERF_TOKEN");
+    }
+  }
   if is_local(&config.base_url) || is_local(&config.project_url) {
     let existing = std::env::var("NO_PROXY")
       .or_else(|_| std::env::var("no_proxy"))
@@ -53,25 +90,23 @@ pub(super) fn git(
   let stderr = child.child.stderr.take().context("capture git stderr")?;
   let out_reader = thread::spawn(move || read_bounded(stdout, 64 * 1024));
   let err_reader = thread::spawn(move || read_bounded(stderr, 64 * 1024));
-  let started = Instant::now();
-  let status = loop {
-    match child.try_wait() {
-      Ok(Some(status)) => break status,
-      Ok(None) => {}
-      Err(error) => {
-        child.terminate_group();
-        let _ = out_reader.join();
-        let _ = err_reader.join();
-        return Err(error).context("wait for git client");
-      }
-    }
-    if started.elapsed() > Duration::from_millis(config.timeout_ms) {
+  let status = match child
+    .child
+    .wait_timeout(Duration::from_millis(config.timeout_ms))
+  {
+    Ok(Some(status)) => status,
+    Ok(None) => {
       child.terminate_group();
       let _ = out_reader.join();
       let _ = err_reader.join();
       bail!("git operation exceeded {} ms timeout", config.timeout_ms);
     }
-    thread::sleep(Duration::from_millis(25));
+    Err(error) => {
+      child.terminate_group();
+      let _ = out_reader.join();
+      let _ = err_reader.join();
+      return Err(error).context("wait for git client");
+    }
   };
   child.terminate_group();
   let out = out_reader.join().unwrap_or_default();
@@ -130,10 +165,6 @@ impl ChildGroup {
     })
   }
 
-  fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
-    self.child.try_wait()
-  }
-
   fn terminate_group(&mut self) {
     if self.stopped {
       return;
@@ -155,7 +186,11 @@ impl Drop for ChildGroup {
 }
 
 pub(super) fn sanitize(value: &str, token: &str) -> String {
-  value.replace(token, "<token>")
+  if token.is_empty() {
+    value.to_owned()
+  } else {
+    value.replace(token, "<token>")
+  }
 }
 fn is_local(raw: &str) -> bool {
   url::Url::parse(raw).ok().is_some_and(|url| {
@@ -172,21 +207,24 @@ pub(super) fn path_string(path: &Path) -> Result<String> {
     .context("Git work path is not valid UTF-8")
 }
 
-pub(super) struct Askpass {
+pub(in crate::git_stress) struct Askpass {
   path: PathBuf,
 }
 impl Askpass {
-  pub(super) fn create(directory: &Path) -> Result<Self> {
+  pub(super) fn create(directory: &Path, transport: Transport) -> Result<Self> {
     #[cfg(windows)]
     bail!("Git stress askpass currently requires a Unix-compatible shell");
     #[cfg(not(windows))]
     {
       use std::os::unix::fs::PermissionsExt;
       let path = directory.join("git-askpass.sh");
-      fs::write(
-        &path,
-        "#!/bin/sh\ncase \"$1\" in\n  *sername*) printf '%s\\n' \"$GITY_GIT_PERF_USERNAME\" ;;\n  *) printf '%s\\n' \"$GITY_GIT_PERF_TOKEN\" ;;\nesac\n",
-      )?;
+      let content = match transport {
+        Transport::Ssh => crate::git_stress::transport::SSH_WRAPPER,
+        Transport::Http => {
+          "#!/bin/sh\ncase \"$1\" in\n  *sername*) printf '%s\\n' \"$GITY_GIT_PERF_USERNAME\" ;;\n  *) printf '%s\\n' \"$GITY_GIT_PERF_TOKEN\" ;;\nesac\n"
+        }
+      };
+      fs::write(&path, content)?;
       fs::set_permissions(&path, fs::Permissions::from_mode(0o700))?;
       Ok(Self { path })
     }
@@ -205,36 +243,4 @@ pub(super) fn safe_remove(root: &Path, target: &Path) -> Result<()> {
     fs::remove_dir_all(target)?;
   }
   Ok(())
-}
-
-pub(super) fn print_summary(stats: &Stats, failure_count: usize) {
-  println!("\nGit client stress summary");
-  for (name, values) in stats.lock().unwrap().iter() {
-    let mut durations: Vec<f64> = values
-      .iter()
-      .map(|(duration, _)| duration.as_secs_f64() * 1000.0)
-      .collect();
-    durations.sort_by(f64::total_cmp);
-    let avg = durations.iter().sum::<f64>() / durations.len().max(1) as f64;
-    let failed = values.iter().filter(|(_, ok)| !ok).count();
-    println!(
-      "{name:14} count={:4} failed={failed:3} avg={avg:.1}ms p50={:.1}ms p95={:.1}ms max={:.1}ms",
-      values.len(),
-      percentile(&durations, 0.50),
-      percentile(&durations, 0.95),
-      durations.last().copied().unwrap_or(0.0)
-    );
-  }
-  if failure_count > 0 {
-    println!("\nFailures: {failure_count}");
-  }
-}
-fn percentile(values: &[f64], quantile: f64) -> f64 {
-  if values.is_empty() {
-    return 0.0;
-  }
-  let index = ((values.len() as f64 * quantile).ceil() as usize)
-    .saturating_sub(1)
-    .min(values.len() - 1);
-  values[index]
 }

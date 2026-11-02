@@ -50,6 +50,9 @@ pub async fn run(state: AppState) -> anyhow::Result<()> {
   interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
   loop {
     interval.tick().await;
+    if let Err(error) = crate::features::recover_merge_operations(&state).await {
+      tracing::error!(error=%error, "merge operation recovery scan failed");
+    }
     #[cfg(feature = "packages")]
     if let Err(error) = state.artifacts.cleanup_pending(100).await {
       tracing::error!(error=%error, "artifact storage cleanup failed");

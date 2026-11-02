@@ -23,6 +23,7 @@ async fn mutable_tags_resolve_before_cache_and_failures_never_use_stale_cache() 
     Ok(format!("sha256:{}", "b".repeat(64))),
     Err(MirrorResolveError::Unauthenticated),
     Err(MirrorResolveError::Forbidden),
+    Err(MirrorResolveError::NotFound),
   ]));
   let mut gateway_settings = settings(Some(mirror_config()));
   gateway_settings.upstream = format!("http://{upstream}");
@@ -49,6 +50,7 @@ async fn mutable_tags_resolve_before_cache_and_failures_never_use_stale_cache() 
       StatusCode::UNAUTHORIZED,
     ),
     (MirrorResolveError::Forbidden, StatusCode::FORBIDDEN),
+    (MirrorResolveError::NotFound, StatusCode::NOT_FOUND),
   ] {
     let response = client
       .get(format!("http://{address}/v2/team/repo/manifests/latest"))
@@ -62,7 +64,7 @@ async fn mutable_tags_resolve_before_cache_and_failures_never_use_stale_cache() 
   assert!(paths[0].ends_with(&format!("/manifests/sha256:{}", "a".repeat(64))));
   assert!(paths[1].ends_with(&format!("/manifests/sha256:{}", "b".repeat(64))));
   assert_eq!(upstream_calls.no_redirect.load(Ordering::SeqCst), 2);
-  assert_eq!(resolver.calls.load(Ordering::SeqCst), 4);
+  assert_eq!(resolver.calls.load(Ordering::SeqCst), 5);
 
   gateway_task.abort();
   upstream_task.abort();
@@ -182,4 +184,59 @@ fn settings(mirror: Option<MirrorSettings>) -> OciSettings {
     },
     mirror,
   }
+}
+
+#[derive(Clone)]
+struct MixedAuthorizer;
+
+#[async_trait]
+impl OciAuthorization for MixedAuthorizer {
+  async fn authorize(
+    &self,
+    request: &OciRequest,
+    authorization: Option<&str>,
+  ) -> Result<OciAuthorizationDecision, AuthorizationError> {
+    let mut decision = FakeAuthorizer.authorize(request, authorization).await?;
+    if request.repository == "team/hosted" {
+      decision.mirror_source = None;
+    }
+    Ok(decision)
+  }
+}
+
+#[tokio::test]
+async fn configured_mirrors_do_not_disable_hosted_pushes_or_allow_mirror_mutations() {
+  let (upstream, calls, upstream_task) = start_fake_angos().await;
+  let mut settings = settings(Some(mirror_config()));
+  settings.upstream = format!("http://{upstream}");
+  let gateway = OciGateway::new(settings, Arc::new(MixedAuthorizer)).unwrap();
+  let (address, gateway_task) = start_gateway(gateway).await;
+  let client = reqwest::Client::new();
+  for method in [reqwest::Method::POST, reqwest::Method::DELETE] {
+    let suffix = if method == reqwest::Method::POST {
+      "blobs/uploads/"
+    } else {
+      "manifests/sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    };
+    for (repository, expected) in [
+      ("hosted", StatusCode::OK),
+      ("mirror", StatusCode::METHOD_NOT_ALLOWED),
+    ] {
+      let response = client
+        .request(
+          method.clone(),
+          format!("http://{address}/v2/team/{repository}/{suffix}"),
+        )
+        .send()
+        .await
+        .unwrap();
+      assert_eq!(response.status(), expected, "{method} {repository}");
+    }
+  }
+  let paths = calls.paths.lock().unwrap().clone();
+  assert_eq!(paths.len(), 2, "mirror mutations must never reach Angos");
+  assert_eq!(paths[0], "/v2/project-7/repo/blobs/uploads/");
+  assert!(paths[1].starts_with("/v2/project-7/repo/manifests/sha256:"));
+  gateway_task.abort();
+  upstream_task.abort();
 }

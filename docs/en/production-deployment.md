@@ -45,12 +45,59 @@ Configuration files use the `[observability]` section. OTLP environment variable
 | Registry | `GITY_REGISTRY_OBSERVABILITY__OTLP_ENDPOINT` |
 | Runner | `GITY_RUNNER__OBSERVABILITY__OTLP_ENDPOINT` |
 
-## Updates and Recovery
+## Offline Backup
 
-Before an update, create recoverable backups of the database and all related named volumes, and retain the current image tags. Stop services with `down` for the corresponding Compose file; do not add `-v`, or Docker will delete the project’s persistent volumes. After restarting, check Compose health and verify business paths with actual HTTP, Git, package protocol, and OCI operations.
+`cargo xtask backup` takes an offline snapshot of one explicit Compose project. Schedule a write outage, let pipelines finish, and coordinate any host processes that can modify bind directories directly. The tool stops every container with the exact project label, including applications, Runner, Git nodes, PostgreSQL, SeaweedFS, and DinD, then confirms they are stopped before reading data. This requires downtime; it provides neither hot backup nor a zero-data-loss automatic failover guarantee.
 
-The repository currently contains no record of an executed production backup recovery drill. The backup scope above is an operational requirement derived from current volume mounts; it does not mean end-to-end recovery has been verified. Use actual run records for image matrix results, Git replica failure behavior, and full backup/recovery acceptance.
+Prerequisites are a Unix host, Docker Compose v2, an available `debian:bookworm-slim` GNU tar helper image, and the Compose file and private environment file used for the source project. Supply required deployment variables, including image names, through that file or the calling environment. The parent directory below must exist; the `--output` directory must not exist:
 
-See the [verification status](verification.md).
+```sh
+cargo xtask backup \
+  --project gity-prod \
+  --compose-file deploy/components/standalone.compose.yaml \
+  --env-file /srv/gity-private/compose.env \
+  --output /srv/gity-private/backup-20261102
+```
+
+For distributed deployment, use `deploy/components/distributed.compose.yaml` and that project's actual environment file. Keep the project name, Compose file, and environment file consistent. The tool rejects shared or external volumes, undeclared project volumes, anonymous volumes, volume aliases, and named volumes mounted by running containers outside the project. It also rejects actual mounts that differ from the supplied Compose configuration. Explicit bind mounts are supported; top-level Compose `configs` or `secrets` objects are rejected rather than silently omitted.
+
+The snapshot includes every existing project named volume; a declared volume that was never created is recorded as empty. Data includes the database, both Git nodes, object storage, component state, SSH host keys, DinD data, and Docker TLS volumes. Every bind source is archived too, including component configuration, TLS certificates/private keys, S3/Angos/Git-node secret files, and the Runner host work directory. The complete resolved Compose configuration captures actual container environments, including secrets such as a running Runner's token.
+
+A helper container streams archives into host files without buffering entire volumes in memory. The helper reads sources as root through read-only mounts; the calling host user creates the archive files. The bundle directory has mode `0700` and tool-created files have mode `0600`; archived contents retain numeric UID/GID, permissions, extended attributes, and ACLs, including whiteout devices in Docker data layers. Versioned `manifest.json` records volume mappings, image identities, file sizes, and SHA-256 values without plaintext secret values. Protect the entire bundle as credentials because its configuration and archives contain secrets.
+
+For a named `/var/lib/docker` volume used by official, privileged Docker DinD, the tool excludes exactly `volumes/backingFsBlockDev` and `overlay2/backingFsBlockDev`. These quota nodes identify the host device. [Docker's upstream implementation](https://github.com/moby/moby/blob/v28.5.2/quota/projectquota.go#L380-L401) recreates them for the current filesystem, so the old device identity must not be restored into a new project. Existing archives may skip these nodes only when they are empty, root-owned block devices; extraction still never creates them. Ordinary volumes, file binds, other devices, and FIFOs remain rejected. Empty character-device `0:0` whiteout markers in Docker layers are preserved.
+
+The source remains stopped after a successful backup, or a failure after stopping. Only explicit `--resume-source` restarts previously running containers after a successful snapshot. Keep the source stopped when restoring immediately on the same ports. An incomplete output directory is not a usable backup; missing, damaged, or checksum-mismatched bundles are rejected.
+
+## Restore into a New Project
+
+The bundle does not contain Docker images, the host operating system, or files not mounted into the project, such as an offline CA signing private key. Retain the original versioned images separately. Before restore, local image references must still resolve to the exact image IDs in the manifest; keeping a mutable tag alone is insufficient.
+
+Restore requires a new project name, a new private material directory, and unused target volume names. The tool verifies the whole manifest, every archive size/checksum, and archive paths before allocating restore resources. It never overwrites the source project or existing target data:
+
+```sh
+cargo xtask restore \
+  --backup /srv/gity-private/backup-20261102 \
+  --project gity-restored \
+  --secrets-dir /srv/gity-private/restored-assets
+```
+
+The tool creates target-specific volumes, maps all bind sources into the new private directory, and emits `restored-assets/compose.json`. This file contains secrets and has mode `0600`; its parent has mode `0700`. Contents retain their original numeric UID/GID, permissions, extended attributes, and ACLs. Network names and the Runner host work path are changed to the target project; original ports and service configuration are retained. The generated configuration references the new volumes by explicit external names; those volumes carry target project labels and never reuse source volumes.
+
+Restore does not start services. After confirming the source is stopped and ports are available, start explicitly:
+
+```sh
+docker compose --project-name gity-restored \
+  --file /srv/gity-private/restored-assets/compose.json \
+  --profile '*' up --detach --no-build
+```
+
+The generated configuration sets `pull_policy: never` and removes build entries so startup cannot rebuild or pull different images. Failed restores clean up resources newly created by that invocation. After success, verify actual HTTP operations, strictly pinned SSH clone/push/pull, packages, LFS/attachment and OCI bytes, and authorization isolation. Retain the original `known_hosts` check; accepting a replacement host key would hide loss of SSH identity.
+
+## Updates and Runtime Verification
+
+Before an update, create a recoverable full backup and retain original images separately. When stopping services with `down` and the original Compose configuration, omit `--volumes`, which deletes project persistent volumes. See [merge recovery](merge-recovery.md) for interrupted MR merges. Database and Git recovery must preserve the corresponding merge operation records and internal receipt references.
+
+Commands on this page were checked against the current CLI and Compose definitions. Full backup/restore acceptance for Standalone/distributed × Debian/Alpine still requires actual image runs. Source checks, compilation, and tests do not substitute for that acceptance. See [verification status](verification.md) for recorded results.
 
 </div>

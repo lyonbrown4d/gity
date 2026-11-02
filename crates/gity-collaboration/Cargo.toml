@@ -10,6 +10,7 @@ gity-persistence = { path = "../gity-persistence" }
 sea-orm.workspace = true
 chrono.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 fluxdi.workspace = true
 
 [dev-dependencies]

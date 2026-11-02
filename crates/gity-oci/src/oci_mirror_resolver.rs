@@ -45,13 +45,7 @@ impl OciClientMirrorResolver {
     source: &MirrorSource,
     registry: &MirrorRegistry,
   ) -> Result<String, MirrorResolveError> {
-    let source_reference = source
-      .reference
-      .as_deref()
-      .ok_or(MirrorResolveError::InvalidResponse)?;
-    let reference_text = format!("{}/{}:{source_reference}", registry.host, source.repository);
-    let reference =
-      Reference::from_str(&reference_text).map_err(|_| MirrorResolveError::InvalidResponse)?;
+    let reference = upstream_reference(source, registry)?;
     let transport = build_transport(self.mirror.allowed_hosts.clone(), self.timeout)
       .map_err(|_| MirrorResolveError::Unavailable)?;
     let auth = match registry.credential_secret_ref.as_deref() {
@@ -89,9 +83,39 @@ impl MirrorResolver for OciClientMirrorResolver {
   }
 }
 
+fn upstream_reference(
+  source: &MirrorSource,
+  registry: &MirrorRegistry,
+) -> Result<Reference, MirrorResolveError> {
+  let value = source
+    .reference
+    .as_deref()
+    .ok_or(MirrorResolveError::InvalidResponse)?;
+  // OCI tags cannot contain a colon; digest references use the algorithm:hash
+  // form. Let the upstream Reference type format the @ separator and validate
+  // the resulting reference, including digest algorithm and length.
+  let reference = if value.contains(':') {
+    Reference::with_digest(
+      registry.host.clone(),
+      source.repository.clone(),
+      value.into(),
+    )
+  } else {
+    Reference::with_tag(
+      registry.host.clone(),
+      source.repository.clone(),
+      value.into(),
+    )
+  };
+  Reference::from_str(&reference.to_string()).map_err(|_| MirrorResolveError::InvalidResponse)
+}
+
 fn classify_oci_error(error: oci_client::errors::OciDistributionError) -> MirrorResolveError {
   use oci_client::errors::OciDistributionError as OciError;
   match error {
+    OciError::ImageManifestNotFoundError(_) | OciError::ServerError { code: 404, .. } => {
+      MirrorResolveError::NotFound
+    }
     OciError::UnauthorizedError { .. } | OciError::AuthenticationFailure(_) => {
       MirrorResolveError::Unauthenticated
     }
@@ -112,6 +136,18 @@ fn classify_oci_error(error: oci_client::errors::OciDistributionError) -> Mirror
         .any(|error| error.code == oci_client::errors::OciErrorCode::Denied) =>
     {
       MirrorResolveError::Forbidden
+    }
+    OciError::RegistryError { envelope, .. }
+      if envelope.errors.iter().any(|error| {
+        matches!(
+          error.code,
+          oci_client::errors::OciErrorCode::ManifestUnknown
+            | oci_client::errors::OciErrorCode::NameUnknown
+            | oci_client::errors::OciErrorCode::NotFound
+        )
+      }) =>
+    {
+      MirrorResolveError::NotFound
     }
     _ => MirrorResolveError::Unavailable,
   }

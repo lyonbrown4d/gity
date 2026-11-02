@@ -4,36 +4,61 @@
 
 # Current verification status
 
-This page distinguishes source checks, compilation, executed tests, and image acceptance. A successful build does not establish complete functional acceptance.
+This page records completed checks and actual acceptance scope. Debian standalone passed full black-box acceptance; other combinations have no complete acceptance result. Source checks, compilation, source tests, container-specific checks, and full image acceptance are separate evidence. A successful build does not establish functional acceptance.
 
-## Source and compilation checks
+## Completed source-test runs
 
-- Default workspace `cargo check --workspace --locked` passed; production dependencies do not enable `gity-core/test-fixtures`.
-- Native workspace `cargo clippy --workspace --all-targets --locked -- -D warnings` passed.
-- The Web `wasm32-unknown-unknown` target check passed.
-- Formatting, the 300-line limit, and implementation/test separation passed. Source policy prevents platform business adapters from using generic Db CRUD, raw SQL, or direct Entity/ActiveModel operations.
-- mdBook build, bilingual chapter pairing, local links and anchors, and local Mermaid asset checks passed.
+| Check | Current completed run | Evidence |
+| --- | --- | --- |
+| Workspace tests | **332 passed, 0 failed, 13 ignored by default** | `target/production-blackbox/workspace-tests-final.log`; totals from all test summaries. |
+| PostgreSQL 18 business regression | **81 passed** | PostgreSQL child-test section of `target/production-blackbox/database-regression.log`. |
+| MySQL 8.4 business regression | **81 passed** | `target/production-blackbox/mysql-regression-final.log`. |
+| Latest PostgreSQL/MySQL migration schema contracts | **2 passed** | `target/production-blackbox/migration-databases.log`. |
+| PostgreSQL/MySQL merge-lock checks | **7 passed each** | `cargo test -p gity-test-support --test merge_guard_databases -- --ignored --test-threads=1`; isolated Testcontainers covering recovery, abort, and REST reference isolation. |
+| GNU tar metadata restoration check | **1 passed** | `target/production-blackbox/backup-metadata-tests.log`. |
+| Real Docker OCI authentication handshake check | **1 passed** | Separate execution of `gateway::docker_handshake_tests::real_docker_requires_authenticated_ping_for_login_and_challenge_for_push`; tool-session evidence, no separately archived log. |
 
-Checks pass on the pinned toolchain. Cargo still reports a future Rust compatibility note for the third-party `proc-macro-error2 v2.0.1` dependency.
+The workspace collection includes typed persistence, authorization isolation, business/audit transactions, concurrent IID allocation, pipeline deduplication, Runner leases, LFS, Git HTTP/SSH, personal SSH keys, MR merge recovery, backup manifests, and load-tool unit/process checks. The final ordinary workspace rerun passed; complete container acceptance still requires each black-box combination.
 
-## Executed tests
+The 81-test business collections ran earlier in this round. The final database merge-lock checks are listed separately; the entire business collection was not rerun after those final additions.
 
-Workspace execution recorded **259 passing tests and 8 ignored by default**. Coverage includes typed persistence, project isolation, atomic business/audit rollback, secret exclusion, concurrent IID allocation, pipeline deduplication, Runner leases, concurrent LFS uploads, and real Git HTTP/SSH permissions and branch protection.
-
-The platform and server regression collection passed **71 tests each** with isolated PostgreSQL 18 and MySQL 8.4 Testcontainers. `GITY_TEST_DATABASE_URL` switches configurable database fixtures; pure logic tests and transport tests that create their own SQLite databases retain their own resources. This does not imply every test switches database backends. Containers and databases are disposable and do not reuse retained inspection data.
-
-Run both database collections:
+The database collections use `GITY_TEST_DATABASE_URL` for fixtures that support it. Transport tests that create SQLite databases and pure logic tests retain their own resources. “81 passed” does not mean every test changed to PostgreSQL/MySQL. Each container and database is disposable and does not reuse retained environments. Run database regression with:
 
 ```sh
 cargo test -p gity-test-support --test database_regression --locked -- --ignored --test-threads=1
 ```
 
-The two database regression entry points ignored by default were executed separately. The other six specialized checks were not rerun for this business-persistence verification; they include entity/migration container contracts, OCI upstream resolution, and the container Runner. An ignored test is neither a pass nor a failure.
+The 13 default-ignored checks comprise two entity container contracts, two migration container contracts, two business database entry points, two merge-lock database entry points, and one each for OCI Docker handshake, Docker Hub upstream resolution, container Runner, GNU tar metadata, and explicit local-bundle validation. Migration, business database, merge-lock database, OCI handshake, metadata, and explicit local-bundle checks have separate execution evidence; this does not change the workspace log's ignored count. Independent execution results for entity contracts, upstream resolution, and container Runner are not confirmed on this page and cannot be inferred from other scenarios.
 
-## Unverified scope
+Run the OCI handshake check separately with `cargo test -p gity-oci --lib real_docker_requires_authenticated_ping --locked -- --ignored --nocapture`. This run used Docker 29.9.2 and checked authenticated probing, wrong-login denial, successful login, and a real push.
 
-Debian/Alpine application images were not rebuilt for this verification, and the four complete standalone/distributed × Debian/Alpine image black-box combinations remain unverified. Database container regression does not replace image, OCI/mirror, or distributed failure acceptance. See [image black-box checks](deployment/images.md#image-black-box-acceptance).
+The GNU tar check covers numeric UID/GID, permissions, extended attributes, ACLs, file capabilities, SGID, and whiteout devices. It verifies archive metadata handling and does not replace complete recovery of the database, Git, object storage, and secret configuration.
 
-There are no steady-state CPU, peak-memory, or throughput measurements. Arm64, multi-host networking, and production backup restoration remain unverified.
+## Source, compilation, and documentation checks
+
+- Latest formatting, source policy, third-party asset checks, and `git diff --check` passed.
+- Default workspace checks, final Clippy, Web WASM, mdBook build, and bilingual link checks passed.
+- Check default production and test builds separately; `gity-core/test-fixtures` must not hide production dependency errors.
+
+## Full image black-box scope
+
+| Deployment | Base image | Current status |
+| --- | --- | --- |
+| Standalone | Debian | **43 full black-box checks passed**; see [itemized evidence](../evidence/standalone-debian.json). |
+| Standalone | Alpine | Image built; full black-box acceptance not executed. |
+| Distributed components | Debian | Incomplete; startup checks stopped at registry configuration validation. |
+| Distributed components | Alpine | Full black-box acceptance not executed. |
+
+The 43 Debian standalone checks cover real HTTP/SSH Git, personal/deploy key permissions, interrupted MR recovery, Runner container jobs, package protocols, OCI/mirror, cross-project isolation, failure behavior, and a complete offline backup → new-project restore → restart → new-job execution. Hosted-object checks through private Angos prove internal data integrity, not public hosted authorization while a project's policy remains mirror.
+
+One Debian standalone container snapshot measured 74.18 MiB for the application and 282.5 MiB for DIND. This is a single observation after functional checks, not steady-state memory, RSS, or a capacity conclusion.
+
+Retain actual image IDs, platform, checks, failure details, and cleanup results for each combination. A passing deployment or base image does not establish another combination. See [image black-box checks](deployment/images.md#image-black-box-acceptance) and [deployment recovery boundaries](production-deployment.md).
+
+## Not executed or not covered this round
+
+The user canceled actual load testing for this round. Git/SSH and Git REST load tools remain available, but this round runs neither k6 nor real-client load samples and provides no throughput, loaded-latency, steady-state CPU, or peak-memory-under-load conclusions. Script inspection, load-tool unit tests, and timing Gauges are not actual load results.
+
+This page provides no acceptance conclusion for arm64, multi-host networking, real production-data recovery, or lossless automatic failover. Only Debian standalone has passed complete recovery acceptance; the other combinations require independent verification.
 
 </div>

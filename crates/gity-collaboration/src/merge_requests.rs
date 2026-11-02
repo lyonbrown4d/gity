@@ -3,6 +3,7 @@ use gity_core::AppError;
 use gity_entities::project_merge_requests as entity;
 use sea_orm::{
   ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
+  TransactionTrait, sea_query::Expr,
 };
 
 impl CollaborationRepository {
@@ -63,7 +64,32 @@ impl CollaborationRepository {
     key: i64,
     changes: MergeRequestChanges,
   ) -> Result<entity::Model, AppError> {
-    let current = self.merge_request(project, key).await?;
+    let tx = self.connection.begin().await?;
+    entity::Entity::update_many()
+      .col_expr(
+        entity::Column::UpdatedAt,
+        Expr::col(entity::Column::UpdatedAt),
+      )
+      .filter(entity::Column::ProjectId.eq(project))
+      .filter(entity::Column::Iid.eq(key))
+      .exec(&tx)
+      .await?;
+    let current = entity::Entity::find()
+      .filter(entity::Column::ProjectId.eq(project))
+      .filter(entity::Column::Iid.eq(key))
+      .one(&tx)
+      .await?
+      .ok_or_else(|| AppError::not_found("merge request not found"))?;
+    if current.active_merge_operation_id.is_some() {
+      return Err(AppError::conflict(
+        "merge operation is pending reconciliation",
+      ));
+    }
+    if current.state == "merged" && matches!(&changes.state, Change::Set(_)) {
+      return Err(AppError::conflict(
+        "merged merge requests cannot be reopened",
+      ));
+    }
     let mut active = current.into_active_model();
     if let Change::Set(value) = changes.title {
       active.title = Set(value);
@@ -87,34 +113,8 @@ impl CollaborationRepository {
       active.closed_at = Set(value);
     }
     active.updated_at = Set(chrono::Utc::now().naive_utc());
-    Ok(active.update(&self.connection).await?)
-  }
-}
-
-impl CollaborationRepository {
-  pub async fn mark_merged(
-    &self,
-    project: i64,
-    iid: i64,
-    actor: i64,
-    sha: Option<String>,
-  ) -> Result<entity::Model, AppError> {
-    let row = self.merge_request(project, iid).await?;
-    if row.state != "opened" {
-      return Err(AppError::conflict("merge request is not opened"));
-    }
-    Ok(
-      entity::ActiveModel {
-        id: Set(row.id),
-        state: Set("merged".to_owned()),
-        merged_at: Set(Some(chrono::Utc::now().naive_utc())),
-        merged_by_user_id: Set(Some(actor)),
-        merge_commit_sha: Set(sha),
-        updated_at: Set(chrono::Utc::now().naive_utc()),
-        ..Default::default()
-      }
-      .update(&self.connection)
-      .await?,
-    )
+    let updated = active.update(&tx).await?;
+    tx.commit().await?;
+    Ok(updated)
   }
 }

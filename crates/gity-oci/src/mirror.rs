@@ -25,6 +25,7 @@ pub trait MirrorResolver: Send + Sync + 'static {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MirrorResolveError {
+  NotFound,
   Unauthenticated,
   Forbidden,
   Unavailable,

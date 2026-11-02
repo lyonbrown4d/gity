@@ -44,3 +44,12 @@ mod application_queries;
 mod application_release_links;
 mod application_releases;
 mod application_wiki_pages;
+
+mod merge_operation_claim;
+mod merge_operation_events;
+mod merge_operation_finish;
+mod merge_operation_guard;
+pub use merge_operation_claim::MergeOperationClaim;
+pub use merge_operation_guard::MergeOperationGuard;
+
+pub use merge_operation_finish::MergeRejection;

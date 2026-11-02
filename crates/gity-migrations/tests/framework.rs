@@ -75,7 +75,7 @@ async fn appended_migration_runs_once_and_keeps_existing_data() {
   Extended::up(&db, None).await.unwrap();
   Extended::up(&db, None).await.unwrap();
   let applied = Extended::get_applied_migrations(&db).await.unwrap();
-  assert_eq!(applied.len(), 2);
+  assert_eq!(applied.len(), Migrator::migrations().len() + 1);
   assert!(SchemaManager::new(&db).has_table("feature").await.unwrap());
   assert_eq!(
     db.query_one_raw(sea_orm::Statement::from_string(
@@ -93,7 +93,7 @@ async fn appended_migration_runs_once_and_keeps_existing_data() {
   assert!(gity_migrations::apply(&db).await.is_err());
   assert_eq!(
     Extended::get_applied_migrations(&db).await.unwrap().len(),
-    2
+    Migrator::migrations().len() + 1
   );
 }
 
@@ -108,7 +108,7 @@ async fn failed_transactional_upgrade_leaves_no_ddl_or_history_and_keeps_data() 
   assert!(!SchemaManager::new(&db).has_table("feature").await.unwrap());
   assert_eq!(
     Migrator::get_applied_migrations(&db).await.unwrap().len(),
-    1
+    Migrator::migrations().len()
   );
   gity_migrations::apply(&db).await.unwrap();
   assert!(

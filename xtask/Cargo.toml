@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+wait-timeout = "0.2.1"
+shlex = "2"
+tar.workspace = true
 mdbook-mermaid = "=0.17.1"
 mdbook-preprocessor = "=0.5.4"
 zip.workspace = true

@@ -16,6 +16,7 @@ pub struct Model {
   pub milestone_id: Option<i64>,
   pub merged_at: Option<chrono::NaiveDateTime>,
   pub merged_by_user_id: Option<i64>,
+  pub active_merge_operation_id: Option<i64>,
   pub merge_commit_sha: Option<String>,
   pub head_sha: Option<String>,
   pub closed_at: Option<chrono::NaiveDateTime>,

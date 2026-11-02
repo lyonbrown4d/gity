@@ -56,13 +56,23 @@ impl OciAuthorization for PlatformOciAuthorizer {
       .await
       .map_err(map_error)?;
     let mount_source_storage_repository = if let Some(source) = &request.mount_source {
-      Some(
-        self
-          .resolve(source, OciOperation::Pull, &headers, None)
-          .await
-          .map_err(map_error)?
-          .storage_repository,
-      )
+      match self
+        .resolve(source, OciOperation::Pull, &headers, None)
+        .await
+      {
+        // Mirror cache blobs cannot bypass upstream authorization through a mount.
+        Ok(source) if source.mirror_source.is_none() => Some(source.storage_repository),
+        Ok(_) => None,
+        Err(error)
+          if matches!(
+            error.status,
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+          ) =>
+        {
+          None
+        }
+        Err(error) => return Err(map_error(error)),
+      }
     } else {
       None
     };
@@ -78,7 +88,7 @@ impl PlatformOciAuthorizer {
       if headers.contains_key("authorization") {
         return Err(AppError::unauthorized("unsupported registry credentials"));
       }
-      return Ok(());
+      return Err(AppError::unauthorized("registry credentials required"));
     };
     if raw.starts_with("gity_job_v1.") {
       crate::ci::authenticate_job_credential(&self.state, &raw).await?;

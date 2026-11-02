@@ -99,12 +99,3 @@ fn valid_mirror_authority(value: &str) -> bool {
     && url.password().is_none()
     && normalized == value
 }
-
-impl MirrorSettings {
-  pub fn permits_operation(&self, operation: crate::OciOperation) -> bool {
-    matches!(
-      operation,
-      crate::OciOperation::Probe | crate::OciOperation::Pull | crate::OciOperation::Catalog
-    )
-  }
-}

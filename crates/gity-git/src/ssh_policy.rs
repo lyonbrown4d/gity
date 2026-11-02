@@ -6,12 +6,14 @@ use std::path::Path;
 pub const SSH_POLICY_ENV: &str = "GITY_SSH_POLICY";
 const MAX_POLICY_BYTES: usize = 64 * 1024;
 
-/// Server-created deployment-key grant. Its role is always developer (30),
-/// independently of the creator's organization or administrator privileges.
+/// Server-created grant. Deployment keys use developer (30); personal keys
+/// carry their owner's effective role resolved for this Git command.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SshPolicy {
   pub default_branch: String,
+  #[serde(default = "developer_level")]
+  pub actor_level: i64,
   pub rules: Vec<SshBranchRule>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -45,8 +47,14 @@ pub enum SshPushAccess {
   Owner,
   NoOne,
 }
+fn developer_level() -> i64 {
+  30
+}
 impl SshPolicy {
   pub fn validate(&self) -> Result<()> {
+    if ![30, 40, 50, 100].contains(&self.actor_level) {
+      bail!("invalid SSH actor role");
+    }
     if !git2::Reference::is_valid_name(&format!("refs/heads/{}", self.default_branch)) {
       bail!("invalid SSH policy default branch");
     }
@@ -127,7 +135,13 @@ impl SshPolicy {
     let Some(rule) = self.effective_rule(branch) else {
       return Ok(());
     };
-    if !matches!(rule.push_access_level, SshPushAccess::Developer) {
+    let required = match rule.push_access_level {
+      SshPushAccess::Developer => 30,
+      SshPushAccess::Maintainer => 40,
+      SshPushAccess::Owner => 50,
+      SshPushAccess::NoOne => i64::MAX,
+    };
+    if self.actor_level < required {
       bail!("protected branch role requirement not met");
     }
     if new.is_zero() {

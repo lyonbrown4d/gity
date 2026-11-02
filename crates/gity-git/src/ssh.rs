@@ -76,6 +76,8 @@ impl GitService {
       .arg(hook_path)
       .arg("-c")
       .arg("receive.fsckObjects=true")
+      .arg("-c")
+      .arg("transfer.hideRefs=refs/gity/")
       .arg(service.command())
       .arg(".")
       .stdin(Stdio::piped());

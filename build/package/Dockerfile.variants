@@ -30,7 +30,6 @@ WORKDIR /src
 COPY Cargo.toml Cargo.lock rust-toolchain.toml rustfmt.toml ./
 COPY apps ./apps
 COPY crates ./crates
-COPY migrations ./migrations
 COPY xtask ./xtask
 ENV RUSTUP_TOOLCHAIN=1.99.1 CARGO_NET_GIT_FETCH_WITH_CLI=true
 
@@ -64,11 +63,12 @@ RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/reg
       *) echo "unsupported GITY_ROLE" >&2; exit 2 ;; \
     esac; \
     set --; for extra in ${extras}; do set -- "$@" -p "$extra"; done; \
-    CARGO_BUILD_JOBS="${CARGO_JOBS}" cargo build --release --locked -p "${package}" "$@"; \
+    CARGO_HTTP_MULTIPLEXING=false CARGO_BUILD_JOBS="${CARGO_JOBS}" cargo build --release --locked -p "${package}" "$@"; \
     install -Dm0555 "target/release/${binary}" /out/gity; \
     for extra in ${extras}; do install -Dm0555 "target/release/${extra}" "/out/${extra}"; done
 
 FROM web-tools AS web
+ARG CARGO_JOBS=4
 ARG TARGETARCH
 COPY --from=source /src /src
 WORKDIR /src
@@ -77,7 +77,7 @@ RUN --mount=type=cache,id=gity-trunk-tools-${GITY_BASE}-${TARGETARCH},target=/ro
     --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
     --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
     cd /src/apps/gity-web && \
-    NO_COLOR=true /opt/trunk/bin/trunk --skip-version-check build --release
+    CARGO_HTTP_MULTIPLEXING=false CARGO_BUILD_JOBS="${CARGO_JOBS}" NO_COLOR=true /opt/trunk/bin/trunk --skip-version-check build --release
 
 FROM ${RUNTIME_IMAGE} AS runtime
 ARG GITY_BASE=debian
@@ -142,7 +142,7 @@ FROM app AS registry
 EXPOSE 8081 8082
 COPY --from=angos-engine --chmod=0555 /angos /usr/local/bin/angos
 ENV GITY_REGISTRY__ANGOS__EXECUTABLE=/usr/local/bin/angos
-HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8081/v2/ || exit 1
+HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8081/readyz || exit 1
 
 FROM app AS runner
 COPY --from=docker-client /usr/local/bin/docker /usr/local/bin/docker

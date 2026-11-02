@@ -4,13 +4,16 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 mod api;
+mod backup_restore;
 mod ci;
 mod git;
+mod merge_recovery;
 mod native;
 mod oci;
 mod process;
 mod proxy;
 mod runtime;
+mod suites;
 pub(super) use runtime::grant_admin;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum, Serialize)]
@@ -55,6 +58,9 @@ pub struct BlackboxArgs {
   ssh_port: u16,
   #[arg(long, value_enum, default_value_t = ComposeAction::UpDown)]
   compose_action: ComposeAction,
+  /// Use previously built project image tags; never skip runtime checks.
+  #[arg(long)]
+  no_build: bool,
   #[arg(long)]
   env_file: Option<PathBuf>,
   #[arg(long)]
@@ -204,12 +210,8 @@ pub fn run(root: &Path, mut args: BlackboxArgs) -> Result<()> {
   let compose_attempted = true;
   let started = runtime::compose(root, &args, "up");
   let result = match started {
-    Ok(()) => {
-      let suites = runtime::wait_for_health(&config, &mut reporter)
-        .and_then(|_| run_suites(root, &args, &config, temp.path(), &mut reporter));
-      let images = runtime::capture_images(root, &args, &mut reporter);
-      suites.and(images)
-    }
+    Ok(()) => runtime::wait_for_health(&config, &mut reporter)
+      .and_then(|_| suites::run(root, &args, &config, temp.path(), &mut reporter)),
     Err(error) => Err(error),
   };
   if let Err(error) = &result {
@@ -230,32 +232,6 @@ pub fn run(root: &Path, mut args: BlackboxArgs) -> Result<()> {
   );
   result?;
   finalization?;
-  Ok(())
-}
-
-fn run_suites(
-  root: &Path,
-  args: &BlackboxArgs,
-  config: &RunConfig,
-  work: &Path,
-  reporter: &mut Reporter,
-) -> Result<()> {
-  let mut scenario = api::run(root, args, config, reporter)?;
-  ci::run(root, args, config, &scenario, reporter)?;
-  scenario.git_credential = Some(git::run(root, args, config, &scenario, work, reporter)?);
-  oci::run(config, &scenario, work, reporter)?;
-  native::run(args, &scenario, work, reporter)?;
-  if args.mode == Mode::Distributed {
-    api::distributed(
-      root,
-      args,
-      config,
-      &scenario,
-      &scenario.owner_token,
-      work,
-      reporter,
-    )?;
-  }
   Ok(())
 }
 

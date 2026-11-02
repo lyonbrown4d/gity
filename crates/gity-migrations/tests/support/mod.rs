@@ -18,10 +18,12 @@ pub async fn assert_schema(db: DatabaseConnection) {
   gity_migrations::apply(&db).await.unwrap();
   gity_migrations::apply(&db).await.unwrap();
   let history = Migrator::get_applied_migrations(&db).await.unwrap();
-  assert_eq!(history.len(), 1);
+  assert_eq!(history.len(), Migrator::migrations().len());
   assert_eq!(history[0].name(), "m20261102_000001_latest_schema");
   let manager = gity_migrations::sea_orm_migration::SchemaManager::new(&db);
   for table in [
+    "user_ssh_keys",
+    "merge_operations",
     "users",
     "auth_sessions",
     "project_milestones",

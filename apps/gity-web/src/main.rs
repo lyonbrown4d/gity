@@ -1,3 +1,4 @@
+mod account_ssh;
 mod api;
 mod app;
 mod catalog;

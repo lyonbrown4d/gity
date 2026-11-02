@@ -38,6 +38,13 @@ impl DatabaseContainer {
       .with_wait_for(WaitFor::message_on_stderr("ready for connections"))
       .with_env_var("MYSQL_ROOT_PASSWORD", "gity_test_only")
       .with_env_var("MYSQL_DATABASE", "gity")
+      // One isolated server runs the whole regression suite. UUID databases stay
+      // alive until this container is dropped, so dozens of complete schemas can
+      // exceed MySQL's default 2000 cached table definitions and provoke error
+      // 1615 during metadata eviction/reprepare. Size only this test server's
+      // definition cache for that workload; preserve SQLx prepared statements,
+      // production settings and the default file-descriptor-backed table cache.
+      .with_cmd(["--table-definition-cache=16384"])
       .start()
       .await?;
     let host = container.get_host().await?;

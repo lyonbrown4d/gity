@@ -7,14 +7,15 @@ use std::{
   process::Command,
 };
 
-mod commands;
+pub(super) mod commands;
 mod http;
+pub(super) mod personal;
 mod promotion;
 pub(super) use promotion::after_promotion;
 
 pub struct GitCredential {
-  private_key: PathBuf,
-  known_hosts: PathBuf,
+  pub(super) private_key: PathBuf,
+  pub(super) known_hosts: PathBuf,
 }
 
 pub fn run(
@@ -208,7 +209,7 @@ pub fn run(
 fn create_key(path: &Path) -> Result<String> {
   process::run_output(
     Command::new("ssh-keygen")
-      .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+      .args(["-q", "-t", "ed25519", "-N", "", "-C", "", "-f"])
       .arg(path),
     "ssh-keygen",
   )?;

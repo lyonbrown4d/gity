@@ -80,6 +80,7 @@ pub(super) fn parse_request(method: &Method, uri: &Uri) -> Result<ParsedRequest,
 
 pub(super) fn map_mirror_error(error: MirrorResolveError) -> (StatusCode, &'static str) {
   match error {
+    MirrorResolveError::NotFound => (StatusCode::NOT_FOUND, "mirror manifest not found"),
     MirrorResolveError::Unauthenticated => (
       StatusCode::UNAUTHORIZED,
       "mirror source authentication failed",
@@ -142,16 +143,23 @@ pub(super) fn target_uri(
     .ok_or((StatusCode::NOT_FOUND, "invalid OCI path"))?;
   let path = format!("/v2/{}/{}", decision.storage_repository, suffix);
   let query = uri.query().map(|query| {
-    let pairs = url::form_urlencoded::parse(query.as_bytes()).map(|(key, value)| {
+    let pairs = url::form_urlencoded::parse(query.as_bytes()).filter_map(|(key, value)| {
+      // An inaccessible source is an ordinary upload, never an unchecked
+      // mount against the original public repository name. Strip duplicates too.
+      if matches!(key.as_ref(), "mount" | "from")
+        && decision.mount_source_storage_repository.is_none()
+      {
+        return None;
+      }
       let value = if key == "from" {
         decision
           .mount_source_storage_repository
           .clone()
-          .unwrap_or_else(|| value.into_owned())
+          .expect("mount source was authorized")
       } else {
         value.into_owned()
       };
-      (key.into_owned(), value)
+      Some((key.into_owned(), value))
     });
     url::form_urlencoded::Serializer::new(String::new())
       .extend_pairs(pairs)

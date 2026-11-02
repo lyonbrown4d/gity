@@ -58,7 +58,7 @@ impl server::Handler for Connection {
       keys::authorized(&self.state, &fingerprint),
     )
     .await??
-    .is_empty()
+    .is_none()
     {
       return Ok(server::Auth::reject());
     }
@@ -185,7 +185,7 @@ impl server::Handler for Connection {
           tokio::spawn(async move {
             tokio::select! {
                 _=disconnect.cancelled()=>{},
-                _=transfer::run(state,channel,handle,authorized)=>{},
+                _=gity_core::audit_context(authorized.actor_id, transfer::run(state,channel,handle,authorized))=>{},
             }
           }),
         );

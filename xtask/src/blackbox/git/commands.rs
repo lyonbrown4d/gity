@@ -2,7 +2,7 @@ use super::super::process;
 use anyhow::{Context, Result};
 use std::{path::Path, process::Command};
 
-pub(super) fn configure(repo: &Path, key: &Path, known_hosts: &Path) -> Result<()> {
+pub(in crate::blackbox) fn configure(repo: &Path, key: &Path, known_hosts: &Path) -> Result<()> {
   run_git(
     repo,
     key,
@@ -19,7 +19,7 @@ pub(super) fn configure(repo: &Path, key: &Path, known_hosts: &Path) -> Result<(
   )
 }
 
-pub(super) fn run_git<const N: usize>(
+pub(in crate::blackbox) fn run_git<const N: usize>(
   cwd: &Path,
   key: &Path,
   known_hosts: &Path,
@@ -61,4 +61,15 @@ fn git_command(cwd: &Path, key: &Path, known_hosts: &Path) -> Command {
     .env("GIT_TERMINAL_PROMPT", "0")
     .env("GIT_CONFIG_NOSYSTEM", "1");
   command
+}
+
+pub(in crate::blackbox) fn output<const N: usize>(
+  cwd: &Path,
+  key: &Path,
+  known_hosts: &Path,
+  args: [&str; N],
+) -> Result<Vec<u8>> {
+  let mut command = git_command(cwd, key, known_hosts);
+  command.args(args);
+  Ok(process::run_output(&mut command, "strict-pinned SSH refs")?.stdout)
 }

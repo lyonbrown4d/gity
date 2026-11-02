@@ -179,6 +179,7 @@ pub(super) fn Profile() -> impl IntoView {
                   </div>
               </section>
           </div>
+          <crate::account_ssh::PersonalSshKeys />
       </div>
   }
 }

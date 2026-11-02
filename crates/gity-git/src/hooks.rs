@@ -63,6 +63,9 @@ pub fn check_update(
   if !git2::Reference::is_valid_name(reference) {
     bail!("invalid ref update");
   }
+  if reference == "refs/gity" || reference.starts_with("refs/gity/") {
+    bail!("server-owned reference namespace is not writable");
+  }
   let old = Oid::from_str(old).context("invalid old object ID")?;
   let new = Oid::from_str(new).context("invalid new object ID")?;
   match std::env::var(crate::SSH_POLICY_ENV) {

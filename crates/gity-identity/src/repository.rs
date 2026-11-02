@@ -7,6 +7,8 @@ use crate::UserIdentity;
 mod accounts;
 mod authorization;
 mod credentials;
+mod ssh_keys;
+mod user_lock;
 
 #[derive(Clone)]
 pub struct IdentityRepository {

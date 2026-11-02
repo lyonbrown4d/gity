@@ -80,7 +80,15 @@ pub(super) fn compose(root: &Path, args: &BlackboxArgs, action: &str) -> Result<
   configure_compose(&mut command, root, args)?;
   match action {
     "up" => {
-      command.args(["up", "--detach", "--build"]);
+      command.args([
+        "up",
+        "--detach",
+        if args.no_build {
+          "--no-build"
+        } else {
+          "--build"
+        },
+      ]);
     }
     "down" => {
       command.args(["down", "--volumes", "--remove-orphans"]);
@@ -106,7 +114,11 @@ pub(super) fn start_distributed_runner(
     "runner",
     "up",
     "--detach",
-    "--build",
+    if args.no_build {
+      "--no-build"
+    } else {
+      "--build"
+    },
     "docker",
     "runner",
   ]);

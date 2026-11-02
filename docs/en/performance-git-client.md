@@ -4,66 +4,89 @@
 
 # Git Client Stress Tests
 
-The k6 workload covers REST APIs. Git clone/fetch/push needs a real Git client because Smart HTTP uses Git protocol RPCs over `info/refs`, `git-upload-pack`, and `git-receive-pack`.
+`cargo xtask git-stress` runs real Git clone, fetch, push and ls-remote clients over HTTP or OpenSSH. By default it creates an isolated private project through the API. HTTP uses a project access token; SSH registers the supplied public key as a project deployment key with push access. Cleanup revokes that credential, requests project deletion and logs out. Generated accounts and organizations remain until test-database cleanup. Tokens and private keys are excluded from repository URLs, diagnostic logs and JSON summaries.
 
-The `xtask git-stress` command seeds a project through the API, creates a project access token with `read_repository` and `write_repository`, then runs concurrent real `git` subprocesses.
+The runner requires Git, OpenSSH and a Unix shell. Binary fixtures read the operating system entropy source `/dev/urandom`. Windows execution has not been verified. k6 Git REST/API workloads and these native Git protocol workloads are measured separately.
 
-## Run Against The Blackbox Stack
+## Connect To An Existing Server
 
-```bash
-cargo run -p xtask -- git-stress --build --workers 4 --iterations 24
-```
-
-The command starts `docker-compose.blackbox.yaml` and keeps the server stack running. Local temporary Git worktrees are cleaned by default. For a project created by the command, it revokes the access token and marks the project for deletion after the run. The generated account and organization remain in the test database for database-lifecycle cleanup.
-
-## Run Against An Existing Server
+HTTP is the default transport. This creates and tests an isolated project:
 
 ```bash
-cargo run -p xtask -- git-stress --no-compose --base-url http://127.0.0.1:18080 --workers 8 --iterations 80
+cargo xtask git-stress --no-compose \
+  --base-url http://127.0.0.1:18080 \
+  --workers 8 --iterations 80
 ```
 
-## Workload Modes
+SSH requires a dedicated noninteractive private key and a verified host public key file. Obtain the host public key from the environment operator before preparing known_hosts; the runner never accepts an unknown host automatically. The default SSH port is `2222`; the hostname comes from `--base-url`. Override them with `--ssh-port` and `--ssh-host`.
 
 ```bash
-cargo run -p xtask -- git-stress --mode mixed --workers 8 --iterations 100
-cargo run -p xtask -- git-stress --mode clone --workers 4 --iterations 20
-cargo run -p xtask -- git-stress --mode fetch --workers 16 --iterations 200
-cargo run -p xtask -- git-stress --mode push --workers 4 --iterations 40
-cargo run -p xtask -- git-stress --mode ls-remote --workers 32 --iterations 500
+ssh-keygen -q -t ed25519 -N '' -f /tmp/gity-perf-key
+# Example content: [127.0.0.1]:2222 ssh-ed25519 <verified-server-host-public-key>
+chmod 600 /tmp/gity-perf-key /tmp/gity-perf-known_hosts
+cargo xtask git-stress --no-compose --transport ssh \
+  --base-url http://127.0.0.1:18080 --ssh-port 2222 \
+  --ssh-key /tmp/gity-perf-key --ssh-known-hosts /tmp/gity-perf-known_hosts \
+  --workers 8 --iterations 80
 ```
 
-Mixed mode defaults to `clone=20`, `fetch=45`, `push=25`, and `ls-remote=10`. Override with `--clone-percent`, `--fetch-percent`, `--push-percent`, and `--ls-remote-percent`.
+SSH uses the fixed `git` username, strict host verification and the supplied identity file. Machine SSH configuration and global known_hosts are ignored. Paths are passed through separately quoted arguments in a fixed wrapper, rather than assembled into executable shell text.
+
+## Fixed Windows, Dataset Size And Clone Depth
+
+Without `--duration-seconds`, `--iterations` is the total operation count across all workers. With it, each worker repeatedly performs an operation before requesting another within a shared fixed window; this is a closed loop, without a target arrival rate. At the deadline the runner stops starting operations and waits for in-flight operations. Actual measurement time can therefore exceed the requested window. `--timeout-ms` limits each Git subprocess and defaults to `60000`.
+
+This configuration rewrites one 1 MiB random file in each of 16 commits: approximately a 1 MiB working tree and 16 MiB of random full history, plus a small README and Git metadata.
+
+```bash
+cargo xtask git-stress --no-compose --transport ssh \
+  --base-url http://127.0.0.1:18080 \
+  --ssh-key /tmp/gity-perf-key --ssh-known-hosts /tmp/gity-perf-known_hosts \
+  --workers 8 --duration-seconds 60 --mode mixed \
+  --seed-files 1 --bytes-per-file 1048576 --seed-commits 16 \
+  --clone-depth 0 --summary target/git-stress-ssh.json
+```
+
+`--seed-files` defaults to `8`. Omitting `--bytes-per-file` retains small text fixtures, and `--seed-commits` defaults to `1`. A configured byte count generates fresh OS entropy for every file in every commit, preventing repeated filler from compressing heavily. For an 8 MiB working tree with four commits use `--seed-files 1 --bytes-per-file 8388608 --seed-commits 4`.
+
+Measured clones default to `--clone-depth 1`. Zero means a full clone; positive integers specify shallow depth. Initial worker worktrees always fully clone main. API provisioning, fixture writes, the initial push and initial worker clones all belong to setup and are excluded from the measurement window.
+
+## Operation Modes
+
+`--mode` supports `mixed`, `clone`, `fetch`, `push` and `ls-remote`. Mixed defaults to clone 20, fetch 45, push 25 and ls-remote 10; use the corresponding `--*-percent` options to change the weights.
+
+Each clone uses a new directory. Fetch updates an existing worker worktree; running it alone usually measures ref negotiation against an already synchronized repository. Push writes a small commit on a distinct `perf/<run>/<worker>-<iteration>` branch, avoiding contention on main. Mixed fetches can receive branches created by other workers.
+
+## JSON And Latency Scope
+
+`--summary PATH` writes JSON. The console also prints per-operation count, fail, avg, p50, p95, p99 and max, with latency in milliseconds. Percentiles use nearest rank and include failed and timed-out samples.
+
+The `measurement.started_unix_seconds` and `finished_unix_seconds` fields are UTC Unix-second anchors recorded just before workers start together and after the last in-flight operation finishes, for filtering resource samples. Elapsed time and throughput continue to use a monotonic clock, so wall-clock adjustments do not change those measurements. The summary separates `setup` and `measurement`, each with actual `elapsed_seconds`, operation metrics and throughput. It records transport, workers, clone_depth, seed_files, bytes_per_file and seed_commits. `throughput_ops_per_second` divides all completed operations by actual measurement time; `successful_ops_per_second` counts only successful operations. `seed_applied` identifies whether this run generated the seed; configured seed values do not describe the actual contents of an existing repository. Workload failures still produce a summary and cause a nonzero exit status.
+
+These are client end-to-end measurements, including process startup, local file operations and diagnostic collection. Push also includes checkout, add and commit; by default clone includes temporary-directory cleanup. Native child-completion waiting avoids fixed polling intervals, and timeout cancels and reaps the whole process group. Results are not server RPC latency. Setup warms repository, connection paths and file caches, so results do not represent cold starts either.
 
 ## Existing Repository Mode
 
-If you already have a repository URL and token:
+HTTP reads `GITY_GIT_PERF_TOKEN` and supplies it through a temporary askpass helper. Override the variable name or username with `--token-env` and `--token-username`:
 
 ```bash
-GITY_GIT_PERF_TOKEN=<token> cargo run -p xtask -- git-stress --no-compose --project-url http://127.0.0.1:18080/group/project.git --workers 8 --iterations 80
+GITY_GIT_PERF_TOKEN=<token> cargo xtask git-stress --no-compose \
+  --project-url http://127.0.0.1:18080/group/project.git --mode fetch --workers 8 --iterations 80
 ```
 
-The token is read from `GITY_GIT_PERF_TOKEN` and supplied to Git through a temporary askpass helper. Override its username with `--token-username`. The token is not placed in the repository URL or Git arguments. Existing-repository mode does not delete the supplied project or its remote branches. The askpass helper requires a Unix shell; Windows Git stress execution has not been verified.
+SSH uses a key already authorized for the repository. It does not read an HTTP token or call the API to create or delete a project:
 
-## Proxy And Credential Helpers
+```bash
+cargo xtask git-stress --no-compose --transport ssh \
+  --project-url ssh://git@127.0.0.1:2222/group/project.git \
+  --ssh-key /tmp/gity-perf-key --ssh-known-hosts /tmp/gity-perf-known_hosts \
+  --mode ls-remote --workers 8 --duration-seconds 60 --summary target/git-existing.json
+```
 
-For localhost targets, the runner bypasses Git/HTTP proxies and clears Git credential helpers for subprocesses. This keeps blackbox runs independent from machine-level proxy settings such as `HTTP_PROXY` or Git credential manager configuration.
+The caller supplies permissions and prepared data for an existing repository; remote branches created by the command remain. `--keep-workdir` preserves local worktrees; default cleanup removes only the generated run directory. Localhost HTTP requests bypass machine proxies and Git credential helpers.
 
-The server must return `WWW-Authenticate: Basic` on Git Smart HTTP authentication failures. Git clients use that challenge before retrying URL credentials for private repositories.
+## Start Test Compose
 
-## Server-Side Git RPC Capacity
-
-The server limits concurrent native Git Smart HTTP subprocesses with `git.max_concurrent_rpc` (`GITY_GIT__MAX_CONCURRENT_RPC`). The default is `32`; set it to `0` to disable the limiter. Raise it only when the host has enough CPU, file descriptors, and repository I/O capacity. Lower it if mixed API + Git traffic starts producing gateway errors or long tail latency.
-
-## Metrics
-
-The runner prints per-operation count, failures, avg, p50, p95, and max for:
-
-- `setup.init`, `setup.commit`, `setup.push`, `setup.clone`.
-- `ls-remote` for ref advertisement/read checks.
-- `clone` for fresh client clone flows.
-- `fetch` for incremental `git-upload-pack` flows.
-- `push` for `git-receive-pack` flows.
-
-`--keep-workdir` preserves local worktrees for debugging. When the command creates its own project, project deletion is requested and its test token is revoked regardless of this flag. Branches pushed to an existing external project are left in place.
+Omitting `--no-compose` retains `docker-compose.blackbox.yaml` startup, with optional `--build`; the stack remains running afterward. SSH adds a temporary Compose override to enable and publish the selected SSH port. Operators must still verify and prepare known_hosts in advance. For production-image acceptance and performance sampling, connect to an already started isolated environment so builds, other tests and shared-service load do not contaminate measurements.
 
 </div>

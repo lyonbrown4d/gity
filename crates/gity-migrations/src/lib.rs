@@ -6,6 +6,8 @@ use sea_orm_migration::{MigrationTrait, MigratorTrait};
 
 mod guard;
 mod m20261102_000001_latest_schema;
+mod m20261102_000002_personal_ssh_keys;
+mod m20261102_000003_merge_operations;
 mod schema;
 
 pub use sea_orm_migration;
@@ -15,7 +17,11 @@ pub struct Migrator;
 #[sea_orm_migration::async_trait::async_trait]
 impl MigratorTrait for Migrator {
   fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-    vec![Box::new(m20261102_000001_latest_schema::Migration)]
+    vec![
+      Box::new(m20261102_000001_latest_schema::Migration),
+      Box::new(m20261102_000002_personal_ssh_keys::Migration),
+      Box::new(m20261102_000003_merge_operations::Migration),
+    ]
   }
 }
 

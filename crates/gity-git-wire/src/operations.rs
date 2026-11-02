@@ -97,6 +97,17 @@ pub enum GitOperation {
   CreateFileCommit {
     input: serde_json::Value,
   },
+  MergeOperation {
+    input: serde_json::Value,
+  },
+  MergeOperationOutcome {
+    input: serde_json::Value,
+  },
+  AbortMergeOperation {
+    input: serde_json::Value,
+    reason: String,
+    actor_user_id: i64,
+  },
   MergeBranches {
     input: serde_json::Value,
   },
@@ -140,6 +151,8 @@ impl GitOperation {
         | Self::DeleteTag { .. }
         | Self::CreateFileCommit { .. }
         | Self::MergeBranches { .. }
+        | Self::MergeOperation { .. }
+        | Self::AbortMergeOperation { .. }
         | Self::Maintenance { .. }
         | Self::InstallManagedHook
     )

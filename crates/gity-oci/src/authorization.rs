@@ -42,6 +42,8 @@ pub trait OciAuthorization: Send + Sync + 'static {
 #[serde(deny_unknown_fields)]
 pub struct OciAuthorizationDecision {
   pub storage_repository: String,
+  /// None on a mount request means start an ordinary upload: the gateway must
+  /// remove both mount/from, including when the requested source is inaccessible.
   pub mount_source_storage_repository: Option<String>,
   /// Gity-managed mirror source chosen by the platform after ACL checks.
   pub mirror_source: Option<MirrorSource>,

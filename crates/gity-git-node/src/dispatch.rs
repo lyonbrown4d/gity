@@ -145,6 +145,25 @@ impl GitNodeService {
           .create_file_commit(repo, serde_json::from_value(input)?)
           .await?
       )),
+      GitOperation::MergeOperation { input } => Ok(serde_json::to_value(
+        git
+          .merge_operation(repo, serde_json::from_value(input)?)
+          .await?,
+      )?),
+      GitOperation::MergeOperationOutcome { input } => Ok(serde_json::to_value(
+        git
+          .merge_operation_outcome(repo, serde_json::from_value(input)?)
+          .await?,
+      )?),
+      GitOperation::AbortMergeOperation {
+        input,
+        reason,
+        actor_user_id,
+      } => Ok(serde_json::to_value(
+        git
+          .abort_merge_operation(repo, serde_json::from_value(input)?, reason, actor_user_id)
+          .await?,
+      )?),
       GitOperation::MergeBranches { input } => {
         git
           .merge_branches(repo, serde_json::from_value(input)?)

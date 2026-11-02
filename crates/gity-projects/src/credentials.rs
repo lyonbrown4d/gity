@@ -1,6 +1,6 @@
 use crate::{NewProjectToken, RepositoryAccessRepository};
 use gity_core::AppError;
-use gity_entities::{project_access_tokens, project_deploy_keys};
+use gity_entities::{project_access_tokens, project_deploy_keys, user_ssh_keys};
 use sea_orm::{
   ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
@@ -142,6 +142,16 @@ impl RepositoryAccessRepository {
     created_by_user_id: i64,
   ) -> Result<project_deploy_keys::Model, AppError> {
     let tx = self.connection.begin().await?;
+    if user_ssh_keys::Entity::find()
+      .filter(user_ssh_keys::Column::Fingerprint.eq(&fingerprint))
+      .one(&tx)
+      .await?
+      .is_some()
+    {
+      return Err(AppError::conflict(
+        "SSH fingerprint already registered as a personal key",
+      ));
+    }
     let now = chrono::Utc::now().naive_utc();
     let model = project_deploy_keys::ActiveModel {
       id: Set(gity_core::new_id()),

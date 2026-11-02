@@ -1,4 +1,5 @@
 mod profile;
+mod ssh_keys;
 use crate::openapi::{schemas as api, user_schemas as spec};
 use crate::{AppState, auth};
 use axum::{
@@ -19,6 +20,11 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .routes(utoipa_axum::routes!(me, update_me))
     .routes(utoipa_axum::routes!(detail, update, remove))
     .routes(utoipa_axum::routes!(tokens, create_token))
+    .routes(utoipa_axum::routes!(
+      ssh_keys::list,
+      ssh_keys::create,
+      ssh_keys::remove
+    ))
 }
 pub async fn admin(state: &AppState, headers: &HeaderMap) -> Result<(), AppError> {
   if !auth::principal(state, headers).await?.is_super_admin {

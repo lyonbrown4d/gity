@@ -3,6 +3,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 use sha2::{Digest, Sha256};
 use std::{path::PathBuf, process::Command};
+mod backup;
 mod blackbox;
 mod container_stats;
 mod docs;
@@ -20,6 +21,8 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Task {
+  Backup(backup::BackupArgs),
+  Restore(backup::RestoreArgs),
   Check,
   Test,
   Web,
@@ -70,6 +73,12 @@ fn main() -> Result<()> {
     Task::K6(args) => k6::run(&root, args)?,
     Task::ContainerStats(args) => container_stats::run(args)?,
     Task::Blackbox(args) => blackbox::run(&root, args)?,
+    Task::Backup(args) => {
+      backup::backup(&root, args)?;
+    }
+    Task::Restore(args) => {
+      backup::restore(&root, args)?;
+    }
     Task::Check => {
       sources::check(&root)?;
       verify_vendor(&root)?;

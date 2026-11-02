@@ -1,0 +1,39 @@
+{
+  "_version": 2,
+  "merge operation journal missing": {
+    "en": "merge operation journal missing",
+    "zh": "合并操作记录缺失"
+  },
+  "merge request changed during merge claim": {
+    "en": "merge request changed during merge claim",
+    "zh": "建立合并操作时，合并请求已发生变化，请刷新后重试"
+  },
+  "merge operation not found": {
+    "en": "merge operation not found",
+    "zh": "未找到合并操作"
+  },
+  "contradictory merge operation outcome": {
+    "en": "contradictory merge operation outcome",
+    "zh": "合并操作结果与已保存的结果冲突"
+  },
+  "merge request operation binding changed": {
+    "en": "merge request operation binding changed",
+    "zh": "合并请求关联的操作已发生变化"
+  },
+  "merge result receipt missing": {
+    "en": "merge result receipt missing",
+    "zh": "合并结果回执缺失"
+  },
+  "abort reason is required": {
+    "en": "abort reason is required",
+    "zh": "请填写终止合并的原因"
+  },
+  "no pending merge operation": {
+    "en": "no pending merge operation",
+    "zh": "当前没有待处理的合并操作"
+  },
+  "merge operation is pending reconciliation": {
+    "en": "merge operation is pending reconciliation",
+    "zh": "合并操作尚待核对，请先确认合并结果再编辑"
+  }
+}

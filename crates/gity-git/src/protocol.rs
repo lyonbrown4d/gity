@@ -121,7 +121,11 @@ impl GitService {
       }
     }
     let mut command = self.command(repo)?;
-    command.arg(service.command()).arg("--stateless-rpc");
+    command
+      .arg("-c")
+      .arg("transfer.hideRefs=refs/gity/")
+      .arg(service.command())
+      .arg("--stateless-rpc");
     if advertise {
       command.arg("--advertise-refs");
     } else {

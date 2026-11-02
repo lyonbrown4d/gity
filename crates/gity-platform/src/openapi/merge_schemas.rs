@@ -17,6 +17,8 @@ pub struct MergeRequest {
   pub merged_at: Option<String>,
   pub merged_by_user_id: Option<String>,
   pub merge_commit_sha: Option<String>,
+  /// Pending durable merge operation; null when no reconciliation is required.
+  pub active_merge_operation_id: Option<String>,
   /// Source branch commit captured when the merge request was created.
   pub head_sha: Option<String>,
   pub closed_at: Option<String>,

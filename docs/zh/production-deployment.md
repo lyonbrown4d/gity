@@ -45,12 +45,59 @@ standalone 中的 Runner 由 `RunnerModule` 启动为独立子进程，服务端
 | Registry | `GITY_REGISTRY_OBSERVABILITY__OTLP_ENDPOINT` |
 | Runner | `GITY_RUNNER__OBSERVABILITY__OTLP_ENDPOINT` |
 
-## 更新与恢复
+## 离线备份
 
-更新前为数据库和所有相关命名卷建立可恢复备份，并保留当前镜像标签。停止服务时使用对应 Compose 文件的 `down`；不要附加 `-v`，否则 Docker 会删除该项目的持久卷。重启后检查 Compose 健康状态，再用实际 HTTP、Git、包协议和 OCI 操作验证业务路径。
+`cargo xtask backup` 为指定的 Compose 项目建立离线快照。先安排停写窗口，等待流水线完成，并协调所有会直接修改宿主机 bind 目录的进程。工具按精确项目标签停止整个项目，包括应用、Runner、Git 节点、PostgreSQL、SeaweedFS 和 DIND；确认容器全部停止后才读取数据。此过程需要停机，不提供热备份或零数据丢失的自动故障切换保证。
 
-当前仓库没有已执行的生产备份恢复演练记录。上述备份范围是由当前卷挂载关系得出的运维要求，不代表已验证端到端恢复成功。镜像矩阵、Git 副本故障行为和完整备份恢复验收结果应以实际运行记录为准。
+前置条件是 Unix 宿主机、Docker Compose v2、可用的 `debian:bookworm-slim` GNU tar 辅助镜像，以及与源项目一致的 Compose 文件和私有环境文件。环境文件或调用环境须提供原部署所需的镜像名称等变量。下面的目录父路径必须已存在，`--output` 指定的目录必须尚未存在：
 
-当前验证范围见[验证状态](verification.md)。
+```sh
+cargo xtask backup \
+  --project gity-prod \
+  --compose-file deploy/components/standalone.compose.yaml \
+  --env-file /srv/gity-private/compose.env \
+  --output /srv/gity-private/backup-20261102
+```
+
+分布式部署把 `--compose-file` 改为 `deploy/components/distributed.compose.yaml`，并使用该项目实际的环境文件。不要把别的项目名称、Compose 文件或环境文件混用。工具拒绝共享或外部卷、未声明的项目卷、匿名卷、卷别名，以及与其他运行中容器共享写入的命名卷；实际挂载与所提供 Compose 配置不一致时也会拒绝。当前支持显式 bind 挂载，遇到 Compose 顶层 `configs` 或 `secrets` 对象会拒绝，而不会遗漏其内容。
+
+快照包含项目全部已创建命名卷；尚未创建的声明卷记录为空卷。内容包括数据库、两个 Git 节点、对象存储、各组件状态、SSH 主机密钥、DIND 数据和 Docker TLS 卷。所有 bind 源也会归档，包括组件配置、TLS 证书/私钥、S3/Angos/Git-node 秘密文件和 Runner 宿主机工作目录。完整的已解析 Compose 配置会保存实际容器环境，因而也包含运行中的 Runner 令牌等秘密。
+
+归档通过辅助容器流式写入宿主机文件，不把整个卷读入内存。辅助容器以 root 只读访问源目录，宿主机归档仍由调用用户创建。备份目录为 `0700`，工具创建的文件为 `0600`；归档保留数字 UID/GID、权限、扩展属性和 ACL，并支持 Docker 数据层的 whiteout 设备。版本化 `manifest.json` 记录卷映射、镜像身份、文件大小和 SHA-256，不保存明文秘密值。包含完整配置和秘密材料的整个备份包都必须按凭据保管。
+
+对官方、特权模式 Docker DinD 的 `/var/lib/docker` 命名卷，工具精确排除 `volumes/backingFsBlockDev` 和 `overlay2/backingFsBlockDev`。这些 quota 节点记录宿主机设备身份；[Docker 上游实现](https://github.com/moby/moby/blob/v28.5.2/quota/projectquota.go#L380-L401)会按当前文件系统重新创建它们，不能把原设备身份还原到新项目。已有归档中的这两个节点仅在确认为空、root 所有的块设备时允许跳过，提取时仍不创建；普通卷、文件 bind、其他设备及 FIFO 继续拒绝。Docker 数据层中字符设备 `0:0` 的空 whiteout 标记仍保留。
+
+默认情况下，成功或停止后的失败都会让源项目保持停止。只有显式提供 `--resume-source` 且快照成功时，工具才重新启动此前运行的容器。需要马上用原端口恢复时保持源项目停止。失败留下的未完成目录不能当作可恢复备份；工具会拒绝缺失、损坏或校验不匹配的包。
+
+## 恢复到新项目
+
+备份包不包含 Docker 镜像、宿主机操作系统或未挂入项目的文件，例如离线保管的 CA 签名私钥。应另外保留原版本镜像；恢复前本机镜像引用必须仍指向清单中的精确 image ID。只保留一个可能被覆盖的镜像标签不够。
+
+恢复要求新的项目名、新的私有材料目录，以及未被占用的目标卷名称。工具先核验整个清单、所有归档大小/校验值和归档路径，再分配恢复资源；不会覆盖源项目或已有目标数据：
+
+```sh
+cargo xtask restore \
+  --backup /srv/gity-private/backup-20261102 \
+  --project gity-restored \
+  --secrets-dir /srv/gity-private/restored-assets
+```
+
+工具创建目标项目专用卷，将全部 bind 源映射到新私有目录，并输出 `restored-assets/compose.json`。该文件包含秘密，权限为 `0600`；父目录为 `0700`。归档内容恢复原数字 UID/GID、权限、扩展属性和 ACL。项目网络改为目标项目网络，Runner 的宿主机工作路径也同步改写；原端口和服务配置保留。目标卷以显式 external 名称供该新配置引用，仍带目标项目标签，绝不复用源卷。
+
+恢复不会启动服务。确认原项目停止、端口可用后，再明确启动：
+
+```sh
+docker compose --project-name gity-restored \
+  --file /srv/gity-private/restored-assets/compose.json \
+  --profile '*' up --detach --no-build
+```
+
+恢复配置使用 `pull_policy: never`，删除构建入口，避免启动时重新构建或拉取不同镜像。恢复失败时会清理本次新建资源；成功后按实际 HTTP、严格主机密钥 SSH clone/push/pull、软件包、LFS/附件和 OCI 读写及权限隔离检查数据。保留原 `known_hosts` 校验，不能通过重新接受主机密钥掩盖 SSH 身份丢失。
+
+## 更新与运行验证
+
+更新前建立可恢复的完整备份并单独保留原镜像。停止服务使用原 Compose 配置的 `down` 时，不要附加 `--volumes`，否则会删除项目持久卷。MR 合并中断的处理见[合并恢复](merge-recovery.md)；恢复数据库与 Git 时必须保留对应的合并操作记录和内部回执引用。
+
+本页命令已按当前 CLI 和 Compose 定义核对；Standalone/分布式 × Debian/Alpine 四种镜像的完整备份恢复黑盒结果仍需实际运行记录支持。源码检查、编译和测试不能替代这些验收。实际结果见[验证状态](verification.md)。
 
 </div>

@@ -18,6 +18,13 @@ The gateway removes the client `Authorization` header before proxying, so
 credentials configured for an upstream registry are never taken from a Gity
 client session.
 
+Use a Gity opaque token as the password for `docker login`. An unauthenticated
+or invalidly authenticated `/v2/` probe returns `401` with a Basic challenge,
+so Docker sends credentials on subsequent registry requests. An authenticated
+probe is proxied to Angos. Registry health checks use `/readyz`: this endpoint
+checks only the configured Angos `/v2/`, returns `200` or `503`, and exposes no
+repository data. It does not require or forward client credentials.
+
 The TOML examples show the Angos filesystem and SeaweedFS S3 settings and
 pull-through repository entries. Store upstream credentials and S3 credentials
 in a mode-0600 generated file from the secret provider; do not put values in the
@@ -26,8 +33,14 @@ the base file stay in deployment source control while a secret provider mounts
 the override file. Angos v1.12.4's S3 client uses path-style endpoint URLs and
 does not expose a `force_path_style` setting.
 
-Mirror mode is read-only at the Gity gateway. Its typed configuration must list
-registry aliases, exact HTTPS authorities allowed for registry and token
+Configuring mirror upstreams allows the same gateway to serve both hosted and
+mirror projects. Upstream configuration enables controlled pulls; it does not
+make the whole registry read-only. Each request first passes identity and
+project authorization, then follows the project's OCI policy. Hosted projects
+allow authorized pushes and deletions; projects with `mode=mirror` reject both.
+
+The typed upstream configuration must list registry aliases, exact HTTPS
+authorities allowed for registry and token
 service traffic, and secret references. The OCI client transport checks each
 request and redirect against that host allowlist, rejects HTTP downgrade, and
 removes Authorization across origins. Clients cannot select arbitrary hosts

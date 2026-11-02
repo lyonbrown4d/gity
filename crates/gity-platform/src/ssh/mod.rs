@@ -1,4 +1,5 @@
 //! Dedicated, bounded SSH listener backed by russh public-key authentication.
+mod authorization;
 mod command;
 mod connection;
 mod keys;
