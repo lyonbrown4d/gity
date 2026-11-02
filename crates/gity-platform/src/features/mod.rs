@@ -3,6 +3,7 @@ mod attachments;
 mod checks;
 mod codeowners;
 mod issue_collaboration;
+mod paging;
 mod issue_views;
 mod issues;
 mod labels;

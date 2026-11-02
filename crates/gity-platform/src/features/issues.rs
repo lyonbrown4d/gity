@@ -1,7 +1,7 @@
 use super::*;
 use crate::openapi::{issue_schemas as spec, schemas as api};
 use axum::{
-  extract::{Path, State},
+  extract::{Path, Query, State},
   http::HeaderMap,
 };
 
@@ -62,20 +62,53 @@ pub(super) fn view(row: Value) -> Value {
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues",tag="issues",
-    params(api::ProjectPath),
-    responses((status=200,description="Operation succeeded",body=api::Envelope<Vec<spec::Issue>>),api::Errors),
+    description="Lists issues newest first; `state` filters by status and `page`/`page_size` paginate.",
+    params(api::ProjectPath, api::ListQuery),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<spec::IssuePage>),api::Errors),
     security((), ("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
-async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
+async fn list(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path(p): Path<i64>,
+  Query(params): Query<api::ListQuery>,
+) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  let state = params.state.as_deref().unwrap_or("all");
+  if !matches!(state, "open" | "closed" | "all") {
+    return Err(AppError::bad_request("state must be open, closed or all"));
+  }
+  let (page, page_size, offset) = super::paging::window(&params)?;
   let rows = s
     .collaboration
     .issues(p)
     .await?
     .into_iter()
     .map(model_value)
-    .collect();
-  response(json!(super::issue_views::list(&s, p, rows).await?))
+    .filter(|row| {
+      // Stored issues use `opened` while the API exposes them as `open`.
+      let raw = row["status"].as_str().or_else(|| row["state"].as_str());
+      state == "all"
+        || match raw {
+          Some("open" | "opened") => state == "open",
+          Some(value) => value == state,
+          None => false,
+        }
+    })
+    .collect::<Vec<_>>();
+  let total = rows.len() as u64;
+  let window = rows
+    .into_iter()
+    .skip(offset)
+    .take(page_size as usize)
+    .collect::<Vec<_>>();
+  let items = super::issue_views::list(&s, p, window).await?;
+  response(json!({
+      "items": items,
+      "total": total,
+      "page": page,
+      "page_size": page_size,
+  }))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(

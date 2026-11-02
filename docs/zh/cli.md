@@ -156,7 +156,7 @@ editor: null
 
 | 命令 | 作用 |
 | --- | --- |
-| `gity issue list <project> [--state <state>]` | 列出 issue；服务端列表接口不读取 `state` 参数，客户端按 `status` 自行过滤，`--state all` 返回全部 |
+| `gity issue list <project> [--state <state>] [--page <n>] [--page-size <n>]` | 列出 issue；`state` 由服务端按 `status` 过滤（`all` 不过滤），分页参数下推到服务端，默认第 1 页、每页 20 条，响应为 `{items,total,page,page_size}` |
 | `gity issue view <project> <iid>` | 打印标题、状态、标签、指派人、里程碑、描述和全部评论 |
 | `gity issue create <project> --title <title> [--description <text>]` | 新建 issue |
 | `gity issue close <project> <iid>` | 把状态改为 `closed` |
@@ -172,7 +172,7 @@ editor: null
 
 | 命令 | 作用 |
 | --- | --- |
-| `gity mr list <project> [--state <state>]` | 列出 MR；服务端列表接口不读取 `state` 参数，客户端按 `state` 自行过滤，`--state all` 返回全部 |
+| `gity mr list <project> [--state <state>] [--page <n>] [--page-size <n>]` | 列出 MR；`state` 由服务端过滤（`all` 不过滤），分页参数下推到服务端，默认第 1 页、每页 20 条，响应为 `{items,total,page,page_size}` |
 | `gity mr view <project> <iid>` | 打印标题、状态、源分支与目标分支、描述，以及 `/checks` 返回的检查项 |
 | `gity mr create <project> --title <title> --source <branch> --target <branch> [--description <text>]` | 创建 MR |
 | `gity mr merge <project> <iid> [--squash]` | 合并 MR；`--squash` 把源分支提交压成一个 |

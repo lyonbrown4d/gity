@@ -156,7 +156,7 @@ Options and keys are described under [Configuration](#configuration).
 
 | Command | Effect |
 | --- | --- |
-| `gity issue list <project> [--state <state>]` | Lists issues; the server list endpoint ignores `state`, so the client filters on `status` and `--state all` returns everything |
+| `gity issue list <project> [--state <state>]` | Lists issues; `state` is filtered server-side on `status` (`all` disables it) and the page window is pushed to the server; defaults to page 1 with 20 items, response shape `{items,total,page,page_size}` |
 | `gity issue view <project> <iid>` | Prints title, state, labels, assignees, milestone, description, and every comment |
 | `gity issue create <project> --title <title> [--description <text>]` | Creates an issue |
 | `gity issue close <project> <iid>` | Sets the state to `closed` |
@@ -172,7 +172,7 @@ Options and keys are described under [Configuration](#configuration).
 
 | Command | Effect |
 | --- | --- |
-| `gity mr list <project> [--state <state>]` | Lists merge requests; the server list endpoint ignores `state`, so the client filters on `state` and `--state all` returns everything |
+| `gity mr list <project> [--state <state>]` | Lists merge requests; `state` is filtered server-side (`all` disables it) and the page window is pushed to the server; defaults to page 1 with 20 items, response shape `{items,total,page,page_size}` |
 | `gity mr view <project> <iid>` | Prints title, state, source and target branches, description, and the checks returned by `/checks` |
 | `gity mr create <project> --title <title> --source <branch> --target <branch> [--description <text>]` | Opens a merge request |
 | `gity mr merge <project> <iid> [--squash]` | Merges the merge request; `--squash` collapses the source commits into one |

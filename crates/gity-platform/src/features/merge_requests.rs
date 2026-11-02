@@ -3,7 +3,7 @@ pub(super) use super::project_lock::lock;
 use super::*;
 use crate::openapi::{merge_schemas as spec, schemas as api};
 use axum::{
-  extract::{Path, State},
+  extract::{Path, Query, State},
   http::HeaderMap,
 };
 
@@ -50,20 +50,48 @@ pub(super) async fn branch(s: &AppState, p: &Value, name: &str) -> Result<String
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests",tag="merge requests",
-    params(api::ProjectPath),
-    responses((status=200,description="Operation succeeded",body=api::Envelope<Vec<spec::MergeRequest>>),api::Errors),
+    description="Lists merge requests newest first; `state` filters by state and `page`/`page_size` paginate.",
+    params(api::ProjectPath, api::ListQuery),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<spec::MergeRequestPage>),api::Errors),
     security((), ("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
-async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
+async fn list(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path(p): Path<i64>,
+  Query(params): Query<api::ListQuery>,
+) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  let state = params.state.as_deref().unwrap_or("all");
+  if !matches!(state, "opened" | "merged" | "closed" | "all") {
+    return Err(AppError::bad_request(
+      "state must be opened, merged, closed or all",
+    ));
+  }
+  let (page, page_size, offset) = super::paging::window(&params)?;
   let rows = s
     .collaboration
     .merge_requests(p)
     .await?
     .into_iter()
     .map(model_value)
+    .filter(|row| {
+      state == "all" || row["state"].as_str().or_else(|| row["status"].as_str()) == Some(state)
+    })
     .collect::<Vec<_>>();
-  response(json!(rows.into_iter().map(view).collect::<Vec<_>>()))
+  let total = rows.len() as u64;
+  let items = rows
+    .into_iter()
+    .skip(offset)
+    .take(page_size as usize)
+    .map(view)
+    .collect::<Vec<_>>();
+  response(json!({
+      "items": items,
+      "total": total,
+      "page": page,
+      "page_size": page_size,
+  }))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
