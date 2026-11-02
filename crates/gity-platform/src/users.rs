@@ -19,7 +19,7 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .routes(utoipa_axum::routes!(list, create))
     .routes(utoipa_axum::routes!(me, update_me))
     .routes(utoipa_axum::routes!(detail, update, remove))
-    .routes(utoipa_axum::routes!(tokens, create_token))
+    .routes(utoipa_axum::routes!(tokens, create_token, revoke_token))
     .routes(utoipa_axum::routes!(
       ssh_keys::list,
       ssh_keys::create,
@@ -269,6 +269,25 @@ async fn create_token(
   Ok(ok(row))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
+#[utoipa::path(
+    delete,path="/users/{id}/tokens/{token}",tag="users",
+    description="Only this user or an administrator can revoke a personal token. The token stops authenticating immediately.",
+    params(("id"=i64, Path, description="User identifier"), ("token"=i64, Path, description="Personal token identifier")),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<spec::OkResult>),api::Errors),
+    security(("bearer"=[]))
+)]
+async fn revoke_token(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path((id, token)): Path<(i64, i64)>,
+) -> Reply {
+  own_tokens(&s, &h, id).await?;
+  if !s.identity.delete_personal_token(id, token).await? {
+    return Err(AppError::not_found("personal token not found"));
+  }
+  Ok(ok(json!({ "ok": true })))
+}
 fn view_model(user: gity_entities::users::Model) -> Value {
   json!({
       "id": user.id,

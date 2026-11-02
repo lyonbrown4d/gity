@@ -40,6 +40,19 @@ impl IdentityRepository {
     .await
   }
 
+  /// Revokes one personal token owned by `user_id`; unused names such as
+  /// `access`/`refresh` recorded by older schema versions stay untouched.
+  pub async fn delete_personal_token(&self, user_id: i64, token_id: i64) -> Result<bool, DbErr> {
+    let deleted = user_access_tokens::Entity::delete_many()
+      .filter(user_access_tokens::Column::Id.eq(token_id))
+      .filter(user_access_tokens::Column::UserId.eq(user_id))
+      .filter(user_access_tokens::Column::Name.is_not_in(["access", "refresh"]))
+      .exec(&self.connection)
+      .await?
+      .rows_affected;
+    Ok(deleted > 0)
+  }
+
   pub async fn create_session_pair(
     &self,
     user_id: i64,
