@@ -1,15 +1,9 @@
 use crate::{AppError, new_id, now};
-use rust_embed::Embed;
 use sea_orm::{
   ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DatabaseTransaction,
   FromQueryResult, Statement, TransactionTrait, Value,
 };
 use serde_json::{Map, Value as Json};
-use sha2::{Digest, Sha256};
-
-#[derive(Embed)]
-#[folder = "../../migrations/"]
-struct Migrations;
 
 #[derive(Clone)]
 pub struct Db {

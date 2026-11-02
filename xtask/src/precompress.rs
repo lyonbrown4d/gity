@@ -47,9 +47,11 @@ fn precompress(dist: &Path) -> Result<()> {
       }
       let data = fs::read(&path)?;
       let mut compressed = Vec::with_capacity(data.len() / 3);
-      let mut params = brotli::enc::BrotliEncoderParams::default();
-      params.quality = 6;
-      params.lgwin = 22;
+      let params = brotli::enc::BrotliEncoderParams {
+        quality: 6,
+        lgwin: 22,
+        ..Default::default()
+      };
       brotli::BrotliCompress(&mut data.as_slice(), &mut compressed, &params)
         .with_context(|| format!("brotli {}", path.display()))?;
       fs::write(&target, &compressed).with_context(|| target.display().to_string())?;

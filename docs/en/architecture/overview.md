@@ -31,7 +31,7 @@ Identity / artifacts / Git domain services and ports
 SeaORM repositories, local or RPC Git adapters, object storage adapters
 ```
 
-Applications do not import business implementations from other applications. Shared components belong in `crates/`, database changes in `migrations/`, and build and verification tools in `xtask/`.
+Applications do not import business implementations from other applications. Shared components and the database migration library belong in `crates/`; build and verification tools belong in `xtask/`. See [Database migrations](../database-migrations.md) for the migration workflow.
 
 The contexts cover identity and access, projects and collaboration, Git, CI, and artifacts. Identity and artifacts have dedicated services and repositories. Organization/project, Issue, MR, and CI implementations are partly concentrated in `gity-platform`. These boundaries do not imply a separate service or database for every context.
 

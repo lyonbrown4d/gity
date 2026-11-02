@@ -40,7 +40,7 @@ API, Git server, and Worker use the Git cluster backend to reach storage nodes. 
 ## Compose startup dependencies
 
 1. PostgreSQL, SeaweedFS, and the two Git nodes can start first. Git nodes have their own repository volumes and do not depend on the database.
-2. After SeaweedFS becomes healthy, `seaweed-buckets` creates `gity-artifacts` and `gity-oci`. The one-shot `migrate` service waits for database health and successful bucket initialization, applies schema migrations, and exits.
+2. After SeaweedFS becomes healthy, `seaweed-buckets` creates `gity-artifacts` and `gity-oci`. The one-shot `migrate` service waits for database health and successful bucket initialization, applies schema migrations, and exits. The database must be empty; an incompatible existing schema causes migration to fail, and the application does not clear it. See [Database migrations](../database-migrations.md) for upgrade prerequisites.
 3. API, Git server, and Worker wait for migration completion, started Git nodes, and the relevant storage dependencies. Git node's condition is `service_started`, not RPC readiness or replica catch-up.
 4. Registry waits for API and object storage health. Its process supervises Angos, OCI gateway, and an independent package HTTP module, using API Authority RPC for package/OCI permissions.
 5. Gateway waits for the API, Git server, and Registry health checks before exposing HTTP/SSH ingress.
@@ -50,7 +50,7 @@ These are dependency conditions, not a strictly serial startup of all nodes. See
 
 ## Shared code and application roles
 
-| Role / default command | HTTP | SSH | CI scheduler | Maintenance | Automatic migrations |
+| Role / default command | HTTP | SSH | CI scheduler | Maintenance | Migrations at startup |
 | --- | --- | --- | --- | --- | --- |
 | Standalone / `standalone` | Yes | When enabled | Yes | Yes | Yes |
 | API / `serve` | Yes | No | No | Yes | No |

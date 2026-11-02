@@ -38,7 +38,7 @@ flowchart TB
 ## Compose 的启动依赖
 
 1. PostgreSQL、SeaweedFS 和两个 Git node 可以先启动。Git node 使用各自仓库卷，不依赖数据库。
-2. `seaweed-buckets` 等 SeaweedFS 健康后创建 `gity-artifacts`、`gity-oci` 桶；`migrate` 等数据库健康及桶初始化成功，再执行一次迁移并退出。
+2. `seaweed-buckets` 等 SeaweedFS 健康后创建 `gity-artifacts`、`gity-oci` 桶；`migrate` 等数据库健康及桶初始化成功，再执行一次迁移并退出。数据库必须为空；已有不兼容结构会导致迁移失败，应用不会自动清库。升级前置条件见[数据库迁移说明](../database-migrations.md)。
 3. API、Git server 和 Worker 等待迁移完成、Git node 已启动，以及相应存储依赖。Git node 的条件是 `service_started`，不是 RPC 就绪或仓库副本追平。
 4. Registry 等 API 和对象存储健康后启动；其进程监督 Angos、OCI gateway 和独立软件包 HTTP module。包和 OCI 权限通过 API Authority RPC 查询。
 5. Gateway 等 API、Git server、Registry 的健康检查通过后启动公开 HTTP/SSH 入口。
@@ -48,7 +48,7 @@ flowchart TB
 
 ## 应用角色怎样使用共同代码
 
-| 角色默认命令 | HTTP | SSH | CI scheduler | maintenance | 自动迁移 |
+| 角色默认命令 | HTTP | SSH | CI scheduler | maintenance | 启动时迁移 |
 | --- | --- | --- | --- | --- | --- |
 | Standalone / `standalone` | 是 | 配置开启时 | 是 | 是 | 是 |
 | API / `serve` | 是 | 否 | 否 | 是 | 否 |

@@ -25,7 +25,7 @@ pub fn check(root: &Path) -> Result<()> {
       ));
     }
   }
-  for directory in ["apps", "crates", "xtask", "scripts", "perf", "migrations"] {
+  for directory in ["apps", "crates", "xtask", "scripts", "perf"] {
     walk(&root.join(directory), &mut violations)?;
   }
   if !violations.is_empty() {

@@ -60,6 +60,8 @@ jobs:
         run: |
           docker compose -f deploy/integration/compose.yaml --profile ci up -d --wait --wait-timeout 180 postgres-test mysql-test s3
           docker compose -f deploy/integration/compose.yaml run --rm s3-init
+      - name: Isolated Testcontainers migration contracts
+        run: cargo test -p gity-migrations --test databases --locked -- --ignored --test-threads=1
       - name: Isolated Testcontainers entity contracts
         run: cargo test -p gity-entities --test container_databases --locked -- --ignored --test-threads=1
       - name: PostgreSQL API regression

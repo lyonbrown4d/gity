@@ -15,8 +15,10 @@ async fn before_save_assigns_ids_only_on_insert_without_one() {
     .unwrap();
   assert!(matches!(inserted.id, ActiveValue::Set(id) if id > 0));
 
-  let mut preset: users::ActiveModel = Default::default();
-  preset.id = Set(42);
+  let preset = users::ActiveModel {
+    id: Set(42),
+    ..Default::default()
+  };
   let kept = <users::ActiveModel as ActiveModelBehavior>::before_save(preset, connection, true)
     .await
     .unwrap();

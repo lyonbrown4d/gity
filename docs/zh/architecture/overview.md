@@ -31,7 +31,7 @@ crates/gity-platform    平台路由、应用编排与平台业务
 SeaORM 仓储、Git 本地或 RPC 适配、对象存储适配
 ```
 
-`apps/` 不供其他应用导入业务实现。`crates/` 保存可复用组件，`migrations/` 保存数据库迁移，`xtask/` 保存构建和验证工具。
+`apps/` 不供其他应用导入业务实现。`crates/` 保存可复用组件和数据库迁移库，`xtask/` 保存构建和验证工具。数据库迁移由 [数据库迁移说明](../database-migrations.md) 介绍。
 
 当前按身份权限、项目协作、Git、CI、制品等上下文拆分。身份与制品已有独立服务和仓储；组织项目、Issue、MR、CI 等部分实现仍集中在 `gity-platform`。这些上下文边界并不表示每个上下文都拥有独立服务和数据库。
 

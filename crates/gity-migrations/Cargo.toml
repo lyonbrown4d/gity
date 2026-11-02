@@ -1,0 +1,13 @@
+[package]
+name = "gity-migrations"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+sea-orm.workspace = true
+sea-orm-migration.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+gity-test-support = { path = "../gity-test-support" }

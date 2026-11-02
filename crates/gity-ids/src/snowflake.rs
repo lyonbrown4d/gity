@@ -142,22 +142,20 @@ impl IdGenerator<MonotonicClock<1>> {
 
 /// Installs this process's generator. Repeated installs must agree on the node.
 pub fn install(generator: IdGenerator) -> Result<(), IdError> {
-  if let Some(installed) = INSTALLED.get() {
-    return if installed.node() == generator.node() {
-      Ok(())
-    } else {
-      Err(IdError::NodeConflict {
-        installed: installed.node(),
-        requested: generator.node(),
-      })
-    };
-  }
-  INSTALLED
-    .set(generator)
-    .map_err(|pending| IdError::NodeConflict {
-      installed: INSTALLED.get().map(IdGenerator::node).unwrap_or_default(),
-      requested: pending.node(),
+  install_in(&INSTALLED, generator)
+}
+
+fn install_in(slot: &OnceLock<IdGenerator>, generator: IdGenerator) -> Result<(), IdError> {
+  let requested = generator.node();
+  let installed = slot.get_or_init(|| generator);
+  if installed.node() == requested {
+    Ok(())
+  } else {
+    Err(IdError::NodeConflict {
+      installed: installed.node(),
+      requested,
     })
+  }
 }
 
 /// Generates an entity primary key, panicking only on an unrecoverable clock fault.
@@ -180,3 +178,6 @@ pub fn try_new_id() -> Result<i64, IdError> {
     }
   }
 }
+
+#[cfg(test)]
+mod tests;

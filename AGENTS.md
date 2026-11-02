@@ -13,7 +13,8 @@
 - `apps/`：可打包、部署的应用，例如 server、runner 和 Web。
 - `crates/`：共享领域、应用服务和基础设施库，不混入应用可执行入口。
 - `xtask/`：使用 Rust 实现的仓库构建、验证和资源检查工具。
-- `migrations/`：版本化数据库迁移，支持 SQLite、PostgreSQL 和 MySQL。
+- `crates/gity-migrations/`：使用 SeaORM 官方 `sea-orm-migration` 管理版本化 Rust 迁移，支持 SQLite、PostgreSQL 和 MySQL；结构优先使用 SeaQuery 与 `DeriveIden`，不得另建迁移执行器或运行时 SQL 解析器。
+- 迁移版本必须固定结构快照，不从可变的当前 Entity 自动推导历史版本；已发布的 Rust 迁移保持不变，后续变更新增版本。迁移由 standalone 启动入口或分布式部署的单一迁移任务调用，不能让多个写入组件并发迁移。
 - 数据结构以最新 Rust 版本为唯一基准，不接管旧 Go 数据库，不为历史 schema 保留兼容分支。使用最新初始 schema，并继续通过版本化迁移维护后续 Rust 版本。
 - 应用依赖共享库；共享库不能反向依赖应用。
 - 不把 HTTP、数据库实体和前端组件混成同一个层次；公共请求响应类型不得包含服务端秘密。

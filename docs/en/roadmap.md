@@ -10,7 +10,7 @@ Gity provides Git hosting and collaboration for small teams and self-hosted depl
 
 The current product is Web-based. The server uses Rust, Axum, Tokio, and SeaORM; the Web app uses Rust, Leptos, and WebAssembly; FluxDI assembles the server. Runner, Git hook, and search tools are also Rust applications. A desktop application is not in scope.
 
-CI configuration uses typed and validated YAML, with `.gity-ci.yml` as the default repository file. The current database schema is defined by versioned migrations for SQLite, PostgreSQL, and MySQL. Migration startup accepts an empty database or a managed database with matching migration history and checksums.
+CI configuration uses typed and validated YAML, with `.gity-ci.yml` as the default repository file. The current database schema is defined by versioned Rust migrations for SQLite, PostgreSQL, and MySQL. The initial baseline requires an empty database; see [Database migrations](database-migrations.md) for upgrade prerequisites.
 
 ## Core Workflows
 

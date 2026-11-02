@@ -1,45 +1,21 @@
 use gity_core::Db;
 use sea_orm::{ConnectionTrait, DatabaseBackend};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 #[tokio::test]
 async fn fresh_latest_schema_is_versioned_idempotent_and_preserves_required_capacity() {
   let (db, cleanup) = fresh_database().await;
   db.migrate().await.unwrap();
   db.migrate().await.unwrap();
-  let dialect = match db.backend() {
-    DatabaseBackend::Sqlite => "sqlite",
-    DatabaseBackend::Postgres => "postgres",
-    DatabaseBackend::MySql => "mysql",
-    other => panic!("unsupported backend {other:?}"),
-  };
-  let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-    .join("../../migrations")
-    .join(dialect);
-  let mut files = std::fs::read_dir(folder)
-    .unwrap()
-    .map(|entry| entry.unwrap().path())
-    .collect::<Vec<_>>();
-  files.sort();
   let history = db
     .all(
-      "SELECT name,checksum FROM rust_schema_history ORDER BY name",
+      "SELECT version FROM seaql_migrations ORDER BY version",
       vec![],
     )
     .await
     .unwrap();
-  assert_eq!(history.len(), files.len());
-  for (file, row) in files.iter().zip(&history) {
-    assert_eq!(
-      row["name"],
-      format!("{dialect}/{}", file.file_name().unwrap().to_str().unwrap())
-    );
-    assert_eq!(
-      row["checksum"],
-      hex::encode(Sha256::digest(std::fs::read(file).unwrap()))
-    );
-  }
+  assert_eq!(history.len(), 1);
+  assert_eq!(history[0]["version"], "m20261102_000001_latest_schema");
   for table in [
     "user_passwords",
     "auth_sessions",
@@ -120,16 +96,7 @@ async fn fresh_latest_schema_is_versioned_idempotent_and_preserves_required_capa
       .unwrap()["username"],
     "latest-schema-user"
   );
-  db.execute(
-    "UPDATE rust_schema_history SET checksum=? WHERE name=?",
-    vec![
-      "tampered".into(),
-      history[0]["name"].as_str().unwrap().into(),
-    ],
-  )
-  .await
-  .unwrap();
-  assert_eq!(db.migrate().await.unwrap_err().status.as_u16(), 409);
+  db.migrate().await.unwrap();
   assert_eq!(
     db.one(
       "SELECT password_hash FROM user_passwords WHERE user_id=42",

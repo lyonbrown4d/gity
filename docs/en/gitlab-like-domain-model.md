@@ -4,7 +4,7 @@
 
 # Gity Domain Model
 
-This page describes the main domain objects, path rules, and permission relationships in the current Rust implementation. The current Rust migrations in `migrations/` are the source of truth for the data model.
+This page describes the main domain objects, path rules, and permission relationships in the current Rust implementation. Versioned Rust migrations in `crates/gity-migrations` define the data model; see [Database migrations](database-migrations.md) for initialization and upgrade prerequisites.
 
 ## Organizations and Projects
 
@@ -91,7 +91,7 @@ The current fields in the `project_merge_requests` table are:
 
 ## Database Migration Boundaries
 
-The current Rust schema is defined by versioned SQL migrations for SQLite, PostgreSQL, and MySQL under the repository-root `migrations/` directory. Startup migrations validate migration names and checksums. Empty databases can be initialized, and managed databases can be upgraded according to their recorded history. Migration startup refuses to continue if it finds an unmanaged schema, invalid migration history, or a checksum mismatch.
+The current Rust schema is defined by versioned Rust migrations in `crates/gity-migrations` for SQLite, PostgreSQL, and MySQL. The initial baseline requires an empty database; an incompatible existing schema or migration history causes migration to fail. See [Database migrations](database-migrations.md) for operating prerequisites.
 
 New deployments use an empty database initialized from the current schema definitions.
 
@@ -99,11 +99,11 @@ New deployments use an empty database initialized from the current schema defini
 
 Review the core definitions in:
 
-- Versioned table definitions: `migrations/{sqlite,postgres,mysql}/`.
+- Versioned table definitions: `crates/gity-migrations`.
 - Organization and project path updates: `crates/gity-platform/src/projects/`.
 - Role resolution and access actions: `crates/gity-platform/src/access.rs`, `crates/gity-platform/src/access/`.
 - Git storage name selection by project ID: `crates/gity-platform/src/repository/mod.rs`.
 - YAML configuration loading and validation: `crates/gity-platform/src/ci/config.rs`, `crates/gity-platform/src/ci/service.rs`.
-- Migration history and checksum validation: `crates/gity-core/src/database/migration.rs`.
+- Migration execution entry point: `crates/gity-core/src/database`; migration definitions: `crates/gity-migrations`.
 
 </div>

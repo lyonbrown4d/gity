@@ -81,7 +81,6 @@ fn RouteLoadingBar() -> impl IntoView {
     }
     count
   });
-  ()
 }
 #[component]
 pub(super) fn Shell() -> impl IntoView {

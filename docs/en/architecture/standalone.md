@@ -33,7 +33,7 @@ The platform process runs HTTP, Web, APIs, package protocols, SSH, scheduling, m
 
 1. `apps/gity-standalone` invokes `application::run(Standalone)`. Clap parses arguments, configuration is loaded and validated, and logging, metrics, and optional tracing initialize.
 2. `composition::compose` creates database and storage adapters. `RuntimeModule` resolves identity, Git backend, search, and `AppState`; packages add the artifact service. Without Git cluster configuration, the local Git backend is selected.
-3. The default command is `standalone`, which applies the Rust schema migrations before component startup. Invalid configuration, migration, or dependency construction aborts startup.
+3. The default command is `standalone`, which applies Rust schema migrations before component startup. The database must be empty; an incompatible existing schema or migration history causes startup to fail. Startup never clears the database or converts the old migration history. Invalid configuration, migration, or dependency construction aborts startup. See [Database migrations](../database-migrations.md) for upgrade prerequisites.
 4. Composition registers enabled Angos, Platform, Authority, OCI gateway, and Runner modules. `PlatformModule` imports the embedded package module and optional Git cluster module.
 5. `fluxdi::Application::bootstrap()` invokes module lifecycle hooks. Platform binds HTTP/SSH listeners before starting servers, scheduling, and maintenance tasks. Embedded packages reuse platform HTTP routes instead of opening port `8082`.
 6. Runner module launches `gity-runner`, pointing at the loopback platform API, private project token directory, and configured container engine. Project Runner registration supplies credentials for local job claiming.

@@ -4,7 +4,7 @@
 
 # Gity 领域模型
 
-本文描述当前 Rust 实现中的主要领域对象、路径和权限关系。数据结构以 `migrations/` 中当前版本的 Rust 迁移为准。
+本文描述当前 Rust 实现中的主要领域对象、路径和权限关系。数据结构以 `crates/gity-migrations` 中版本化 Rust 迁移为准；数据库初始化和升级前提见[数据库迁移说明](database-migrations.md)。
 
 ## 组织与项目
 
@@ -91,7 +91,7 @@
 
 ## 数据库迁移边界
 
-当前 Rust schema 由根目录 `migrations/` 中按 SQLite、PostgreSQL、MySQL 方言维护的版本化 SQL 构成。启动迁移会校验迁移名称和校验值；空数据库可初始化，已管理数据库可按记录升级。存在未受管 schema、无效迁移历史或不匹配校验值时会拒绝继续。
+当前 Rust schema 由 `crates/gity-migrations` 中适用于 SQLite、PostgreSQL、MySQL 的版本化 Rust 迁移构成。首个基线迁移要求空数据库；不兼容的既有结构或迁移历史会导致迁移失败。详细操作条件见[数据库迁移说明](database-migrations.md)。
 
 新部署使用空数据库，由当前 schema 定义初始化。
 
@@ -99,11 +99,11 @@
 
 核心定义可从以下位置复核：
 
-- 版本化表结构：`migrations/{sqlite,postgres,mysql}/`。
+- 版本化表结构：`crates/gity-migrations`。
 - 组织与项目路径更新：`crates/gity-platform/src/projects/`。
 - 角色合并和访问动作：`crates/gity-platform/src/access.rs`、`crates/gity-platform/src/access/`。
 - 按项目 ID 选择 Git 存储名：`crates/gity-platform/src/repository/mod.rs`。
 - YAML 配置读取与校验：`crates/gity-platform/src/ci/config.rs`、`crates/gity-platform/src/ci/service.rs`。
-- 迁移历史及校验：`crates/gity-core/src/database/migration.rs`。
+- 迁移执行入口：`crates/gity-core/src/database`；迁移定义：`crates/gity-migrations`。
 
 </div>
