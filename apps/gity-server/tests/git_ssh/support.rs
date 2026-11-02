@@ -31,6 +31,7 @@ impl Fixture {
     settings.storage.root = root.path().join("storage");
     settings.storage.driver = "local".into();
     settings.search.index_root = root.path().join("search");
+    settings.search.code_index_root = root.path().join("code-index");
     settings.search.index_enabled = false;
     settings.ssh.enabled = true;
     settings.ssh.host_key = root.path().join("host_ed25519");

@@ -41,6 +41,8 @@ pub struct Settings {
 pub struct SearchConfig {
   pub index_enabled: bool,
   pub index_root: PathBuf,
+  /// Root of the code-intelligence store written by the indexer job.
+  pub code_index_root: PathBuf,
   pub refresh_interval_seconds: u64,
   pub max_files_per_project: usize,
   pub max_file_size_bytes: usize,
@@ -128,6 +130,9 @@ impl Settings {
       ("storage.s3_region", "us-east-1"),
       ("web.root", "dist/web"),
       ("search.index_root", "data/search-index"),
+      // Kept beside the text search root so operators find both index stores
+      // together; the code index reuses the same file-lock and layout rules.
+      ("search.code_index_root", "data/code-index"),
       ("observability.service_name", "gity-server"),
       ("observability.log_format", "json"),
       ("observability.log_level", "gity=info,tower_http=info"),
@@ -194,6 +199,11 @@ impl Settings {
     {
       return Err(AppError::bad_request(
         "invalid search refresh interval or index limits",
+      ));
+    }
+    if raw.search.code_index_root.as_os_str().is_empty() {
+      return Err(AppError::bad_request(
+        "search.code_index_root must not be empty",
       ));
     }
     if !["sqlite", "postgres", "postgresql", "mysql"].contains(&raw.database.driver.as_str()) {

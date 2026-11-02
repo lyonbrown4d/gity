@@ -27,7 +27,7 @@ impl CiRepository {
       .await?;
     // Compare the attempt and current expiry: a renewed lease is no longer expired.
     let expired = job::Entity::find()
-      .filter(job::Column::Kind.eq("script"))
+      .filter(job::Column::Kind.is_in(["script", "index"]))
       .filter(job::Column::Status.eq("running"))
       .filter(job::Column::LockedUntil.lt(time()))
       .all(&self.connection)

@@ -28,6 +28,7 @@ web:
 search:
   index_enabled: true
   index_root: data/search-index
+  code_index_root: data/code-index
   refresh_interval_seconds: 300
   max_files_per_project: 5000
   max_file_size_bytes: 524288

@@ -8,6 +8,7 @@ mod api_application;
 pub mod application;
 pub mod auth;
 pub mod ci;
+mod code_index;
 mod composition;
 pub mod deployment_api;
 pub mod events;
@@ -46,6 +47,7 @@ pub struct AppState {
   pub git: GitService,
   pub git_cluster: Option<gity_git_cluster::GitClusterModule>,
   pub search: gity_search::SearchIndex,
+  pub code_index: gity_code_intel::Store,
   pub settings: Arc<Settings>,
   pub storage: gity_core::Storage,
   pub identity: fluxdi::Shared<gity_identity::IdentityRepository>,

@@ -39,6 +39,7 @@ fn services(
   }))
 }
 use gity_search::{Limits, SearchIndex};
+type CodeIndexStore = gity_code_intel::Store;
 fn id_generator(settings: Shared<Settings>) -> Result<Shared<IdGenerator>, fluxdi::Error> {
   IdGenerator::new(settings.database_node_id)
     .map(Shared::new)
@@ -59,6 +60,11 @@ fn search(
   )
   .map(Shared::new)
   .map_err(|e| fluxdi::Error::factory_failed("SearchIndex", &e.to_string()))
+}
+fn code_index(settings: Shared<Settings>) -> Result<Shared<CodeIndexStore>, fluxdi::Error> {
+  gity_code_intel::Store::new(&settings.search.code_index_root)
+    .map(Shared::new)
+    .map_err(|e| fluxdi::Error::factory_failed("CodeIndexStore", &e.to_string()))
 }
 
 struct Backend {
@@ -92,6 +98,7 @@ fn state(
   settings: Shared<Settings>,
   storage: Shared<Storage>,
   search: Shared<SearchIndex>,
+  code_index: Shared<CodeIndexStore>,
   services: Shared<ApplicationServices>,
   _artifacts: Shared<ArtifactBindings>,
 ) -> Result<Shared<AppState>, fluxdi::Error> {
@@ -102,6 +109,7 @@ fn state(
     settings,
     storage: (*storage).clone(),
     search: (*search).clone(),
+    code_index: (*code_index).clone(),
     identity: services.identity.clone(),
     oauth: services.oauth.clone(),
     collaboration: services.collaboration.clone(),
@@ -137,13 +145,15 @@ static_module! {
     pub struct RuntimeModule {
         import services_module: ServicesModule { services: ApplicationServices; };
         #[scope(root)]
-        state:AppState=state(database,backend,settings,storage,search,services,artifacts);
+        state:AppState=state(database,backend,settings,storage,search,code_index,services,artifacts);
         #[scope(root)]
         git:GitService=git(backend);
         #[scope(root)]
         backend:Backend=backend(settings,database);
         #[scope(root)]
         search:SearchIndex=search(settings,git);
+        #[scope(root)]
+        code_index:CodeIndexStore=code_index(settings);
         #[scope(root)]
         id_generator:IdGenerator=id_generator(settings);
         external settings:Settings;

@@ -16,7 +16,9 @@ impl CiRepository {
     Ok(
       job::Entity::find()
         .filter(job::Column::ProjectId.eq(p))
-        .filter(job::Column::Kind.eq("script"))
+        // Index jobs are enqueued by the platform itself; the public create
+        // endpoint still accepts only noop and script.
+        .filter(job::Column::Kind.is_in(["script", "index"]))
         .filter(job::Column::Status.eq("pending"))
         .filter(job::Column::RunAfter.lte(time()))
         .filter(

@@ -44,6 +44,8 @@ pub struct Outcome {
   pub success: bool,
   pub exit_code: i32,
   pub duration_millis: u128,
+  /// Short, non-secret summary appended to the job result (empty for scripts).
+  pub detail: String,
 }
 
 pub async fn execute(
@@ -114,26 +116,7 @@ pub async fn execute(
     );
   let deadline = tokio::time::sleep(Duration::from_secs(job.timeout_seconds));
   tokio::pin!(deadline);
-  let pulse_client = client.clone();
-  let pulse_id = id.to_owned();
-  let mut pulse = tokio::spawn(async move {
-    let mut heartbeat = tokio::time::interval(Duration::from_secs(15));
-    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    loop {
-      heartbeat.tick().await;
-      let response = tokio::time::timeout(
-        Duration::from_secs(15),
-        pulse_client.post("/runners/heartbeat", json!({})),
-      )
-      .await
-      .context("runner heartbeat timed out")??;
-      if response["running_job_attempts"][&pulse_id].as_i64() != Some(attempt) {
-        return Err::<(), anyhow::Error>(anyhow::anyhow!(
-          "CI job was canceled or its lease was lost"
-        ));
-      }
-    }
-  });
+  let mut pulse = super::heartbeat::spawn(client, id.to_owned(), attempt);
   let status: Result<std::process::ExitStatus> = tokio::select! {
       _=super::shutdown::cancelled()=>Err(anyhow::anyhow!("Runner is shutting down")),
       status=child.wait()=>status.context("wait for CI script"),
@@ -169,6 +152,7 @@ pub async fn execute(
     success,
     exit_code: code,
     duration_millis: started.elapsed().as_millis(),
+    detail: String::new(),
   })
 }
 fn terminate_group(pid: Option<u32>) {

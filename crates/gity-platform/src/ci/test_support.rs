@@ -140,6 +140,7 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
     search: gity_core::SearchConfig {
       index_enabled: true,
       index_root: dir.path().join("search"),
+      code_index_root: dir.path().join("code-index"),
       refresh_interval_seconds: 300,
       max_files_per_project: 5000,
       max_file_size_bytes: 524288,
@@ -190,6 +191,7 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
       gity_search::Limits::default(),
     )
     .unwrap(),
+    code_index: gity_code_intel::Store::new(dir.path().join("code-index")).unwrap(),
     db,
     git,
     settings: Arc::new(settings),

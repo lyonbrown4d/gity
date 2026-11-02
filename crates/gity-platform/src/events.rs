@@ -117,6 +117,16 @@ pub async fn repository_changed(s: &AppState, p: &Value, reference: &str, sha: &
   if let Err(error) = crate::ci::create_push_pipeline(s, id, reference, sha).await {
     tracing::error!(error=%error,project_id=id,reference,"push pipeline creation failed");
   }
+  match crate::code_index::enqueue(s, p, reference, sha).await {
+    Ok(Some(_)) => {
+      metrics::counter!("gity_code_index_enqueue_total", "result" => "success").increment(1);
+    }
+    Ok(None) => {}
+    Err(error) => {
+      metrics::counter!("gity_code_index_enqueue_total", "result" => "failure").increment(1);
+      tracing::warn!(error=%error,project_id=id,reference,"code index job enqueue failed");
+    }
+  }
   let branch = reference.strip_prefix("refs/heads/").unwrap_or(reference);
   if s.settings.search.index_enabled && branch == repository::default_branch(p) {
     let state = s.clone();

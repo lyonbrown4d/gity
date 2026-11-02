@@ -72,6 +72,7 @@ fn generated_contract_resolves_all_schemas_and_preserves_protocol_errors() {
       "patch",
     ),
     ("/api/v1/projects/{id}/search/index/refresh", "post"),
+    ("/api/v1/projects/{id}/search/code-index/refresh", "post"),
     ("/api/v1/projects/{id}/file-commits", "post"),
     ("/{organization}/{project}/info/refs", "get"),
     ("/{organization}/{project}/git-receive-pack", "post"),

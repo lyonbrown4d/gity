@@ -112,16 +112,62 @@ pub(crate) async fn upload_artifacts(
       bail!("artifact path escapes workspace");
     }
     let bytes = tokio::fs::read(&path).await?;
-    client.post(&format!("/runners/jobs/{id}/artifacts"),
-            json!({
-                    "attempt":attempt,
-                    "name":relative,
-                    "file_name":path.file_name().context("artifact filename missing")?.to_string_lossy(),
-                    "file_path":relative,
-                    "content_type":"application/octet-stream",
-                    "content_base64":STANDARD.encode(bytes)
-                }
-        )).await?;
+    let file_name = path
+      .file_name()
+      .context("artifact filename missing")?
+      .to_string_lossy();
+    upload_artifact(
+      client,
+      id,
+      attempt,
+      relative,
+      &file_name,
+      "application/octet-stream",
+      &bytes,
+    )
+    .await?;
   }
+  Ok(())
+}
+/// Uploads one bounded artifact. The server rejects archives above 64 MiB, so
+/// callers get an explicit runner-side error instead of a truncated upload.
+pub(crate) async fn upload_artifact(
+  client: &Client,
+  id: &str,
+  attempt: i64,
+  name: &str,
+  file_name: &str,
+  content_type: &str,
+  bytes: &[u8],
+) -> Result<()> {
+  const MAX_ARTIFACT: usize = 64 * 1024 * 1024;
+  if bytes.len() > MAX_ARTIFACT {
+    bail!(
+      "artifact {} is {} bytes; job artifacts are limited to 64 MiB",
+      file_name,
+      bytes.len()
+    );
+  }
+  if file_name.is_empty()
+    || file_name.contains(['/', '\\', '\0'])
+    || Path::new(file_name)
+      .components()
+      .any(|part| !matches!(part, std::path::Component::Normal(_)))
+  {
+    bail!("invalid artifact file name");
+  }
+  client
+    .post(
+      &format!("/runners/jobs/{id}/artifacts"),
+      json!({
+        "attempt":attempt,
+        "name":name,
+        "file_name":file_name,
+        "file_path":file_name,
+        "content_type":content_type,
+        "content_base64":STANDARD.encode(bytes)
+      }),
+    )
+    .await?;
   Ok(())
 }

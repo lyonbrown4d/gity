@@ -140,6 +140,20 @@ async fn finish(
         .unwrap_or(if success { 0 } else { 1 }) as i32,
     })
     .await?;
+  if success && text(&job, "kind") == crate::code_index::JOB_KIND {
+    // Indexing is a follow-up concern: an ingest failure must not rewrite the
+    // already accepted job completion.
+    let project_id = job["project_id"].as_i64().unwrap_or_default();
+    match crate::code_index::ingest(s, project_id, &job).await {
+      Ok(()) => {
+        metrics::counter!("gity_code_index_ingest_total", "result" => "success").increment(1);
+      }
+      Err(error) => {
+        metrics::counter!("gity_code_index_ingest_total", "result" => "failure").increment(1);
+        tracing::warn!(error=%error, job_id=j, project_id, "code index ingest failed");
+      }
+    }
+  }
   Ok(gity_core::ok(public_job(
     job_row(s, job["project_id"].as_i64().unwrap(), j).await?,
   )))

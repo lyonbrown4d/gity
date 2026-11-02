@@ -10,6 +10,7 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
   let mut settings = gity_core::Settings::load();
   settings.repo_root = dir.path().join("repos");
   settings.storage_root = dir.path().join("storage");
+  settings.search.code_index_root = dir.path().join("code-index");
   tokio::fs::create_dir_all(&settings.repo_root)
     .await
     .unwrap();
@@ -84,6 +85,7 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
       gity_search::Limits::default(),
     )
     .unwrap(),
+    code_index: gity_code_intel::Store::new(dir.path().join("code-index")).unwrap(),
     git: gity_git::GitService::new(&settings.repo_root, &settings.git_bin),
     storage: gity_core::Storage::local(&settings.storage_root).unwrap(),
     settings: std::sync::Arc::new(settings),

@@ -74,6 +74,16 @@ impl CiService {
     }
     self.repository.create_job(input).await
   }
+  /// Platform-internal jobs run outside `.gity-ci.yml`. They are deliberately
+  /// unreachable from the public create endpoint, which keeps its own whitelist.
+  pub async fn create_system_job(&self, input: NewJob) -> Result<job::Model, AppError> {
+    if input.kind != "index" || !(1..=10).contains(&input.max_attempts) {
+      return Err(AppError::bad_request(
+        "invalid system job kind or max_attempts",
+      ));
+    }
+    self.repository.create_job(input).await
+  }
   pub async fn ready_jobs(&self, p: i64) -> Result<Vec<job::Model>, AppError> {
     self.repository.ready_jobs(p).await
   }

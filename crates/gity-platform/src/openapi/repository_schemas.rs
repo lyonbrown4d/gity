@@ -155,3 +155,10 @@ pub struct IndexStatus {
   pub truncated: bool,
   pub unchanged: bool,
 }
+#[derive(Serialize, ToSchema)]
+pub struct CodeIndexStatus {
+  pub commit: String,
+  pub files: u64,
+  pub definitions: u64,
+  pub indexed_at: String,
+}

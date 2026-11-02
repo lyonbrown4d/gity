@@ -26,7 +26,9 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .routes(routes!(protection::protect))
     .routes(routes!(protection::update))
     .routes(routes!(protection::unprotect));
-  let refresh = OpenApiRouter::new().routes(routes!(search::refresh));
+  let refresh = OpenApiRouter::new()
+    .routes(routes!(search::refresh))
+    .merge(crate::code_index::routes());
   let mut router = OpenApiRouter::new()
     .routes(routes!(read_routes::tags))
     .nest("/projects/{id}/repository", shared.clone())

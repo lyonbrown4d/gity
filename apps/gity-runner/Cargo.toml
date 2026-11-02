@@ -15,6 +15,7 @@ reqwest = { version = "0.13", features = ["json"] }
 clap = { version = "4", features = ["derive", "env"] }
 dotenvy = "0.15"
 gity-observability = { path = "../../crates/gity-observability" }
+gity-code-intel = { path = "../../crates/gity-code-intel" }
 tempfile.workspace = true
 zip = { version = "2.6", default-features = false, features = ["deflate"] }
 libc = "0.2"

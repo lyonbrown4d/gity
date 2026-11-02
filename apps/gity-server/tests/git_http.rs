@@ -19,6 +19,7 @@ async fn fixture(root: &Path) -> AppState {
   settings.storage.driver = "local".into();
   settings.storage.root = settings.storage_root.clone();
   settings.search.index_root = root.join("search");
+  settings.search.code_index_root = root.join("code-index");
   settings.search.index_enabled = false;
   settings.git_hook = Some(env!("CARGO_BIN_EXE_gity-server").into());
   let (_module, state) = compose(settings).await.unwrap();

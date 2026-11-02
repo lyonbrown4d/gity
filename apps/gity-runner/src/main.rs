@@ -1,6 +1,8 @@
 mod client;
 mod command;
 mod executor;
+mod heartbeat;
+mod index;
 mod links;
 mod output;
 mod resources;
@@ -119,10 +121,8 @@ async fn run_one(client: &Client, args: &Args) -> Result<bool> {
   let attempt = job["attempts"]
     .as_i64()
     .context("claimed attempt missing")?;
-  let data: executor::Job =
-    serde_json::from_str(job["payload"].as_str().context("claimed payload missing")?)
-      .context("decode claimed job")?;
-  let client = client.for_job(&data.env);
+  let kind = job["kind"].as_str().unwrap_or("script").to_owned();
+  let payload = job["payload"].as_str().context("claimed payload missing")?;
   let options = executor::Options {
     executor: args.executor,
     container_bin: args.container_bin.clone(),
@@ -130,9 +130,31 @@ async fn run_one(client: &Client, args: &Args) -> Result<bool> {
     work_root: args.work_root.clone(),
     resources: args.resources.clone(),
   };
-  let result = executor::execute(&client, id, attempt, data, &options).await;
+  // Index jobs run in-process; everything else keeps the script executor.
+  let (client, result) = if kind == "index" {
+    let data: index::Job = serde_json::from_str(payload).context("decode claimed index job")?;
+    let client = client.for_job(&Default::default());
+    let result = index::execute(&client, id, attempt, data, &args.work_root).await;
+    (client, result)
+  } else {
+    let data: executor::Job = serde_json::from_str(payload).context("decode claimed job")?;
+    let client = client.for_job(&data.env);
+    let result = executor::execute(&client, id, attempt, data, &options).await;
+    (client, result)
+  };
   match result {
     Ok(result) => {
+      let summary = if result.detail.is_empty() {
+        format!(
+          "exit_code={} duration_ms={}",
+          result.exit_code, result.duration_millis
+        )
+      } else {
+        format!(
+          "{} exit_code={} duration_ms={}",
+          result.detail, result.exit_code, result.duration_millis
+        )
+      };
       client
         .post(
           &format!(
@@ -142,11 +164,12 @@ async fn run_one(client: &Client, args: &Args) -> Result<bool> {
           serde_json::json!({
                       "attempt":attempt,
                       "exit_code":result.exit_code,
-                      "result":format!("exit_code={} duration_ms={}",
-                          result.exit_code,
-                          result.duration_millis),
+                      "result":summary,
                       "error":if result.success{
                           ""
+                      }
+                      else if kind == "index"{
+                          "code index job failed"
                       }
                       else{
                           "script exited unsuccessfully"
