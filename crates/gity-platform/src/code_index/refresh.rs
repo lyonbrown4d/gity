@@ -39,7 +39,10 @@ pub(crate) async fn refresh(State(s): State<AppState>, h: HeaderMap, Path(id): P
   })))
 }
 
+/// Reindexes the default-branch HEAD, keeps the shared copy in step, and falls
+/// back to that shared copy when the checkout cannot be indexed.
 async fn rebuild(s: &AppState, project: &Value) -> Result<gity_code_intel::Status, AppError> {
+  let project_id = super::project_id(project)?;
   let repo = crate::repository::repo(project);
   let branch = crate::repository::default_branch(project).to_owned();
   let commit = s
@@ -47,20 +50,56 @@ async fn rebuild(s: &AppState, project: &Value) -> Result<gity_code_intel::Statu
     .resolve_revision(&repo, &branch, "")
     .await
     .map_err(crate::repository::git_error)?;
+  match index_from_git(s, project_id, &repo, &commit).await {
+    Ok(archive) => {
+      super::publish_archive(s, project_id, &archive).await;
+      local_status(s, project_id).await
+    }
+    Err(error) => {
+      tracing::warn!(
+        error = %error,
+        project_id,
+        commit,
+        "code index rebuild failed; trying the shared archive"
+      );
+      if super::hydrate(s, project_id, &commit).await {
+        return local_status(s, project_id).await;
+      }
+      Err(error)
+    }
+  }
+}
+
+/// Extracts and scans the commit in a worker thread and refreshes the store.
+async fn index_from_git(
+  s: &AppState,
+  project_id: i64,
+  repo: &str,
+  commit: &str,
+) -> Result<gity_code_intel::Archive, AppError> {
   let archive = s
     .git
-    .archive(&repo, &commit)
+    .archive(repo, commit)
     .await
     .map_err(crate::repository::git_error)?;
   let directory = tempfile::tempdir()
     .map_err(|_| AppError::internal("failed to create a temporary index workspace"))?;
-  let project_id = super::project_id(project)?;
+  let commit = commit.to_owned();
   let store = s.code_index.clone();
   super::blocking(move || {
     snapshot::extract(std::io::Cursor::new(archive), directory.path())?;
     let files =
       gity_code_intel::scan::directory(directory.path(), gity_code_intel::Limits::default())?;
-    store.refresh(project_id, &gity_code_intel::Archive::new(commit, files))
+    let archive = gity_code_intel::Archive::new(commit, files);
+    store.refresh(project_id, &archive)?;
+    Ok(archive)
   })
   .await
+}
+
+/// Status the store serves now; a rebuild that produced nothing is a failure.
+async fn local_status(s: &AppState, project_id: i64) -> Result<gity_code_intel::Status, AppError> {
+  super::local_status(s, project_id)
+    .await?
+    .ok_or_else(|| AppError::internal("code index did not produce a snapshot"))
 }

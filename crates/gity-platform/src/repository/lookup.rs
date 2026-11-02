@@ -19,13 +19,12 @@ use std::collections::HashMap;
 type Reply = Result<Json<Value>, AppError>;
 
 pub(crate) fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
-  utoipa_axum::router::OpenApiRouter::new().routes(utoipa_axum::routes!(
-    symbols,
-    definitions,
-    references,
-    hover,
-    search
-  ))
+  utoipa_axum::router::OpenApiRouter::new()
+    .routes(utoipa_axum::routes!(symbols))
+    .routes(utoipa_axum::routes!(definitions))
+    .routes(utoipa_axum::routes!(references))
+    .routes(utoipa_axum::routes!(hover))
+    .routes(utoipa_axum::routes!(search))
 }
 
 /// Resolves a path, line and column triple with the shared validation rules.
@@ -67,6 +66,11 @@ async fn blocking<T: Send + 'static>(
     .map_err(|error| AppError::internal(format!("code index lookup failed: {error}")))
 }
 
+/// Pulls the shared archive when this replica has no local index for the commit.
+async fn restore(s: &AppState, project: &Value) {
+  crate::code_index::hydrate_head(s, project).await;
+}
+
 fn index_info(status: Option<&Status>) -> spec::CodeIndexInfo {
   spec::CodeIndexInfo {
     available: status.is_some(),
@@ -93,9 +97,9 @@ fn symbol(row: SymbolDoc) -> spec::CodeSymbol {
   }
 }
 
-#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(
-    get, path="/{id}/repository/symbols", tag="Repository",
+    get, path="/symbols", tag="Repository",
     summary="List the declarations of one file as an outline",
     params(api::ProjectPath),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::CodeSymbols>),api::Errors),
@@ -107,7 +111,10 @@ pub(crate) async fn symbols(
   Path(id): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Reply {
-  access::project_action(&s, &h, id, ProjectAction::Read).await?;
+  let project = access::project_action(&s, &h, id, ProjectAction::Read)
+    .await?
+    .project;
+  restore(&s, &project).await;
   let path = q
     .get("path")
     .filter(|path| !path.is_empty())
@@ -129,9 +136,9 @@ pub(crate) async fn symbols(
   })))
 }
 
-#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(
-    get, path="/{id}/repository/definitions", tag="Repository",
+    get, path="/definitions", tag="Repository",
     summary="Resolve the declaration covering a position",
     params(api::ProjectPath),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::CodeDefinitions>),api::Errors),
@@ -143,7 +150,10 @@ pub(crate) async fn definitions(
   Path(id): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Reply {
-  access::project_action(&s, &h, id, ProjectAction::Read).await?;
+  let project = access::project_action(&s, &h, id, ProjectAction::Read)
+    .await?
+    .project;
+  restore(&s, &project).await;
   let (path, line, column) = position(&q)?;
   let store = s.code_index.clone();
   let (status, found) = blocking(move || {
@@ -160,9 +170,9 @@ pub(crate) async fn definitions(
   })))
 }
 
-#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(
-    get, path="/{id}/repository/references", tag="Repository",
+    get, path="/references", tag="Repository",
     summary="List the declarations of a name in the indexed snapshot",
     params(api::ProjectPath),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::CodeReferences>),api::Errors),
@@ -174,7 +184,10 @@ pub(crate) async fn references(
   Path(id): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Reply {
-  access::project_action(&s, &h, id, ProjectAction::Read).await?;
+  let project = access::project_action(&s, &h, id, ProjectAction::Read)
+    .await?
+    .project;
+  restore(&s, &project).await;
   let name = q
     .get("name")
     .filter(|name| !name.is_empty())
@@ -208,9 +221,9 @@ pub(crate) async fn references(
   })))
 }
 
-#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(
-    get, path="/{id}/repository/hover", tag="Repository",
+    get, path="/hover", tag="Repository",
     summary="Return the documentation of the declaration covering a position",
     params(api::ProjectPath),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::CodeHover>),api::Errors),
@@ -222,7 +235,10 @@ pub(crate) async fn hover(
   Path(id): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Reply {
-  access::project_action(&s, &h, id, ProjectAction::Read).await?;
+  let project = access::project_action(&s, &h, id, ProjectAction::Read)
+    .await?
+    .project;
+  restore(&s, &project).await;
   let (path, line, column) = position(&q)?;
   let store = s.code_index.clone();
   let (status, found) = blocking(move || {
@@ -247,9 +263,9 @@ pub(crate) async fn hover(
   })))
 }
 
-#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(
-    get, path="/{id}/repository/code-search", tag="Repository",
+    get, path="/code-search", tag="Repository",
     summary="Search declaration names and paths in the indexed snapshot",
     params(api::ProjectPath),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::CodeSearchResults>),api::Errors),
@@ -261,7 +277,10 @@ pub(crate) async fn search(
   Path(id): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Reply {
-  access::project_action(&s, &h, id, ProjectAction::Read).await?;
+  let project = access::project_action(&s, &h, id, ProjectAction::Read)
+    .await?
+    .project;
+  restore(&s, &project).await;
   let text = q
     .get("q")
     .or_else(|| q.get("query"))

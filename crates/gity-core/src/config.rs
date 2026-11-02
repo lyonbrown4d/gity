@@ -43,6 +43,10 @@ pub struct SearchConfig {
   pub index_root: PathBuf,
   /// Root of the code-intelligence store written by the indexer job.
   pub code_index_root: PathBuf,
+  /// Mirror code-index archives into object storage and restore them on a
+  /// replica whose local snapshot is missing. Needs `storage` to be reachable;
+  /// failures only degrade reads, never the index itself.
+  pub code_index_remote: bool,
   pub refresh_interval_seconds: u64,
   pub max_files_per_project: usize,
   pub max_file_size_bytes: usize,
@@ -154,6 +158,8 @@ impl Settings {
       .set_default("search.max_files_per_project", 5000i64)
       .map_err(config_error)?
       .set_default("search.max_file_size_bytes", 524288i64)
+      .map_err(config_error)?
+      .set_default("search.code_index_remote", true)
       .map_err(config_error)?
       .set_default("database.node_id", 1)
       .map_err(config_error)?

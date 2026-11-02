@@ -141,6 +141,7 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
       index_enabled: true,
       index_root: dir.path().join("search"),
       code_index_root: dir.path().join("code-index"),
+      code_index_remote: true,
       refresh_interval_seconds: 300,
       max_files_per_project: 5000,
       max_file_size_bytes: 524288,

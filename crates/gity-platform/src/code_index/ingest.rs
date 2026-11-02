@@ -30,12 +30,20 @@ pub(crate) async fn ingest(s: &AppState, project_id: i64, job: &Value) -> Result
     return Err(AppError::internal("invalid artifact storage key"));
   }
   let bytes = s.storage.get(&key).await?;
-  let archive = super::blocking(move || gity_code_intel::decode(&bytes)).await?;
+  let archive = super::blocking({
+    let bytes = bytes.clone();
+    move || gity_code_intel::decode(&bytes)
+  })
+  .await?;
   let commit = archive.commit.clone();
   let files = archive.files.len();
   let definitions = archive.definition_count();
   let store = s.code_index.clone();
   super::blocking(move || store.refresh(project_id, &archive)).await?;
+  // Mirror the exact bytes the runner uploaded: they are already the
+  // msgpack+zstd archive `decode` accepts, so the shared copy needs no re-encode
+  // and stays byte-identical to the CI artifact.
+  super::publish(s, project_id, &commit, bytes).await;
   tracing::info!(
     project_id,
     job_id,
