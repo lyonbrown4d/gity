@@ -5,10 +5,16 @@
 //! across files is the index layer's job, so this crate stays free of storage
 //! and transport concerns.
 pub mod archive;
+pub mod index;
 pub mod rust_lang;
+pub mod scan;
+pub mod store;
 pub mod symbol;
 
 pub use archive::{Archive, FORMAT_VERSION, decode, encode};
+pub use index::SymbolDoc;
+pub use scan::Limits;
+pub use store::{Status, Store};
 pub use symbol::{Definition, Import, Kind, SymbolFile};
 
 /// Languages the extractor currently understands.

@@ -8,7 +8,13 @@ anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+chrono.workspace = true
+fs2 = "0.4"
+tantivy = "0.26.2"
 rmp-serde = "1"
 zstd = "0.13"
 tree-sitter = "0.26"
 tree-sitter-rust = "0.24"
+
+[dev-dependencies]
+tempfile.workspace = true

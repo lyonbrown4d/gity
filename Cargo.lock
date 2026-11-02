@@ -2591,9 +2591,13 @@ name = "gity-code-intel"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "chrono",
+ "fs2",
  "rmp-serde",
  "serde",
  "serde_json",
+ "tantivy",
+ "tempfile",
  "thiserror",
  "tree-sitter",
  "tree-sitter-rust",
