@@ -38,7 +38,7 @@ async fn shared_operations_enforce_existing_identity_and_project_permissions() {
     .invoke(&context("alice"), &name, arguments.clone())
     .await
     .unwrap();
-  assert!(owner.is_array());
+  assert!(owner["items"].is_array());
   let denied = api
     .invoke(&context("outsider"), &name, arguments.clone())
     .await

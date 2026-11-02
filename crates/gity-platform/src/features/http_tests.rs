@@ -100,13 +100,13 @@ async fn issue_crud_legacy_contract_and_project_isolation() {
   let list = request(&s, "GET", "/projects/20/issues", "alice", json!({}))
     .await
     .1;
-  assert_eq!(list["data"][0], detail["data"]);
+  assert_eq!(list["data"]["items"][0], detail["data"]);
   let other = request(&s, "GET", "/projects/30/issues", "alice", json!({}))
     .await
     .1;
-  assert_eq!(other["data"][0]["assignee_user_ids"], json!(["1"]));
+  assert_eq!(other["data"]["items"][0]["assignee_user_ids"], json!(["1"]));
   assert_eq!(
-    other["data"][0]["labels"][0]["name"],
+    other["data"]["items"][0]["labels"][0]["name"],
     "private-other-project-label"
   );
 

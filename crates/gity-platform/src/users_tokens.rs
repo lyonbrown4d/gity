@@ -12,8 +12,11 @@ use serde_json::{Value, json};
 type Reply = Result<Json<Value>, AppError>;
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
-  utoipa_axum::router::OpenApiRouter::new()
-    .routes(utoipa_axum::routes!(tokens, create_token, revoke_token))
+  utoipa_axum::router::OpenApiRouter::new().routes(utoipa_axum::routes!(
+    tokens,
+    create_token,
+    revoke_token
+  ))
 }
 
 async fn own_tokens(s: &AppState, h: &HeaderMap, id: i64) -> Result<(), AppError> {

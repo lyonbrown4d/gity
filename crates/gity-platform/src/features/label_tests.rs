@@ -114,7 +114,7 @@ async fn issue_labels_resolve_project_definitions_and_links() {
   let detail = send(&s, "GET", "/projects/20/issues/1", json!({})).await.1;
   assert_eq!(detail["data"]["labels"], attached["data"]);
   let list = send(&s, "GET", "/projects/20/issues", json!({})).await.1;
-  assert_eq!(list["data"][0]["labels"], attached["data"]);
+  assert_eq!(list["data"]["items"][0]["labels"], attached["data"]);
   let again = json!({"names":["bug","ux"]});
   assert_eq!(data(&s, "PATCH", path, again).await, attached["data"]);
   let reduced = data(&s, "PATCH", path, json!({"names":["ux"]})).await;
