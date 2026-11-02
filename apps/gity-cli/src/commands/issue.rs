@@ -1,5 +1,5 @@
 //! `gity issue` — list, view, create, close, comment, assign, label, milestone.
-use crate::client::{self, Client, Options};
+use crate::client::{Client, Options};
 use crate::format;
 use anyhow::{Result, bail};
 use clap::Subcommand;
@@ -13,6 +13,10 @@ pub enum IssueCommand {
     /// Filter by state: open, closed, or all
     #[arg(long, default_value = "open")]
     state: String,
+    #[arg(long, default_value = "1")]
+    page: u64,
+    #[arg(long = "page-size", default_value = "20")]
+    page_size: u64,
   },
   /// Show one issue by its project-local number
   View { project: String, iid: i64 },
@@ -72,9 +76,14 @@ pub enum IssueCommand {
 }
 
 pub async fn run(command: IssueCommand, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   match command {
-    IssueCommand::List { project, state } => list(&client, options, &project, &state).await,
+    IssueCommand::List {
+      project,
+      state,
+      page,
+      page_size,
+    } => list(&client, options, &project, &state, page, page_size).await,
     IssueCommand::View { project, iid } => view(&client, options, &project, iid).await,
     IssueCommand::Create {
       project,
@@ -110,15 +119,25 @@ pub async fn run(command: IssueCommand, options: &Options) -> Result<()> {
   }
 }
 
-async fn list(client: &Client, options: &Options, project: &str, state: &str) -> Result<()> {
-  let id = client::project_id(client, project).await?;
-  let issues = client.get(&format!("/projects/{id}/issues")).await?;
-  let issues = Value::Array(format::filter_state(&issues, "status", state));
+async fn list(
+  client: &Client,
+  options: &Options,
+  project: &str,
+  state: &str,
+  page: u64,
+  page_size: u64,
+) -> Result<()> {
+  let id = client.project_id(project).await?;
+  let issues = client
+    .get(&format!(
+      "/projects/{id}/issues?state={state}&page={page}&page_size={page_size}"
+    ))
+    .await?;
   if options.json {
     format::print_json(&issues);
     return Ok(());
   }
-  let rows = issues
+  let rows = issues["items"]
     .as_array()
     .into_iter()
     .flatten()
@@ -136,7 +155,7 @@ async fn list(client: &Client, options: &Options, project: &str, state: &str) ->
 }
 
 async fn view(client: &Client, options: &Options, project: &str, iid: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let issue = client.get(&format!("/projects/{id}/issues/{iid}")).await?;
   if options.json {
     format::print_json(&issue);
@@ -181,7 +200,7 @@ async fn view(client: &Client, options: &Options, project: &str, iid: i64) -> Re
 }
 
 async fn create(client: &Client, project: &str, title: String, description: String) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let mut body = json!({ "title": title });
   if !description.is_empty() {
     body["description"] = json!(description);
@@ -196,7 +215,7 @@ async fn create(client: &Client, project: &str, title: String, description: Stri
 }
 
 async fn close(client: &Client, options: &Options, project: &str, iid: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let issue = client
     .patch(
       &format!("/projects/{id}/issues/{iid}"),
@@ -212,7 +231,7 @@ async fn close(client: &Client, options: &Options, project: &str, iid: i64) -> R
 }
 
 async fn comment(client: &Client, project: &str, iid: i64, body: String) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let comment = client
     .post(
       &format!("/projects/{id}/issues/{iid}/comments"),
@@ -224,7 +243,7 @@ async fn comment(client: &Client, project: &str, iid: i64, body: String) -> Resu
 }
 
 async fn assign(client: &Client, project: &str, iid: i64, users: Vec<i64>) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let path = format!("/projects/{id}/issues/{iid}/assignees");
   client.patch(&path, json!({ "user_ids": users })).await?;
   let assignees = client.get(&path).await?;
@@ -233,7 +252,7 @@ async fn assign(client: &Client, project: &str, iid: i64, users: Vec<i64>) -> Re
 }
 
 async fn unassign(client: &Client, project: &str, iid: i64, users: Vec<i64>) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let path = format!("/projects/{id}/issues/{iid}/assignees");
   let current = client.get(&path).await?;
   let keep = current
@@ -250,7 +269,7 @@ async fn unassign(client: &Client, project: &str, iid: i64, users: Vec<i64>) -> 
 }
 
 async fn labels(client: &Client, options: &Options, project: &str, iid: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let labels = client
     .get(&format!("/projects/{id}/issues/{iid}/labels"))
     .await?;
@@ -279,7 +298,7 @@ async fn label(
   if add.is_empty() && remove.is_empty() {
     bail!("pass --add and/or --remove");
   }
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let path = format!("/projects/{id}/issues/{iid}/labels");
   let current = client.get(&path).await?;
   let mut labels = current
@@ -326,7 +345,7 @@ async fn milestone(
   set: Option<i64>,
   clear: bool,
 ) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let value = match (set, clear) {
     (Some(milestone), false) => json!(resolve_milestone(client, &id, milestone).await?),
     (None, true) => Value::Null,
@@ -343,7 +362,7 @@ async fn milestone(
 }
 
 async fn milestones(client: &Client, options: &Options, project: &str) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let milestones = client.get(&format!("/projects/{id}/milestones")).await?;
   if options.json {
     format::print_json(&milestones);

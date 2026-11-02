@@ -2824,11 +2824,21 @@ dependencies = [
  "clap",
  "clap_complete",
  "dirs",
- "reqwest",
+ "gity-client",
  "serde",
  "serde_json",
  "serde_yaml_ng",
  "tokio",
+]
+
+[[package]]
+name = "gity-client"
+version = "0.2.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

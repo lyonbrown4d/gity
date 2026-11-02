@@ -1,5 +1,5 @@
 //! `gity project` — list and inspect projects.
-use crate::client::{self, Client, Options};
+use crate::client::{Client, Options};
 use crate::format;
 use anyhow::Result;
 use clap::Subcommand;
@@ -16,7 +16,7 @@ pub enum ProjectCommand {
 }
 
 pub async fn run(command: ProjectCommand, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   match command {
     ProjectCommand::List => list(&client, options).await,
     ProjectCommand::View { project } => view(&client, options, &project).await,
@@ -47,7 +47,7 @@ async fn list(client: &Client, options: &Options) -> Result<()> {
 }
 
 async fn view(client: &Client, options: &Options, reference: &str) -> Result<()> {
-  let id = client::project_id(client, reference).await?;
+  let id = client.project_id(reference).await?;
   let project = client.get(&format!("/projects/{id}")).await?;
   if options.json {
     format::print_json(&project);

@@ -1,9 +1,8 @@
 //! `gity mr` — list, view, create, merge and inspect merge requests.
-use crate::client::{self, Client, Options};
+use crate::client::{Client, Options};
 use crate::format;
 use anyhow::Result;
 use clap::Subcommand;
-use serde_json::Value;
 use serde_json::json;
 
 #[derive(Subcommand)]
@@ -14,6 +13,10 @@ pub enum MrCommand {
     /// Filter by state: opened, merged, closed, or all
     #[arg(long, default_value = "opened")]
     state: String,
+    #[arg(long, default_value = "1")]
+    page: u64,
+    #[arg(long = "page-size", default_value = "20")]
+    page_size: u64,
   },
   /// Show one merge request
   View { project: String, iid: i64 },
@@ -42,9 +45,14 @@ pub enum MrCommand {
 }
 
 pub async fn run(command: MrCommand, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   match command {
-    MrCommand::List { project, state } => list(&client, options, &project, &state).await,
+    MrCommand::List {
+      project,
+      state,
+      page,
+      page_size,
+    } => list(&client, options, &project, &state, page, page_size).await,
     MrCommand::View { project, iid } => view(&client, options, &project, iid).await,
     MrCommand::Create {
       project,
@@ -62,17 +70,25 @@ pub async fn run(command: MrCommand, options: &Options) -> Result<()> {
   }
 }
 
-async fn list(client: &Client, options: &Options, project: &str, state: &str) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+async fn list(
+  client: &Client,
+  options: &Options,
+  project: &str,
+  state: &str,
+  page: u64,
+  page_size: u64,
+) -> Result<()> {
+  let id = client.project_id(project).await?;
   let merge_requests = client
-    .get(&format!("/projects/{id}/merge-requests"))
+    .get(&format!(
+      "/projects/{id}/merge-requests?state={state}&page={page}&page_size={page_size}"
+    ))
     .await?;
-  let merge_requests = Value::Array(format::filter_state(&merge_requests, "state", state));
   if options.json {
     format::print_json(&merge_requests);
     return Ok(());
   }
-  let rows = merge_requests
+  let rows = merge_requests["items"]
     .as_array()
     .into_iter()
     .flatten()
@@ -94,7 +110,7 @@ async fn list(client: &Client, options: &Options, project: &str, state: &str) ->
 }
 
 async fn view(client: &Client, options: &Options, project: &str, iid: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let mr = client
     .get(&format!("/projects/{id}/merge-requests/{iid}"))
     .await?;
@@ -137,7 +153,7 @@ async fn create(
   target: String,
   description: String,
 ) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let mut body = json!({
     "title": title,
     "source_branch": source,
@@ -158,7 +174,7 @@ async fn create(
 }
 
 async fn merge(client: &Client, project: &str, iid: i64, squash: bool) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let result = client
     .post(
       &format!("/projects/{id}/merge-requests/{iid}/merge"),
@@ -170,7 +186,7 @@ async fn merge(client: &Client, project: &str, iid: i64, squash: bool) -> Result
 }
 
 async fn diff(client: &Client, project: &str, iid: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let diff = client
     .get(&format!("/projects/{id}/merge-requests/{iid}/diff"))
     .await?;

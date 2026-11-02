@@ -1,5 +1,5 @@
 //! `gity repo clone` — clone a project through the URL the server advertises.
-use crate::client::{self, Client, Options};
+use crate::client::Options;
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use std::path::PathBuf;
@@ -36,8 +36,8 @@ async fn clone(
   directory: Option<PathBuf>,
   with_token: bool,
 ) -> Result<()> {
-  let client = Client::from_options(options)?;
-  let id = client::project_id(&client, &project).await?;
+  let client = options.client()?;
+  let id = client.project_id(&project).await?;
   let detail = client.get(&format!("/projects/{id}")).await?;
   let url = detail["clone_http_url"]
     .as_str()

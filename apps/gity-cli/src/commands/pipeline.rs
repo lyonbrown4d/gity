@@ -1,5 +1,5 @@
 //! `gity pipeline` — list, inspect, run, retry and cancel pipelines.
-use crate::client::{self, Client, Options};
+use crate::client::{Client, Options};
 use crate::format;
 use anyhow::Result;
 use clap::Subcommand;
@@ -30,7 +30,7 @@ pub enum PipelineCommand {
 }
 
 pub async fn run(command: PipelineCommand, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   match command {
     PipelineCommand::List { project } => list(&client, options, &project).await,
     PipelineCommand::View { project, pipeline } => view(&client, options, &project, pipeline).await,
@@ -50,7 +50,7 @@ pub async fn run(command: PipelineCommand, options: &Options) -> Result<()> {
 }
 
 async fn list(client: &Client, options: &Options, project: &str) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let pipelines = client.get(&format!("/projects/{id}/pipelines")).await?;
   if options.json {
     format::print_json(&pipelines);
@@ -76,7 +76,7 @@ async fn list(client: &Client, options: &Options, project: &str) -> Result<()> {
 }
 
 async fn view(client: &Client, options: &Options, project: &str, pipeline: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let detail = client
     .get(&format!("/projects/{id}/pipelines/{pipeline}"))
     .await?;
@@ -108,7 +108,7 @@ async fn view(client: &Client, options: &Options, project: &str, pipeline: i64) 
 }
 
 async fn jobs(client: &Client, options: &Options, project: &str, pipeline: i64) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let jobs = client
     .get(&format!("/projects/{id}/pipelines/{pipeline}/jobs"))
     .await?;
@@ -127,7 +127,7 @@ async fn run_pipeline(
   ref_name: Option<String>,
   sha: Option<String>,
 ) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let mut body = json!({ "source": "cli" });
   if let Some(ref_name) = ref_name {
     body["ref_name"] = json!(ref_name);
@@ -160,7 +160,7 @@ async fn act(
   pipeline: i64,
   action: &str,
 ) -> Result<()> {
-  let id = client::project_id(client, project).await?;
+  let id = client.project_id(project).await?;
   let result = client
     .post(
       &format!("/projects/{id}/pipelines/{pipeline}/{action}"),

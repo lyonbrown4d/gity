@@ -19,7 +19,7 @@ pub enum TokenCommand {
 }
 
 pub async fn run(command: TokenCommand, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   match command {
     TokenCommand::List => list(&client, options).await,
     TokenCommand::Create { name } => create(&client, name).await,

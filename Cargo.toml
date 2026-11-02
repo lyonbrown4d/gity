@@ -11,7 +11,6 @@ members = [
   "apps/gity-search-index",
   "apps/gity-server",
   "apps/gity-standalone",
-  "apps/gity-web",
   "apps/gity-worker",
   "crates/gity-api-macros",
   "crates/gity-api-contracts",
@@ -19,6 +18,7 @@ members = [
   "crates/gity-mcp",
   "crates/gity-artifacts",
   "crates/gity-authority",
+  "crates/gity-client",
   "crates/gity-core",
   "crates/gity-persistence",
   "crates/gity-collaboration",
@@ -104,7 +104,3 @@ fluxdi = { version = "=2.0.0", features = ["thread-safe", "macros", "tracing", "
 [profile.release]
 lto = "thin"
 strip = true
-
-# wasm-bindgen/wasm-opt need the target_features section for validation.
-[profile.release.package.gity-web]
-strip = false

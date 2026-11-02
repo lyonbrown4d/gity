@@ -1,5 +1,5 @@
 //! `gity api` — raw REST access for endpoints the CLI does not model yet.
-use crate::client::{Client, Options};
+use crate::client::Options;
 use crate::format;
 use anyhow::Result;
 use clap::{Args, ValueEnum};
@@ -26,7 +26,7 @@ pub struct ApiArgs {
 }
 
 pub async fn run(args: ApiArgs, options: &Options) -> Result<()> {
-  let client = Client::from_options(options)?;
+  let client = options.client()?;
   let path = if args.path.starts_with('/') {
     args.path.clone()
   } else {
