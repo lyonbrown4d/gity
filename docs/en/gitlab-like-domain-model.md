@@ -49,9 +49,41 @@ Project operations also map to minimum roles. Reads usually do not require membe
 
 Project access tokens are independent of user roles and are limited to their project and declared scopes. They do not inherit the creator’s administrator or member roles. When reviewing permission changes, check the endpoint’s `ProjectAction`, scope mapping, and server-side checks; hiding a frontend button is not sufficient.
 
+## Work Item Modeling
+
+### Issue
+
+The current fields in the `project_issues` table are:
+
+- `id`, `project_id`, and `iid`: stable key, owning project, and the project-scoped number allocated by `project_iid_counters`.
+- `author_user_id`, `title`, `description`, and `state`: author, title, description, and `opened`/`closed` state.
+- `milestone_id`: the owning milestone; the server rejects milestones from other projects.
+- `due_date` and `weight`: due date (`YYYY-MM-DD`) and weight.
+- `confidential` and `issue_type`: confidentiality flag (0/1) and work item type such as `issue`.
+- `closed_by_user_id`, `closed_at`, and `updated_by_user_id`: close and last-update metadata; reopening clears the close fields.
+- `created_at` and `updated_at`.
+
+### Milestone
+
+`project_milestones` belongs to a project and holds `id`, `project_id`, `iid`, `title`, `description`, `state` (`active`/`closed`), `start_date`, `due_date`, and timestamps. Issues and merge requests reference milestones through `milestone_id`; deleting a milestone clears `milestone_id` on its issues. Only project-level milestones exist; there are no group milestones or iterations.
+
+### Label
+
+`project_labels` stores project label definitions (`project_id`, `title`, `color`, `description`) with a unique `title` per project. `project_label_links` is polymorphic: `label_id`, `target_type` (`issue`/`merge_request`), and `target_id` point at work items, with a uniqueness constraint preventing duplicate links. Older schemas inlined label name and color on the issue link table; migration V0011 aggregates existing rows into `project_labels` and drops the old table.
+
+### Merge Request
+
+The current fields in the `project_merge_requests` table are:
+
+- `id`, `project_id`, `iid`, `author_user_id`, `title`, `description`, and `state` (`opened`/`closed`/`merged`).
+- `source_branch`, `target_branch`, and `head_sha`: source branch, target branch, and the source commit captured at creation.
+- `milestone_id`: the owning milestone.
+- `merged_at`, `merged_by_user_id`, and `merge_commit_sha`: merge time, merging user, and the target branch commit after the merge; when the commit cannot be resolved the field stays empty with a warning instead of being fabricated.
+- `closed_at`, `squash`, and `draft`: close time, squash marker, and draft marker. Draft merge requests are blocked from merging.
+
 ## Collaboration and Automation Objects
 
-- **Issues and merge requests**: Issues and merge requests belong to a project; work items are identified by a project-scoped number and project ID. Membership, labels, comments, reviewers, approval rules, and branch protection are managed by their respective project-domain objects.
+- **Issues and merge requests**: Issues and merge requests belong to a project; work items are identified by a project-scoped number and project ID. Membership, project labels, comments, reviewers, approval rules, and branch protection are managed by their respective project-domain objects; see the previous section for fields.
 - **Pipelines and jobs**: Pipelines and jobs belong to a project and reference Git revisions such as commits, branches, or tags. Execution configuration uses `.gity-ci.yml` YAML with typed parsing and semantic validation; configuration uses typed YAML.
 - **Runner**: Runners claim jobs subject to project scope, labels, and authorization. The server handles scheduling and lifecycle APIs; the Runner executes scripts.
 - **Logs and artifacts**: Runners upload job traces and artifacts, which the server records and project pages and download endpoints expose. They are associated with jobs and projects; configuration-file paths are not their identity.
@@ -68,10 +100,10 @@ New deployments use an empty database initialized from the current schema defini
 Review the core definitions in:
 
 - Versioned table definitions: `migrations/{sqlite,postgres,mysql}/`.
-- Organization and project path updates: `apps/gity-server/src/projects/`.
-- Role resolution and access actions: `apps/gity-server/src/access.rs`, `apps/gity-server/src/access/`.
-- Git storage name selection by project ID: `apps/gity-server/src/repository/mod.rs`.
-- YAML configuration loading and validation: `apps/gity-server/src/ci/config.rs`, `apps/gity-server/src/ci/service.rs`.
+- Organization and project path updates: `crates/gity-platform/src/projects/`.
+- Role resolution and access actions: `crates/gity-platform/src/access.rs`, `crates/gity-platform/src/access/`.
+- Git storage name selection by project ID: `crates/gity-platform/src/repository/mod.rs`.
+- YAML configuration loading and validation: `crates/gity-platform/src/ci/config.rs`, `crates/gity-platform/src/ci/service.rs`.
 - Migration history and checksum validation: `crates/gity-core/src/database/migration.rs`.
 
 </div>

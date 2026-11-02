@@ -49,9 +49,41 @@
 
 项目访问令牌独立于用户角色，仅允许其所属项目和令牌声明的 scope。它不会继承创建者的管理员或成员角色。审查权限变更时，应核对端点的 `ProjectAction`、scope 映射和服务端检查，而不能只依据前端隐藏按钮。
 
+## 工作项建模
+
+### Issue
+
+`project_issues` 当前字段：
+
+- `id`、`project_id`、`iid`：稳定主键、所属项目，以及由 `project_iid_counters` 分配的项目内序号。
+- `author_user_id`、`title`、`description`、`state`：作者、标题、描述和 `opened`/`closed` 状态。
+- `milestone_id`：所属里程碑；服务端拒绝引用其他项目的里程碑。
+- `due_date`、`weight`：截止日期（`YYYY-MM-DD`）和权重。
+- `confidential`、`issue_type`：保密标记（0/1）和 `issue` 等工作项类型。
+- `closed_by_user_id`、`closed_at`、`updated_by_user_id`：关闭与最后更新元数据；重新打开时清空关闭字段。
+- `created_at`、`updated_at`。
+
+### Milestone
+
+`project_milestones` 属于项目，字段为 `id`、`project_id`、`iid`、`title`、`description`、`state`（`active`/`closed`）、`start_date`、`due_date` 和时间戳。Issue 和 Merge Request 通过 `milestone_id` 引用里程碑；删除里程碑会把相关 issue 的 `milestone_id` 置为空。当前只支持项目级里程碑，没有组织级里程碑或迭代。
+
+### Label
+
+`project_labels` 保存项目内的标签定义（`project_id`、`title`、`color`、`description`），`title` 在项目内唯一。`project_label_links` 是多态关联表，用 `label_id`、`target_type`（`issue`/`merge_request`）和 `target_id` 指向工作项，唯一约束防止重复打标。旧 schema 曾把标签名和颜色内联在 issue 关联表；V0011 迁移把历史数据聚合到 `project_labels` 后删除了旧表。
+
+### Merge Request
+
+`project_merge_requests` 当前字段：
+
+- `id`、`project_id`、`iid`、`author_user_id`、`title`、`description`、`state`（`opened`/`closed`/`merged`）。
+- `source_branch`、`target_branch`、`head_sha`：源分支、目标分支和创建时的源分支提交。
+- `milestone_id`：所属里程碑。
+- `merged_at`、`merged_by_user_id`、`merge_commit_sha`：合并时间、合并人，以及合并后目标分支的提交；取不到提交时留空并记录警告，不伪造。
+- `closed_at`、`squash`、`draft`：关闭时间、压缩合并标记和草稿标记。草稿状态会阻断合并。
+
 ## 协作与自动化对象
 
-- **Issue 与 Merge Request**：属于项目；通过项目内序号和项目 ID 标识工作项。成员、标签、评论、审查人、审批规则和分支保护分别由各自项目域对象管理。
+- **Issue 与 Merge Request**：属于项目；通过项目内序号和项目 ID 标识工作项。成员、项目级标签、评论、审查人、审批规则和分支保护分别由各自项目域对象管理，字段见上节。
 - **Pipeline 与 Job**：属于项目并关联提交、分支或标签等 Git 修订信息。执行配置使用 `.gity-ci.yml` YAML，经类型解析和语义校验；不支持旧 Plano DSL。
 - **Runner**：领取受项目范围、标签和授权约束的 Job。服务端负责调度与生命周期接口，Runner 负责执行脚本。
 - **日志与产物**：Job trace 和 artifact 通过 Runner 上传、服务端记录，再由项目页面和下载接口读取；它们关联 Job/项目，不由配置文件路径充当身份。
@@ -68,10 +100,10 @@
 核心定义可从以下位置复核：
 
 - 版本化表结构：`migrations/{sqlite,postgres,mysql}/`。
-- 组织与项目路径更新：`apps/gity-server/src/projects/`。
-- 角色合并和访问动作：`apps/gity-server/src/access.rs`、`apps/gity-server/src/access/`。
-- 按项目 ID 选择 Git 存储名：`apps/gity-server/src/repository/mod.rs`。
-- YAML 配置读取与校验：`apps/gity-server/src/ci/config.rs`、`apps/gity-server/src/ci/service.rs`。
+- 组织与项目路径更新：`crates/gity-platform/src/projects/`。
+- 角色合并和访问动作：`crates/gity-platform/src/access.rs`、`crates/gity-platform/src/access/`。
+- 按项目 ID 选择 Git 存储名：`crates/gity-platform/src/repository/mod.rs`。
+- YAML 配置读取与校验：`crates/gity-platform/src/ci/config.rs`、`crates/gity-platform/src/ci/service.rs`。
 - 迁移历史及校验：`crates/gity-core/src/database/migration.rs`。
 
 </div>
