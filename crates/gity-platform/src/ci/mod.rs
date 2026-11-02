@@ -35,7 +35,7 @@ use crate::AppState;
 use crate::access::ProjectAction;
 use axum::{Json, Router};
 use gity_core::{AppError, new_id, now};
-use sea_orm::{ConnectionTrait, DatabaseTransaction, FromQueryResult, Value as SqlValue};
+use gity_persistence::model_value;
 use serde_json::{Value, json};
 pub use service::{CreatePipelineInput, create_pipeline, create_push_pipeline};
 pub use worker::{refresh_pipeline, worker_tick};
@@ -71,66 +71,18 @@ pub(crate) fn payload(row: &Value) -> Result<Value, AppError> {
 pub(crate) fn git_error(e: anyhow::Error) -> AppError {
   AppError::bad_request(e.to_string())
 }
-pub(crate) async fn one(
-  s: &AppState,
-  table: &str,
-  project: i64,
-  item: i64,
-) -> Result<Value, AppError> {
-  s.db
-    .one(
-      &format!("SELECT * FROM {table} WHERE project_id=? AND id=?"),
-      vec![project.into(), item.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("CI resource not found"))
+pub(crate) async fn job_row(s: &AppState, project: i64, item: i64) -> Result<Value, AppError> {
+  Ok(model_value(s.ci.job(project, item).await?))
 }
-pub(crate) async fn insert_tx(
-  s: &AppState,
-  tx: &DatabaseTransaction,
-  table: &str,
-  mut row: Value,
-) -> Result<Value, AppError> {
-  let row = row
-    .as_object_mut()
-    .ok_or_else(|| AppError::internal("invalid CI row"))?;
-  row.entry("id").or_insert(json!(new_id()));
-  row.entry("created_at").or_insert(json!(now()));
-  row.entry("updated_at").or_insert(json!(now()));
-  let columns = row.keys().cloned().collect::<Vec<_>>();
-  let values = row
-    .values()
-    .map(|v| match v {
-      Value::String(v) => Ok(SqlValue::from(v.clone())),
-      Value::Number(v) => v
-        .as_i64()
-        .map(SqlValue::from)
-        .ok_or_else(|| AppError::internal("invalid CI integer")),
-      _ => Err(AppError::internal("invalid CI field")),
-    })
-    .collect::<Result<Vec<_>, _>>()?;
-  tx.execute_raw(s.db.statement(
-    &format!(
-      "INSERT INTO {table} ({}) VALUES ({})",
-      columns.join(","),
-      vec!["?"; columns.len()].join(",")
-    ),
-    values,
-  ))
-  .await?;
-  Ok(Value::Object(row.clone()))
+pub(crate) async fn pipeline_row(s: &AppState, project: i64, item: i64) -> Result<Value, AppError> {
+  Ok(model_value(s.ci.pipeline(project, item).await?))
 }
-pub(crate) async fn tx_rows(
-  s: &AppState,
-  tx: &DatabaseTransaction,
-  sql: &str,
-  args: Vec<SqlValue>,
-) -> Result<Vec<Value>, AppError> {
-  Ok(
-    Value::find_by_statement(s.db.statement(sql, args))
-      .all(tx)
-      .await?,
-  )
+pub(crate) fn lease(job: &Value) -> gity_ci::Lease {
+  gity_ci::Lease {
+    job_id: id(job),
+    attempt: job["attempts"].as_i64().unwrap_or(0) as i32,
+    owner: text(job, "locked_by").into(),
+  }
 }
 pub(crate) fn public_job(mut row: Value) -> Value {
   if let Ok(mut body) = payload(&row) {

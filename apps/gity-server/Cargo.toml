@@ -14,6 +14,7 @@ fluxdi.workspace = true
 clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
+gity-core = { path = "../../crates/gity-core", features = ["test-fixtures"] }
 hex = "0.4"
 rand = "0.10"
 tempfile.workspace = true

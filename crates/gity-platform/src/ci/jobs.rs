@@ -90,31 +90,19 @@ async fn create(
       .with_timezone(&chrono::Utc)
       .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
   };
-  let row = s
-    .db
-    .insert(
-      "project_jobs",
-      json!({
-              "project_id":p,
-              "kind":kind,
-              "status":"pending",
-              "payload":body,
-              "result":"",
-              "attempts":0,
-              "max_attempts":attempts,
-              "run_after":run_after,
-              "locked_by":"",
-              "locked_until":worker::ZERO,
-              "last_error":"",
-              "started_at":worker::ZERO,
-              "finished_at":worker::ZERO
-          }
-      )
-      .as_object()
-      .unwrap()
-      .clone(),
-    )
-    .await?;
+  let row = model_value(
+    s.ci
+      .create_job(gity_ci::NewJob {
+        project_id: p,
+        kind: kind.into(),
+        payload: body,
+        max_attempts: attempts as i32,
+        run_after: chrono::DateTime::parse_from_rfc3339(&run_after)
+          .map_err(|_| AppError::bad_request("invalid run_after"))?
+          .naive_utc(),
+      })
+      .await?,
+  );
   Ok(gity_core::ok(public_job(row)))
 }
 #[utoipa::path(
@@ -127,13 +115,11 @@ async fn create(
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
   Ok(gity_core::ok(
-    s.db
-      .all(
-        "SELECT * FROM project_jobs WHERE project_id=? ORDER BY created_at DESC LIMIT 200",
-        vec![p.into()],
-      )
+    s.ci
+      .jobs(p)
       .await?
       .into_iter()
+      .map(model_value)
       .map(public_job)
       .collect::<Vec<_>>(),
   ))
@@ -147,9 +133,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
 )]
 async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
-  Ok(gity_core::ok(public_job(
-    one(&s, "project_jobs", p, j).await?,
-  )))
+  Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
 #[utoipa::path(
     post, path="/{project}/jobs/{job}/cancel", tag="ci",
@@ -160,17 +144,9 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64
 )]
 async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobWrite).await?;
-  one(&s, "project_jobs", p, j).await?;
-  s.db.execute("UPDATE project_jobs SET status='canceled',finished_at=?,updated_at=?,locked_by='',locked_until=? WHERE id=? AND project_id=? AND status IN ('pending','running')",
-        vec![now().into(),
-            now().into(),
-            now().into(),
-            j.into(),
-            p.into()]).await?;
-  worker::refresh_job_pipeline(&s, j).await?;
-  Ok(gity_core::ok(public_job(
-    one(&s, "project_jobs", p, j).await?,
-  )))
+  job_row(&s, p, j).await?;
+  s.ci.cancel_job(p, j).await?;
+  Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
 #[utoipa::path(
     post, path="/{project}/jobs/{job}/retry", tag="ci",
@@ -181,57 +157,8 @@ async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64
 )]
 async fn retry(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobWrite).await?;
-  let job = one(&s, "project_jobs", p, j).await?;
-  let data = if job["kind"] == "noop" {
-    json!({})
-  } else {
-    payload(&job)?
-  };
-  let needs = data["needs"].as_array().is_some_and(|v| !v.is_empty());
-  let tx = s.db.transaction().await?;
-  if let Some(link) = tx_rows(
-    &s,
-    &tx,
-    "SELECT pipeline_id FROM project_pipeline_jobs WHERE project_job_id=?",
-    vec![j.into()],
-  )
-  .await?
-  .first()
-  {
-    let pipeline = link["pipeline_id"].as_i64().unwrap();
-    tx.execute_raw(s.db.statement("UPDATE project_pipelines SET status='pending',finished_at=?,updated_at=? WHERE id=? AND status IN ('failed','canceled','succeeded')",
-                vec![worker::ZERO.into(),
-                    now().into(),
-                    pipeline.into()])).await?;
-    tx.execute_raw(s.db.statement(
-            "UPDATE project_jobs SET status='pending',max_attempts=attempts+3,locked_by='',locked_until=?,run_after=?,finished_at=?,updated_at=? WHERE id IN (SELECT project_job_id FROM project_pipeline_jobs WHERE pipeline_id=?) AND id<>? AND status='canceled'",
-            vec![worker::ZERO.into(),worker::BLOCKED.into(),worker::ZERO.into(),now().into(),pipeline.into(),j.into()],
-        )).await?;
-  }
-  let changed=tx.execute_raw(s.db.statement("UPDATE project_jobs SET status='pending',max_attempts=attempts+3,result='',last_error='',locked_by='',locked_until=?,run_after=?,started_at=?,finished_at=?,updated_at=? WHERE id=? AND project_id=? AND status IN ('failed','canceled')",
-            vec![worker::ZERO.into(),
-                if needs{
-                    worker::BLOCKED.into()
-                }
-                else{
-                    now().into()
-                }
-                ,
-                worker::ZERO.into(),
-                worker::ZERO.into(),
-                now().into(),
-                j.into(),
-                p.into()])).await?.rows_affected();
-  if changed != 1 {
-    return Err(AppError::conflict(
-      "only failed or canceled jobs can be retried",
-    ));
-  }
-  tx.commit().await?;
-  worker::refresh_job_pipeline(&s, j).await?;
-  Ok(gity_core::ok(public_job(
-    one(&s, "project_jobs", p, j).await?,
-  )))
+  s.ci.retry_job(p, j).await?;
+  Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
 #[utoipa::path(
     get, path="/{project}/jobs/{job}/trace", tag="ci",
@@ -242,14 +169,14 @@ async fn retry(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64,
 )]
 async fn trace(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
-  let job = one(&s, "project_jobs", p, j).await?;
+  let job = job_row(&s, p, j).await?;
   let logs = s
-    .db
-    .all(
-      "SELECT * FROM project_job_logs WHERE project_id=? AND project_job_id=? ORDER BY attempt,id",
-      vec![p.into(), j.into()],
-    )
-    .await?;
+    .ci
+    .logs(p, j)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let latest = logs
     .last()
     .cloned()

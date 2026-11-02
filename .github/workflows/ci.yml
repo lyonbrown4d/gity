@@ -29,6 +29,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo xtask source-check
       - run: cargo fmt --all -- --check
+      - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo check -p gity-web --target wasm32-unknown-unknown --locked
@@ -56,22 +57,16 @@ jobs:
       - uses: actions/checkout@v6
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
-      - name: Start disposable database and S3 services
+      - name: Start disposable S3 service
         run: |
-          docker compose -f deploy/integration/compose.yaml --profile ci up -d --wait --wait-timeout 180 postgres-test mysql-test s3
+          docker compose -f deploy/integration/compose.yaml --profile ci up -d --wait --wait-timeout 180 s3
           docker compose -f deploy/integration/compose.yaml run --rm s3-init
       - name: Isolated Testcontainers migration contracts
         run: cargo test -p gity-migrations --test databases --locked -- --ignored --test-threads=1
       - name: Isolated Testcontainers entity contracts
         run: cargo test -p gity-entities --test container_databases --locked -- --ignored --test-threads=1
-      - name: PostgreSQL API regression
-        env:
-          GITY_TEST_DATABASE_URL: postgres://gity:gity-test-db-only@localhost:5434/gity
-        run: cargo test -p gity-platform -p gity-server --locked -- --test-threads=1
-      - name: MySQL API regression
-        env:
-          GITY_TEST_DATABASE_URL: mysql://root:gity-test-root-only@localhost:3308/gity
-        run: cargo test -p gity-platform -p gity-server --locked -- --test-threads=1
+      - name: Isolated Testcontainers API regression
+        run: cargo test -p gity-test-support --test database_regression --locked -- --ignored --test-threads=1
       - name: SeaweedFS S3 contract
         env:
           GITY_TEST_S3_ENDPOINT: http://localhost:9000

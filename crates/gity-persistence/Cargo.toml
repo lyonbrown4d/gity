@@ -1,0 +1,15 @@
+[package]
+name = "gity-persistence"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-core = { path = "../gity-core" }
+gity-entities = { path = "../gity-entities" }
+sea-orm.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

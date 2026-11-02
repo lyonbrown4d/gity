@@ -6,9 +6,35 @@ pub struct ArtifactBindings {
   #[cfg(feature = "packages")]
   service: Shared<ArtifactService>,
 }
+use gity_ci::{CiModule, CiService};
+use gity_collaboration::{CollaborationModule, CollaborationService};
 use gity_core::{Db, IdGenerator, Settings, Storage, install};
 use gity_git::GitService;
 use gity_identity::{IdentityModule, IdentityRepository};
+use gity_projects::{ProjectModule, ProjectService, RepositoryAccessService};
+
+struct ApplicationServices {
+  identity: Shared<IdentityRepository>,
+  collaboration: Shared<CollaborationService>,
+  ci: Shared<CiService>,
+  projects: Shared<ProjectService>,
+  repository_access: Shared<RepositoryAccessService>,
+}
+fn services(
+  identity: Shared<IdentityRepository>,
+  collaboration: Shared<CollaborationService>,
+  ci: Shared<CiService>,
+  projects: Shared<ProjectService>,
+  repository_access: Shared<RepositoryAccessService>,
+) -> Result<Shared<ApplicationServices>, fluxdi::Error> {
+  Ok(Shared::new(ApplicationServices {
+    identity,
+    collaboration,
+    ci,
+    projects,
+    repository_access,
+  }))
+}
 use gity_search::{Limits, SearchIndex};
 fn id_generator(settings: Shared<Settings>) -> Result<Shared<IdGenerator>, fluxdi::Error> {
   IdGenerator::new(settings.database_node_id)
@@ -63,7 +89,7 @@ fn state(
   settings: Shared<Settings>,
   storage: Shared<Storage>,
   search: Shared<SearchIndex>,
-  identity: Shared<IdentityRepository>,
+  services: Shared<ApplicationServices>,
   _artifacts: Shared<ArtifactBindings>,
 ) -> Result<Shared<AppState>, fluxdi::Error> {
   Ok(Shared::new(AppState {
@@ -73,19 +99,40 @@ fn state(
     settings,
     storage: (*storage).clone(),
     search: (*search).clone(),
-    identity,
+    identity: services.identity.clone(),
+    collaboration: services.collaboration.clone(),
+    ci: services.ci.clone(),
+    projects: services.projects.clone(),
+    repository_access: services.repository_access.clone(),
     #[cfg(feature = "packages")]
     artifacts: _artifacts.service.clone(),
   }))
 }
 // Missing dependencies, factory types, cycles and root scope are checked by FluxDI.
 static_module! {
-    pub struct RuntimeModule {
+    pub struct ServicesModule {
         import identity_module: IdentityModule {
             repository: IdentityRepository;
         };
+        import collaboration_module: CollaborationModule {
+            collaboration: CollaborationService = service;
+        };
+        import ci_module: CiModule {
+            ci: CiService = service;
+        };
+        import projects_module: ProjectModule {
+            projects: ProjectService = service;
+            repository_access: RepositoryAccessService;
+        };
         #[scope(root)]
-        state:AppState=state(database,backend,settings,storage,search,repository,artifacts);
+        services: ApplicationServices=services(repository,collaboration,ci,projects,repository_access);
+    }
+}
+static_module! {
+    pub struct RuntimeModule {
+        import services_module: ServicesModule { services: ApplicationServices; };
+        #[scope(root)]
+        state:AppState=state(database,backend,settings,storage,search,services,artifacts);
         #[scope(root)]
         git:GitService=git(backend);
         #[scope(root)]
@@ -112,12 +159,18 @@ pub async fn compose(settings: Settings) -> anyhow::Result<(RuntimeModule, AppSt
   let identity = IdentityModule::new(connection.clone());
   #[cfg(feature = "packages")]
   let artifacts = Shared::new(ArtifactBindings {
-    service: ArtifactModule::new(connection, storage.clone()).service()?,
+    service: ArtifactModule::new(connection.clone(), storage.clone()).service()?,
   });
   #[cfg(not(feature = "packages"))]
   let artifacts = Shared::new(ArtifactBindings {});
-  let module = RuntimeModule::new(
+  let services = ServicesModule::new(
     identity,
+    CollaborationModule::new(connection.clone()),
+    CiModule::new(connection.clone()),
+    ProjectModule::new(connection.clone()),
+  );
+  let module = RuntimeModule::new(
+    services,
     Shared::new(settings),
     Shared::new(db),
     storage,

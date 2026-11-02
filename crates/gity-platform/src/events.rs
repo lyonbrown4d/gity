@@ -85,22 +85,16 @@ pub async fn project_change(
     return Ok(());
   }
   let org = projects::id(&p["organization_id"])?;
-  let recipients = if kind == "project_created" {
-    s.db
-      .all(
-        "SELECT user_id FROM organization_members WHERE organization_id=?",
-        vec![org.into()],
-      )
-      .await?
-  } else {
-    s.db.all("SELECT user_id FROM project_members WHERE project_id=? UNION SELECT user_id FROM organization_members WHERE organization_id=?",vec![id.into(),org.into()]).await?
-  };
+  let recipients = s
+    .projects
+    .member_user_ids(id, org, kind == "project_created")
+    .await?;
   for recipient in recipients {
     features::notify_event(
       s,
       features::Notification {
         project: id,
-        user: projects::id(&recipient["user_id"])?,
+        user: recipient,
         kind,
         target_type,
         target: &target,

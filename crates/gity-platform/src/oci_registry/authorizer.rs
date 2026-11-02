@@ -4,12 +4,10 @@ use crate::{
 };
 use axum::http::{HeaderMap, StatusCode};
 use gity_core::AppError;
-use gity_entities::{project_registry_settings, projects};
 use gity_oci::{
   AuthorizationError, MirrorSource, OciAuthorization, OciAuthorizationDecision, OciOperation,
   OciRequest,
 };
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 #[derive(Clone)]
 pub struct PlatformOciAuthorizer {
@@ -109,10 +107,10 @@ impl PlatformOciAuthorizer {
     let candidates = (2..=segments.len())
       .map(|count| segments[..count].join("/"))
       .collect::<Vec<_>>();
-    let project = projects::Entity::find()
-      .filter(projects::Column::FullPath.is_in(candidates))
-      .filter(projects::Column::DeletedAt.is_null())
-      .all(&self.state.db.connection)
+    let project = self
+      .state
+      .projects
+      .paths(candidates)
       .await?
       .into_iter()
       .max_by_key(|project| project.full_path.len())
@@ -138,8 +136,10 @@ impl PlatformOciAuthorizer {
       .unwrap()
       .strip_prefix('/')
       .unwrap_or("");
-    let policy = project_registry_settings::Entity::find_by_id(project.id)
-      .one(&self.state.db.connection)
+    let policy = self
+      .state
+      .repository_access
+      .registry_settings(project.id)
       .await?;
     if let Some(policy) = policy
       && policy.mode == "mirror"

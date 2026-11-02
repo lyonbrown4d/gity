@@ -25,12 +25,12 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
 }
 async fn value(s: &AppState, p: &Value, row: Value) -> Result<Value, AppError> {
   let links = s
-    .db
-    .all(
-      "SELECT * FROM project_release_links WHERE project_release_id = ? ORDER BY id",
-      vec![number(&row, "id").into()],
-    )
-    .await?;
+    .collaboration
+    .release_links(number(p, "id"), number(&row, "id"))
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let tag = tag(s, p, string(&row, "tag_name")).await?;
   Ok(json!({"release":row,"links":links,"tag":tag}))
 }
@@ -46,12 +46,11 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
     .project;
   let mut out = Vec::new();
   for row in s
-    .db
-    .all(
-      "SELECT * FROM project_releases WHERE project_id = ? ORDER BY released_at DESC,id DESC",
-      vec![p.into()],
-    )
+    .collaboration
+    .releases(p)
     .await?
+    .into_iter()
+    .map(model_value)
   {
     out.push(value(&s, &project, row).await?);
   }
@@ -67,7 +66,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, r)): Path<(i64
   let project = crate::access::project_action(&s, &h, p, ProjectAction::Read)
     .await?
     .project;
-  let row = scoped(&s, "project_releases", p, r, false).await?;
+  let row = model_value(&s.collaboration.release(p, r).await?);
   response(value(&s, &project, row).await?)
 }
 fn time(b: &Value) -> Result<String, AppError> {
@@ -100,15 +99,7 @@ async fn create(
   let _guard = super::merge_requests::lock(p).await;
   let name = required(&b, "tag_name")?;
   let released = time(&b)?;
-  if s
-    .db
-    .one(
-      "SELECT id FROM project_releases WHERE project_id = ? AND tag_name = ?",
-      vec![p.into(), name.clone().into()],
-    )
-    .await?
-    .is_some()
-  {
+  if s.collaboration.find_release(p, &name).await?.is_some() {
     return Err(AppError::conflict("release already exists for tag"));
   }
   if tag(&s, &project, &name).await?.is_none() {
@@ -130,7 +121,20 @@ async fn create(
   } else {
     string(&b, "name").trim().to_owned()
   };
-  let row=s.db.insert("project_releases",fields(json!({"project_id":p,"tag_name":name,"name":title,"description":string(&b,"description").trim(),"created_by_user_id":actor.user_id,"released_at":released}))).await?;
+  let row = model_value(
+    s.collaboration
+      .create_release(ReleaseCreate {
+        project_id: p,
+        tag_name: name,
+        name: title,
+        description: string(&b, "description").trim().to_owned(),
+        created_by_user_id: actor.user_id,
+        released_at: chrono::DateTime::parse_from_rfc3339(&released)
+          .map_err(|_| AppError::bad_request("invalid released_at"))?
+          .naive_utc(),
+      })
+      .await?,
+  );
   response(value(&s, &project, row).await?)
 }
 #[utoipa::path(
@@ -149,12 +153,16 @@ async fn update(
   let project = crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin)
     .await?
     .project;
-  scoped(&s, "project_releases", p, r, false).await?;
+  s.collaboration.release(p, r).await?;
   let mut change = patch(&b, &["name", "description"]);
   if b.get("released_at").is_some() {
     change.insert("released_at".into(), json!(time(&b)?));
   }
-  let row = s.db.update("project_releases", r, change).await?;
+  let row = model_value(
+    s.collaboration
+      .update_release(p, r, command(Value::Object(change))?)
+      .await?,
+  );
   response(value(&s, &project, row).await?)
 }
 #[utoipa::path(
@@ -172,7 +180,7 @@ async fn remove(
   let project = crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin)
     .await?
     .project;
-  let row = scoped(&s, "project_releases", p, r, false).await?;
+  let row = model_value(&s.collaboration.release(p, r).await?);
   if q.get("delete_tag").is_some_and(|v| v == "true")
     && tag(&s, &project, string(&row, "tag_name")).await?.is_some()
   {
@@ -181,7 +189,7 @@ async fn remove(
       .await
       .map_err(git_error)?;
   }
-  s.db.delete("project_releases", r).await?;
+  s.collaboration.delete_release(p, r).await?;
   response(json!({"status":"deleted"}))
 }
 #[utoipa::path(
@@ -198,7 +206,7 @@ async fn link(
   Json(b): Json<Value>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
-  scoped(&s, "project_releases", p, r, false).await?;
+  s.collaboration.release(p, r).await?;
   let name = required(&b, "name")?;
   let url = required(&b, "url")?;
   let parsed =
@@ -206,7 +214,24 @@ async fn link(
   if !["http", "https"].contains(&parsed.scheme()) || parsed.host_str().is_none() {
     return Err(AppError::bad_request("release link url is invalid"));
   }
-  response(s.db.insert("project_release_links",fields(json!({"project_release_id":r,"name":name,"url":url,"link_type":if string(&b,"link_type").is_empty(){"other"}else{string(&b,"link_type")}}))).await?)
+  response(model_value(
+    s.collaboration
+      .create_release_link(
+        p,
+        r,
+        ReleaseLinkCreate {
+          project_release_id: r,
+          name,
+          url,
+          link_type: if string(&b, "link_type").is_empty() {
+            "other".to_owned()
+          } else {
+            string(&b, "link_type").to_owned()
+          },
+        },
+      )
+      .await?,
+  ))
 }
 #[utoipa::path(
     delete,path="/{id}/releases/{release}/links/{link}",tag="releases",
@@ -220,18 +245,7 @@ async fn unlink(
   Path((p, r, l)): Path<(i64, i64, i64)>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
-  scoped(&s, "project_releases", p, r, false).await?;
-  if s
-    .db
-    .one(
-      "SELECT id FROM project_release_links WHERE id = ? AND project_release_id = ?",
-      vec![l.into(), r.into()],
-    )
-    .await?
-    .is_none()
-  {
-    return Err(AppError::not_found("release link not found"));
-  }
-  s.db.delete("project_release_links", l).await?;
+  s.collaboration.release(p, r).await?;
+  s.collaboration.delete_release_link(p, r, l).await?;
   response(json!({"status":"deleted"}))
 }

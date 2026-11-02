@@ -45,29 +45,20 @@ pub(crate) async fn upload(
     .put(&key, bytes::Bytes::from(bytes.clone()))
     .await?;
   let row = s
-    .db
-    .insert(
-      "project_job_artifacts",
-      json!({
-              "id":artifact,
-              "project_id":p,
-              "project_job_id":j,
-              "name":text(&b,
-                  "name"),
-              "file_name":name,
-              "file_path":text(&b,
-                  "file_path"),
-              "content_type":text(&b,
-                  "content_type"),
-              "byte_size":bytes.len() as i64,
-              "storage_key":key
-          }
-      )
-      .as_object()
-      .unwrap()
-      .clone(),
-    )
-    .await;
+    .ci
+    .add_artifact(gity_ci::NewArtifact {
+      id: artifact,
+      project_id: p,
+      job_id: j,
+      name: text(&b, "name").into(),
+      file_name: name.into(),
+      file_path: text(&b, "file_path").into(),
+      content_type: text(&b, "content_type").into(),
+      byte_size: bytes.len() as i64,
+      storage_key: key.clone(),
+    })
+    .await
+    .map(model_value);
   match row {
     Ok(mut row) => {
       row.as_object_mut().unwrap().remove("storage_key");
@@ -93,14 +84,14 @@ pub(crate) async fn list(
   Path((p, j)): Path<(i64, i64)>,
 ) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
-  one(&s, "project_jobs", p, j).await?;
+  job_row(&s, p, j).await?;
   let mut rows = s
-    .db
-    .all(
-      "SELECT * FROM project_job_artifacts WHERE project_id=? AND project_job_id=? ORDER BY id",
-      vec![p.into(), j.into()],
-    )
-    .await?;
+    .ci
+    .artifacts(p, j)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   for row in &mut rows {
     row.as_object_mut().unwrap().remove("storage_key");
   }
@@ -119,15 +110,8 @@ pub(crate) async fn download(
   Path((p, j, a)): Path<(i64, i64, i64)>,
 ) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
-  one(&s, "project_jobs", p, j).await?;
-  let mut row = s
-    .db
-    .one(
-      "SELECT * FROM project_job_artifacts WHERE project_id=? AND project_job_id=? AND id=?",
-      vec![p.into(), j.into(), a.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("artifact not found"))?;
+  job_row(&s, p, j).await?;
+  let mut row = model_value(s.ci.artifact(p, j, a).await?);
   let key = text(&row, "storage_key");
   if !config::safe_relative(key) {
     return Err(AppError::internal("invalid artifact storage key"));

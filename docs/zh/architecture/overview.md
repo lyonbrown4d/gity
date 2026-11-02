@@ -24,16 +24,16 @@ Gity 采用共享业务库和多个可部署入口。Standalone 在一个平台�
 ```text
 apps/                   可执行入口与进程配置
   ↓
-crates/gity-platform    平台路由、应用编排与平台业务
+crates/gity-platform    平台路由、HTTP 适配与应用装配
   ↓
-身份 / 制品 / Git 等领域服务和端口
+gity-projects / gity-collaboration / gity-ci 等应用服务与领域规则
   ↓
-SeaORM 仓储、Git 本地或 RPC 适配、对象存储适配
+SeaORM 类型化仓储、Git 本地或 RPC 适配、对象存储适配
 ```
 
 `apps/` 不供其他应用导入业务实现。`crates/` 保存可复用组件和数据库迁移库，`xtask/` 保存构建和验证工具。数据库迁移由 [数据库迁移说明](../database-migrations.md) 介绍。
 
-当前按身份权限、项目协作、Git、CI、制品等上下文拆分。身份与制品已有独立服务和仓储；组织项目、Issue、MR、CI 等部分实现仍集中在 `gity-platform`。这些上下文边界并不表示每个上下文都拥有独立服务和数据库。
+当前按身份权限、项目、协作、CI、Git、制品等上下文组织实现。项目与仓库访问由 `gity-projects` 提供应用服务；Issue、MR、里程碑、发布等协作流程由 `gity-collaboration` 提供；流水线和任务流程由 `gity-ci` 提供。`gity-platform` 保留 HTTP 路由适配、请求身份与权限检查以及运行时组合。上下文边界并不表示每个上下文拥有独立进程或数据库。持久化边界和事务说明见[业务持久化与依赖装配](typed-persistence.md)。
 
 ## 运行依赖
 
@@ -47,7 +47,7 @@ Web 是编译后的静态资源，由平台 HTTP 服务提供，不是独立的 
 | --- | --- |
 | 装配 | FluxDI 注册、解析和 module 生命周期 |
 | HTTP / 并发 | Axum、Tokio；传输路径保留流式读写 |
-| 持久化 | SeaORM Entity、ActiveModel、事务；部分平台仓储使用现有通用接口 |
+| 持久化 | SeaORM Entity、ActiveModel、类型化仓储与事务；跨上下文审计和 IID 计数由 `gity-persistence` 提供 |
 | 实体标识 | Snowflake（ferroid，41/10/12 位）；装配阶段按唯一 node ID 安装生成器，插入时由 `before_save` 赋值；对外 JSON 主键用字符串 |
 | 操作标识 | UUID v7；秘密凭据使用密码学随机数 |
 | 配置 | 代码默认值 < 文件 < 环境变量 < 显式 CLI |

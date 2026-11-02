@@ -9,8 +9,6 @@ use axum::{
   http::HeaderMap,
 };
 use gity_core::AppError;
-use gity_entities::project_registry_settings as settings;
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -38,9 +36,7 @@ async fn get(
   Path(project): Path<i64>,
 ) -> Result<Json<serde_json::Value>, AppError> {
   access::project_action(&state, &headers, project, ProjectAction::RegistryAdmin).await?;
-  let row = settings::Entity::find_by_id(project)
-    .one(&state.db.connection)
-    .await?;
+  let row = state.repository_access.registry_settings(project).await?;
   let policy = row
     .map(|row| RegistryPolicy {
       mode: if row.mode == "mirror" {
@@ -105,32 +101,19 @@ async fn put(
       Some(alias.to_owned())
     }
   };
-  let existing = settings::Entity::find_by_id(project)
-    .one(&state.db.connection)
+  state
+    .repository_access
+    .set_registry_settings(
+      project,
+      match policy.mode {
+        RegistryMode::Hosted => "hosted",
+        RegistryMode::Mirror => "mirror",
+      },
+      alias,
+      prefix.to_owned(),
+      actor.user_id,
+    )
     .await?;
-  let is_new = existing.is_none();
-  let mut row = existing
-    .map(IntoActiveModel::into_active_model)
-    .unwrap_or_else(|| settings::ActiveModel {
-      project_id: Set(project),
-      ..Default::default()
-    });
-  row.mode = Set(
-    match policy.mode {
-      RegistryMode::Hosted => "hosted",
-      RegistryMode::Mirror => "mirror",
-    }
-    .into(),
-  );
-  row.mirror_alias = Set(alias);
-  row.mirror_repository_prefix = Set(prefix.to_owned());
-  row.updated_by = Set(Some(actor.user_id));
-  row.updated_at = Set(chrono::Utc::now().naive_utc());
-  if is_new {
-    row.insert(&state.db.connection).await?;
-  } else {
-    row.update(&state.db.connection).await?;
-  }
   Ok(gity_core::ok(serde_json::to_value(policy).map_err(
     |_| AppError::internal("serialize registry policy"),
   )?))

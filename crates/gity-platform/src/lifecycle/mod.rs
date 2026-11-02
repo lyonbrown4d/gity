@@ -58,18 +58,21 @@ struct PlatformRuntime {
 }
 impl Module for PlatformModule {
   fn imports(&self) -> Vec<Box<dyn Module>> {
-    let mut imports = self
+    let imports = self
       .state
       .git_cluster
       .as_ref()
       .map(|module| vec![Box::new(module.clone()) as Box<dyn Module>])
       .unwrap_or_default();
     #[cfg(feature = "packages")]
-    imports.push(Box::new(
-      gity_package_registry::PackageRegistryModule::embedded(crate::package_authority::state(
-        &self.state,
-      )),
-    ));
+    let imports = imports
+      .into_iter()
+      .chain([
+        Box::new(gity_package_registry::PackageRegistryModule::embedded(
+          crate::package_authority::state(&self.state),
+        )) as Box<dyn Module>,
+      ])
+      .collect();
     imports
   }
 

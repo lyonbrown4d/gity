@@ -1,7 +1,7 @@
 //! Registry credentials, package distribution and Git LFS.
 mod audit;
 pub use audit::{AuditRecord, record_event};
-mod credential_repository;
+mod credential_views;
 mod credentials;
 mod lfs;
 mod lfs_protocol;
@@ -13,8 +13,8 @@ pub use lfs::{handle_lfs, is_lfs_path};
 mod variables;
 use crate::{AppState, access::ProjectAction};
 use axum::{Json, Router, http::HeaderMap};
-use gity_core::{AppError, externalize, now};
-use serde_json::{Map, Value, json};
+use gity_core::{AppError, externalize};
+use serde_json::{Value, json};
 pub use tokens::{ProjectToken, authenticate_token, token_from_headers};
 type Reply = Result<Json<Value>, AppError>;
 pub fn routes() -> Router<AppState> {
@@ -47,19 +47,6 @@ fn required(v: &Value, k: &str) -> Result<String, AppError> {
     Ok(s.to_owned())
   }
 }
-fn map(v: Value) -> Map<String, Value> {
-  v.as_object().cloned().unwrap_or_default()
-}
-
-async fn scoped(s: &AppState, table: &str, p: i64, id: i64) -> Result<Value, AppError> {
-  s.db
-    .one(
-      &format!("SELECT * FROM {table} WHERE project_id = ? AND id = ?"),
-      vec![p.into(), id.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("resource not found"))
-}
 async fn authorize(
   s: &AppState,
   h: &HeaderMap,
@@ -81,6 +68,8 @@ async fn authorize(
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod credential_authorization_tests;
 #[cfg(test)]
 mod credential_tests;
 #[cfg(test)]

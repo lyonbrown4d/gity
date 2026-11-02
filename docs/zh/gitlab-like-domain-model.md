@@ -100,7 +100,7 @@
 核心定义可从以下位置复核：
 
 - 版本化表结构：`crates/gity-migrations`。
-- 组织与项目路径更新：`crates/gity-platform/src/projects/`。
+- 组织与项目路径应用服务与适配器：`crates/gity-projects/`、`crates/gity-platform/src/projects/`。
 - 角色合并和访问动作：`crates/gity-platform/src/access.rs`、`crates/gity-platform/src/access/`。
 - 按项目 ID 选择 Git 存储名：`crates/gity-platform/src/repository/mod.rs`。
 - YAML 配置读取与校验：`crates/gity-platform/src/ci/config.rs`、`crates/gity-platform/src/ci/service.rs`。

@@ -29,13 +29,9 @@ fn slug(v: &str) -> Result<String, AppError> {
   Ok(out)
 }
 async fn page(s: &AppState, p: i64, key: &str) -> Result<Value, AppError> {
-  s.db
-    .one(
-      "SELECT * FROM project_wiki_pages WHERE project_id = ? AND slug = ?",
-      vec![p.into(), slug(key)?.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("wiki page not found"))
+  Ok(model_value(
+    s.collaboration.wiki_page(p, &slug(key)?).await?,
+  ))
 }
 #[utoipa::path(
     get,path="/{id}/wiki/pages",tag="wiki",
@@ -46,12 +42,12 @@ async fn page(s: &AppState, p: i64, key: &str) -> Result<Value, AppError> {
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::WikiRead).await?;
   response(json!(
-    s.db
-      .all(
-        "SELECT * FROM project_wiki_pages WHERE project_id = ? ORDER BY title,id",
-        vec![p.into()]
-      )
+    s.collaboration
+      .wiki_pages(p)
       .await?
+      .into_iter()
+      .map(model_value)
+      .collect::<Vec<_>>()
   ))
 }
 #[utoipa::path(
@@ -94,18 +90,22 @@ async fn create(
   } else {
     string(&b, "slug")
   })?;
-  if s
-    .db
-    .one(
-      "SELECT id FROM project_wiki_pages WHERE project_id = ? AND slug = ?",
-      vec![p.into(), key.clone().into()],
-    )
-    .await?
-    .is_some()
-  {
+  if s.collaboration.find_wiki_page(p, &key).await?.is_some() {
     return Err(AppError::conflict("wiki page already exists"));
   }
-  response(s.db.insert("project_wiki_pages",fields(json!({"project_id":p,"slug":key,"title":title,"content":string(&b,"content"),"format":"markdown","author_user_id":actor.user_id,"last_edited_by_user_id":actor.user_id}))).await?)
+  response(model_value(
+    s.collaboration
+      .create_wiki_page(WikiPageCreate {
+        project_id: p,
+        slug: key,
+        title,
+        content: Some(string(&b, "content").to_owned()),
+        format: "markdown".to_owned(),
+        author_user_id: actor.user_id,
+        last_edited_by_user_id: actor.user_id,
+      })
+      .await?,
+  ))
 }
 #[utoipa::path(
     patch,path="/{id}/wiki/pages/{slug}",tag="wiki",
@@ -123,17 +123,17 @@ async fn update(
   let actor = crate::access::project_action(&s, &h, p, ProjectAction::WikiWrite)
     .await?
     .actor()?;
-  let row = page(&s, p, &key).await?;
+  page(&s, p, &key).await?;
   if b.get("title").is_some() {
     required(&b, "title")?;
   }
   let mut change = patch(&b, &["title", "content"]);
   change.insert("last_edited_by_user_id".into(), json!(actor.user_id));
-  response(
-    s.db
-      .update("project_wiki_pages", number(&row, "id"), change)
+  response(model_value(
+    s.collaboration
+      .update_wiki_page(p, &slug(&key)?, command(Value::Object(change))?)
       .await?,
-  )
+  ))
 }
 #[utoipa::path(
     delete,path="/{id}/wiki/pages/{slug}",tag="wiki",
@@ -148,9 +148,7 @@ async fn remove(
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::WikiWrite).await?;
   let row = page(&s, p, &key).await?;
-  s.db
-    .delete("project_wiki_pages", number(&row, "id"))
-    .await?;
+  s.collaboration.delete_wiki_page(p, &slug(&key)?).await?;
   response(row)
 }
 #[cfg(test)]

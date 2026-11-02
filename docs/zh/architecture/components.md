@@ -27,7 +27,9 @@
 
 | 组件库 | 作用 |
 | --- | --- |
-| `gity-platform` | 平台 HTTP/SSH、应用装配、协作及 CI 编排 |
+| `gity-platform` | 平台 HTTP/SSH、路由适配、FluxDI 应用装配及运行时编排 |
+| `gity-projects` / `gity-collaboration` / `gity-ci` | 项目与仓库访问、Issue/MR 等协作、流水线和任务应用服务及类型化仓储 |
+| `gity-persistence` | 跨上下文的类型化审计快照、IID 计数和模型 JSON 边界转换 |
 | `gity-identity` / `gity-authority` | 身份仓储与服务；内部 OCI/软件包权限 RPC、远程授权适配 |
 | `gity-artifacts` / `gity-package-registry` | 制品规则、元数据和存储服务；各语言 HTTP 协议适配 |
 | `gity-oci` / `gity-runtime` | OCI 策略与 mirror；Angos 和组合 module 生命周期 |
@@ -35,7 +37,7 @@
 | `gity-git-cluster` | 仓库放置、主副本选择、复制推进与受控提升 |
 | `gity-git-node` / `gity-git-wire` | Git 节点实现；内部 RPC、客户端、流式传输与 TLS |
 | `gity-gateway` | HTTP / SSH 网关 module |
-| `gity-core` / `gity-entities` / `gity-ids` | 基础配置、存储和通用类型；实体映射；统一 ID 生成 |
+| `gity-core` / `gity-entities` / `gity-ids` | 数据库连接与迁移、基础配置和存储；实体映射；统一 ID 生成 |
 | `gity-search` / `gity-i18n` / `gity-observability` | 搜索、共享语言资产、日志/指标/追踪 |
 | `gity-test-support` | 可回收的容器集成测试依赖 |
 

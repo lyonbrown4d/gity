@@ -4,7 +4,7 @@ use crate::openapi::{lfs_schemas as spec, schemas as api};
 use axum::{
   body::Body,
   extract::{Path, Query, State},
-  http::{HeaderMap, StatusCode},
+  http::HeaderMap,
 };
 use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
@@ -19,12 +19,10 @@ pub(super) fn validate_oid(oid: &str) -> Result<(), AppError> {
   }
 }
 pub(super) async fn object(s: &AppState, p: i64, oid: &str) -> Result<Value, AppError> {
-  s.db
-    .one(
-      "SELECT * FROM project_lfs_objects WHERE project_id = ? AND oid = ?",
-      vec![p.into(), oid.into()],
-    )
+  s.repository_access
+    .lfs_object(p, oid)
     .await?
+    .map(gity_persistence::model_value)
     .ok_or_else(|| AppError::not_found("lfs object not found"))
 }
 pub(super) async fn upload(s: &AppState, p: i64, oid: &str, body: Body) -> Result<Value, AppError> {
@@ -47,41 +45,35 @@ pub(super) async fn upload(s: &AppState, p: i64, oid: &str, body: Body) -> Resul
       "lfs object SHA256 does not match oid",
     ));
   }
-  let row = s
-    .db
-    .one(
-      "SELECT * FROM project_lfs_objects WHERE project_id = ? AND oid = ?",
-      vec![p.into(), oid.into()],
-    )
-    .await?;
-  if let Some(row) = row {
-    if s.storage.exists(text(&row, "storage_key")).await? {
+  let missing_storage_key = if let Some(row) = s.repository_access.lfs_object(p, oid).await? {
+    if s.storage.exists(&row.storage_key).await? {
       s.storage.delete(&key).await?;
-      return Ok(row);
+      return Ok(gity_persistence::model_value(row));
     }
-    return s
-      .db
-      .update(
-        "project_lfs_objects",
-        num(&row, "id"),
-        map(json!({"byte_size":size,"storage_key":key})),
-      )
-      .await;
-  }
+    Some(row.storage_key)
+  } else {
+    None
+  };
   let result = s
-    .db
-    .insert(
-      "project_lfs_objects",
-      map(json!({"project_id":p,"oid":oid,"byte_size":size,"storage_key":key})),
+    .repository_access
+    .save_lfs_object(
+      p,
+      oid,
+      i64::try_from(size).map_err(|_| AppError::bad_request("lfs object is too large"))?,
+      key.clone(),
+      missing_storage_key.as_deref(),
     )
     .await;
-  if let Err(e) = &result {
-    let _ = s.storage.delete(&key).await;
-    if e.status == StatusCode::CONFLICT {
-      return object(s, p, oid).await;
+  match &result {
+    Ok(row) if row.storage_key != key => {
+      s.storage.delete(&key).await?;
     }
+    Err(_) => {
+      let _ = s.storage.delete(&key).await;
+    }
+    _ => {}
   }
-  result
+  result.map(gity_persistence::model_value)
 }
 #[utoipa::path(
     get,path="/projects/{id}/lfs/objects",tag="lfs objects",
@@ -97,7 +89,17 @@ pub(super) async fn objects(
 ) -> Reply {
   authorize(&s, &h, p, ProjectAction::RepositoryRead).await?;
   let (cursor, limit) = super::lfs_locks::pagination(&q)?;
-  let mut rows=s.db.all("SELECT id,project_id,oid,byte_size,created_at,updated_at FROM project_lfs_objects WHERE project_id = ? AND id > ? ORDER BY id LIMIT ?",vec![p.into(),cursor.into(),(limit+1).into()]).await?;
+  let mut rows = s
+    .repository_access
+    .lfs_objects(p, cursor, (limit + 1) as u64)
+    .await?
+    .into_iter()
+    .map(|row| {
+      let mut value = gity_persistence::model_value(row);
+      value.as_object_mut().unwrap().remove("storage_key");
+      value
+    })
+    .collect::<Vec<_>>();
   let next = if rows.len() > limit as usize {
     rows.truncate(limit as usize);
     num(rows.last().unwrap(), "id").to_string()

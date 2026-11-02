@@ -44,7 +44,23 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
     }
   }
   let state = AppState {
+    ci: gity_ci::CiModule::new(fluxdi::Shared::new(db.connection.clone()))
+      .service()
+      .unwrap(),
+    projects: gity_projects::ProjectModule::new(fluxdi::Shared::new(db.connection.clone()))
+      .service()
+      .unwrap(),
+    repository_access: gity_projects::ProjectModule::new(fluxdi::Shared::new(
+      db.connection.clone(),
+    ))
+    .repository_access()
+    .unwrap(),
     git_cluster: None,
+    collaboration: gity_collaboration::CollaborationModule::new(fluxdi::Shared::new(
+      db.connection.clone(),
+    ))
+    .service()
+    .unwrap(),
     identity: gity_identity::IdentityModule::new(fluxdi::Shared::new(db.connection.clone()))
       .repository()
       .unwrap(),

@@ -17,7 +17,7 @@ use axum::{
 };
 use gity_core::{AppError, ok};
 use organizations::*;
-use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel, Set};
+
 use serde_json::{Value, json};
 use std::collections::HashMap;
 type Reply = Result<Json<Value>, AppError>;
@@ -160,44 +160,23 @@ async fn update(
   Json(b): Json<Value>,
 ) -> Reply {
   access::project(&s, &h, id, 40).await?;
-  if b.get("visibility").is_some() {
-    visibility(&b)?;
-  }
-  let mut project = gity_entities::projects::Entity::find_by_id(id)
-    .one(&s.db.connection)
-    .await?
-    .ok_or_else(|| AppError::not_found("project not found"))?
-    .into_active_model();
-  if let Some(name) = b.get("name") {
-    project.name = Set(
-      name
-        .as_str()
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| AppError::bad_request("name required"))?
-        .to_owned(),
-    );
-  }
-  if let Some(description) = b.get("description") {
-    project.description = Set(match description {
-      Value::Null => None,
-      Value::String(value) => Some(value.clone()),
-      _ => return Err(AppError::bad_request("description must be a string")),
-    });
-  }
-  if let Some(visibility) = b.get("visibility") {
-    project.visibility = Set(visibility.as_str().unwrap_or("private").to_owned());
-  }
-  if let Some(branch) = b.get("default_branch") {
-    project.default_branch = Set(
-      branch
-        .as_str()
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| AppError::bad_request("default_branch required"))?
-        .to_owned(),
-    );
-  }
-  project.updated_at = Set(chrono::Utc::now().naive_utc());
-  let project = project.update(&s.db.connection).await?;
+  let actor = auth::principal(&s, &h).await?;
+  let command = gity_projects::ProjectChanges {
+    name: b
+      .get("name")
+      .map(|_| required(&b, "name").map(str::to_owned))
+      .transpose()?,
+    description: b.get("description").map(|_| description(&b)).transpose()?,
+    visibility: b
+      .get("visibility")
+      .map(|_| visibility(&b).map(str::to_owned))
+      .transpose()?,
+    default_branch: b
+      .get("default_branch")
+      .map(|_| required(&b, "default_branch").map(str::to_owned))
+      .transpose()?,
+  };
+  let project = s.projects.update(&actor, id, command).await?;
   Ok(ok(project_view(&s, access::project_record(project))))
 }
 #[utoipa::path(
@@ -214,21 +193,10 @@ async fn remove(
   Json(body): Json<Value>,
 ) -> Reply {
   let project = access::project(&s, &h, id, 50).await?;
-  if body["confirmation"].as_str().map(str::trim) != project["full_path"].as_str() {
-    return Err(AppError::bad_request(
-      "project delete confirmation does not match full path",
-    ));
-  }
   let actor = auth::principal(&s, &h).await?;
-  let mut model = gity_entities::projects::Entity::find_by_id(id)
-    .one(&s.db.connection)
-    .await?
-    .ok_or_else(|| AppError::not_found("project not found"))?
-    .into_active_model();
-  model.deleted_at = Set(Some(chrono::Utc::now().naive_utc()));
-  model.status = Set("pending_delete".to_owned());
-  model.updated_at = Set(chrono::Utc::now().naive_utc());
-  model.update(&s.db.connection).await?;
+  s.projects
+    .mark_deleted(&actor, id, body["confirmation"].as_str().unwrap_or(""))
+    .await?;
   crate::events::project_change(
     &s,
     &project,
@@ -247,3 +215,11 @@ mod org_membership_tests;
 
 #[cfg(test)]
 mod namespace_tests;
+
+fn description(body: &Value) -> Result<Option<String>, AppError> {
+  match body.get("description") {
+    None | Some(Value::Null) => Ok(None),
+    Some(Value::String(value)) => Ok(Some(value.clone())),
+    _ => Err(AppError::bad_request("description must be a string")),
+  }
+}

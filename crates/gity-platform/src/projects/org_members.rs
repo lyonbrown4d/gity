@@ -1,7 +1,7 @@
 use super::org_membership::{Change, mutate};
 use super::*;
 use crate::openapi::{project_schemas as spec, schemas as api};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+
 use std::collections::HashMap;
 
 #[utoipa::path(get,path="/orgs/{id}/members",tag="projects",params(api::ProjectPath),
@@ -12,18 +12,14 @@ pub(super) async fn org_members(
   Path(id): Path<i64>,
 ) -> Reply {
   org_access(&s, &h, id, 0).await?;
-  let members = gity_entities::organization_members::Entity::find()
-    .filter(gity_entities::organization_members::Column::OrganizationId.eq(id))
-    .order_by_asc(gity_entities::organization_members::Column::Id)
-    .all(&s.db.connection)
-    .await?;
+  let members = s.projects.organization_members(id).await?;
   let user_ids = members
     .iter()
     .map(|member| member.user_id)
     .collect::<Vec<_>>();
-  let users = gity_entities::users::Entity::find()
-    .filter(gity_entities::users::Column::Id.is_in(user_ids))
-    .all(&s.db.connection)
+  let users = s
+    .projects
+    .users(user_ids)
     .await?
     .into_iter()
     .map(|user| (user.id, user))

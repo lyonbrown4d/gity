@@ -32,7 +32,14 @@ async fn list(
     .and_then(|v| v.parse::<i64>().ok())
     .filter(|v| *v > 0 && *v <= 200)
     .unwrap_or(50);
-  response(json!(s.db.all("SELECT * FROM project_todos WHERE user_id = ? AND (? = '' OR state = ?) ORDER BY created_at DESC, id DESC LIMIT ?",vec![actor.user_id.into(),state.into(),state.into(),limit.into()]).await?))
+  response(json!(
+    s.collaboration
+      .todos(actor.user_id, state, limit as u64)
+      .await?
+      .into_iter()
+      .map(model_value)
+      .collect::<Vec<_>>()
+  ))
 }
 #[utoipa::path(
     post,path="/todos/{id}/done",tag="todos",
@@ -42,21 +49,7 @@ async fn list(
 )]
 async fn done(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) -> Reply {
   let actor = crate::access::actor(&s, &h).await?;
-  let row = s
-    .db
-    .one(
-      "SELECT id FROM project_todos WHERE id = ? AND user_id = ?",
-      vec![id.into(), actor.user_id.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("todo not found"))?;
-  s.db
-    .update(
-      "project_todos",
-      number(&row, "id"),
-      fields(json!({"state":"done","done_at":now(),"updated_at":now()})),
-    )
-    .await?;
+  s.collaboration.complete_todo(actor.user_id, id).await?;
   response(json!({"id":id,"state":"done"}))
 }
 pub(crate) struct Notification<'a, T> {
@@ -83,25 +76,19 @@ pub(crate) async fn notify(
     summary,
     suffix,
   } = notification;
-  let result = async {
-        let row = s.db.one("SELECT organization_id FROM projects WHERE id = ?",vec![project.into()])
-            .await?.ok_or_else(||AppError::not_found("project not found"))?;
-        let org = number(&row,"organization_id");
-        let conflict = if s.db.backend()==sea_orm::DatabaseBackend::MySql {
-            "ON DUPLICATE KEY UPDATE id=id"
-        } else {
-            "ON CONFLICT(user_id,kind,target_type,target_id) DO NOTHING"
-        };
-        let columns="id,user_id,organization_id,project_id,kind,state,target_type,target_id,title,summary,action_url,created_at,updated_at";
-        let sql=format!("INSERT INTO project_todos({columns}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) {conflict}");
-        let args=vec![
-            gity_core::new_id().into(), user.into(), org.into(), project.into(), kind.into(),
-            "pending".into(), target_type.into(), target.to_string().into(), title.into(),
-            summary.into(), format!("/app/projects/{org}/{project}{suffix}").into(), now().into(), now().into()
-        ];
-        s.db.execute(&sql,args).await?;
-        Ok::<(),AppError>(())
-    }.await;
+  let result = s
+    .collaboration
+    .notify(gity_collaboration::Notification {
+      project,
+      user,
+      kind: kind.to_owned(),
+      target_type: target_type.to_owned(),
+      target: target.to_string(),
+      title: title.to_owned(),
+      summary: summary.to_owned(),
+      suffix: suffix.to_owned(),
+    })
+    .await;
   if let Err(error) = result {
     tracing::warn!(project_id=project,user_id=user,error=%error,"collaboration todo creation failed");
   }

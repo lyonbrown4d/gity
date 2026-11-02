@@ -126,10 +126,7 @@ async fn manual_noop_job_runs_and_push_pipeline_pins_yaml_commit() {
   .await;
   worker_tick(&s).await.unwrap();
   let j = job["id"].as_str().unwrap().parse::<i64>().unwrap();
-  assert_eq!(
-    one(&s, "project_jobs", p, j).await.unwrap()["status"],
-    "succeeded"
-  );
+  assert_eq!(job_row(&s, p, j).await.unwrap()["status"], "succeeded");
   let sha = s
     .git
     .resolve_revision(&format!("{p}.git"), "main", "")
@@ -154,4 +151,32 @@ async fn manual_noop_job_runs_and_push_pipeline_pins_yaml_commit() {
   )
   .await;
   assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn concurrent_push_admission_creates_one_complete_pipeline() {
+  let (_dir, state, _app, _token, project) = fixture().await;
+  let sha = state
+    .git
+    .resolve_revision(&format!("{project}.git"), "main", "")
+    .await
+    .unwrap();
+  let (first, second) = tokio::join!(
+    create_push_pipeline(&state, project, "refs/heads/main", &sha),
+    create_push_pipeline(&state, project, "refs/heads/main", &sha)
+  );
+  let first = first.unwrap().unwrap();
+  let second = second.unwrap().unwrap();
+  assert_eq!(first["pipeline"]["id"], second["pipeline"]["id"]);
+  let rows = state.ci.pipelines(project).await.unwrap();
+  assert_eq!(rows.len(), 1);
+  let jobs = state.ci.pipeline_jobs(project, rows[0].id).await.unwrap();
+  assert_eq!(jobs.len(), 2);
+  assert_eq!(
+    jobs
+      .iter()
+      .filter(|(_, job)| job.run_after.to_string().starts_with("2037-12-31"))
+      .count(),
+    1
+  );
 }

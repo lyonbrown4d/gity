@@ -2470,6 +2470,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "gity-ci"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "fluxdi",
+ "gity-core",
+ "gity-entities",
+ "gity-persistence",
+ "sea-orm",
+ "serde_json",
+]
+
+[[package]]
+name = "gity-collaboration"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "fluxdi",
+ "gity-core",
+ "gity-entities",
+ "gity-persistence",
+ "sea-orm",
+ "serde",
+]
+
+[[package]]
 name = "gity-core"
 version = "0.2.0"
 dependencies = [
@@ -2504,6 +2530,7 @@ dependencies = [
  "gity-ids",
  "gity-test-support",
  "sea-orm",
+ "serde",
  "tokio",
 ]
 
@@ -2780,6 +2807,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gity-persistence"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "gity-core",
+ "gity-entities",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "gity-platform"
 version = "0.2.0"
 dependencies = [
@@ -2797,6 +2837,8 @@ dependencies = [
  "futures-util",
  "gity-artifacts",
  "gity-authority",
+ "gity-ci",
+ "gity-collaboration",
  "gity-core",
  "gity-entities",
  "gity-git",
@@ -2805,6 +2847,8 @@ dependencies = [
  "gity-observability",
  "gity-oci",
  "gity-package-registry",
+ "gity-persistence",
+ "gity-projects",
  "gity-runtime",
  "gity-search",
  "glob",
@@ -2838,6 +2882,21 @@ dependencies = [
  "utoipa-swagger-ui",
  "uuid",
  "zip 6.0.0",
+]
+
+[[package]]
+name = "gity-projects"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "fluxdi",
+ "gity-core",
+ "gity-entities",
+ "gity-identity",
+ "gity-persistence",
+ "sea-orm",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2923,7 +2982,9 @@ dependencies = [
  "clap",
  "fluxdi",
  "gity-core",
+ "gity-entities",
  "gity-git",
+ "gity-projects",
  "gity-search",
  "serde_json",
  "tokio",
@@ -2972,6 +3033,7 @@ name = "gity-test-support"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "sea-orm",
  "testcontainers",
  "tokio",
 ]

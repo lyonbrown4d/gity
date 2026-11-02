@@ -147,6 +147,22 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
   };
   let storage = gity_core::Storage::local(&settings.storage_root).unwrap();
   let state = AppState {
+    collaboration: gity_collaboration::CollaborationModule::new(fluxdi::Shared::new(
+      db.connection.clone(),
+    ))
+    .service()
+    .unwrap(),
+    projects: gity_projects::ProjectModule::new(fluxdi::Shared::new(db.connection.clone()))
+      .service()
+      .unwrap(),
+    repository_access: gity_projects::ProjectModule::new(fluxdi::Shared::new(
+      db.connection.clone(),
+    ))
+    .repository_access()
+    .unwrap(),
+    ci: gity_ci::CiModule::new(fluxdi::Shared::new(db.connection.clone()))
+      .service()
+      .unwrap(),
     git_cluster: None,
     identity: gity_identity::IdentityModule::new(fluxdi::Shared::new(db.connection.clone()))
       .repository()

@@ -84,6 +84,7 @@ fn walk(path: &Path, violations: &mut Vec<String>) -> Result<()> {
     let is_test = path.components().any(|v| v.as_os_str() == "tests")
       || name == "tests.rs"
       || name.ends_with("_tests.rs");
+    crate::persistence_policy::check(&path, &text, is_test, violations);
     if path.extension().is_some_and(|v| v == "rs")
       && !is_test
       && text

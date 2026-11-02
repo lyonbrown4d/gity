@@ -1,7 +1,5 @@
 //! Merge request response shaping and request-field normalisation.
 use super::*;
-use gity_entities::project_milestones::{Column as MilestoneColumn, Entity as Milestones};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 pub(super) fn view(mut row: Value) -> Value {
   for key in ["squash", "draft"] {
@@ -28,13 +26,6 @@ pub(super) async fn milestone_patch(
   if id <= 0 {
     return Err(AppError::bad_request(format!("{key} must be positive")));
   }
-  let exists = Milestones::find()
-    .filter(MilestoneColumn::ProjectId.eq(project))
-    .filter(MilestoneColumn::Id.eq(id))
-    .one(&s.db.connection)
-    .await?;
-  if exists.is_none() {
-    return Err(AppError::not_found("milestone not found"));
-  }
+  s.collaboration.milestone_id(project, id).await?;
   Ok(json!(id))
 }

@@ -9,6 +9,7 @@ mod docs;
 mod docs_mermaid;
 mod git_stress;
 mod k6;
+mod persistence_policy;
 mod precompress;
 mod sources;
 #[derive(Parser)]

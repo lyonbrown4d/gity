@@ -67,12 +67,8 @@ pub(super) async fn owners(s: &AppState, p: &Value, mr: &Value) -> Result<Vec<i6
   }
   let mut ids = Vec::new();
   for user in usernames {
-    if let Some(row) = s
-      .db
-      .one("SELECT id FROM users WHERE username = ?", vec![user.into()])
-      .await?
-    {
-      ids.push(number(&row, "id"));
+    if let Some(id) = s.collaboration.username_id(&user).await? {
+      ids.push(id);
     }
   }
   Ok(ids)

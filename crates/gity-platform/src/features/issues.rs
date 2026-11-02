@@ -4,7 +4,6 @@ use axum::{
   extract::{Path, State},
   http::HeaderMap,
 };
-use sea_orm::EntityTrait;
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   let shared = utoipa_axum::router::OpenApiRouter::new()
@@ -69,12 +68,12 @@ pub(super) fn view(row: Value) -> Value {
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   let rows = s
-    .db
-    .all(
-      "SELECT * FROM project_issues WHERE project_id = ? ORDER BY iid DESC",
-      vec![p.into()],
-    )
-    .await?;
+    .collaboration
+    .issues(p)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect();
   response(json!(super::issue_views::list(&s, p, rows).await?))
 }
 #[utoipa::path(
@@ -85,7 +84,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
 )]
 async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  response(super::issue_views::one(&s, p, scoped(&s, "project_issues", p, i, true).await?).await?)
+  response(super::issue_views::one(&s, p, model_value(&s.collaboration.issue(p, i).await?)).await?)
 }
 #[utoipa::path(
     post,path="/{id}/issues",tag="issues",
@@ -104,14 +103,28 @@ async fn create(
     .await?
     .actor()?;
   let title = required(&b, "title")?;
-  let iid = s.db.next_iid(p, "issue").await?;
+
   let milestone_id = milestone_ref(&s, p, b.get("milestone_id")).await?;
   let due_date = date_value(b.get("due_date"))?;
   let weight = weight_value(b.get("weight"))?;
-  let row=s.db.insert("project_issues",fields(json!({"project_id":p,"iid":iid,"author_user_id":actor.user_id,"title":title,"description":string(&b,"description"),"state":"opened","milestone_id":milestone_id,"due_date":due_date,"weight":weight,"confidential":flag(&b),"issue_type":kind(&b)}))).await?;
-  let recipients=s.db.all("SELECT user_id FROM project_members WHERE project_id = ? UNION SELECT user_id FROM organization_members WHERE organization_id = (SELECT organization_id FROM projects WHERE id = ?)",vec![p.into(),p.into()]).await?;
-  for user in recipients {
-    let u = number(&user, "user_id");
+  let row = model_value(
+    s.collaboration
+      .create_issue(IssueCreate {
+        project_id: p,
+        author_user_id: actor.user_id,
+        title: title.clone(),
+        description: Some(string(&b, "description").to_owned()),
+        milestone_id,
+        due_date,
+        weight,
+        confidential: flag(&b),
+        issue_type: kind(&b),
+      })
+      .await?,
+  );
+  let iid = number(&row, "iid");
+  let recipients = s.collaboration.recipients(p).await?;
+  for u in recipients {
     if u != actor.user_id {
       super::todos::notify(
         &s,
@@ -147,7 +160,7 @@ async fn update(
   let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite)
     .await?
     .actor()?;
-  let row = scoped(&s, "project_issues", p, i, true).await?;
+  s.collaboration.issue(p, i).await?;
   if b.get("title").is_some() {
     required(&b, "title")?;
   }
@@ -200,19 +213,11 @@ async fn update(
   if b.get("issue_type").is_some() {
     change.insert("issue_type".into(), json!(kind(&b)));
   }
-  let state = string(&b, "state");
-  if state == "closed" && string(&row, "state") != "closed" {
-    change.insert("closed_at".into(), json!(now()));
-    change.insert("closed_by_user_id".into(), json!(actor.user_id));
-  }
-  if state == "opened" && string(&row, "state") == "closed" {
-    change.insert("closed_at".into(), Value::Null);
-    change.insert("closed_by_user_id".into(), Value::Null);
-  }
-  let row = s
-    .db
-    .update("project_issues", number(&row, "id"), change)
-    .await?;
+  let row = model_value(
+    s.collaboration
+      .update_issue(p, i, command(Value::Object(change))?)
+      .await?,
+  );
   response(super::issue_views::one(&s, p, row).await?)
 }
 async fn milestone_ref(
@@ -230,14 +235,9 @@ async fn milestone_ref(
     .as_i64()
     .or_else(|| value.as_str().and_then(|v| v.parse().ok()))
     .ok_or_else(|| AppError::bad_request("milestone_id must be an integer"))?;
-  gity_entities::project_milestones::Entity::find_by_id(id)
-    .one(&s.db.connection)
-    .await?
-    .filter(|row| row.project_id == project)
-    .map(|row| Some(row.id))
-    .ok_or_else(|| AppError::not_found("milestone not found"))
+  s.collaboration.milestone_id(project, id).await.map(Some)
 }
-fn date_value(value: Option<&Value>) -> Result<Option<String>, AppError> {
+fn date_value(value: Option<&Value>) -> Result<Option<chrono::NaiveDate>, AppError> {
   match value {
     None | Some(Value::Null) => Ok(None),
     Some(Value::String(raw)) => {
@@ -246,7 +246,7 @@ fn date_value(value: Option<&Value>) -> Result<Option<String>, AppError> {
         return Ok(None);
       }
       chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
-        .map(|v| Some(v.to_string()))
+        .map(Some)
         .map_err(|_| AppError::bad_request("due_date must use YYYY-MM-DD"))
     }
     Some(_) => Err(AppError::bad_request("due_date must use YYYY-MM-DD")),

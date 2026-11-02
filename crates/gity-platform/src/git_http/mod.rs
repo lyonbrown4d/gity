@@ -37,12 +37,10 @@ async fn project(
     .strip_suffix(".git")
     .ok_or_else(|| AppError::not_found("repository not found"))?;
   let project = s
-    .db
-    .one(
-      "SELECT * FROM projects WHERE full_path=? AND deleted_at IS NULL",
-      vec![format!("{org}/{name}").into()],
-    )
+    .projects
+    .active_by_path(&format!("{org}/{name}"))
     .await?
+    .map(gity_persistence::model_value)
     .ok_or_else(|| AppError::not_found("repository not found"))?;
   let mut h = headers.clone();
   if let Some(value) = headers

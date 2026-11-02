@@ -47,18 +47,10 @@ pub(super) async fn write(
         serde_json::from_value(b).map_err(|e| AppError::bad_request(e.to_string()))?;
       check_branch(&s, &h, &p, &input.branch_name, false, false).await?;
       input.author_name = actor.username;
-      let user = s
-        .db
-        .one(
-          "SELECT email FROM users WHERE id=?",
-          vec![actor.user_id.into()],
-        )
-        .await?;
+      let user = s.identity.user_model(actor.user_id).await?;
       input.author_email = user
-        .as_ref()
-        .and_then(|v| v["email"].as_str())
-        .unwrap_or("noreply@gity.local")
-        .into();
+        .and_then(|user| user.email)
+        .unwrap_or_else(|| "noreply@gity.local".to_owned());
       let (branch, file, message) = (
         input.branch_name.clone(),
         input.file_path.clone(),

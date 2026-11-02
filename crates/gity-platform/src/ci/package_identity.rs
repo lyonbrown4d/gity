@@ -1,8 +1,6 @@
 use crate::AppState;
 use axum::http::HeaderMap;
 use gity_core::AppError;
-use gity_entities::{project_jobs, project_pipeline_jobs};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use subtle::ConstantTimeEq;
 
@@ -67,11 +65,9 @@ pub(crate) async fn authenticate(
   if job_id <= 0 || attempt <= 0 {
     return Err(denied());
   }
-  let job = project_jobs::Entity::find_by_id(job_id)
-    .filter(project_jobs::Column::Status.eq("running"))
-    .filter(project_jobs::Column::Attempts.eq(attempt))
-    .filter(project_jobs::Column::LockedUntil.gt(chrono::Utc::now().naive_utc()))
-    .one(&state.db.connection)
+  let job = state
+    .ci
+    .live_job(job_id, attempt as i32)
     .await?
     .ok_or_else(denied)?;
   if job.kind != "script"
@@ -95,10 +91,7 @@ pub(crate) async fn authenticate(
     .active_project(job.project_id)
     .await?
     .ok_or_else(denied)?;
-  let link = project_pipeline_jobs::Entity::find()
-    .filter(project_pipeline_jobs::Column::ProjectJobId.eq(job.id))
-    .one(&state.db.connection)
-    .await?;
+  let link = state.ci.job_link(job.id).await?;
   Ok(JobPackageIdentity {
     project_id: job.project_id,
     job_id: job.id,

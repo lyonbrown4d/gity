@@ -27,3 +27,6 @@ tokio.workspace = true
 tokio-util.workspace = true
 utoipa = { version = "6", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.3"
+
+[dev-dependencies]
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }

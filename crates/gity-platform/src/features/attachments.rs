@@ -22,14 +22,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
   router
 }
 async fn load(s: &AppState, p: i64, i: i64, a: i64) -> Result<Value, AppError> {
-  let row = scoped(s, "project_issues", p, i, true).await?;
-  s.db
-    .one(
-      "SELECT * FROM project_issue_attachments WHERE project_issue_id = ? AND id = ?",
-      vec![number(&row, "id").into(), a.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("attachment not found"))
+  Ok(model_value(s.collaboration.attachment(p, i, a).await?))
 }
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/attachments",tag="attachments",
@@ -39,14 +32,13 @@ async fn load(s: &AppState, p: i64, i: i64, a: i64) -> Result<Value, AppError> {
 )]
 async fn list(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  let row = scoped(&s, "project_issues", p, i, true).await?;
   response(json!(
-    s.db
-      .all(
-        "SELECT * FROM project_issue_attachments WHERE project_issue_id = ? ORDER BY created_at,id",
-        vec![number(&row, "id").into()]
-      )
+    s.collaboration
+      .attachments(p, i)
       .await?
+      .into_iter()
+      .map(model_value)
+      .collect::<Vec<_>>()
   ))
 }
 async fn store(
@@ -69,7 +61,7 @@ async fn store(
   let id = gity_core::new_id();
   let key = format!("issues/{p}/{id}");
   let issue = if i > 0 {
-    Some(scoped(s, "project_issues", p, i, true).await?)
+    Some(model_value(s.collaboration.issue(p, i).await?))
   } else {
     None
   };
@@ -82,7 +74,23 @@ async fn store(
     ctype.trim()
   };
   if let Some(issue) = issue {
-    let result=s.db.insert("project_issue_attachments",fields(json!({"id":id,"project_issue_id":number(&issue,"id"),"uploaded_by_user_id":u,"file_name":name.trim(),"content_type":ctype,"byte_size":content.len(),"storage_key":key}))).await;
+    let result = s
+      .collaboration
+      .create_attachment(
+        p,
+        i,
+        AttachmentCreate {
+          id,
+          project_issue_id: number(&issue, "id"),
+          uploaded_by_user_id: u,
+          file_name: name.trim().to_owned(),
+          content_type: Some(ctype.to_owned()),
+          byte_size: content.len() as i64,
+          storage_key: key.clone(),
+        },
+      )
+      .await
+      .map(model_value);
     if result.is_err() {
       let _ = s.storage.delete(&key).await;
     }

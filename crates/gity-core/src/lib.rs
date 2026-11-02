@@ -9,9 +9,10 @@ pub use config::{
   ObservabilityConfig, RegistryConfig, SearchConfig, Settings, SshConfig, StorageConfig,
 };
 pub use database::Db;
-pub use database::audit_context;
+#[cfg(any(test, feature = "test-fixtures"))]
 pub use database::sql_value;
-pub use error::{AppError, externalize, ok};
+pub use database::{audit_actor, audit_context};
+pub use error::{AppError, externalize, normalize_timestamps, ok};
 pub use ids::{IdError, IdGenerator, install, new_id, now, try_new_id};
 pub use storage::{Storage, StorageMeta};
 

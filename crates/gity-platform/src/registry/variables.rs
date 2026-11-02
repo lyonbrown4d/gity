@@ -27,16 +27,11 @@ fn view(mut row: Value) -> Value {
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project(&s, &h, p, 40).await?;
   reply(json!(
-    s.db
-      .all(
-        &format!(
-          "SELECT * FROM project_ci_variables WHERE project_id = ? ORDER BY {}",
-          s.db.quote_identifier("key")?
-        ),
-        vec![p.into()]
-      )
+    s.repository_access
+      .variables(p)
       .await?
       .into_iter()
+      .map(gity_persistence::model_value)
       .map(view)
       .collect::<Vec<_>>()
   ))
@@ -56,46 +51,14 @@ async fn upsert(
 ) -> Reply {
   crate::access::project(&s, &h, p, 40).await?;
   let key = required(&b, "key")?.to_uppercase();
-  if key.len() > 128
-    || !regex::Regex::new("^[A-Z_][A-Z0-9_]*$")
-      .unwrap()
-      .is_match(&key)
-  {
-    return Err(AppError::bad_request("ci variable key is invalid"));
-  }
   let value = text(&b, "value");
-  if value.len() > 64 * 1024 {
-    return Err(AppError::bad_request("ci variable value is too large"));
-  }
-  if b["masked"] == true && (value.len() < 8 || value.contains(['\n', '\r'])) {
-    return Err(AppError::bad_request(
-      "masked ci variable value must be at least 8 characters",
-    ));
-  }
-  let key_column = s.db.quote_identifier("key")?;
-  let sql = format!("SELECT * FROM project_ci_variables WHERE project_id = ? AND {key_column} = ?");
-  let args = vec![p.into(), key.clone().into()];
-  let data = map(json!({
-      "project_id":p,"key":key,"value":value,
-      "masked":i64::from(b["masked"]==true),
-      "protected":i64::from(b["protected"]==true)
-  }));
-  let row = if let Some(row) = s.db.one(&sql, args.clone()).await? {
-    s.db
-      .update("project_ci_variables", num(&row, "id"), data)
-      .await?
-  } else {
-    match s.db.insert("project_ci_variables", data.clone()).await {
-      Ok(row) => row,
-      Err(error) if error.status == axum::http::StatusCode::CONFLICT => {
-        let existing = s.db.one(&sql, args).await?.ok_or(error)?;
-        s.db
-          .update("project_ci_variables", num(&existing, "id"), data)
-          .await?
-      }
-      Err(error) => return Err(error),
-    }
+  let command = gity_projects::VariableCommand {
+    key,
+    value: value.into(),
+    masked: b["masked"] == true,
+    protected: b["protected"] == true,
   };
+  let row = gity_persistence::model_value(s.repository_access.save_variable(p, command).await?);
   reply(view(row))
 }
 #[utoipa::path(
@@ -110,16 +73,8 @@ async fn remove(
   Path((p, key)): Path<(i64, String)>,
 ) -> Reply {
   crate::access::project(&s, &h, p, 40).await?;
-  let sql = format!(
-    "SELECT id FROM project_ci_variables WHERE project_id = ? AND {} = ?",
-    s.db.quote_identifier("key")?
-  );
-  if let Some(row) = s
-    .db
-    .one(&sql, vec![p.into(), key.trim().to_uppercase().into()])
-    .await?
-  {
-    s.db.delete("project_ci_variables", num(&row, "id")).await?;
-  }
+  s.repository_access
+    .delete_variable(p, &key.trim().to_uppercase())
+    .await?;
   reply(json!({"status":"deleted"}))
 }

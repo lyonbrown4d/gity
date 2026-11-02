@@ -81,7 +81,7 @@ async fn normalize(
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
   response(
-    json!({"project_id":p,"rules":s.db.all("SELECT * FROM project_merge_request_approval_rules WHERE project_id = ? ORDER BY id",vec![p.into()]).await?.into_iter().map(view).collect::<Vec<_>>()}),
+    json!({"project_id":p,"rules":s.collaboration.approval_rules(p).await?.into_iter().map(model_value).map(view).collect::<Vec<_>>()}),
   )
 }
 #[utoipa::path(
@@ -97,15 +97,18 @@ async fn create(
   Path(p): Path<i64>,
   Json(b): Json<Value>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
+  let actor = crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin)
+    .await?
+    .actor()?
+    .user_id;
   let _guard = super::merge_requests::lock(p).await;
   let mut data = normalize(&s, &b, true).await?;
   data.insert("project_id".into(), json!(p));
-  response(view(
-    s.db
-      .insert("project_merge_request_approval_rules", data)
+  response(view(model_value(
+    s.collaboration
+      .create_approval_rule(command(Value::Object(data))?, Some(actor))
       .await?,
-  ))
+  )))
 }
 #[utoipa::path(
     patch,path="/projects/{id}/merge-request-approval-rules/{rule}",tag="rules",
@@ -120,18 +123,22 @@ async fn update(
   Path((p, r)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
+  let actor = crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin)
+    .await?
+    .actor()?
+    .user_id;
   let _guard = super::merge_requests::lock(p).await;
-  scoped(&s, "project_merge_request_approval_rules", p, r, false).await?;
-  response(view(
-    s.db
-      .update(
-        "project_merge_request_approval_rules",
+  s.collaboration.approval_rule(p, r).await?;
+  response(view(model_value(
+    s.collaboration
+      .update_approval_rule(
+        p,
         r,
-        normalize(&s, &b, false).await?,
+        command(Value::Object(normalize(&s, &b, false).await?))?,
+        Some(actor),
       )
       .await?,
-  ))
+  )))
 }
 #[utoipa::path(
     delete,path="/projects/{id}/merge-request-approval-rules/{rule}",tag="rules",
@@ -140,11 +147,14 @@ async fn update(
     security(("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
 async fn remove(State(s): State<AppState>, h: HeaderMap, Path((p, r)): Path<(i64, i64)>) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin).await?;
+  let actor = crate::access::project_action(&s, &h, p, ProjectAction::RepositoryAdmin)
+    .await?
+    .actor()?
+    .user_id;
   let _guard = super::merge_requests::lock(p).await;
-  scoped(&s, "project_merge_request_approval_rules", p, r, false).await?;
-  s.db
-    .delete("project_merge_request_approval_rules", r)
+  s.collaboration.approval_rule(p, r).await?;
+  s.collaboration
+    .delete_approval_rule(p, r, Some(actor))
     .await?;
   response(json!({"deleted":true}))
 }

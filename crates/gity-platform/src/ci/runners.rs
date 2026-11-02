@@ -45,13 +45,11 @@ pub(super) fn public_runner(mut row: Value) -> Value {
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::RunnerRead).await?;
   Ok(gity_core::ok(
-    s.db
-      .all(
-        "SELECT * FROM project_runners WHERE project_id=? ORDER BY id",
-        vec![p.into()],
-      )
+    s.ci
+      .runners(p)
       .await?
       .into_iter()
+      .map(model_value)
       .map(public_runner)
       .collect::<Vec<_>>(),
   ))
@@ -75,30 +73,17 @@ async fn register(
     return Err(AppError::bad_request("runner name is required"));
   }
   let token = format!("grt_{}", auth::secret());
-  let row = s
-    .db
-    .insert(
-      "project_runners",
-      json!({
-              "project_id":p,
-              "name":text(&b,
-                  "name"),
-              "description":text(&b,
-                  "description"),
-              "tags":text(&b,
-                  "tags"),
-              "token":format!("sha256:{}",
-                  auth::token_hash(&token)),
-              "status":"offline",
-              "active":1,
-              "last_contact_at":worker::ZERO
-          }
-      )
-      .as_object()
-      .unwrap()
-      .clone(),
-    )
-    .await?;
+  let row = model_value(
+    s.ci
+      .register_runner(gity_ci::NewRunner {
+        project_id: p,
+        name: text(&b, "name").into(),
+        description: text(&b, "description").into(),
+        tags: text(&b, "tags").into(),
+        token_hash: format!("sha256:{}", auth::token_hash(&token)),
+      })
+      .await?,
+  );
   crate::standalone::runner::enroll(&s, id(&row), &token).await?;
   Ok(gity_core::ok(
     json!({"runner":public_runner(row),"token":token}),
@@ -113,8 +98,7 @@ async fn register(
 )]
 async fn remove(State(s): State<AppState>, h: HeaderMap, Path((p, r)): Path<(i64, i64)>) -> Reply {
   access::project(&s, &h, p, 40).await?;
-  let row = one(&s, "project_runners", p, r).await?;
-  s.db.delete("project_runners", r).await?;
+  let row = model_value(s.ci.remove_runner(p, r).await?);
   crate::standalone::runner::revoke(&s, r).await?;
   Ok(gity_core::ok(public_runner(row)))
 }
@@ -123,21 +107,16 @@ pub(crate) async fn authenticate(s: &AppState, b: &Value) -> Result<Value, AppEr
   if token.is_empty() {
     return Err(AppError::unauthorized("runner token required"));
   }
-  let row=s.db.one("SELECT * FROM project_runners WHERE (token=? OR (token=? AND token NOT LIKE 'sha256:%')) AND active=1",
-        vec![format!("sha256:{}",
-                auth::token_hash(token)).into(),
-            token.into()]).await?.ok_or_else(||AppError::unauthorized("invalid runner token"))?;
-  s.db
-    .execute(
-      "UPDATE project_runners SET status='online',last_contact_at=?,updated_at=? WHERE id=?",
-      vec![now().into(), now().into(), id(&row).into()],
-    )
-    .await?;
+  let row = model_value(
+    s.ci
+      .authenticate_runner(&format!("sha256:{}", auth::token_hash(token)), token)
+      .await?,
+  );
   Ok(row)
 }
 pub(crate) async fn owned(s: &AppState, b: &Value, j: i64) -> Result<(Value, Value), AppError> {
   let runner = authenticate(s, b).await?;
-  let job = one(s, "project_jobs", runner["project_id"].as_i64().unwrap(), j).await?;
+  let job = job_row(s, runner["project_id"].as_i64().unwrap(), j).await?;
   let attempt = b["attempt"].as_i64().unwrap_or(0);
   if text(&job, "status") != "running"
     || text(&job, "locked_by") != format!("runner:{}", id(&runner))
@@ -159,19 +138,13 @@ pub(crate) async fn owned(s: &AppState, b: &Value, j: i64) -> Result<(Value, Val
 )]
 async fn heartbeat(State(s): State<AppState>, Json(b): Json<Value>) -> Reply {
   let runner = authenticate(&s, &b).await?;
-  let owner = format!("runner:{}", id(&runner));
-  let until = (chrono::Utc::now() + chrono::Duration::seconds(180))
-    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-  s.db.execute("UPDATE project_jobs SET locked_until=?,updated_at=? WHERE project_id=? AND locked_by=? AND status='running' AND locked_until>?",
-        vec![until.into(),
-            now().into(),
-            runner["project_id"].as_i64().unwrap().into(),
-            owner.clone().into(),
-            now().into()]).await?;
-  let rows=s.db.all("SELECT id,attempts FROM project_jobs WHERE project_id=? AND locked_by=? AND status='running' AND locked_until>?",
-        vec![runner["project_id"].as_i64().unwrap().into(),
-            owner.into(),
-            now().into()]).await?;
+  let rows = s
+    .ci
+    .heartbeat(runner["project_id"].as_i64().unwrap(), id(&runner))
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let mut response = public_runner(runner);
   response["running_job_ids"] = json!(rows.iter().map(|r| id(r).to_string()).collect::<Vec<_>>());
   response["running_job_attempts"] = json!(

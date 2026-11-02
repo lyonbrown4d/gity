@@ -8,15 +8,10 @@ use axum::{
   extract::{Path, State},
   http::HeaderMap,
 };
-use gity_entities::{project_label_links as links, project_labels as labels};
-use sea_orm::{
-  ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
-};
+use gity_entities::project_labels as labels;
 
 /// Default colour used when a request omits one, matching the schema default.
 pub(super) const DEFAULT_COLOR: &str = "#428BCA";
-/// Polymorphic link discriminator for issue labels.
-pub(super) const ISSUE_TARGET: &str = "issue";
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   let shared = utoipa_axum::router::OpenApiRouter::new()
@@ -73,58 +68,11 @@ fn description(body: &Value) -> Option<String> {
 }
 
 async fn find(s: &AppState, project: i64, title: &str) -> Result<Option<labels::Model>, AppError> {
-  Ok(
-    labels::Entity::find()
-      .filter(labels::Column::ProjectId.eq(project))
-      .filter(labels::Column::Title.eq(title))
-      .one(&s.db.connection)
-      .await?,
-  )
+  s.collaboration.named_label(project, title).await
 }
-
 async fn load(s: &AppState, project: i64, label: i64) -> Result<labels::Model, AppError> {
-  labels::Entity::find_by_id(label)
-    .filter(labels::Column::ProjectId.eq(project))
-    .one(&s.db.connection)
-    .await?
-    .ok_or_else(|| AppError::not_found("label not found"))
+  s.collaboration.label(project, label).await
 }
-
-/// Returns the project label for `title`, creating the definition when the
-/// project does not define it yet.
-pub(super) async fn ensure<C>(
-  db: &C,
-  project: i64,
-  title: &str,
-  color: Option<String>,
-) -> Result<labels::Model, AppError>
-where
-  C: sea_orm::ConnectionTrait,
-{
-  if let Some(model) = labels::Entity::find()
-    .filter(labels::Column::ProjectId.eq(project))
-    .filter(labels::Column::Title.eq(title))
-    .one(db)
-    .await?
-  {
-    return Ok(model);
-  }
-  let now = chrono::Utc::now().naive_utc();
-  Ok(
-    labels::ActiveModel {
-      project_id: Set(project),
-      title: Set(title.to_owned()),
-      color: Set(color.unwrap_or_else(|| DEFAULT_COLOR.to_owned())),
-      description: Set(None),
-      created_at: Set(now),
-      updated_at: Set(now),
-      ..Default::default()
-    }
-    .insert(db)
-    .await?,
-  )
-}
-
 #[utoipa::path(
     get,path="/{id}/labels",tag="labels",
     params(api::ProjectPath),
@@ -133,12 +81,7 @@ where
 )]
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  let rows = labels::Entity::find()
-    .filter(labels::Column::ProjectId.eq(p))
-    .order_by_asc(labels::Column::Title)
-    .order_by_asc(labels::Column::Id)
-    .all(&s.db.connection)
-    .await?;
+  let rows = s.collaboration.labels(p).await?;
   response(json!(rows.iter().map(view).collect::<Vec<_>>()))
 }
 
@@ -160,18 +103,17 @@ async fn create(
   if find(&s, p, &title).await?.is_some() {
     return Err(AppError::bad_request("label title already exists"));
   }
-  let now = chrono::Utc::now().naive_utc();
-  let model = labels::ActiveModel {
-    project_id: Set(p),
-    title: Set(title),
-    color: Set(color(&b)),
-    description: Set(description(&b)),
-    created_at: Set(now),
-    updated_at: Set(now),
-    ..Default::default()
-  }
-  .insert(&s.db.connection)
-  .await?;
+  let model = s
+    .collaboration
+    .create_label(
+      p,
+      LabelCreate {
+        title,
+        color: color(&b),
+        description: description(&b),
+      },
+    )
+    .await?;
   response(view(&model))
 }
 
@@ -211,18 +153,19 @@ async fn update(
     None => None,
   };
   let description = b.get("description").map(|_| description(&b));
-  let mut active = current.into_active_model();
-  if let Some(title) = title {
-    active.title = Set(title);
-  }
-  if let Some(color) = color {
-    active.color = Set(color);
-  }
-  if let Some(description) = description {
-    active.description = Set(description);
-  }
-  active.updated_at = Set(chrono::Utc::now().naive_utc());
-  response(view(&active.update(&s.db.connection).await?))
+  let model = s
+    .collaboration
+    .update_label(
+      p,
+      label,
+      LabelChanges {
+        title: title.map_or(Change::Unchanged, Change::Set),
+        color: color.map_or(Change::Unchanged, Change::Set),
+        description: description.map_or(Change::Unchanged, Change::Set),
+      },
+    )
+    .await?;
+  response(view(&model))
 }
 
 #[utoipa::path(
@@ -237,13 +180,6 @@ async fn remove(
   Path((p, label)): Path<(i64, i64)>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite).await?;
-  let current = load(&s, p, label).await?;
-  let tx = s.db.transaction().await?;
-  links::Entity::delete_many()
-    .filter(links::Column::LabelId.eq(current.id))
-    .exec(&tx)
-    .await?;
-  labels::Entity::delete_by_id(current.id).exec(&tx).await?;
-  tx.commit().await?;
+  s.collaboration.delete_label(p, label).await?;
   response(json!({"status":"deleted"}))
 }

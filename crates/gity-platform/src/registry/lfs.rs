@@ -31,14 +31,11 @@ pub async fn handle_lfs(s: AppState, request: Request) -> Result<Response, AppEr
     .strip_suffix(".git")
     .ok_or_else(|| AppError::bad_request("invalid repository path"))?;
   let project = s
-    .db
-    .one(
-      "SELECT * FROM projects WHERE full_path = ? AND deleted_at IS NULL",
-      vec![project_path.into()],
-    )
+    .projects
+    .active_by_path(project_path)
     .await?
     .ok_or_else(|| AppError::not_found("project not found"))?;
-  let p = num(&project, "id");
+  let p = project.id;
   let h = &parts.headers;
   let q = parts
     .uri
@@ -109,12 +106,10 @@ pub async fn handle_lfs(s: AppState, request: Request) -> Result<Response, AppEr
         continue;
       }
       let row = s
-        .db
-        .one(
-          "SELECT * FROM project_lfs_objects WHERE project_id = ? AND oid = ?",
-          vec![p.into(), oid.into()],
-        )
-        .await?;
+        .repository_access
+        .lfs_object(p, oid)
+        .await?
+        .map(gity_persistence::model_value);
       let exists = if let Some(row) = &row {
         s.storage.exists(text(row, "storage_key")).await?
       } else {

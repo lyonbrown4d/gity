@@ -29,12 +29,12 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
   Ok(gity_core::ok(
-    s.db
-      .all(
-        "SELECT * FROM project_pipelines WHERE project_id=? ORDER BY created_at DESC LIMIT 200",
-        vec![p.into()],
-      )
-      .await?,
+    s.ci
+      .pipelines(p)
+      .await?
+      .into_iter()
+      .map(model_value)
+      .collect::<Vec<_>>(),
   ))
 }
 #[utoipa::path(
@@ -105,7 +105,7 @@ async fn list_jobs(
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
-  one(&s, "project_pipelines", p, i).await?;
+  pipeline_row(&s, p, i).await?;
   Ok(gity_core::ok(pipeline_jobs(&s, p, i).await?))
 }
 #[utoipa::path(
@@ -117,7 +117,7 @@ async fn list_jobs(
 )]
 async fn refresh(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobWrite).await?;
-  one(&s, "project_pipelines", p, i).await?;
+  pipeline_row(&s, p, i).await?;
   refresh_pipeline(&s, i).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }
@@ -130,19 +130,8 @@ async fn refresh(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i6
 )]
 async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobWrite).await?;
-  one(&s, "project_pipelines", p, i).await?;
-  let tx = s.db.transaction().await?;
-  tx.execute_raw(s.db.statement("UPDATE project_pipelines SET status='canceled',finished_at=?,updated_at=? WHERE id=? AND status IN ('pending','running')",
-            vec![now().into(),
-                now().into(),
-                i.into()])).await?;
-  tx.execute_raw(s.db.statement("UPDATE project_jobs SET status='canceled',finished_at=?,updated_at=?,locked_by='',locked_until=? WHERE project_id=? AND id IN (SELECT project_job_id FROM project_pipeline_jobs WHERE pipeline_id=?) AND status IN ('pending','running')",
-            vec![now().into(),
-                now().into(),
-                now().into(),
-                p.into(),
-                i.into()])).await?;
-  tx.commit().await?;
+  pipeline_row(&s, p, i).await?;
+  s.ci.cancel_pipeline(p, i).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }
 #[utoipa::path(
@@ -154,38 +143,6 @@ async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
 )]
 async fn retry(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobWrite).await?;
-  let tx = s.db.transaction().await?;
-  tx.execute_raw(s.db.statement(
-    "UPDATE project_pipelines SET updated_at=? WHERE id=? AND project_id=?",
-    vec![now().into(), i.into(), p.into()],
-  ))
-  .await?;
-  let rows = tx_rows(
-    &s,
-    &tx,
-    "SELECT * FROM project_pipelines WHERE id=? AND project_id=?",
-    vec![i.into(), p.into()],
-  )
-  .await?;
-  let row = rows
-    .first()
-    .ok_or_else(|| AppError::not_found("pipeline not found"))?;
-  if !["failed", "canceled", "succeeded"].contains(&text(row, "status")) {
-    return Err(AppError::conflict("pipeline must be terminal before retry"));
-  }
-  tx.execute_raw(s.db.statement("UPDATE project_jobs SET status='pending',max_attempts=attempts+3,result='',last_error='',locked_by='',locked_until=?,run_after=?,started_at=?,finished_at=?,updated_at=? WHERE id IN (SELECT project_job_id FROM project_pipeline_jobs WHERE pipeline_id=?)",
-            vec![now().into(),
-                worker::BLOCKED.into(),
-                worker::ZERO.into(),
-                worker::ZERO.into(),
-                now().into(),
-                i.into()])).await?;
-  tx.execute_raw(s.db.statement("UPDATE project_pipelines SET status='pending',started_at=?,finished_at=?,updated_at=? WHERE id=?",
-            vec![worker::ZERO.into(),
-                worker::ZERO.into(),
-                now().into(),
-                i.into()])).await?;
-  tx.commit().await?;
-  refresh_pipeline(&s, i).await?;
+  s.ci.retry_pipeline(p, i).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }

@@ -4,8 +4,6 @@ use axum::{
   extract::{Path, State},
   http::HeaderMap,
 };
-use gity_entities::project_label_links as links;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use std::collections::{HashMap, HashSet};
 pub(super) fn child(mut row: Value, iid: i64) -> Value {
   if let Some(map) = row.as_object_mut() {
@@ -17,24 +15,34 @@ pub(super) fn child(mut row: Value, iid: i64) -> Value {
   }
   row
 }
+#[derive(Clone, Copy)]
+pub(super) enum IssueCollection {
+  Comments,
+  Assignees,
+}
 pub(super) async fn children(
   s: &AppState,
   p: i64,
   i: i64,
-  table: &str,
+  collection: IssueCollection,
 ) -> Result<Vec<Value>, AppError> {
-  let row = scoped(s, "project_issues", p, i, true).await?;
-  Ok(
-    s.db
-      .all(
-        &format!("SELECT * FROM {table} WHERE project_issue_id = ? ORDER BY created_at, id"),
-        vec![number(&row, "id").into()],
-      )
+  let rows = match collection {
+    IssueCollection::Comments => s
+      .collaboration
+      .issue_comments(p, i)
       .await?
       .into_iter()
-      .map(|r| child(r, i))
-      .collect(),
-  )
+      .map(model_value)
+      .collect::<Vec<_>>(),
+    IssueCollection::Assignees => s
+      .collaboration
+      .issue_assignees(p, i)
+      .await?
+      .into_iter()
+      .map(model_value)
+      .collect::<Vec<_>>(),
+  };
+  Ok(rows.into_iter().map(|r| child(r, i)).collect())
 }
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/comments",tag="issues",
@@ -48,7 +56,7 @@ pub(super) async fn comments(
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  response(json!(children(&s, p, i, "project_issue_comments").await?))
+  response(json!(children(&s, p, i, IssueCollection::Comments).await?))
 }
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/assignees",tag="issues",
@@ -62,7 +70,7 @@ pub(super) async fn assignees(
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  response(json!(children(&s, p, i, "project_issue_assignees").await?))
+  response(json!(children(&s, p, i, IssueCollection::Assignees).await?))
 }
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/labels",tag="issues",
@@ -80,7 +88,7 @@ pub(super) async fn labels(
 }
 /// Labels of one issue, resolved through project definitions and label links.
 async fn issue_labels(s: &AppState, p: i64, i: i64) -> Result<Vec<Value>, AppError> {
-  let row = scoped(s, "project_issues", p, i, true).await?;
+  let row = model_value(s.collaboration.issue(p, i).await?);
   let id = number(&row, "id");
   let mut groups = super::issue_views::label_rows(s, p, &HashMap::from([(id, i)])).await?;
   Ok(groups.remove(&id).unwrap_or_default())
@@ -101,21 +109,25 @@ pub(super) async fn comment(
   let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueComment)
     .await?
     .actor()?;
-  let issue = scoped(&s, "project_issues", p, i, true).await?;
+  let issue = model_value(&s.collaboration.issue(p, i).await?);
   let body = if string(&b, "body").is_empty() {
     required(&b, "content")?
   } else {
     required(&b, "body")?
   };
-  let row = s
-    .db
-    .insert(
-      "project_issue_comments",
-      fields(
-        json!({"project_issue_id":number(&issue,"id"),"author_user_id":actor.user_id,"body":body}),
-      ),
-    )
-    .await?;
+  let row = model_value(
+    s.collaboration
+      .create_issue_comment(
+        p,
+        i,
+        IssueCommentCreate {
+          project_issue_id: number(&issue, "id"),
+          author_user_id: actor.user_id,
+          body,
+        },
+      )
+      .await?,
+  );
   if number(&issue, "author_user_id") != actor.user_id {
     super::todos::notify(
       &s,
@@ -150,22 +162,10 @@ pub(super) async fn set_assignees(
   let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite)
     .await?
     .actor()?;
-  let row = scoped(&s, "project_issues", p, i, true).await?;
+  let row = model_value(&s.collaboration.issue(p, i).await?);
   let ids = users(&s, &b["user_ids"]).await?;
   let id = number(&row, "id");
-  let records = ids
-    .iter()
-    .map(|u| fields(json!({"project_issue_id":id,"user_id":u})))
-    .collect();
-  replace(
-    &s,
-    "project_issue_assignees",
-    "project_issue_id",
-    id,
-    None,
-    records,
-  )
-  .await?;
+  s.collaboration.replace_assignees(p, i, ids.clone()).await?;
   for u in ids {
     if u != actor.user_id {
       super::todos::notify(
@@ -184,7 +184,7 @@ pub(super) async fn set_assignees(
       .await?;
     }
   }
-  response(json!(children(&s, p, i, "project_issue_assignees").await?))
+  response(json!(children(&s, p, i, IssueCollection::Assignees).await?))
 }
 #[utoipa::path(
     patch,path="/{id}/issues/{iid}/labels",tag="issues",
@@ -200,8 +200,7 @@ pub(super) async fn set_labels(
   Json(b): Json<Value>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite).await?;
-  let row = scoped(&s, "project_issues", p, i, true).await?;
-  attach(&s, p, number(&row, "id"), requested(&b)?).await?;
+  s.collaboration.replace_labels(p, i, requested(&b)?).await?;
   response(json!(issue_labels(&s, p, i).await?))
 }
 /// Accepts the three historical shapes: label objects plus the bare
@@ -229,46 +228,4 @@ fn requested(body: &Value) -> Result<Vec<(String, Option<String>)>, AppError> {
     }
   }
   Ok(out)
-}
-/// Replaces the issue's label links, creating missing project definitions.
-async fn attach(
-  s: &AppState,
-  p: i64,
-  issue: i64,
-  wanted: Vec<(String, Option<String>)>,
-) -> Result<(), AppError> {
-  let tx = s.db.transaction().await?;
-  let mut attached = Vec::with_capacity(wanted.len());
-  for (title, color) in wanted {
-    attached.push(super::labels::ensure(&tx, p, &title, color).await?.id);
-  }
-  let current = links::Entity::find()
-    .filter(links::Column::ProjectId.eq(p))
-    .filter(links::Column::TargetType.eq(super::labels::ISSUE_TARGET))
-    .filter(links::Column::TargetId.eq(issue))
-    .all(&tx)
-    .await?;
-  for link in &current {
-    if !attached.contains(&link.label_id) {
-      links::Entity::delete_by_id(link.id).exec(&tx).await?;
-    }
-  }
-  let now = chrono::Utc::now().naive_utc();
-  for label in attached {
-    if current.iter().any(|link| link.label_id == label) {
-      continue;
-    }
-    links::ActiveModel {
-      project_id: Set(p),
-      label_id: Set(label),
-      target_type: Set(super::labels::ISSUE_TARGET.to_owned()),
-      target_id: Set(issue),
-      created_at: Set(now),
-      ..Default::default()
-    }
-    .insert(&tx)
-    .await?;
-  }
-  tx.commit().await?;
-  Ok(())
 }

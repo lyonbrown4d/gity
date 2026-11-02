@@ -5,10 +5,7 @@ use axum::{
   extract::{Path, State},
   http::HeaderMap,
 };
-use gity_entities::{project_issues, project_milestones as entity};
-use sea_orm::{
-  ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr,
-};
+use gity_entities::project_milestones as entity;
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   utoipa_axum::router::OpenApiRouter::new().nest(
@@ -26,11 +23,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
 )]
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  let rows = entity::Entity::find()
-    .filter(entity::Column::ProjectId.eq(p))
-    .order_by_asc(entity::Column::Iid)
-    .all(&s.db.connection)
-    .await?;
+  let rows = s.collaboration.milestones(p).await?;
   response(json!(rows.into_iter().map(view).collect::<Vec<_>>()))
 }
 #[utoipa::path(
@@ -62,22 +55,19 @@ async fn create(
     Some(value) => state(value)?,
     None => "active".to_owned(),
   };
-  let iid = s.db.next_iid(p, "milestone").await?;
-  let timestamp = chrono::Utc::now().naive_utc();
-  let row = entity::ActiveModel {
-    project_id: Set(p),
-    iid: Set(iid),
-    title: Set(title),
-    description: Set(text(&b)),
-    state: Set(state),
-    start_date: Set(day(b.get("start_date"))?),
-    due_date: Set(day(b.get("due_date"))?),
-    created_at: Set(timestamp),
-    updated_at: Set(timestamp),
-    ..Default::default()
-  }
-  .insert(&s.db.connection)
-  .await?;
+  let row = s
+    .collaboration
+    .create_milestone(
+      p,
+      MilestoneCreate {
+        title,
+        description: text(&b),
+        state,
+        start_date: day(b.get("start_date"))?,
+        due_date: day(b.get("due_date"))?,
+      },
+    )
+    .await?;
   response(view(row))
 }
 #[utoipa::path(
@@ -94,28 +84,23 @@ async fn update(
   Json(b): Json<Value>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite).await?;
-  let current = find(&s, p, i).await?;
-  let mut change = entity::ActiveModel {
-    id: Set(current.id),
-    updated_at: Set(chrono::Utc::now().naive_utc()),
-    ..Default::default()
-  };
+  let mut change = MilestoneChanges::default();
   if b.get("title").is_some() {
-    change.title = Set(required(&b, "title")?);
+    change.title = Change::Set(required(&b, "title")?);
   }
   if b.get("description").is_some() {
-    change.description = Set(text(&b));
+    change.description = Change::Set(text(&b));
   }
   if let Some(value) = b.get("state") {
-    change.state = Set(state(value)?);
+    change.state = Change::Set(state(value)?);
   }
   if b.get("start_date").is_some() {
-    change.start_date = Set(day(b.get("start_date"))?);
+    change.start_date = Change::Set(day(b.get("start_date"))?);
   }
   if b.get("due_date").is_some() {
-    change.due_date = Set(day(b.get("due_date"))?);
+    change.due_date = Change::Set(day(b.get("due_date"))?);
   }
-  let row = change.update(&s.db.connection).await?;
+  let row = s.collaboration.update_milestone(p, i, change).await?;
   response(view(row))
 }
 #[utoipa::path(
@@ -126,28 +111,11 @@ async fn update(
 )]
 async fn remove(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite).await?;
-  let current = find(&s, p, i).await?;
-  // Issues keep their history; only the milestone reference is detached.
-  project_issues::Entity::update_many()
-    .col_expr(
-      project_issues::Column::MilestoneId,
-      Expr::value(Option::<i64>::None),
-    )
-    .filter(project_issues::Column::MilestoneId.eq(current.id))
-    .exec(&s.db.connection)
-    .await?;
-  entity::Entity::delete_by_id(current.id)
-    .exec(&s.db.connection)
-    .await?;
+  s.collaboration.delete_milestone(p, i).await?;
   response(json!({"status":"deleted"}))
 }
 async fn find(s: &AppState, project: i64, iid: i64) -> Result<entity::Model, AppError> {
-  entity::Entity::find()
-    .filter(entity::Column::ProjectId.eq(project))
-    .filter(entity::Column::Iid.eq(iid))
-    .one(&s.db.connection)
-    .await?
-    .ok_or_else(|| AppError::not_found("milestone not found"))
+  s.collaboration.milestone(project, iid).await
 }
 fn view(row: entity::Model) -> Value {
   json!({

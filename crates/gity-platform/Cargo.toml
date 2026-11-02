@@ -9,6 +9,10 @@ packages = ["dep:gity-package-registry","dep:gity-artifacts", "dep:semver", "dep
 oci = ["dep:gity-oci", "dep:gity-authority"]
 
 [dependencies]
+gity-persistence = { path = "../gity-persistence" }
+gity-collaboration = { path = "../gity-collaboration" }
+gity-ci = { path = "../gity-ci" }
+gity-projects = { path = "../gity-projects" }
 gity-observability = { path = "../gity-observability" }
 gity-package-registry = { path = "../gity-package-registry", optional = true }
 libc = "0.2"
@@ -65,6 +69,7 @@ metrics = "0.24"
 tracing-subscriber = { workspace = true, features = ["json"] }
 
 [dev-dependencies]
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }
 tempfile.workspace = true
 tower.workspace = true
 reqwest = { version = "0.13", features = ["blocking", "json"] }

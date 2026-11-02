@@ -49,8 +49,9 @@ pub fn translate_message(locale: &str, message: &str) -> String {
   translate(message, locale, &[])
 }
 
-#[cfg(test)]
+// Track every locale asset in native and WASM compiler dependency graphs.
 mod assets;
+const _: &[&str] = assets::CHUNKS;
 #[cfg(test)]
 #[path = "tests/server_catalog.rs"]
 mod server_catalog;

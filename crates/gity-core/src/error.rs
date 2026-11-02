@@ -107,7 +107,8 @@ pub fn externalize(mut value: Value) -> Value {
   }
   value
 }
-pub(crate) fn normalize_timestamps(value: &mut Value) {
+/// Normalize database timestamps for the public JSON contract without changing IDs.
+pub fn normalize_timestamps(value: &mut Value) {
   match value {
     Value::Object(map) => {
       for (key, value) in map {

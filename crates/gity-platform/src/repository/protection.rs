@@ -37,12 +37,12 @@ pub async fn check_branch(
     authorization.role_level()
   };
   let rules = s
-    .db
-    .all(
-      "SELECT * FROM project_branch_protections WHERE project_id=?",
-      vec![projects::id(&p["id"])?.into()],
-    )
-    .await?;
+    .repository_access
+    .protections(projects::id(&p["id"])?)
+    .await?
+    .into_iter()
+    .map(gity_persistence::model_value)
+    .collect::<Vec<_>>();
   if let Some(rule) = effective_rule(&rules, branch) {
     let yes = |k: &str| {
       rule[k]
@@ -120,20 +120,27 @@ pub(super) async fn protect(
       ));
     }
   }
-  let existing = s
-    .db
-    .one(
-      "SELECT id FROM project_branch_protections WHERE project_id=? AND branch_name=?",
-      vec![id.into(), branch.clone().into()],
-    )
-    .await?;
-  let row = if let Some(old) = existing {
-    s.db
-      .update("project_branch_protections", projects::id(&old["id"])?, row)
-      .await?
-  } else {
-    s.db.insert("project_branch_protections", row).await?
+  let command = gity_projects::ProtectionCommand {
+    rule_type: row["rule_type"].as_str().unwrap_or("exact").to_owned(),
+    push_access_level: row["push_access_level"]
+      .as_str()
+      .unwrap_or("no_one")
+      .to_owned(),
+    merge_access_level: row["merge_access_level"]
+      .as_str()
+      .unwrap_or("maintainer")
+      .to_owned(),
+    require_merge_request: row["require_merge_request"].as_bool().unwrap_or(true),
+    require_pipeline_success: row["require_pipeline_success"].as_bool().unwrap_or(false),
+    allow_force_push: row["allow_force_push"].as_bool().unwrap_or(false),
+    allow_delete: row["allow_delete"].as_bool().unwrap_or(false),
+    actor: gity_core::audit_actor(),
   };
+  let row = gity_persistence::model_value(
+    s.repository_access
+      .save_protection(id, &branch, &command)
+      .await?,
+  );
   let actor = auth::principal(&s, &h).await?;
   crate::events::project_change(
     &s,
@@ -157,17 +164,7 @@ pub(super) async fn unprotect(
   let project = access::project_action(&s, &h, id, access::ProjectAction::RepositoryAdmin)
     .await?
     .project;
-  if let Some(row) = s
-    .db
-    .one(
-      "SELECT id FROM project_branch_protections WHERE project_id=? AND branch_name=?",
-      vec![id.into(), branch.clone().into()],
-    )
-    .await?
-  {
-    s.db
-      .delete("project_branch_protections", projects::id(&row["id"])?)
-      .await?;
+  if s.repository_access.delete_protection(id, &branch).await? {
     let actor = auth::principal(&s, &h).await?;
     crate::events::project_change(
       &s,

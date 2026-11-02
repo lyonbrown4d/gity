@@ -1,0 +1,47 @@
+{
+  "_version": 2,
+  "invalid artifacts": {
+    "en": "invalid artifacts",
+    "zh": "产物配置无效"
+  },
+  "invalid job kind or max_attempts": {
+    "en": "invalid job kind or max_attempts",
+    "zh": "任务类型或最大尝试次数无效"
+  },
+  "invalid lfs object size": {
+    "en": "invalid lfs object size",
+    "zh": "LFS 对象大小无效"
+  },
+  "invalid needs": {
+    "en": "invalid needs",
+    "zh": "任务依赖无效"
+  },
+  "invalid participant role": {
+    "en": "invalid participant role",
+    "zh": "参与者角色无效"
+  },
+  "invalid registry mode": {
+    "en": "invalid registry mode",
+    "zh": "容器仓库模式无效"
+  },
+  "invalid run_after": {
+    "en": "invalid run_after",
+    "zh": "计划执行时间无效"
+  },
+  "invalid script": {
+    "en": "invalid script",
+    "zh": "脚本配置无效"
+  },
+  "invalid token kind": {
+    "en": "invalid token kind",
+    "zh": "令牌类型无效"
+  },
+  "lfs object is too large": {
+    "en": "lfs object is too large",
+    "zh": "LFS 对象过大"
+  },
+  "title is required": {
+    "en": "title is required",
+    "zh": "标题不能为空"
+  }
+}

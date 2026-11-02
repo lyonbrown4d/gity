@@ -25,12 +25,12 @@ pub(super) async fn read(
         .await
         .map_err(git_error)?;
       let rules = s
-        .db
-        .all(
-          "SELECT * FROM project_branch_protections WHERE project_id=? ORDER BY branch_name",
-          vec![id.into()],
-        )
-        .await?;
+        .repository_access
+        .protections(id)
+        .await?
+        .into_iter()
+        .map(gity_persistence::model_value)
+        .collect::<Vec<_>>();
       if let Some(items) = branches.as_array_mut() {
         for branch in items {
           let rule = effective_rule(&rules, branch["name"].as_str().unwrap_or_default());
@@ -61,12 +61,12 @@ pub(super) async fn read(
     "search" => return Ok(ok(search::query(&s, &project, revision, &q).await?)),
     "branch-protections" => {
       return Ok(ok(
-        s.db
-          .all(
-            "SELECT * FROM project_branch_protections WHERE project_id=? ORDER BY branch_name",
-            vec![id.into()],
-          )
+        s.repository_access
+          .protections(id)
           .await?
+          .into_iter()
+          .map(gity_persistence::model_value)
+          .collect::<Vec<_>>()
           .into_iter()
           .map(views::protection)
           .collect::<Vec<_>>(),

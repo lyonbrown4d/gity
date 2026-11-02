@@ -23,6 +23,7 @@ tracing.workspace = true
 thiserror = "2"
 
 [dev-dependencies]
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }
 axum.workspace = true
 tempfile.workspace = true
 bytes.workspace = true

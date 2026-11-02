@@ -3,6 +3,9 @@ name = "gity-core"
 version.workspace = true
 edition.workspace = true
 
+[features]
+test-fixtures = []
+
 [dependencies]
 gity-migrations = { path = "../gity-migrations" }
 gity-observability = { path = "../gity-observability" }

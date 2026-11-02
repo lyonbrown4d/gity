@@ -22,12 +22,11 @@ pub(super) async fn authorize(
   service: GitRpc,
 ) -> anyhow::Result<Authorized> {
   let project = state
-    .db
-    .one(
-      "SELECT * FROM projects WHERE full_path=? AND status='active' AND deleted_at IS NULL",
-      vec![path.into()],
-    )
+    .projects
+    .active_by_path(path)
     .await?
+    .filter(|project| project.status == "active")
+    .map(gity_persistence::model_value)
     .ok_or_else(|| anyhow::anyhow!("repository unavailable"))?;
   let id = projects::id(&project["id"])?;
   let key = keys::authorized(state, fingerprint)
@@ -43,12 +42,12 @@ pub(super) async fn authorize(
       "deploy key is read-only"
     );
     let mut rules = state
-      .db
-      .all(
-        "SELECT * FROM project_branch_protections WHERE project_id=?",
-        vec![id.into()],
-      )
-      .await?;
+      .repository_access
+      .protections(id)
+      .await?
+      .into_iter()
+      .map(gity_persistence::model_value)
+      .collect::<Vec<_>>();
     for rule in &mut rules {
       for field in ["require_merge_request", "allow_force_push", "allow_delete"] {
         rule[field] = Value::Bool(
@@ -77,11 +76,8 @@ pub(super) async fn authorize(
     None
   };
   state
-    .db
-    .execute(
-      "UPDATE project_deploy_keys SET last_used_at=? WHERE id=?",
-      vec![gity_core::now().into(), projects::id(&key["id"])?.into()],
-    )
+    .repository_access
+    .touch_deploy_key(projects::id(&key["id"])?)
     .await?;
   Ok(Authorized {
     project,

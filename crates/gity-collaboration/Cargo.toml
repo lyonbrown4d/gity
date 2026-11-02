@@ -1,0 +1,16 @@
+[package]
+name = "gity-collaboration"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+gity-core = { path = "../gity-core" }
+gity-entities = { path = "../gity-entities" }
+gity-persistence = { path = "../gity-persistence" }
+sea-orm.workspace = true
+chrono.workspace = true
+serde.workspace = true
+fluxdi.workspace = true
+
+[dev-dependencies]
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }

@@ -58,6 +58,7 @@ fn required(v: &Value, key: &str) -> Result<String, AppError> {
   }
   Ok(value.to_owned())
 }
+#[cfg(test)]
 fn fields(v: Value) -> Map<String, Value> {
   v.as_object().cloned().unwrap_or_default()
 }
@@ -72,25 +73,6 @@ fn patch(body: &Value, keys: &[&str]) -> Map<String, Value> {
   }
   out.insert("updated_at".into(), json!(now()));
   out
-}
-async fn scoped(
-  state: &AppState,
-  table: &str,
-  project: i64,
-  id: i64,
-  iid: bool,
-) -> Result<Value, AppError> {
-  state
-    .db
-    .one(
-      &format!(
-        "SELECT * FROM {table} WHERE project_id = ? AND {} = ?",
-        if iid { "iid" } else { "id" }
-      ),
-      vec![project.into(), id.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("resource not found"))
 }
 async fn users(state: &AppState, body: &Value) -> Result<Vec<i64>, AppError> {
   let mut out = Vec::new();
@@ -109,63 +91,28 @@ async fn users(state: &AppState, body: &Value) -> Result<Vec<i64>, AppError> {
       return Err(AppError::bad_request("user id must be positive"));
     }
     if !out.contains(&id) {
-      if state
-        .db
-        .one("SELECT id FROM users WHERE id = ?", vec![id.into()])
-        .await?
-        .is_none()
-      {
-        return Err(AppError::not_found("user not found"));
-      }
+      state.collaboration.validate_users(&[id]).await?;
       out.push(id);
     }
   }
   Ok(out)
 }
-async fn replace(
-  state: &AppState,
-  table: &str,
-  fk: &str,
-  id: i64,
-  role: Option<&str>,
-  rows: Vec<Map<String, Value>>,
-) -> Result<(), AppError> {
-  use sea_orm::{ConnectionTrait, TransactionTrait};
-  let tx = state.db.connection.begin().await.map_err(AppError::from)?;
-  let mut args = vec![id.into()];
-  let mut sql = format!("DELETE FROM {table} WHERE {fk} = ?");
-  if let Some(role) = role {
-    sql.push_str(" AND role = ?");
-    args.push(role.into());
+fn command<T: serde::de::DeserializeOwned>(mut value: Value) -> Result<T, AppError> {
+  // Request timestamps use RFC 3339; persistence commands use UTC calendar values.
+  if let Some(fields) = value.as_object_mut() {
+    for (key, value) in fields.iter_mut() {
+      if key.ends_with("_at")
+        && let Some(raw) = value.as_str()
+        && let Ok(stamp) = chrono::DateTime::parse_from_rfc3339(raw)
+      {
+        *value = json!(stamp.naive_utc());
+      }
+    }
   }
-  tx.execute_raw(state.db.statement(&sql, args))
-    .await
-    .map_err(AppError::from)?;
-  for mut row in rows {
-    row.insert("id".into(), json!(gity_core::new_id()));
-    row.insert("created_at".into(), json!(now()));
-    row.insert("updated_at".into(), json!(now()));
-    let keys = row.keys().cloned().collect::<Vec<_>>();
-    let sql = format!(
-      "INSERT INTO {table} ({}) VALUES ({})",
-      keys.join(","),
-      vec!["?"; keys.len()].join(",")
-    );
-    let values = keys
-      .iter()
-      .map(|key| match &row[key] {
-        Value::Number(n) => sea_orm::Value::BigInt(n.as_i64()),
-        Value::Bool(b) => sea_orm::Value::Bool(Some(*b)),
-        Value::String(s) => s.clone().into(),
-        _ => sea_orm::Value::String(None),
-      })
-      .collect();
-    tx.execute_raw(state.db.statement(&sql, values))
-      .await
-      .map_err(AppError::from)?;
-  }
-  tx.commit().await.map_err(AppError::from)
+  serde_json::from_value(value).map_err(|error| AppError::bad_request(error.to_string()))
 }
+use gity_collaboration::domain::*;
+use gity_persistence::model_value;
 #[cfg(test)]
 mod helper_tests;
 
@@ -196,3 +143,6 @@ mod token_access_tests;
 
 #[cfg(test)]
 mod attachment_http_tests;
+
+#[cfg(test)]
+mod rule_tests;

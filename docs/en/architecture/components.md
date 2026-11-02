@@ -27,7 +27,9 @@ Independent deployment means separate processes and images, with the dependencie
 
 | Libraries | Responsibility |
 | --- | --- |
-| `gity-platform` | Platform HTTP/SSH, composition, collaboration and CI orchestration |
+| `gity-platform` | Platform HTTP/SSH, route adapters, FluxDI application composition, and runtime orchestration |
+| `gity-projects`, `gity-collaboration`, `gity-ci` | Project/repository access, Issue/MR collaboration, and pipeline/job application services with typed repositories |
+| `gity-persistence` | Typed cross-context audit snapshots, IID counters, and model-to-JSON boundary conversion |
 | `gity-identity`, `gity-authority` | Identity repository/services; internal OCI/package authorization RPC and remote adapters |
 | `gity-artifacts`, `gity-package-registry` | Artifact rules, metadata/storage services, language HTTP protocol adapters |
 | `gity-oci`, `gity-runtime` | OCI policy and mirror; Angos and composition module lifecycle |
@@ -35,7 +37,7 @@ Independent deployment means separate processes and images, with the dependencie
 | `gity-git-cluster` | Placement, primary/replica selection, replication, controlled promotion |
 | `gity-git-node`, `gity-git-wire` | Storage node; internal RPC, clients, streaming and TLS |
 | `gity-gateway` | HTTP/SSH gateway module |
-| `gity-core`, `gity-entities`, `gity-ids` | Configuration, storage and common types; entity mappings; shared ID generation |
+| `gity-core`, `gity-entities`, `gity-ids` | Database connection and migrations, configuration and storage; entity mappings; shared ID generation |
 | `gity-search`, `gity-i18n`, `gity-observability` | Search, shared language assets, logging/metrics/tracing |
 | `gity-test-support` | Disposable integration container support |
 

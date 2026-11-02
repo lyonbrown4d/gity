@@ -1,4 +1,3 @@
-use super::credential_repository as repository;
 use super::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 #[derive(Clone, Debug)]
@@ -47,7 +46,7 @@ pub(super) fn active(v: &Value) -> bool {
 }
 pub async fn authenticate_token(s: &AppState, raw: &str) -> Result<Option<ProjectToken>, AppError> {
   let digest = format!("sha256:{}", crate::auth::token_hash(raw));
-  let Some(row) = repository::token_by_hash(&s.db, &digest).await? else {
+  let Some(row) = s.repository_access.token_by_hash(&digest).await? else {
     return Ok(None);
   };
   if row.revoked_at.is_some()
@@ -71,7 +70,7 @@ pub async fn authenticate_token(s: &AppState, raw: &str) -> Result<Option<Projec
       .collect(),
     kind: row.kind.clone(),
   };
-  repository::mark_token_used(&s.db, row).await?;
+  s.repository_access.mark_token_used(row).await?;
   Ok(Some(token))
 }
 #[cfg(test)]

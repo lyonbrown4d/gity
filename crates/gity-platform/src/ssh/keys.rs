@@ -20,7 +20,15 @@ pub(super) async fn authorized(
   state: &AppState,
   fingerprint: &str,
 ) -> Result<Vec<Value>, AppError> {
-  state.db.all("SELECT k.* FROM project_deploy_keys k JOIN users u ON u.id=k.created_by_user_id JOIN projects p ON p.id=k.project_id WHERE k.fingerprint=? AND u.status='active' AND p.status='active' AND p.deleted_at IS NULL", vec![fingerprint.into()]).await
+  Ok(
+    state
+      .repository_access
+      .authorized_keys(fingerprint)
+      .await?
+      .into_iter()
+      .map(gity_persistence::model_value)
+      .collect(),
+  )
 }
 pub(super) fn host_key(path: &Path) -> anyhow::Result<PrivateKey> {
   if path.exists() {

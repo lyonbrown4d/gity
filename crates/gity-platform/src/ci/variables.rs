@@ -5,23 +5,16 @@ pub(crate) async fn environment(
   project_id: i64,
   data: &Value,
 ) -> Result<(BTreeMap<String, String>, Vec<String>), AppError> {
-  let project = s
-    .db
-    .one(
-      "SELECT * FROM projects WHERE id=? AND deleted_at IS NULL",
-      vec![project_id.into()],
-    )
-    .await?
-    .ok_or_else(|| AppError::not_found("project not found"))?;
+  let project = model_value(s.ci.project(project_id).await?);
   let branch = text(data, "ref_name");
   let repo = crate::repository::repo(&project);
   let rules = s
-    .db
-    .all(
-      "SELECT * FROM project_branch_protections WHERE project_id=?",
-      vec![project_id.into()],
-    )
-    .await?;
+    .ci
+    .protections(project_id)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let protected = branch == text(&project, "default_branch")
     || crate::repository::effective_rule(&rules, branch).is_some();
   // A caller cannot obtain protected variables by naming main while running
@@ -42,14 +35,13 @@ pub(crate) async fn environment(
         .collect::<BTreeMap<_, _>>()
     })
     .unwrap_or_default();
-  let key = s.db.quote_identifier("key")?;
   let rows = s
-    .db
-    .all(
-      &format!("SELECT * FROM project_ci_variables WHERE project_id=? ORDER BY {key}"),
-      vec![project_id.into()],
-    )
-    .await?;
+    .ci
+    .variables(project_id)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let mut masked = Vec::new();
   for row in rows {
     if flag(&row, "protected") && !trusted {

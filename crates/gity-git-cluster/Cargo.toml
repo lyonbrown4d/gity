@@ -21,6 +21,7 @@ tokio-util.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }
 gity-git = { path = "../gity-git" }
 gity-git-node = { path = "../gity-git-node" }
 tonic.workspace = true

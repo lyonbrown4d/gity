@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+serde.workspace = true
 async-trait.workspace = true
 sea-orm.workspace = true
 chrono.workspace = true
@@ -11,5 +12,5 @@ gity-ids = { path = "../gity-ids" }
 
 [dev-dependencies]
 gity-test-support = { path = "../gity-test-support" }
-gity-core = { path = "../gity-core" }
+gity-core = { path = "../gity-core", features = ["test-fixtures"] }
 tokio.workspace = true

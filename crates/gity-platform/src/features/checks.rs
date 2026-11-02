@@ -84,12 +84,12 @@ pub(super) async fn evaluate(s: &AppState, p: &Value, mr: &Value) -> Result<Valu
   let sha = branch(s, p, source).await?;
   branch(s, p, target).await?;
   let protections = s
-    .db
-    .all(
-      "SELECT * FROM project_branch_protections WHERE project_id = ? ORDER BY id",
-      vec![project.into()],
-    )
-    .await?;
+    .collaboration
+    .protections(project)
+    .await?
+    .into_iter()
+    .map(model_value)
+    .collect::<Vec<_>>();
   let protection = crate::repository::effective_rule(&protections, target);
   let require_mr = protection
     .map(|v| number(v, "require_merge_request") != 0)
@@ -114,32 +114,54 @@ pub(super) async fn evaluate(s: &AppState, p: &Value, mr: &Value) -> Result<Valu
   let mut status = "not_required".to_owned();
   let mut pipeline = Value::Null;
   if pipeline_required {
-    if let Some(row) = s.db.one(
-            "SELECT * FROM project_pipelines WHERE project_id = ? AND ref_name = ? AND commit_sha = ? ORDER BY id DESC LIMIT 1",
-            vec![project.into(), source.into(), sha.clone().into()],
-        ).await? {
-            status = string(&row, "status").to_owned();
-            if has_ci {
-                let pinned = s.git.get_blob_limited(&repository(p), &sha, "", ".gity-ci.yml", 1024 * 1024)
-                    .await.map_err(git_error)?;
-                if pinned["encoding"] != "utf-8" || string(&pinned, "content") != string(&row, "config_content") {
-                    status = "untrusted".into();
-                    blockers.push(blocker("pipeline_config_mismatch", "pipeline", "pipeline configuration differs from the source commit"));
-                }
-            }
-            if status != "succeeded" && status != "untrusted" {
-                blockers.push(blocker("pipeline_not_succeeded", "pipeline", &format!("pipeline status is {status}")));
-            }
-            pipeline = row;
-        } else {
-            status = "missing".into();
-            blockers.push(blocker("pipeline_missing", "pipeline", "required pipeline is missing"));
+    if let Some(model) = s
+      .collaboration
+      .source_pipeline(project, source, &sha)
+      .await?
+    {
+      let row = model_value(model);
+      status = string(&row, "status").to_owned();
+      if has_ci {
+        let pinned = s
+          .git
+          .get_blob_limited(&repository(p), &sha, "", ".gity-ci.yml", 1024 * 1024)
+          .await
+          .map_err(git_error)?;
+        if pinned["encoding"] != "utf-8"
+          || string(&pinned, "content") != string(&row, "config_content")
+        {
+          status = "untrusted".into();
+          blockers.push(blocker(
+            "pipeline_config_mismatch",
+            "pipeline",
+            "pipeline configuration differs from the source commit",
+          ));
         }
+      }
+      if status != "succeeded" && status != "untrusted" {
+        blockers.push(blocker(
+          "pipeline_not_succeeded",
+          "pipeline",
+          &format!("pipeline status is {status}"),
+        ));
+      }
+      pipeline = row;
+    } else {
+      status = "missing".into();
+      blockers.push(blocker(
+        "pipeline_missing",
+        "pipeline",
+        "required pipeline is missing",
+      ));
+    }
   }
-  let approvals=s.db.all("SELECT user_id FROM project_merge_request_approvals WHERE merge_request_id = ? AND user_id <> ?",vec![number(mr,"id").into(),number(mr,"author_user_id").into()]).await?;
-  let approvers = approvals
-    .iter()
-    .map(|v| number(v, "user_id"))
+  let approvers = s
+    .collaboration
+    .merge_approvals(project, number(mr, "iid"))
+    .await?
+    .into_iter()
+    .filter(|v| v.user_id != number(mr, "author_user_id"))
+    .map(|v| v.user_id)
     .collect::<Vec<_>>();
   let mut checks = Vec::new();
   if require_mr {
@@ -150,12 +172,11 @@ pub(super) async fn evaluate(s: &AppState, p: &Value, mr: &Value) -> Result<Valu
     ));
   }
   for rule in s
-    .db
-    .all(
-      "SELECT * FROM project_merge_request_approval_rules WHERE project_id = ? ORDER BY id",
-      vec![project.into()],
-    )
+    .collaboration
+    .approval_rules(project)
     .await?
+    .into_iter()
+    .map(model_value)
   {
     if !matches(string(&rule, "target_branch"), target) {
       continue;

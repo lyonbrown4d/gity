@@ -41,6 +41,10 @@ pub struct AppState {
   pub settings: Arc<Settings>,
   pub storage: gity_core::Storage,
   pub identity: fluxdi::Shared<gity_identity::IdentityRepository>,
+  pub collaboration: fluxdi::Shared<gity_collaboration::CollaborationService>,
+  pub ci: fluxdi::Shared<gity_ci::CiService>,
+  pub projects: fluxdi::Shared<gity_projects::ProjectService>,
+  pub repository_access: fluxdi::Shared<gity_projects::RepositoryAccessService>,
   #[cfg(feature = "packages")]
   pub artifacts: fluxdi::Shared<gity_artifacts::ArtifactService>,
 }

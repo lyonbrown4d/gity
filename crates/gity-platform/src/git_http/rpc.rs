@@ -45,12 +45,12 @@ pub(super) async fn rpc(
       .await
       .map_err(repository::git_error)?;
     let rules = s
-      .db
-      .all(
-        "SELECT * FROM project_branch_protections WHERE project_id=?",
-        vec![crate::projects::id(&project["id"])?.into()],
-      )
-      .await?;
+      .repository_access
+      .protections(crate::projects::id(&project["id"])?)
+      .await?
+      .into_iter()
+      .map(gity_persistence::model_value)
+      .collect::<Vec<_>>();
     let mut deny_force = Vec::new();
     loop {
       let mut len = [0; 4];

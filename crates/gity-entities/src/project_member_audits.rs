@@ -1,6 +1,6 @@
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, DeriveEntityModel)]
 #[sea_orm(table_name = "project_member_audits")]
 pub struct Model {
   // The DDL is keyless; application code assigns each audit row a unique revision id.

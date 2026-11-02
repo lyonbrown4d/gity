@@ -1,6 +1,6 @@
 use crate::composition::Runtime;
-use anyhow::{Context, Result, bail};
-use serde_json::Value;
+use anyhow::{Result, bail};
+use gity_entities::projects::Model;
 use std::collections::BTreeSet;
 pub async fn run(runtime: &Runtime, selected: &[i64]) -> Result<()> {
   if selected.iter().any(|id| *id <= 0) {
@@ -11,18 +11,12 @@ pub async fn run(runtime: &Runtime, selected: &[i64]) -> Result<()> {
   if selected.is_empty() {
     let mut after = 0i64;
     loop {
-      let rows = runtime
-        .db
-        .all(
-          "SELECT * FROM projects WHERE deleted_at IS NULL AND id>? ORDER BY id LIMIT 100",
-          vec![after.into()],
-        )
-        .await?;
+      let rows = runtime.projects.search_projects_after(after, 100).await?;
       if rows.is_empty() {
         break;
       }
       for project in rows {
-        after = id(&project)?;
+        after = project.id;
         count += 1;
         if let Err(error) = refresh(runtime, &project).await {
           failures += 1;
@@ -38,14 +32,7 @@ pub async fn run(runtime: &Runtime, selected: &[i64]) -> Result<()> {
       .into_iter()
       .collect::<Vec<_>>();
     for chunk in selected.chunks(100) {
-      let sql = format!(
-        "SELECT * FROM projects WHERE deleted_at IS NULL AND id IN ({}) ORDER BY id",
-        vec!["?"; chunk.len()].join(",")
-      );
-      let rows = runtime
-        .db
-        .all(&sql, chunk.iter().map(|id| (*id).into()).collect())
-        .await?;
+      let rows = runtime.projects.search_projects_selected(chunk).await?;
       if rows.len() != chunk.len() {
         bail!("one or more selected projects do not exist or were deleted");
       }
@@ -53,7 +40,7 @@ pub async fn run(runtime: &Runtime, selected: &[i64]) -> Result<()> {
         count += 1;
         if let Err(error) = refresh(runtime, &project).await {
           failures += 1;
-          eprintln!("project {}: {error:#}", id(&project)?);
+          eprintln!("project {}: {error:#}", project.id);
         }
       }
     }
@@ -64,21 +51,14 @@ pub async fn run(runtime: &Runtime, selected: &[i64]) -> Result<()> {
   println!("Refreshed {count} project indexes");
   Ok(())
 }
-async fn refresh(runtime: &Runtime, project: &Value) -> Result<()> {
-  let repo = format!(
-    "{}.git",
-    project["full_path"]
-      .as_str()
-      .context("project path missing")?
-  );
-  let branch = project["default_branch"]
-    .as_str()
-    .context("project default branch missing")?;
-  match runtime.search.refresh(id(project)?, &repo, branch).await {
+async fn refresh(runtime: &Runtime, project: &Model) -> Result<()> {
+  let repo = format!("{}.git", project.full_path);
+  let branch = &project.default_branch;
+  match runtime.search.refresh(project.id, &repo, branch).await {
     Ok(status) => {
       println!(
         "Project {} revision {}: {} files, {} bytes{}",
-        id(project)?,
+        project.id,
         status.revision,
         status.indexed_files,
         status.total_bytes,
@@ -88,7 +68,4 @@ async fn refresh(runtime: &Runtime, project: &Value) -> Result<()> {
     }
     Err(error) => Err(error),
   }
-}
-fn id(project: &Value) -> Result<i64> {
-  project["id"].as_i64().context("invalid project identifier")
 }

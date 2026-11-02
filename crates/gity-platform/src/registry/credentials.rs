@@ -1,4 +1,4 @@
-use super::credential_repository as repository;
+use super::credential_views as views;
 use super::tokens::active;
 use super::*;
 use crate::openapi::{credential_schemas as spec, schemas as api};
@@ -31,10 +31,11 @@ fn token_view(mut row: Value) -> Value {
 async fn list(s: AppState, h: HeaderMap, p: i64, kind: &str) -> Reply {
   crate::access::project_action(&s, &h, p, crate::access::ProjectAction::RepositoryAdmin).await?;
   reply(json!(
-    repository::list_tokens(&s.db, p, kind)
+    s.repository_access
+      .list_tokens(p, kind)
       .await?
       .iter()
-      .map(repository::token_json)
+      .map(views::token_json)
       .map(token_view)
       .collect::<Vec<_>>()
   ))
@@ -122,9 +123,9 @@ async fn create(s: AppState, h: HeaderMap, p: i64, b: Value, kind: &str) -> Repl
     if kind == "deploy" { "gdt_" } else { "gpat_" },
     crate::auth::secret()
   );
-  let row = repository::create_token(
-    &s.db,
-    repository::NewProjectToken {
+  let row = s
+    .repository_access
+    .create_token(gity_projects::NewProjectToken {
       project_id: p,
       kind: kind.to_owned(),
       name,
@@ -133,10 +134,9 @@ async fn create(s: AppState, h: HeaderMap, p: i64, b: Value, kind: &str) -> Repl
       scopes: scopes.join(","),
       created_by_user_id: actor.user_id,
       expires_at: expires,
-    },
-  )
-  .await?;
-  reply(json!({"project_token":token_view(repository::token_json(&row)),"token":raw}))
+    })
+    .await?;
+  reply(json!({"project_token":token_view(views::token_json(&row)),"token":raw}))
 }
 #[utoipa::path(
     post,path="/projects/{id}/access-tokens",tag="credentials",
@@ -170,13 +170,15 @@ async fn create_deploy(
 }
 async fn revoke(s: AppState, h: HeaderMap, p: i64, id: i64, kind: &str) -> Reply {
   crate::access::project_action(&s, &h, p, crate::access::ProjectAction::RepositoryAdmin).await?;
-  let row = repository::scoped_token(&s.db, p, id)
+  let row = s
+    .repository_access
+    .scoped_token(p, id)
     .await?
     .ok_or_else(|| AppError::not_found("resource not found"))?;
   if row.kind != kind {
     return Err(AppError::not_found("project token not found"));
   }
-  repository::revoke_token(&s.db, row).await?;
+  s.repository_access.revoke_token(row).await?;
   reply(json!({"status":"revoked"}))
 }
 #[utoipa::path(
@@ -218,10 +220,11 @@ fn key_view(mut row: Value) -> Value {
 async fn keys(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, crate::access::ProjectAction::RepositoryAdmin).await?;
   reply(json!(
-    repository::list_deploy_keys(&s.db, p)
+    s.repository_access
+      .list_deploy_keys(p)
       .await?
       .into_iter()
-      .map(|row| key_view(repository::deploy_key_json(&row)))
+      .map(|row| key_view(views::deploy_key_json(&row)))
       .collect::<Vec<_>>()
   ))
 }
@@ -246,17 +249,18 @@ async fn create_key(
     .collect::<Vec<_>>()
     .join(" ");
   let (key, fingerprint) = crate::ssh::canonical_key(&key)?;
-  let row = repository::create_deploy_key(
-    &s.db,
-    p,
-    title,
-    key,
-    fingerprint,
-    b["can_push"] == true,
-    actor.user_id,
-  )
-  .await?;
-  reply(key_view(repository::deploy_key_json(&row)))
+  let row = s
+    .repository_access
+    .create_deploy_key(
+      p,
+      title,
+      key,
+      fingerprint,
+      b["can_push"] == true,
+      actor.user_id,
+    )
+    .await?;
+  reply(key_view(views::deploy_key_json(&row)))
 }
 #[utoipa::path(
     delete,path="/projects/{id}/deploy-keys/{key}",tag="credentials",
@@ -270,9 +274,11 @@ async fn delete_key(
   Path((p, id)): Path<(i64, i64)>,
 ) -> Reply {
   crate::access::project_action(&s, &h, p, crate::access::ProjectAction::RepositoryAdmin).await?;
-  let key = repository::scoped_deploy_key(&s.db, p, id)
+  let key = s
+    .repository_access
+    .scoped_deploy_key(p, id)
     .await?
     .ok_or_else(|| AppError::not_found("resource not found"))?;
-  repository::delete_deploy_key(&s.db, key).await?;
+  s.repository_access.delete_deploy_key(key).await?;
   reply(json!({"status":"deleted"}))
 }

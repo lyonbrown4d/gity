@@ -111,3 +111,42 @@ async fn lfs_hash_verification_batch_streaming_and_lock_ownership() {
     StatusCode::FORBIDDEN
   );
 }
+
+#[tokio::test]
+async fn concurrent_lfs_uploads_reuse_one_metadata_row_and_storage_object() {
+  use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+  let (dir, s) = fixture().await;
+  let oid = hex::encode(Sha256::digest(b"same content"));
+  let path = format!("/team/p20.git/info/lfs/objects/{oid}");
+  let (first, second) = tokio::join!(
+    lfs_req(&s, "PUT", &path, "alice", Body::from("same content")),
+    lfs_req(&s, "PUT", &path, "alice", Body::from("same content")),
+  );
+  assert_eq!(first.0, StatusCode::OK);
+  assert_eq!(second.0, StatusCode::OK);
+  let rows = gity_entities::project_lfs_objects::Entity::find()
+    .filter(gity_entities::project_lfs_objects::Column::ProjectId.eq(20))
+    .all(&s.db.connection)
+    .await
+    .unwrap();
+  assert_eq!(rows.len(), 1);
+  let objects = std::fs::read_dir(dir.path().join("storage/lfs/20"))
+    .unwrap()
+    .count();
+  assert_eq!(objects, 1);
+  assert_eq!(
+    lfs_req(&s, "GET", &path, "bob", Body::empty()).await.2,
+    b"same content"
+  );
+  s.storage.delete(&rows[0].storage_key).await.unwrap();
+  assert_eq!(
+    lfs_req(&s, "PUT", &path, "alice", Body::from("same content"))
+      .await
+      .0,
+    StatusCode::OK
+  );
+  assert_eq!(
+    lfs_req(&s, "GET", &path, "bob", Body::empty()).await.2,
+    b"same content"
+  );
+}

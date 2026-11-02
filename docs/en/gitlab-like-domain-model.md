@@ -100,7 +100,7 @@ New deployments use an empty database initialized from the current schema defini
 Review the core definitions in:
 
 - Versioned table definitions: `crates/gity-migrations`.
-- Organization and project path updates: `crates/gity-platform/src/projects/`.
+- Organization/project application services and adapters: `crates/gity-projects/`, `crates/gity-platform/src/projects/`.
 - Role resolution and access actions: `crates/gity-platform/src/access.rs`, `crates/gity-platform/src/access/`.
 - Git storage name selection by project ID: `crates/gity-platform/src/repository/mod.rs`.
 - YAML configuration loading and validation: `crates/gity-platform/src/ci/config.rs`, `crates/gity-platform/src/ci/service.rs`.

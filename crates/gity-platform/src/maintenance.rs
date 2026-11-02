@@ -8,12 +8,12 @@ pub async fn refresh_indexes(state: &AppState) -> Result<(), AppError> {
   let mut cursor = 0i64;
   loop {
     let rows = state
-      .db
-      .all(
-        "SELECT * FROM projects WHERE id>? ORDER BY id LIMIT 100",
-        vec![cursor.into()],
-      )
-      .await?;
+      .projects
+      .list_after(cursor, 100)
+      .await?
+      .into_iter()
+      .map(gity_persistence::model_value)
+      .collect::<Vec<_>>();
     if rows.is_empty() {
       break;
     }

@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+gity-projects = { path = "../../crates/gity-projects" }
+gity-entities = { path = "../../crates/gity-entities" }
 anyhow.workspace = true
 gity-core = { path = "../../crates/gity-core" }
 gity-git = { path = "../../crates/gity-git" }
@@ -12,3 +14,6 @@ clap = { version = "4", features = ["derive"] }
 fluxdi.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+gity-core = { path = "../../crates/gity-core", features = ["test-fixtures"] }
