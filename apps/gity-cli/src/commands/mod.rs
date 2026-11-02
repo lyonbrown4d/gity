@@ -1,7 +1,10 @@
 pub mod api;
 pub mod auth;
+pub mod completion;
 pub mod issue;
 pub mod mr;
 pub mod pipeline;
 pub mod project;
+pub mod repo;
+pub mod settings;
 pub mod token;

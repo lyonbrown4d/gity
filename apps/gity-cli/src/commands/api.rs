@@ -37,7 +37,7 @@ pub async fn run(args: ApiArgs, options: &Options) -> Result<()> {
     Method::Get => client.get(&path).await?,
     Method::Post => client.post(&path, body).await?,
     Method::Patch => client.patch(&path, body).await?,
-    Method::Put => client.post(&path, body).await?,
+    Method::Put => client.put(&path, body).await?,
     Method::Delete => client.delete(&path).await?,
   };
   format::print_json(&result);

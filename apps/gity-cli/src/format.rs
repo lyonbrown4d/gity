@@ -90,3 +90,15 @@ pub fn paint(value: &str, code: &str) -> String {
     value.to_owned()
   }
 }
+
+/// The server's list endpoints ignore the `state` query parameter, so filter
+/// client-side instead of pretending the filter was applied remotely.
+pub fn filter_state(value: &Value, key: &str, wanted: &str) -> Vec<Value> {
+  value
+    .as_array()
+    .into_iter()
+    .flatten()
+    .filter(|row| wanted == "all" || row[key].as_str() == Some(wanted))
+    .cloned()
+    .collect()
+}

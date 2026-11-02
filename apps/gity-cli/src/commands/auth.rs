@@ -65,7 +65,7 @@ async fn login(
   };
   let client = Client::new(&host, &token);
   let me = client.get("/users/me").await?;
-  config::store(options, &host, &token)?;
+  config::store_host(options, &host, &token, me["username"].as_str())?;
   println!(
     "{} {} on {}",
     format::paint("signed in as", "32"),
@@ -135,7 +135,8 @@ async fn post(
 }
 
 async fn status(options: &Options) -> Result<()> {
-  let (host, _) = config::resolve(options)?;
+  let resolved = config::resolve(options)?;
+  let host = resolved.host;
   let client = Client::from_options(options)?;
   let me = client.get("/users/me").await?;
   if options.json {
@@ -149,13 +150,11 @@ async fn status(options: &Options) -> Result<()> {
 }
 
 fn logout(options: &Options) -> Result<()> {
-  let mut config = config::load(&options.config_file);
-  let Some(name) = config.current.take() else {
+  let Some(host) = config::load(&options.config_file).host else {
     println!("no stored credentials");
     return Ok(());
   };
-  config.profiles.remove(&name);
-  config::save(&options.config_file, &config)?;
-  println!("removed profile {name}");
+  config::remove_host(options, &host)?;
+  println!("signed out of {host}");
   Ok(())
 }

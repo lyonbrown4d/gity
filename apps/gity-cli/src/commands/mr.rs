@@ -3,6 +3,7 @@ use crate::client::{self, Client, Options};
 use crate::format;
 use anyhow::Result;
 use clap::Subcommand;
+use serde_json::Value;
 use serde_json::json;
 
 #[derive(Subcommand)]
@@ -63,11 +64,10 @@ pub async fn run(command: MrCommand, options: &Options) -> Result<()> {
 
 async fn list(client: &Client, options: &Options, project: &str, state: &str) -> Result<()> {
   let id = client::project_id(client, project).await?;
-  let path = match state {
-    "all" => format!("/projects/{id}/merge-requests"),
-    other => format!("/projects/{id}/merge-requests?state={other}"),
-  };
-  let merge_requests = client.get(&path).await?;
+  let merge_requests = client
+    .get(&format!("/projects/{id}/merge-requests"))
+    .await?;
+  let merge_requests = Value::Array(format::filter_state(&merge_requests, "state", state));
   if options.json {
     format::print_json(&merge_requests);
     return Ok(());

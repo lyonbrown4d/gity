@@ -31,8 +31,8 @@ impl Client {
   /// Builds a client from resolved credentials. `required` allows commands such
   /// as `auth login` to run without a stored token.
   pub fn from_options(options: &Options) -> Result<Client> {
-    let (host, token) = config::resolve(options)?;
-    Ok(Self::new(&host, &token))
+    let resolved = config::resolve(options)?;
+    Ok(Self::new(&resolved.host, &resolved.token))
   }
 
   pub async fn get(&self, path: &str) -> Result<Value> {
@@ -41,6 +41,10 @@ impl Client {
 
   pub async fn post(&self, path: &str, body: Value) -> Result<Value> {
     self.send(reqwest::Method::POST, path, Some(body)).await
+  }
+
+  pub async fn put(&self, path: &str, body: Value) -> Result<Value> {
+    self.send(reqwest::Method::PUT, path, Some(body)).await
   }
 
   pub async fn patch(&self, path: &str, body: Value) -> Result<Value> {
