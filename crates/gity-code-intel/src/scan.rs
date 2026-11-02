@@ -37,12 +37,24 @@ const SKIP: [&str; 9] = [
   "third_party",
 ];
 
+/// Result of a scan: the parsed files plus whether a quota stopped it early.
+pub struct ScanReport {
+  pub files: Vec<SymbolFile>,
+  pub truncated: bool,
+}
+
 /// Parses every supported file under `root`, applying the size quotas.
 pub fn directory(root: &Path, limits: Limits) -> Result<Vec<SymbolFile>> {
+  Ok(report(root, limits)?.files)
+}
+
+/// Like [`directory`], but tells the caller whether the tree was cut short.
+pub fn report(root: &Path, limits: Limits) -> Result<ScanReport> {
   let mut files = Vec::new();
   let mut total = 0usize;
-  walk(root, root, limits, &mut total, &mut files)?;
-  Ok(files)
+  let mut truncated = false;
+  walk(root, root, limits, &mut total, &mut files, &mut truncated)?;
+  Ok(ScanReport { files, truncated })
 }
 
 fn walk(
@@ -51,6 +63,7 @@ fn walk(
   limits: Limits,
   total: &mut usize,
   files: &mut Vec<SymbolFile>,
+  truncated: &mut bool,
 ) -> Result<()> {
   let entries = std::fs::read_dir(directory).with_context(|| directory.display().to_string())?;
   let mut paths = entries
@@ -59,6 +72,7 @@ fn walk(
   paths.sort();
   for path in paths {
     if files.len() >= limits.max_files || *total >= limits.max_total_bytes {
+      *truncated = true;
       return Ok(());
     }
     let metadata = match std::fs::symlink_metadata(&path) {
@@ -74,11 +88,12 @@ fn walk(
         .and_then(|name| name.to_str())
         .unwrap_or("");
       if !SKIP.contains(&name) {
-        walk(root, &path, limits, total, files)?;
+        walk(root, &path, limits, total, files, truncated)?;
       }
       continue;
     }
     if metadata.len() as usize > limits.max_file_size {
+      *truncated = true;
       continue;
     }
     let relative = path

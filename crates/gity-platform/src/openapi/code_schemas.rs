@@ -27,6 +27,8 @@ pub struct CodeIndexInfo {
   pub available: bool,
   pub commit: String,
   pub indexed_at: String,
+  /// True when a quota stopped the scan, so the index covers only part of the tree.
+  pub truncated: bool,
 }
 
 #[derive(Serialize, ToSchema)]

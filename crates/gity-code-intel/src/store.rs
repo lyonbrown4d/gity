@@ -25,6 +25,9 @@ pub struct Status {
   pub definitions: usize,
   pub archive_bytes: usize,
   pub indexed_at: String,
+  /// True when the index covers only part of the tree because a quota was hit.
+  #[serde(default)]
+  pub truncated: bool,
 }
 
 #[derive(Clone)]
@@ -52,7 +55,9 @@ impl Store {
     Ok(path)
   }
 
-  fn lock(&self, project: i64, exclusive: bool) -> Result<File> {
+  /// Shared locks degrade to `None` when a writer holds the index, so a busy
+  /// rebuild reads as "no index yet" instead of failing the request.
+  fn lock(&self, project: i64, exclusive: bool) -> Result<Option<File>> {
     let path = self.root.join(format!("{project}.lock"));
     std::fs::OpenOptions::new()
       .create(true)
@@ -63,20 +68,26 @@ impl Store {
       .with_context(|| format!("open code index lock for project {project}"))
       .and_then(|file| {
         // Disambiguate from std's inherent File methods, which return a bool.
-        let locked = if exclusive {
+        let outcome = if exclusive {
           fs2::FileExt::try_lock_exclusive(&file)
         } else {
           fs2::FileExt::try_lock_shared(&file)
         };
-        locked.with_context(|| format!("code index for project {project} is busy; retry later"))?;
-        Ok(file)
+        match outcome {
+          Ok(()) => Ok(Some(file)),
+          Err(error) if exclusive => {
+            Err(error).with_context(|| format!("code index for project {project} is busy"))
+          }
+          // A reader that cannot lock simply reports "no index yet".
+          Err(_) => Ok(None),
+        }
       })
   }
 
   /// Indexes an in-memory archive, replacing the previous snapshot.
   pub fn refresh(&self, project: i64, archive: &Archive) -> Result<Status> {
     let directory = self.project(project)?;
-    let _lock = self.lock(project, true)?;
+    self.lock(project, true)?;
     std::fs::create_dir_all(directory.join("archive"))?;
     let bytes = archive::encode(archive)?;
     let archive_path = directory
@@ -90,6 +101,7 @@ impl Store {
       files: archive.files.len(),
       definitions,
       archive_bytes: bytes.len(),
+      truncated: archive.truncated,
       indexed_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
     };
     let text = serde_json::to_string_pretty(&status)?;
@@ -106,17 +118,24 @@ impl Store {
     checkout: &Path,
     limits: Limits,
   ) -> Result<Status> {
-    let files: Vec<SymbolFile> = scan::directory(checkout, limits)?;
-    self.refresh(project, &Archive::new(commit, files))
+    let report = scan::report(checkout, limits)?;
+    self.refresh(
+      project,
+      &Archive::new(commit, report.files).truncated(report.truncated),
+    )
   }
 
   pub fn status(&self, project: i64) -> Result<Option<Status>> {
-    let _lock = self.lock(project, false)?;
+    if self.lock(project, false)?.is_none() {
+      return Ok(None);
+    }
     read_status(&self.project(project)?)
   }
 
   pub fn symbols(&self, project: i64, path: &str) -> Result<Vec<SymbolDoc>> {
-    let _lock = self.lock(project, false)?;
+    if self.lock(project, false)?.is_none() {
+      return Ok(Vec::new());
+    }
     let directory = self.project(project)?;
     let Some((index, fields)) = index::open(&directory.join("current"))? else {
       return Ok(Vec::new());
@@ -153,7 +172,9 @@ impl Store {
 
   /// Declarations of a name across the indexed snapshot.
   pub fn references(&self, project: i64, name: &str) -> Result<Vec<SymbolDoc>> {
-    let _lock = self.lock(project, false)?;
+    if self.lock(project, false)?.is_none() {
+      return Ok(Vec::new());
+    }
     let directory = self.project(project)?;
     let Some((index, fields)) = index::open(&directory.join("current"))? else {
       return Ok(Vec::new());
@@ -163,7 +184,9 @@ impl Store {
 
   /// Free-text lookup over declaration names, used by the outline search box.
   pub fn search(&self, project: i64, text: &str, limit: usize) -> Result<Vec<SymbolDoc>> {
-    let _lock = self.lock(project, false)?;
+    if self.lock(project, false)?.is_none() {
+      return Ok(Vec::new());
+    }
     let directory = self.project(project)?;
     let Some((index, fields)) = index::open(&directory.join("current"))? else {
       return Ok(Vec::new());
@@ -172,7 +195,7 @@ impl Store {
   }
 
   pub fn forget(&self, project: i64) -> Result<()> {
-    let _lock = self.lock(project, true)?;
+    self.lock(project, true)?;
     let directory = self.project(project)?;
     if directory.exists() {
       std::fs::remove_dir_all(directory).context("remove code index")?;

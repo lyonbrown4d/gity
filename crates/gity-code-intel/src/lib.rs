@@ -13,7 +13,7 @@ pub mod symbol;
 
 pub use archive::{Archive, FORMAT_VERSION, decode, encode};
 pub use index::SymbolDoc;
-pub use scan::Limits;
+pub use scan::{Limits, ScanReport};
 pub use store::{Status, Store};
 pub use symbol::{Definition, Import, Kind, SymbolFile};
 

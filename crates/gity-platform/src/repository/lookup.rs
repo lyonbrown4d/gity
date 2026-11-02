@@ -76,6 +76,7 @@ fn index_info(status: Option<&Status>) -> spec::CodeIndexInfo {
     indexed_at: status
       .map(|status| status.indexed_at.clone())
       .unwrap_or_default(),
+    truncated: status.map(|status| status.truncated).unwrap_or(false),
   }
 }
 
@@ -274,7 +275,8 @@ pub(crate) async fn search(
     let rows = store.search(id, &text, limit)?;
     anyhow::Ok((status, rows))
   })
-  .await?;
+  .await
+  .map_err(|error| AppError::bad_request(format!("invalid search query: {error}")))?;
   Ok(ok(json!(spec::CodeSearchResults {
     total: rows.len() as u64,
     matches: rows.into_iter().map(symbol).collect(),

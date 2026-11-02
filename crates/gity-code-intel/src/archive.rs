@@ -16,6 +16,10 @@ pub struct Archive {
   pub commit: String,
   #[serde(default)]
   pub files: Vec<SymbolFile>,
+  /// Set when the scanner stopped early because a quota was reached; readers must
+  /// treat the snapshot as partial rather than complete.
+  #[serde(default)]
+  pub truncated: bool,
 }
 
 impl Archive {
@@ -24,7 +28,13 @@ impl Archive {
       version: FORMAT_VERSION,
       commit: commit.into(),
       files,
+      truncated: false,
     }
+  }
+  /// Marks a snapshot that stopped at a quota.
+  pub fn truncated(mut self, truncated: bool) -> Self {
+    self.truncated = truncated;
+    self
   }
   pub fn definition_count(&self) -> usize {
     self.files.iter().map(|file| file.definitions.len()).sum()
