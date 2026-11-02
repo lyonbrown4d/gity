@@ -8,6 +8,8 @@ pub struct Model {
   pub merge_request_id: i64,
   pub author_user_id: i64,
   pub body: String,
+  pub discussion_id: Option<i64>,
+  pub position: Option<String>,
   pub created_at: chrono::NaiveDateTime,
   pub updated_at: chrono::NaiveDateTime,
 }

@@ -100,7 +100,7 @@ async fn issue_labels(s: &AppState, p: i64, i: i64) -> Result<Vec<Value>, AppErr
 #[utoipa::path(
     post,path="/{id}/issues/{iid}/comments",tag="issues",
     params(api::IidPath),
-    request_body(content=spec::CreateComment),
+    request_body(content=crate::openapi::discussion_schemas::CreateComment),
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::Comment>),api::Errors),
     security(("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
@@ -119,19 +119,8 @@ pub(super) async fn comment(
   } else {
     required(&b, "body")?
   };
-  let row = model_value(
-    s.collaboration
-      .create_issue_comment(
-        p,
-        i,
-        IssueCommentCreate {
-          project_issue_id: number(&issue, "id"),
-          author_user_id: actor.user_id,
-          body,
-        },
-      )
-      .await?,
-  );
+  let command = super::discussions::issue_comment(&b, actor.user_id, number(&issue, "id"), body)?;
+  let row = model_value(s.collaboration.create_issue_comment(p, i, command).await?);
   if number(&issue, "author_user_id") != actor.user_id {
     super::todos::notify(
       &s,
@@ -149,6 +138,69 @@ pub(super) async fn comment(
     .await?;
   }
   response(child(row, i))
+}
+/// Comment authors edit their own words; other users need the project write
+/// action. Issue and merge request comments share this rule.
+pub(super) async fn authorize_comment(
+  s: &AppState,
+  h: &HeaderMap,
+  p: i64,
+  author: i64,
+  comment: ProjectAction,
+  write: ProjectAction,
+) -> Result<(), AppError> {
+  let authorization = crate::access::project_action(s, h, p, comment).await?;
+  if authorization.actor()?.user_id == author || authorization.allows(write) {
+    return Ok(());
+  }
+  Err(AppError::forbidden("insufficient project permissions"))
+}
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[utoipa::path(
+    patch,path="/{id}/issues/{iid}/comments/{comment}",tag="issues",
+    params(api::IidPath,("comment"=i64,Path,description="Comment identifier")),
+    request_body(content=spec::CreateComment),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<spec::Comment>),api::Errors),
+    security(("bearer"=[]), ("basic"=[]), ("private_token"=[]))
+)]
+pub(super) async fn update_comment(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path((p, i, c)): Path<(i64, i64, i64)>,
+  Json(b): Json<Value>,
+) -> Reply {
+  let current = s.collaboration.issue_comment(p, i, c).await?;
+  let (comment, write) = (ProjectAction::IssueComment, ProjectAction::IssueWrite);
+  authorize_comment(&s, &h, p, current.author_user_id, comment, write).await?;
+  let body = if string(&b, "body").is_empty() {
+    required(&b, "content")?
+  } else {
+    required(&b, "body")?
+  };
+  let row = model_value(
+    s.collaboration
+      .update_issue_comment(p, i, c, IssueCommentUpdate { body })
+      .await?,
+  );
+  response(child(row, i))
+}
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[utoipa::path(
+    delete,path="/{id}/issues/{iid}/comments/{comment}",tag="issues",
+    params(api::IidPath,("comment"=i64,Path,description="Comment identifier")),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<crate::openapi::user_schemas::OkResult>),api::Errors),
+    security(("bearer"=[]), ("basic"=[]), ("private_token"=[]))
+)]
+pub(super) async fn delete_comment(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path((p, i, c)): Path<(i64, i64, i64)>,
+) -> Reply {
+  let current = s.collaboration.issue_comment(p, i, c).await?;
+  let (comment, write) = (ProjectAction::IssueComment, ProjectAction::IssueWrite);
+  authorize_comment(&s, &h, p, current.author_user_id, comment, write).await?;
+  s.collaboration.delete_issue_comment(p, i, c).await?;
+  response(json!({"ok":true}))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(

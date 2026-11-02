@@ -37,3 +37,7 @@ mod notification;
 pub use notification::Notification;
 mod lifecycle;
 pub use lifecycle::*;
+mod subscription;
+pub use subscription::*;
+mod discussion;
+pub use discussion::*;

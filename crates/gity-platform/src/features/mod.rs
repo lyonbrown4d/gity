@@ -1,7 +1,9 @@
 //! Collaboration APIs. Every resource lookup is scoped to its project before mutation.
+mod activity;
 mod attachments;
 mod checks;
 mod codeowners;
+mod discussions;
 mod issue_collaboration;
 mod issue_views;
 mod issues;
@@ -17,6 +19,7 @@ mod mr_collaboration;
 mod project_lock;
 mod releases;
 mod rules;
+mod subscriptions;
 mod tags;
 mod todos;
 pub(crate) use todos::{Notification, notify as notify_event};
@@ -41,6 +44,9 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .merge(releases::documented_routes())
     .merge(milestones::documented_routes())
     .merge(labels::documented_routes())
+    .merge(discussions::documented_routes())
+    .merge(subscriptions::documented_routes())
+    .merge(activity::documented_routes())
 }
 fn response(v: Value) -> Reply {
   Ok(gity_core::ok(externalize(v)))
@@ -149,3 +155,18 @@ mod attachment_http_tests;
 
 #[cfg(test)]
 mod rule_tests;
+
+#[cfg(test)]
+mod collaboration_tests;
+
+#[cfg(test)]
+mod subscription_notification_tests;
+
+#[cfg(test)]
+mod subscription_tests;
+
+#[cfg(test)]
+mod discussion_tests;
+
+#[cfg(test)]
+mod activity_tests;

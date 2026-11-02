@@ -88,3 +88,70 @@ pub(super) async fn label_rows(
   }
   Ok(groups)
 }
+
+/// One entry of the merged issue timeline.
+///
+/// `type` distinguishes user comments from system events so the client can
+/// render both from one sorted list.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub(super) struct TimelineEntry {
+  /// Comment id or audit event id, serialized as a string.
+  pub id: String,
+  /// `comment` for user comments, `system` for audit events.
+  #[serde(rename = "type")]
+  #[schema(example = "comment")]
+  pub entry_type: String,
+  /// Comment author or the actor of the audited change.
+  pub author_user_id: String,
+  /// Comment text; null for system entries.
+  pub body: Option<String>,
+  /// Human readable system summary; null for comments.
+  pub summary: Option<String>,
+  /// Audit event name such as `project.issue.closed`; null for comments.
+  pub event_name: Option<String>,
+  #[schema(format = DateTime)]
+  pub created_at: String,
+}
+
+/// Comments and audit events of one issue interleaved by creation time.
+///
+/// Snowflake identifiers are monotonic per process, so they break timestamp
+/// ties in the order the rows were written.
+pub(super) async fn timeline(s: &AppState, project: i64, iid: i64) -> Result<Vec<Value>, AppError> {
+  let (comments, events) = s.collaboration.issue_timeline(project, iid).await?;
+  let mut rows = comments
+    .into_iter()
+    .map(|comment| (comment.created_at, comment.id, comment_entry(&comment)))
+    .chain(
+      events
+        .into_iter()
+        .map(|event| (event.created_at, event.id, event_entry(&event))),
+    )
+    .collect::<Vec<_>>();
+  rows.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+  Ok(rows.into_iter().map(|row| row.2).collect())
+}
+
+fn comment_entry(comment: &gity_entities::project_issue_comments::Model) -> Value {
+  json!({
+    "id": comment.id,
+    "type": "comment",
+    "author_user_id": comment.author_user_id,
+    "body": comment.body,
+    "summary": Value::Null,
+    "event_name": Value::Null,
+    "created_at": comment.created_at,
+  })
+}
+
+fn event_entry(event: &gity_entities::project_audit_events::Model) -> Value {
+  json!({
+    "id": event.id,
+    "type": "system",
+    "author_user_id": event.actor_user_id,
+    "body": Value::Null,
+    "summary": event.summary,
+    "event_name": event.event_name,
+    "created_at": event.created_at,
+  })
+}

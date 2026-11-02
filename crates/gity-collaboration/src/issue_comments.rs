@@ -15,12 +15,60 @@ impl CollaborationRepository {
         project_issue_id: Set(command.project_issue_id),
         author_user_id: Set(command.author_user_id),
         body: Set(command.body),
+        discussion_id: Set(command.discussion_id),
+        position: Set(command.position),
         created_at: Set(now),
         updated_at: Set(now),
       }
       .insert(&self.connection)
       .await?,
     )
+  }
+}
+
+impl CollaborationRepository {
+  pub async fn issue_comment(
+    &self,
+    project: i64,
+    iid: i64,
+    comment: i64,
+  ) -> Result<entity::Model, AppError> {
+    let parent = self.issue(project, iid).await?;
+    entity::Entity::find_by_id(comment)
+      .filter(entity::Column::ProjectIssueId.eq(parent.id))
+      .one(&self.connection)
+      .await?
+      .ok_or_else(|| AppError::not_found("comment not found"))
+  }
+  pub async fn update_issue_comment(
+    &self,
+    project: i64,
+    iid: i64,
+    comment: i64,
+    command: IssueCommentUpdate,
+  ) -> Result<entity::Model, AppError> {
+    let current = self.issue_comment(project, iid, comment).await?;
+    let row = entity::ActiveModel {
+      id: Set(current.id),
+      body: Set(command.body),
+      updated_at: Set(chrono::Utc::now().naive_utc()),
+      ..Default::default()
+    }
+    .update(&self.connection)
+    .await?;
+    Ok(row)
+  }
+  pub async fn delete_issue_comment(
+    &self,
+    project: i64,
+    iid: i64,
+    comment: i64,
+  ) -> Result<(), AppError> {
+    let current = self.issue_comment(project, iid, comment).await?;
+    entity::Entity::delete_by_id(current.id)
+      .exec(&self.connection)
+      .await?;
+    Ok(())
   }
 }
 

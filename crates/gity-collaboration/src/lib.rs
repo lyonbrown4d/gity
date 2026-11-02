@@ -1,7 +1,9 @@
 //! Typed collaboration application services and SeaORM repository adapters.
+pub mod activity;
 mod approval_rules;
 mod attachments;
 mod catalog;
+mod discussions;
 pub mod domain;
 mod issue_comments;
 mod issues;
@@ -14,6 +16,7 @@ mod queries;
 mod release_links;
 mod releases;
 mod repository;
+mod subscriptions;
 mod wiki_pages;
 
 pub use module::CollaborationModule;
@@ -30,9 +33,11 @@ impl CollaborationService {
 }
 mod milestones;
 pub use domain::Notification;
+mod application_activity;
 mod application_approval_rules;
 mod application_attachments;
 mod application_catalog;
+mod application_discussions;
 mod application_issue_comments;
 mod application_issues;
 mod application_merge_comments;
@@ -43,6 +48,7 @@ mod application_participants;
 mod application_queries;
 mod application_release_links;
 mod application_releases;
+mod application_subscriptions;
 mod application_wiki_pages;
 
 mod merge_operation_claim;

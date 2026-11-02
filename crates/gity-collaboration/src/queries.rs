@@ -1,8 +1,8 @@
 use crate::repository::CollaborationRepository;
 use gity_core::AppError;
 use gity_entities::{
-  organization_members, project_branch_protections, project_members, project_pipelines, projects,
-  users,
+  organization_members, project_audit_events, project_branch_protections, project_members,
+  project_pipelines, projects, users,
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
@@ -60,6 +60,27 @@ impl CollaborationRepository {
       project_branch_protections::Entity::find()
         .filter(project_branch_protections::Column::ProjectId.eq(project))
         .order_by_asc(project_branch_protections::Column::Id)
+        .all(&self.connection)
+        .await?,
+    )
+  }
+  /// Audit events attached to one issue, oldest first.
+  ///
+  /// `target_id` stores the project-scoped issue primary key as text, matching
+  /// how merge operations record their targets, so the filter never crosses
+  /// projects and never matches a different issue number.
+  pub async fn issue_audit_events(
+    &self,
+    project: i64,
+    issue: i64,
+  ) -> Result<Vec<project_audit_events::Model>, AppError> {
+    Ok(
+      project_audit_events::Entity::find()
+        .filter(project_audit_events::Column::ProjectId.eq(project))
+        .filter(project_audit_events::Column::TargetType.eq("issue"))
+        .filter(project_audit_events::Column::TargetId.eq(issue.to_string()))
+        .order_by_asc(project_audit_events::Column::CreatedAt)
+        .order_by_asc(project_audit_events::Column::Id)
         .all(&self.connection)
         .await?,
     )

@@ -4,15 +4,21 @@ use axum::{
   extract::{Path, Query, State},
   http::HeaderMap,
 };
+use issue_views::TimelineEntry;
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   let shared = utoipa_axum::router::OpenApiRouter::new()
     .routes(utoipa_axum::routes!(list))
     .routes(utoipa_axum::routes!(detail))
+    .routes(utoipa_axum::routes!(timeline))
     .merge(super::issues_mutation::documented_routes())
     .routes(utoipa_axum::routes!(
       super::issue_collaboration::comments,
       super::issue_collaboration::comment
+    ))
+    .routes(utoipa_axum::routes!(
+      super::issue_collaboration::update_comment,
+      super::issue_collaboration::delete_comment
     ))
     .routes(utoipa_axum::routes!(
       super::issue_collaboration::assignees,
@@ -122,3 +128,23 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(super::issue_views::one(&s, p, model_value(&s.collaboration.issue(p, i).await?)).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
+#[utoipa::path(
+    get,path="/{id}/issues/{iid}/timeline",tag="issues",
+    description="Comments and audit events of one issue, oldest first; `type` is `comment` or `system`.",
+    params(api::IidPath),
+    responses((status=200,description="Operation succeeded",body=api::Envelope<Vec<TimelineEntry>>),api::Errors),
+    security((), ("bearer"=[]), ("basic"=[]), ("private_token"=[]))
+)]
+async fn timeline(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path((p, i)): Path<(i64, i64)>,
+) -> Reply {
+  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  response(json!(super::issue_views::timeline(&s, p, i).await?))
+}
+
+#[cfg(test)]
+#[path = "timeline_tests.rs"]
+mod timeline_tests;

@@ -1,5 +1,5 @@
-mod protection;
 mod lookup;
+mod protection;
 mod read;
 mod read_routes;
 mod search;

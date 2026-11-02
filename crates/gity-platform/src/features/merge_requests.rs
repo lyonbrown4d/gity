@@ -19,6 +19,10 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
       super::mr_collaboration::comments,
       super::mr_collaboration::comment
     ))
+    .routes(utoipa_axum::routes!(
+      super::mr_collaboration::update_comment,
+      super::mr_collaboration::delete_comment
+    ))
     .routes(utoipa_axum::routes!(super::mr_collaboration::participants))
     .routes(utoipa_axum::routes!(super::mr_collaboration::reviewers))
     .routes(utoipa_axum::routes!(super::mr_collaboration::assignees))

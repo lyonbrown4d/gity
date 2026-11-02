@@ -70,6 +70,18 @@ pub(super) async fn create(
       .await?;
     }
   }
+  audit_issue(
+    &s,
+    p,
+    actor.user_id,
+    "project.issue.created",
+    "create_issue",
+    number(&row, "id"),
+    iid,
+    &format!("Issue #{iid} created"),
+    json!({"project_id": p, "issue_id": number(&row, "id"), "iid": iid}),
+  )
+  .await;
   response(super::issues::view(row))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
@@ -89,7 +101,8 @@ pub(super) async fn update(
   let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite)
     .await?
     .actor()?;
-  s.collaboration.issue(p, i).await?;
+  let existing = s.collaboration.issue(p, i).await?;
+  let previous_state = existing.state.clone();
   if b.get("title").is_some() {
     required(&b, "title")?;
   }
@@ -147,7 +160,57 @@ pub(super) async fn update(
       .update_issue(p, i, command(Value::Object(change))?)
       .await?,
   );
+  let next_state = string(&row, "state").to_owned();
+  if previous_state != next_state {
+    let (event, action, label) = if next_state == "closed" {
+      ("project.issue.closed", "close_issue", "closed")
+    } else {
+      ("project.issue.reopened", "reopen_issue", "reopened")
+    };
+    audit_issue(
+      &s,
+      p,
+      actor.user_id,
+      event,
+      action,
+      number(&row, "id"),
+      i,
+      &format!("Issue #{i} {label}"),
+      json!({"project_id": p, "issue_id": number(&row, "id"), "iid": i, "state": next_state}),
+    )
+    .await;
+  }
   response(super::issue_views::one(&s, p, row).await?)
+}
+
+/// Timeline system entries are best-effort: a failed audit write is logged and
+/// never rolls back the issue mutation that produced it.
+#[allow(clippy::too_many_arguments)]
+async fn audit_issue(
+  s: &AppState,
+  project: i64,
+  actor: i64,
+  event: &str,
+  action: &str,
+  issue_id: i64,
+  iid: i64,
+  summary: &str,
+  payload: Value,
+) {
+  let target = issue_id.to_string();
+  let record = crate::registry::AuditRecord {
+    project,
+    actor,
+    event,
+    action,
+    target_type: "issue",
+    target_id: &target,
+    summary,
+    payload,
+  };
+  if let Err(error) = crate::registry::record_event(s, record).await {
+    tracing::warn!(project_id = project, issue_iid = iid, error = %error, "issue audit event persistence failed");
+  }
 }
 async fn milestone_ref(
   s: &AppState,

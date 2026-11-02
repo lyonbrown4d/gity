@@ -1,6 +1,8 @@
 use crate::CollaborationService;
 use gity_core::AppError;
-use gity_entities::{project_branch_protections, project_pipelines};
+use gity_entities::{
+  project_audit_events, project_branch_protections, project_issue_comments, project_pipelines,
+};
 
 impl CollaborationService {
   pub async fn validate_users(&self, ids: &[i64]) -> Result<(), AppError> {
@@ -17,6 +19,30 @@ impl CollaborationService {
     project: i64,
   ) -> Result<Vec<project_branch_protections::Model>, AppError> {
     self.repository.protections(project).await
+  }
+  /// Both timeline sources of one issue, each ordered oldest first.
+  ///
+  /// Interleaving the two sources is presentation, so the HTTP layer merges
+  /// them; the application service owns issue resolution and the scoped reads.
+  pub async fn issue_timeline(
+    &self,
+    project: i64,
+    iid: i64,
+  ) -> Result<
+    (
+      Vec<project_issue_comments::Model>,
+      Vec<project_audit_events::Model>,
+    ),
+    AppError,
+  > {
+    let issue = self.repository.issue(project, iid).await?;
+    Ok((
+      self.repository.issue_comments(project, iid).await?,
+      self
+        .repository
+        .issue_audit_events(project, issue.id)
+        .await?,
+    ))
   }
   pub async fn source_pipeline(
     &self,

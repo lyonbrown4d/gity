@@ -24,6 +24,7 @@ pub mod project_ci_variable_audits;
 pub mod project_ci_variables;
 pub mod project_deploy_key_audits;
 pub mod project_deploy_keys;
+pub mod project_discussions;
 pub mod project_iid_counters;
 pub mod project_issue_assignees;
 pub mod project_issue_attachments;
@@ -54,10 +55,12 @@ pub mod project_pipelines;
 pub mod project_release_links;
 pub mod project_releases;
 pub mod project_runners;
+pub mod project_subscriptions;
 pub mod project_todos;
 pub mod project_wiki_pages;
 pub mod projects;
 pub mod user_access_tokens;
+pub mod user_notification_preferences;
 pub mod user_passwords;
 pub mod user_ssh_keys;
 pub mod users;
@@ -80,6 +83,7 @@ application_ids!(
   project_branch_protections,
   project_ci_variables,
   project_deploy_keys,
+  project_discussions,
   project_issue_assignees,
   project_issue_attachments,
   project_issue_comments,
@@ -107,10 +111,12 @@ application_ids!(
   project_release_links,
   project_releases,
   project_runners,
+  project_subscriptions,
   project_todos,
   project_wiki_pages,
   projects,
   user_access_tokens,
+  user_notification_preferences,
   users,
   user_ssh_keys,
   merge_operations
