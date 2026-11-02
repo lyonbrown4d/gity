@@ -3,7 +3,7 @@ use super::*;
 use crate::openapi::{project_schemas as spec, schemas as api};
 
 use std::collections::HashMap;
-
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(get,path="/orgs/{id}/members",tag="projects",params(api::ProjectPath),
     responses((status=200,description="Organization members with current user identity and email",body=api::Envelope<Vec<spec::OrganizationMember>>),api::Errors),security(("bearer"=[])))]
 pub(super) async fn org_members(
@@ -43,6 +43,7 @@ pub(super) async fn org_members(
   }
   Ok(ok(rows))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(post,path="/orgs/{id}/members",tag="projects",params(api::ProjectPath),request_body=spec::AddMember,
     responses((status=200,description="Add a new organization member; owner required",body=api::Envelope<spec::OrganizationMember>),api::Errors),security(("bearer"=[])))]
 pub(super) async fn add_org_member(
@@ -60,6 +61,7 @@ pub(super) async fn add_org_member(
   )
   .await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(patch,path="/orgs/{id}/members/{user}",tag="projects",params(spec::MemberPath),request_body=spec::SetMember,
     responses((status=200,description="Update membership; owner required and last owner must remain",body=api::Envelope<spec::OrganizationMember>),api::Errors),security(("bearer"=[])))]
 pub(super) async fn set_org_member(
@@ -77,6 +79,7 @@ pub(super) async fn set_org_member(
   )
   .await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(delete,path="/orgs/{id}/members/{user}",tag="projects",params(spec::MemberPath),
     responses((status=200,description="Remove membership; owner required and last owner must remain",body=api::Envelope<crate::openapi::user_schemas::OkResult>),api::Errors),security(("bearer"=[])))]
 pub(super) async fn delete_org_member(

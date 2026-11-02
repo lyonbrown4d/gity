@@ -17,6 +17,7 @@ pub(super) async fn tag(s: &AppState, p: &Value, name: &str) -> Result<Option<Va
       .cloned(),
   )
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/repository/tags",tag="releases",
     params(api::ProjectPath),
@@ -34,6 +35,7 @@ pub(super) async fn tags(State(s): State<AppState>, h: HeaderMap, Path(p): Path<
       .map_err(git_error)?,
   )
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/repository/tags",tag="releases",
     params(api::ProjectPath),
@@ -62,6 +64,7 @@ pub(super) async fn create_tag(
     .map_err(git_error)?;
   response(tag(&s, &project, &name).await?.unwrap_or(Value::Null))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/repository/tags",tag="releases",
     params(api::ProjectPath,("name"=String,Query,description="Tag name")),

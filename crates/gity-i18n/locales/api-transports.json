@@ -1,0 +1,67 @@
+{
+  "_version": 2,
+  "invalid OAuth request": {
+    "en": "invalid OAuth request",
+    "zh": "OAuth 请求无效"
+  },
+  "OAuth request expired or already used": {
+    "en": "OAuth request expired or already used",
+    "zh": "OAuth 请求已过期或已使用"
+  },
+  "OAuth service unavailable": {
+    "en": "OAuth service unavailable",
+    "zh": "OAuth 服务暂不可用"
+  },
+  "administrator reauthentication required": {
+    "en": "administrator reauthentication required",
+    "zh": "请重新输入管理员密码"
+  },
+  "OAuth consent requires a browser session": {
+    "en": "OAuth consent requires a browser session",
+    "zh": "OAuth 授权需要浏览器会话"
+  },
+  "valid browser session required": {
+    "en": "valid browser session required",
+    "zh": "需要有效的浏览器会话"
+  },
+  "OAuth bearer token required": {
+    "en": "OAuth bearer token required",
+    "zh": "需要 OAuth 访问令牌"
+  },
+  "MCP scope required": {
+    "en": "MCP scope required",
+    "zh": "需要 MCP 授权范围"
+  },
+  "credential audience does not match this API": {
+    "en": "credential audience does not match this API",
+    "zh": "凭据的目标资源与此 API 不匹配"
+  },
+  "credential scope does not permit this operation": {
+    "en": "credential scope does not permit this operation",
+    "zh": "凭据的授权范围不允许此操作"
+  },
+  "unknown operation": {
+    "en": "unknown operation",
+    "zh": "未知操作"
+  },
+  "arguments do not match operation schema": {
+    "en": "arguments do not match operation schema",
+    "zh": "参数与操作契约不匹配"
+  },
+  "invalid identifier": {
+    "en": "invalid identifier",
+    "zh": "标识符无效"
+  },
+  "invalid path arguments": {
+    "en": "invalid path arguments",
+    "zh": "路径参数无效"
+  },
+  "invalid query arguments": {
+    "en": "invalid query arguments",
+    "zh": "查询参数无效"
+  },
+  "invalid body arguments": {
+    "en": "invalid body arguments",
+    "zh": "请求正文参数无效"
+  }
+}

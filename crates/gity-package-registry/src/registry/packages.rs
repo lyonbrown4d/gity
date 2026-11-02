@@ -1,6 +1,7 @@
 pub(super) use super::package_lookup::{coordinate, file, named};
 use super::package_storage::{Upload, upload};
 use super::*;
+pub use crate::control::PackageListQuery;
 use crate::openapi::{package_schemas as spec, schemas as api};
 use axum::{
   body::Body,
@@ -25,22 +26,10 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     .merge(super::package_protocols::documented_routes())
     .layer(DefaultBodyLimit::max(1024 * 1024 * 1024))
 }
-#[derive(serde::Deserialize, utoipa::IntoParams)]
-#[into_params(parameter_in=Query)]
-struct PackageListQuery {
-  #[param(nullable = true)]
-  format: Option<String>,
-  #[param(nullable = true)]
-  name: Option<String>,
-  #[param(minimum = 1)]
-  page: Option<u64>,
-  #[param(minimum = 1, maximum = 100)]
-  per_page: Option<u64>,
-}
 #[utoipa::path(
     get,path="/{id}/packages",tag="packages",
     params(api::ProjectPath,PackageListQuery),
-    responses((status=200,description="Paginated package list"),api::Errors),
+    responses((status=200,description="Paginated package list",body=api::Envelope<spec::PackageListPage>),api::Errors),
     security((), ("bearer"=[]),("basic"=[]),("private_token"=[]))
 )]
 async fn list(
@@ -49,36 +38,7 @@ async fn list(
   Path(p): Path<i64>,
   Query(query): Query<PackageListQuery>,
 ) -> Reply {
-  authorize(&s, &h, p, PackageAction::Read).await?;
-  let format = query
-    .format
-    .as_deref()
-    .map(|value| {
-      gity_artifacts::PackageFormat::parse(value)
-        .ok_or_else(|| AppError::bad_request("unsupported package format"))
-    })
-    .transpose()?;
-  let page = query.page.unwrap_or(1).max(1);
-  let per_page = query.per_page.unwrap_or(20).clamp(1, 100);
-  let (packages, total) = s
-    .artifacts
-    .repository
-    .list_packages(p, format, query.name.as_deref(), page, per_page)
-    .await?;
-  reply(json!({
-      "items": packages.into_iter().map(|package| json!({
-          "id": package.id,
-          "project_id": package.project_id,
-          "type": package.r#type,
-          "name": package.name,
-          "created_at": package.created_at,
-          "updated_at": package.updated_at,
-      })).collect::<Vec<_>>(),
-      "page": page,
-      "per_page": per_page,
-      "total": total,
-      "total_pages": total.div_ceil(per_page),
-  }))
+  reply(crate::control::list(&s, &h, p, query).await?)
 }
 #[utoipa::path(
     get,path="/{id}/packages/{package}",tag="packages",
@@ -87,10 +47,9 @@ async fn list(
     security((), ("bearer"=[]),("basic"=[]),("private_token"=[]))
 )]
 async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, id)): Path<(i64, i64)>) -> Reply {
-  authorize(&s, &h, p, PackageAction::Read).await?;
-  reply(package(&s, p, id).await?)
+  reply(crate::control::detail(&s, &h, p, id).await?)
 }
-pub(super) async fn package(s: &AppState, p: i64, id: i64) -> Result<Value, AppError> {
+pub(crate) async fn package(s: &AppState, p: i64, id: i64) -> Result<Value, AppError> {
   let (package, details) = s
     .artifacts
     .repository
@@ -225,12 +184,7 @@ async fn delete_package(
   h: HeaderMap,
   Path((project_id, package_id)): Path<(i64, i64)>,
 ) -> Result<axum::http::StatusCode, AppError> {
-  authorize_package_delete(&s, &h, project_id).await?;
-  s.artifacts
-    .repository
-    .delete_package(project_id, package_id)
-    .await?;
-  let _ = s.artifacts.cleanup_pending(100).await;
+  crate::control::delete_package(&s, &h, project_id, package_id).await?;
   Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -245,12 +199,7 @@ async fn delete_version(
   h: HeaderMap,
   Path((project_id, package_id, version)): Path<(i64, i64, String)>,
 ) -> Result<axum::http::StatusCode, AppError> {
-  authorize_package_delete(&s, &h, project_id).await?;
-  s.artifacts
-    .repository
-    .delete_version(project_id, package_id, &version)
-    .await?;
-  let _ = s.artifacts.cleanup_pending(100).await;
+  crate::control::delete_version(&s, &h, project_id, package_id, &version).await?;
   Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -265,11 +214,6 @@ async fn delete_file(
   h: HeaderMap,
   Path((project_id, file_id)): Path<(i64, i64)>,
 ) -> Result<axum::http::StatusCode, AppError> {
-  authorize_package_delete(&s, &h, project_id).await?;
-  s.artifacts
-    .repository
-    .delete_file(project_id, file_id)
-    .await?;
-  let _ = s.artifacts.cleanup_pending(100).await;
+  crate::control::delete_file(&s, &h, project_id, file_id).await?;
   Ok(axum::http::StatusCode::NO_CONTENT)
 }

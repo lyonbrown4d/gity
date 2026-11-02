@@ -92,6 +92,7 @@ pub(super) struct AbortMergeOperation {
   /// Human reason, persisted with the owner actor in the immutable receipt.
   reason: String,
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
   post, path="/{id}/merge-requests/{iid}/merge/abort", tag="merge requests",
   params(api::IidPath), request_body(content=AbortMergeOperation),

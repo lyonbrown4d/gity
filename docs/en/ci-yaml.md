@@ -52,6 +52,6 @@ Project variables marked `protected` are provided only to the default branch or 
 
 ## API
 
-For project pipelines, YAML validation, job retries, cancellation, Runner registration, job claims, and artifact endpoints, refer to `/docs` on the running service. Endpoint definitions are collected from the actual Axum routes and Utoipa macros; download `/openapi.json` for contract checks.
+For project pipelines, YAML validation, job retries, cancellation, Runner registration, job claims, and artifact endpoints, refer to a development service explicitly enabling `api-docs`. Endpoint definitions are collected from actual Axum routes and Utoipa macros; releases do not serve documentation endpoints.
 
 </div>

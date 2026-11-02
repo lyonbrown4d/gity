@@ -18,6 +18,7 @@ fn view(mut row: Value) -> Value {
   }
   row
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/ci/variables",tag="variables",
     params(api::ProjectPath),
@@ -36,6 +37,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>()
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/projects/{id}/ci/variables",tag="variables",
     params(api::ProjectPath),
@@ -61,6 +63,7 @@ async fn upsert(
   let row = gity_persistence::model_value(s.repository_access.save_variable(p, command).await?);
   reply(view(row))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/ci/variables/{key}",tag="variables",
     params(api::VariablePath),

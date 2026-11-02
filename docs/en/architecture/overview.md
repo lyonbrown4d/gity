@@ -52,7 +52,7 @@ Web is a Leptos/WASM static bundle served by the platform HTTP service. Monaco a
 | Operation identifiers | UUID v7; cryptographically random secrets |
 | Configuration | Code defaults < file < environment < explicit CLI |
 | Observability | Tracing, Prometheus and optional OTLP, initialized per process |
-| API documentation | Utoipa-generated OpenAPI, `/docs` and `/openapi.json` |
+| API documentation | Utoipa-generated contracts; documentation endpoints only in `api-docs` development builds |
 | Localization | Shared `gity-i18n` assets; request-scoped server language |
 
 ## Deployment boundaries

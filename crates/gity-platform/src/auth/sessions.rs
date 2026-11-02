@@ -9,7 +9,7 @@ pub(super) async fn create_account(
   let org_id = new_id();
   let membership_id = new_id();
   let username = body.username.trim().to_owned();
-  let (user, _) = state
+  let user = state
     .identity
     .register_account(
       id,

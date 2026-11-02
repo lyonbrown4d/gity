@@ -40,6 +40,7 @@ async fn list(s: AppState, h: HeaderMap, p: i64, kind: &str) -> Reply {
       .collect::<Vec<_>>()
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/access-tokens",tag="credentials",
     params(api::ProjectPath),
@@ -49,6 +50,7 @@ async fn list(s: AppState, h: HeaderMap, p: i64, kind: &str) -> Reply {
 async fn access_tokens(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   list(s, h, p, "project_access").await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/deploy-tokens",tag="credentials",
     params(api::ProjectPath),
@@ -138,6 +140,7 @@ async fn create(s: AppState, h: HeaderMap, p: i64, b: Value, kind: &str) -> Repl
     .await?;
   reply(json!({"project_token":token_view(views::token_json(&row)),"token":raw}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects/{id}/access-tokens",tag="credentials",
     params(api::ProjectPath),
@@ -153,6 +156,7 @@ async fn create_access(
 ) -> Reply {
   create(s, h, p, b, "project_access").await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects/{id}/deploy-tokens",tag="credentials",
     params(api::ProjectPath),
@@ -181,6 +185,7 @@ async fn revoke(s: AppState, h: HeaderMap, p: i64, id: i64, kind: &str) -> Reply
   s.repository_access.revoke_token(row).await?;
   reply(json!({"status":"revoked"}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/access-tokens/{token}",tag="credentials",
     params(api::TokenPath),
@@ -194,6 +199,7 @@ async fn revoke_access(
 ) -> Reply {
   revoke(s, h, p, id, "project_access").await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/deploy-tokens/{token}",tag="credentials",
     params(api::TokenPath),
@@ -211,6 +217,7 @@ fn key_view(mut row: Value) -> Value {
   row["can_push"] = json!(num(&row, "can_push") != 0);
   row
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/deploy-keys",tag="credentials",
     params(api::ProjectPath),
@@ -228,6 +235,7 @@ async fn keys(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>()
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects/{id}/deploy-keys",tag="credentials",
     params(api::ProjectPath),
@@ -262,6 +270,7 @@ async fn create_key(
     .await?;
   reply(key_view(views::deploy_key_json(&row)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/deploy-keys/{key}",tag="credentials",
     params(api::KeyPath),

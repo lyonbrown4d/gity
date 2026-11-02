@@ -21,10 +21,12 @@ pub fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .routes(utoipa_axum::routes!(health))
     .routes(utoipa_axum::routes!(runtime))
 }
+#[gity_api_macros::application_operation(prefix = "")]
 #[utoipa::path(get,path="/api/health",tag="System",responses((status=200,description="Server process health",body=Envelope<Health>)),security())]
 async fn health() -> Json<Value> {
   ok(json!({"status":"ok","runtime":"rust"}))
 }
+#[gity_api_macros::application_operation(prefix = "")]
 #[utoipa::path(get,path="/api/v1/rewrite/info",tag="System",responses((status=200,description="Runtime and build version",body=Envelope<Runtime>)),security())]
 async fn runtime() -> Json<Value> {
   ok(json!({"backend":"rust","frontend":"leptos","version":env!("CARGO_PKG_VERSION")}))

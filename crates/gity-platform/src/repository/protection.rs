@@ -78,6 +78,7 @@ pub async fn check_branch(
   }
   Ok(())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(post,path="/branches/{branch}/protect",tag="Repository",params(spec::BranchPath),request_body=spec::ProtectionInput,
     responses((status=200,description="Create or update branch protection; maintainer required",body=api::Envelope<spec::BranchProtection>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn protect(
@@ -154,6 +155,7 @@ pub(super) async fn protect(
   .await?;
   Ok(ok(views::protection(row)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(post,path="/branches/{branch}/unprotect",tag="Repository",params(spec::BranchPath),
     responses((status=200,description="Remove protection rule; maintainer required",body=api::Envelope<spec::Ack>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn unprotect(
@@ -180,6 +182,7 @@ pub(super) async fn unprotect(
   Ok(ok(json!({"ok":true})))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(patch,path="/branch-protections/{branch}",tag="Repository",params(spec::BranchPath),request_body=spec::ProtectionInput,
     responses((status=200,description="Create or update branch protection; maintainer required",body=api::Envelope<spec::BranchProtection>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn update(

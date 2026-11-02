@@ -8,6 +8,7 @@ pub(super) async fn run(
   options: PlatformOptions,
   http: Option<TcpListener>,
   ssh: Option<(TcpListener, Arc<russh::server::Config>)>,
+  api_routes: Option<axum::Router>,
 ) -> anyhow::Result<()> {
   let mut tasks = JoinSet::<anyhow::Result<()>>::new();
   if let Some(listener) = http {
@@ -15,9 +16,12 @@ pub(super) async fn run(
     let stop = runtime.stop.clone();
     tasks.spawn(async move {
       tracing::info!(address=%listener.local_addr()?, "Gity HTTP listener started");
-      axum::serve(listener, crate::router(state))
-        .with_graceful_shutdown(stop.cancelled_owned())
-        .await?;
+      axum::serve(
+        listener,
+        crate::router_with_apis(state, api_routes.unwrap_or_default()),
+      )
+      .with_graceful_shutdown(stop.cancelled_owned())
+      .await?;
       Ok(())
     });
   }

@@ -1,9 +1,11 @@
 use super::*;
+#[cfg(feature = "api-docs")]
 use axum::{
   body::{Body, to_bytes},
   http::{Request, StatusCode},
 };
 use serde_json::Value;
+#[cfg(feature = "api-docs")]
 use tower::ServiceExt;
 fn assert_references(value: &Value, document: &Value) {
   match value {
@@ -117,6 +119,7 @@ fn generated_contract_resolves_all_schemas_and_preserves_protocol_errors() {
   }
   assert_references(&spec, &spec);
 }
+#[cfg(feature = "api-docs")]
 #[tokio::test]
 async fn swagger_serves_vendored_assets_and_raw_openapi_json_without_cdn() {
   let (_dir, state) = crate::features::test_support::fixture().await;

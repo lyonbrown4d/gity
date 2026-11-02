@@ -77,6 +77,9 @@ impl Module for PlatformModule {
   }
 
   fn configure(&self, injector: &Injector) -> Result<(), Error> {
+    if self.options.http {
+      crate::api_application::module::configure(&self.state, injector)?;
+    }
     let state = Shared::new(self.state.clone());
     injector.try_provide(Provider::<AppState>::root(move |_| state.clone()))?;
     let state = self.state.clone();
@@ -102,6 +105,17 @@ impl Module for PlatformModule {
           .await
           .map_err(|e| failure("on_start", e))?;
       }
+      if options.http {
+        crate::auth::bootstrap::initialize(&runtime.state)
+          .await
+          .map_err(|_| {
+            Error::module_lifecycle_failed(
+              "PlatformModule",
+              "on_start",
+              "administrator bootstrap failed",
+            )
+          })?;
+      }
       // Bind and validate every listener before creating background tasks.
       let http = if options.http {
         Some(
@@ -122,9 +136,19 @@ impl Module for PlatformModule {
       } else {
         None
       };
+      let api_routes = if options.http {
+        Some(
+          injector
+            .try_resolve::<crate::api_application::module::ApiRoutes>()?
+            .0
+            .clone(),
+        )
+      } else {
+        None
+      };
       let running = runtime.clone();
       *runtime.task.lock().await = Some(tokio::spawn(async move {
-        supervise::run(running, options, http, ssh).await
+        supervise::run(running, options, http, ssh, api_routes).await
       }));
       Ok(())
     })

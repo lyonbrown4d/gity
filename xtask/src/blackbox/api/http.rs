@@ -55,21 +55,3 @@ pub fn id(value: &Value, description: &str) -> Result<String> {
     _ => bail!("{description} response did not include an identifier"),
   }
 }
-
-pub fn check_openapi_routes(spec: &Value) -> Result<()> {
-  let paths = spec["paths"]
-    .as_object()
-    .ok_or_else(|| anyhow::anyhow!("OpenAPI document has no route map"))?;
-  for route in [
-    "/api/v1/auth/register",
-    "/api/v1/auth/login",
-    "/api/v1/projects",
-    "/api/v1/projects/{id}/file-commits",
-    "/api/v1/projects/{id}/packages/generic/{name}/{version}/{file}",
-  ] {
-    if !paths.contains_key(route) {
-      anyhow::bail!("OpenAPI document is missing an exercised route");
-    }
-  }
-  Ok(())
-}

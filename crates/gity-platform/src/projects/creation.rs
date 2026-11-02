@@ -1,5 +1,5 @@
 use super::*;
-
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects",tag="projects",
     description="Requires developer or higher organization membership; initializes the bare Git repository.",

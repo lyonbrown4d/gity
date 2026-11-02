@@ -5,7 +5,9 @@ use futures::{
 use gloo_net::http::{Method, RequestBuilder};
 use serde_json::{Value, json};
 use std::cell::RefCell;
+mod navigation;
 mod pagination;
+pub(crate) use navigation::safe_after_login_redirect;
 pub use pagination::list_all_pages;
 type RefreshFuture = Shared<LocalBoxFuture<'static, Result<(), String>>>;
 thread_local! { static REFRESH: RefCell<Option<RefreshFuture>> = const { RefCell::new(None) }; }
@@ -141,7 +143,17 @@ pub async fn request(method: &str, path: &str, body: Option<Value>) -> Result<Va
               Ok(())
             } else {
               clear_auth();
-              navigate("/login");
+              let redirect = web_sys::window()
+                .and_then(|window| {
+                  let location = window.location();
+                  safe_after_login_redirect(&format!(
+                    "{}{}",
+                    location.pathname().ok()?,
+                    location.search().ok()?
+                  ))
+                })
+                .unwrap_or_else(|| "/login".into());
+              navigate(&redirect);
               Err("Your session expired. Please sign in again.".into())
             }
           }

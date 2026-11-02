@@ -46,7 +46,7 @@ fn view(key: gity_entities::user_ssh_keys::Model) -> SshKey {
     last_used_at: key.last_used_at.map(timestamp),
   }
 }
-
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(get, path="/users/me/ssh-keys", tag="users",
   description="Lists only the authenticated account's public SSH keys, newest first. Administrator privileges do not grant access to another account's keys.",
   responses((status=200, description="Personal SSH keys", body=api::Envelope<Vec<SshKey>>), api::Errors),
@@ -63,6 +63,7 @@ pub(super) async fn list(State(s): State<AppState>, h: HeaderMap) -> Reply {
   ))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(post, path="/users/me/ssh-keys", tag="users",
   description="Registers one OpenSSH public key for the authenticated account. Fingerprints are globally unique and cannot also be deploy keys. Private keys and authorized_keys options are rejected.",
   request_body=CreateSshKey,
@@ -106,6 +107,7 @@ pub(super) async fn create(
   Ok(ok(view(key)))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(delete, path="/users/me/ssh-keys/{id}", tag="users",
   description="Revokes only a key owned by the authenticated account. New Git commands on existing SSH connections recheck revocation.",
   params(("id"=String, Path, description="Personal SSH key ID")),

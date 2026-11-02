@@ -27,7 +27,9 @@ Independent deployment means separate processes and images, with the dependencie
 
 | Libraries | Responsibility |
 | --- | --- |
-| `gity-platform` | Platform HTTP/SSH, route adapters, FluxDI application composition, and runtime orchestration |
+| `gity-platform` | Platform HTTP/SSH, route adapters, shared API operation catalog, FluxDI composition and runtime orchestration |
+| `gity-api-contracts`, `gity-api-macros` | Request context, operation/error contracts, macro extraction of shared application entry points |
+| `gity-graphql`, `gity-mcp` | async-graphql and rmcp adapters sharing use cases, authorization, and audit |
 | `gity-projects`, `gity-collaboration`, `gity-ci` | Project/repository access, Issue/MR collaboration, and pipeline/job application services with typed repositories |
 | `gity-persistence` | Typed cross-context audit snapshots, IID counters, and model-to-JSON boundary conversion |
 | `gity-identity`, `gity-authority` | Identity repository/services; internal OCI/package authorization RPC and remote adapters |
@@ -40,6 +42,8 @@ Independent deployment means separate processes and images, with the dependencie
 | `gity-core`, `gity-entities`, `gity-ids` | Database connection and migrations, configuration and storage; entity mappings; shared ID generation |
 | `gity-search`, `gity-i18n`, `gity-observability` | Search, shared language assets, logging/metrics/tracing |
 | `gity-test-support` | Disposable integration container support |
+
+At API startup, `PlatformModule` registers the operation service, GraphQL module, and MCP module in the same FluxDI container and merges their routes into the platform listener. Identity also supplies persisted OAuth services; see [Administration and MCP authorization](../reference/administration.md) for consent and bootstrap settings.
 
 ## Authorization ownership
 

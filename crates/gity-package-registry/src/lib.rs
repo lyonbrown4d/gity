@@ -1,4 +1,5 @@
 //! Package registry protocols backed by shared artifact storage and an authorization port.
+pub mod control;
 mod module;
 pub mod openapi;
 mod registry;

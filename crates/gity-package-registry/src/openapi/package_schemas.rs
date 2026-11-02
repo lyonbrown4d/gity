@@ -11,6 +11,14 @@ pub struct Package {
   pub timestamps: Timestamps,
 }
 #[derive(Serialize, ToSchema)]
+pub struct PackageListPage {
+  pub items: Vec<Package>,
+  pub page: u64,
+  pub per_page: u64,
+  pub total: u64,
+  pub total_pages: u64,
+}
+#[derive(Serialize, ToSchema)]
 pub struct Version {
   pub id: String,
   pub project_package_id: String,

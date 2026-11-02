@@ -34,6 +34,7 @@ async fn value(s: &AppState, p: &Value, row: Value) -> Result<Value, AppError> {
   let tag = tag(s, p, string(&row, "tag_name")).await?;
   Ok(json!({"release":row,"links":links,"tag":tag}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/releases",tag="releases",
     params(api::ProjectPath),
@@ -56,6 +57,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
   }
   response(json!(out))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/releases/{release}",tag="releases",
     params(api::ReleasePath),
@@ -79,6 +81,7 @@ fn time(b: &Value) -> Result<String, AppError> {
       .map_err(|_| AppError::bad_request("invalid released_at"))
   }
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/releases",tag="releases",
     params(api::ProjectPath),
@@ -137,6 +140,7 @@ async fn create(
   );
   response(value(&s, &project, row).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/releases/{release}",tag="releases",
     params(api::ReleasePath),
@@ -165,6 +169,7 @@ async fn update(
   );
   response(value(&s, &project, row).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/releases/{release}",tag="releases",
     params(api::ReleasePath,("delete_tag"=Option<bool>,Query)),
@@ -192,6 +197,7 @@ async fn remove(
   s.collaboration.delete_release(p, r).await?;
   response(json!({"status":"deleted"}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/releases/{release}/links",tag="releases",
     params(api::ReleasePath),
@@ -233,6 +239,7 @@ async fn link(
       .await?,
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/releases/{release}/links/{link}",tag="releases",
     params(api::LinkPath),

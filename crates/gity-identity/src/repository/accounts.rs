@@ -1,7 +1,7 @@
 use chrono::{NaiveDateTime, Utc};
 use gity_entities::{
-  auth_sessions, bootstrap_claim, organization_members, organizations, user_access_tokens,
-  user_passwords, user_ssh_keys, users,
+  auth_sessions, organization_members, organizations, user_access_tokens, user_passwords,
+  user_ssh_keys, users,
 };
 use sea_orm::{
   ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, QueryFilter, Set, TransactionTrait,
@@ -42,14 +42,8 @@ impl IdentityRepository {
     username: String,
     password_hash: String,
     timestamp: NaiveDateTime,
-  ) -> Result<(users::Model, bool), DbErr> {
+  ) -> Result<users::Model, DbErr> {
     let transaction = self.connection.begin().await?;
-    let is_first = users::Entity::find().one(&transaction).await?.is_none();
-    if is_first {
-      bootstrap_claim::ActiveModel { id: Set(1) }
-        .insert(&transaction)
-        .await?;
-    }
     let user = users::ActiveModel {
       id: Set(id),
       username: Set(username.clone()),
@@ -57,7 +51,7 @@ impl IdentityRepository {
       email: Set(Some(format!("{username}@local.gity"))),
       created_at: Set(timestamp),
       updated_at: Set(timestamp),
-      is_super_admin: Set(if is_first { 1 } else { 0 }),
+      is_super_admin: Set(0),
       status: Set("active".to_owned()),
     }
     .insert(&transaction)
@@ -92,7 +86,7 @@ impl IdentityRepository {
     .insert(&transaction)
     .await?;
     transaction.commit().await?;
-    Ok((user, is_first))
+    Ok(user)
   }
 
   pub async fn set_password_and_revoke_sessions(

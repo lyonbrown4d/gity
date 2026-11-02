@@ -4,16 +4,24 @@
 
 # 当前验证状态
 
-本页记录已完成的检查与实际验收范围。Debian standalone 完整黑盒已通过；其余组合未获得完整验收结论。源码检查、编译、源码测试、容器专项与完整镜像验收分别记录，构建成功不等于功能验收完成。
+本页分别记录当前源码检查和留存的镜像验收证据。管理员、GraphQL、MCP 和 OAuth 已通过源码回归；当前源码未重新构建容器验收，不能把留存镜像的结果视为这些能力的镜像验证。
+
+## 管理员与多协议 API
+
+默认工作区检查、严格 Clippy、Web WASM 检查、release API 检查、源码约束和双语 mdBook 构建均已执行。默认路由测试确认文档和 Swagger 资源返回 404，LFS 继续可用；release 显式启用 `api-docs` 会被编译器拒绝。
+
+真实应用服务联调覆盖 GraphQL 项目读取、MCP 工具目录与调用、跨项目隔离、OAuth 资源与 scope、撤销后拒绝，以及 PKCE 授权码、浏览器同意、刷新轮换和管理员重新认证。刷新竞态使用两个独立数据库连接，连续重跑 20 轮，并检查撤销后写入的后续令牌仍被拒绝。此并发回归不属于压力测试。
+
+结果摘要见[源码验证证据](../evidence/api-admin-validation.json)。当前未重新运行 Debian/Alpine 镜像黑盒或 PostgreSQL/MySQL 容器专项，下表中这些专项是所列日志的留存记录。
 
 ## 已完成的源码测试
 
 | 检查 | 当前已完成运行 | 证据 |
 | --- | --- | --- |
-| 工作区测试 | **332 项通过、0 项失败、13 项默认忽略** | `target/production-blackbox/workspace-tests-final.log`；按全部测试摘要汇总。 |
+| 工作区测试 | **379 项通过、0 项失败、13 项默认忽略** | `target/verification/api-admin/workspace-tests.log`；按全部测试摘要汇总。 |
 | PostgreSQL 18 业务回归 | **81 项通过** | `target/production-blackbox/database-regression.log` 中 PostgreSQL 子测试段。 |
 | MySQL 8.4 业务回归 | **81 项通过** | `target/production-blackbox/mysql-regression-final.log`。 |
-| PostgreSQL/MySQL 最新迁移结构契约 | **2 项通过** | `target/production-blackbox/migration-databases.log`。 |
+| PostgreSQL/MySQL 迁移结构契约（留存记录） | **2 项通过** | `target/production-blackbox/migration-databases.log`。 |
 | PostgreSQL/MySQL 合并锁专项 | **各 7 项通过** | `cargo test -p gity-test-support --test merge_guard_databases -- --ignored --test-threads=1`；独立 Testcontainers，覆盖恢复、abort 和 REST 引用隔离。 |
 | GNU tar 元数据恢复专项 | **1 项通过** | `target/production-blackbox/backup-metadata-tests.log`。 |
 | 真实 Docker OCI 认证握手专项 | **1 项通过** | 独立运行的 `gateway::docker_handshake_tests::real_docker_requires_authenticated_ping_for_login_and_challenge_for_push`；结果来自工具会话，未单独归档日志。 |
@@ -44,7 +52,7 @@ GNU tar 专项检查数字 UID/GID、权限、扩展属性、ACL、文件 capabi
 
 | 部署形态 | 基础镜像 | 当前状态 |
 | --- | --- | --- |
-| Standalone | Debian | **43 项完整黑盒通过**，见[逐项证据](../evidence/standalone-debian.json)。 |
+| Standalone | Debian | **留存镜像 43 项通过；当前源码未重建验收**，见[逐项证据](../evidence/standalone-debian.json)。 |
 | Standalone | Alpine | 镜像已构建，未执行完整黑盒。 |
 | 分布式组件 | Debian | 未完成；启动检查在 registry 配置校验处停止。 |
 | 分布式组件 | Alpine | 未执行完整黑盒。 |

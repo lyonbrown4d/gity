@@ -2,7 +2,7 @@ use super::*;
 use crate::openapi::{project_schemas as spec, schemas as api};
 
 use std::collections::HashMap;
-
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/members",tag="projects",
     description="Requires project read access.",
@@ -46,6 +46,7 @@ pub(super) fn member_role(b: &Value) -> Result<&str, AppError> {
   Ok(role)
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects/{id}/members",tag="projects",
     description="Requires maintainer. Granting/changing owner membership requires owner.",
@@ -63,6 +64,7 @@ pub(super) async fn add_member(
   set_member(State(s), h, Path((project, id(&b["user_id"])?)), Json(b)).await
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/projects/{id}/members/{user}",tag="projects",
     description="Requires maintainer; owner membership is protected.",
@@ -86,6 +88,7 @@ pub(super) async fn set_member(
   Ok(ok(member_json(&member, None, None)))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/members/{user}",tag="projects",
     description="Requires maintainer; removing an owner requires owner.",

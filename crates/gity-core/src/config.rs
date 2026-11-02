@@ -1,9 +1,15 @@
 use crate::AppError;
+mod api;
+pub use api::ApiConfig;
+mod bootstrap;
 mod cluster;
 mod components;
+mod oauth;
 mod ssh;
+pub use bootstrap::BootstrapConfig;
 pub use cluster::{GitClusterConfig, GitStorageNodeConfig};
 pub use components::{AuthorityConfig, ComponentConfig, MirrorUpstreamConfig, RegistryConfig};
+pub use oauth::OAuthConfig;
 use serde::Deserialize;
 pub use ssh::SshConfig;
 use std::path::{Path, PathBuf};
@@ -27,6 +33,9 @@ pub struct Settings {
   pub observability: ObservabilityConfig,
   pub search: SearchConfig,
   pub ssh: SshConfig,
+  pub bootstrap: BootstrapConfig,
+  pub oauth: OAuthConfig,
+  pub api: ApiConfig,
 }
 #[derive(Clone, Deserialize)]
 pub struct SearchConfig {
@@ -65,6 +74,12 @@ struct Raw {
   observability: ObservabilityConfig,
   search: SearchConfig,
   ssh: SshConfig,
+  #[serde(default)]
+  bootstrap: BootstrapConfig,
+  #[serde(default)]
+  oauth: OAuthConfig,
+  #[serde(default)]
+  api: ApiConfig,
 }
 #[derive(Deserialize)]
 struct Http {
@@ -158,6 +173,12 @@ impl Settings {
       .try_deserialize()
       .map_err(config_error)?;
     raw.ssh.validate()?;
+    raw.api.validate()?;
+    if !raw.oauth.validate() {
+      return Err(AppError::bad_request(
+        "invalid OAuth lifetime or client limit",
+      ));
+    }
     if let Some(cluster) = &mut raw.git.cluster {
       cluster.load_credentials()?;
       cluster.validate()?;
@@ -198,6 +219,7 @@ impl Settings {
     } else {
       raw.database.dsn
     };
+    let bootstrap = raw.bootstrap.with_state_root(&raw.storage.root);
     let matching_scheme = match raw.database.driver.as_str() {
       "sqlite" => database_url.starts_with("sqlite:"),
       "postgres" | "postgresql" => {
@@ -227,6 +249,9 @@ impl Settings {
       observability: raw.observability,
       search: raw.search,
       ssh: raw.ssh,
+      bootstrap,
+      oauth: raw.oauth,
+      api: raw.api,
     })
   }
 }

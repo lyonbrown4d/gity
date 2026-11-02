@@ -4,11 +4,21 @@ version.workspace = true
 edition.workspace = true
 
 [features]
+api-docs = ["dep:utoipa-swagger-ui"]
 default = ["packages", "oci"]
 packages = ["dep:gity-package-registry","dep:gity-artifacts", "dep:semver", "dep:pep440_rs", "dep:quick-xml", "dep:flate2", "dep:tar", "dep:zip"]
 oci = ["dep:gity-oci", "dep:gity-authority"]
 
 [dependencies]
+
+gity-api-contracts = { path = "../gity-api-contracts" }
+gity-api-macros = { path = "../gity-api-macros" }
+gity-graphql = { path = "../gity-graphql" }
+gity-mcp = { path = "../gity-mcp" }
+inventory.workspace = true
+jsonschema.workspace = true
+gity-i18n = { path = "../gity-i18n" }
+
 gity-persistence = { path = "../gity-persistence" }
 gity-collaboration = { path = "../gity-collaboration" }
 gity-ci = { path = "../gity-ci" }
@@ -56,6 +66,7 @@ sha2 = "0.10"
 hex = "0.4"
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.13", features = ["json", "multipart"] }
+url = "2"
 regex = "1"
 russh = "=0.65.0"
 rand = "0.10"
@@ -63,7 +74,7 @@ glob = "0.3"
 deunicode = "1"
 utoipa = { version = "6", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-axum = "0.3"
-utoipa-swagger-ui = { version = "10", default-features = false, features = ["axum", "vendored"] }
+utoipa-swagger-ui = { version = "10", default-features = false, features = ["axum", "vendored"], optional = true }
 futures-util = "0.3"
 metrics = "0.24"
 tracing-subscriber = { workspace = true, features = ["json"] }

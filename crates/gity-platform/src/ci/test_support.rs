@@ -144,9 +144,20 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
       max_files_per_project: 5000,
       max_file_size_bytes: 524288,
     },
+    oauth: Default::default(),
+    api: Default::default(),
+    bootstrap: gity_core::BootstrapConfig::default(),
   };
   let storage = gity_core::Storage::local(&settings.storage_root).unwrap();
   let state = AppState {
+    oauth: fluxdi::Shared::new(
+      gity_identity::OAuthService::new(
+        db.connection.clone(),
+        settings.oauth.clone(),
+        settings.base_url.clone(),
+      )
+      .unwrap(),
+    ),
     collaboration: gity_collaboration::CollaborationModule::new(fluxdi::Shared::new(
       db.connection.clone(),
     ))

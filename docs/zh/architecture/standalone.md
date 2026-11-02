@@ -32,10 +32,10 @@ flowchart TB
 ## 从配置到监听
 
 1. `apps/gity-standalone` 调用 `application::run(Standalone)`。Clap 解析入口参数，加载并验证文件/环境配置，初始化日志、指标和可选追踪。
-2. `composition::compose` 建立数据库与存储适配，使用 `RuntimeModule` 装配身份仓储、Git 后端、搜索索引和 `AppState`；启用软件包时构造制品服务。未配置 Git cluster 时选本地 Git 后端。
-3. 默认命令为 `standalone`，先执行 Rust schema 迁移。数据库必须为空；旧结构或迁移记录不兼容时启动失败，不会自动清库或转换旧迁移历史。配置、迁移或依赖构造失败时启动返回错误。升级前置条件见[数据库迁移说明](../database-migrations.md)。
-4. 组合层登记 Angos、Platform、Authority、OCI gateway、Runner 等 module。启用项由组件配置控制；`PlatformModule` 还导入软件包 embedded module 和可选 Git cluster module。
-5. `fluxdi::Application::bootstrap()` 调用 module 生命周期。Platform 先绑定 HTTP/SSH 监听器，再启动服务、调度和维护任务。软件包 embedded module 复用平台 HTTP 路由，不另开 `8082`。
+2. `composition::compose` 建立数据库与存储适配，使用 `RuntimeModule` 装配身份仓储、持久化 OAuth 服务、Git 后端、搜索索引和 `AppState`；启用软件包时构造制品服务。未配置 Git cluster 时选本地 Git 后端。
+3. 默认命令为 `standalone`，先执行版本化数据库迁移。首次初始化使用空库；受管数据库应用尚未执行的版本。未受管结构或未知迁移记录会使启动失败，不会自动清库。配置、迁移或依赖构造失败时启动返回错误。升级前置条件见[数据库迁移说明](../database-migrations.md)。
+4. 组合层登记 Angos、Platform、Authority、OCI gateway、Runner 等 module。启用项由组件配置控制；`PlatformModule` 还导入软件包 embedded module 和可选 Git cluster module，并在同一容器中装配 GraphQL、MCP 和共享操作契约；契约无效时不启动监听。
+5. `fluxdi::Application::bootstrap()` 调用 module 生命周期。Platform 先完成配置引导的管理员一次性初始化，再绑定 HTTP/SSH 监听器，启动服务、调度和维护任务。GraphQL 与 MCP 复用平台 HTTP 端口。软件包 embedded module 复用平台 HTTP 路由，不另开 `8082`。
 6. Runner module 启动 `gity-runner` 子进程，指向平台回环 HTTP 地址、私有项目令牌目录和配置的容器引擎。项目注册 Runner 后，令牌目录可用于本机 Runner 领取任务。
 
 Standalone 组件共享该平台进程的数据库/存储状态及统一 ID 生成器，不为每个模块配置独立 Snowflake node ID。

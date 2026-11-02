@@ -24,6 +24,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
 async fn load(s: &AppState, p: i64, i: i64, a: i64) -> Result<Value, AppError> {
   Ok(model_value(s.collaboration.attachment(p, i, a).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/attachments",tag="attachments",
     params(api::IidPath),

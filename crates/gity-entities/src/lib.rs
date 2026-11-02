@@ -9,6 +9,11 @@ pub mod audit_revisions;
 pub mod auth_sessions;
 pub mod bootstrap_claim;
 pub mod merge_operations;
+pub mod oauth_authorization_codes;
+pub mod oauth_clients;
+pub mod oauth_pending_requests;
+pub mod oauth_token_families;
+pub mod oauth_tokens;
 pub mod organization_members;
 pub mod organizations;
 pub mod project_access_tokens;
@@ -64,6 +69,11 @@ application_ids!(
   artifact_storage_deletions,
   audit_revisions,
   organization_members,
+  oauth_authorization_codes,
+  oauth_clients,
+  oauth_pending_requests,
+  oauth_tokens,
+  oauth_token_families,
   organizations,
   project_access_tokens,
   project_audit_events,

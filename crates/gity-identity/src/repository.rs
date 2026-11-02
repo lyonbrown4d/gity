@@ -6,6 +6,8 @@ use sea_orm::{
 use crate::UserIdentity;
 mod accounts;
 mod authorization;
+mod bootstrap;
+pub use bootstrap::{BootstrapAccount, BootstrapAccountCommand, BootstrapGuard};
 mod credentials;
 mod ssh_keys;
 mod user_lock;

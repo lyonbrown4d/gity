@@ -44,6 +44,7 @@ pub(super) async fn children(
   };
   Ok(rows.into_iter().map(|r| child(r, i)).collect())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/comments",tag="issues",
     params(api::IidPath),
@@ -58,6 +59,7 @@ pub(super) async fn comments(
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(json!(children(&s, p, i, IssueCollection::Comments).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/assignees",tag="issues",
     params(api::IidPath),
@@ -72,6 +74,7 @@ pub(super) async fn assignees(
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(json!(children(&s, p, i, IssueCollection::Assignees).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues/{iid}/labels",tag="issues",
     params(api::IidPath),
@@ -93,6 +96,7 @@ async fn issue_labels(s: &AppState, p: i64, i: i64) -> Result<Vec<Value>, AppErr
   let mut groups = super::issue_views::label_rows(s, p, &HashMap::from([(id, i)])).await?;
   Ok(groups.remove(&id).unwrap_or_default())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/issues/{iid}/comments",tag="issues",
     params(api::IidPath),
@@ -146,6 +150,7 @@ pub(super) async fn comment(
   }
   response(child(row, i))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/issues/{iid}/assignees",tag="issues",
     params(api::IidPath),
@@ -186,6 +191,7 @@ pub(super) async fn set_assignees(
   }
   response(json!(children(&s, p, i, IssueCollection::Assignees).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/issues/{iid}/labels",tag="issues",
     params(api::IidPath),

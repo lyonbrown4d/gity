@@ -4,7 +4,7 @@
 
 # HTTP API contract
 
-Utoipa macros generate OpenAPI from actual types and routes. Running services expose Swagger UI at `/docs` and JSON at `/openapi.json`; use that generated contract for current fields, responses, and permissions.
+Utoipa macros generate contracts from actual types and routes. Only development builds explicitly enabling `api-docs` serve `/docs` and `/openapi.json`; releases exclude documentation endpoints and Swagger assets. See [API transports](api-transports.md) for GraphQL, MCP, configuration, and boundaries.
 
 Project operations require the appropriate user or project token. The server enforces permissions and scopes. Public JSON entity IDs are strings. See [API and permission examples](../api-examples.md).
 

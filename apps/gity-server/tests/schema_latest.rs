@@ -14,7 +14,7 @@ async fn fresh_latest_schema_is_versioned_idempotent_and_preserves_required_capa
     )
     .await
     .unwrap();
-  assert_eq!(history.len(), 3);
+  assert_eq!(history.len(), 4);
   assert_eq!(history[0]["version"], "m20261102_000001_latest_schema");
   for table in [
     "user_passwords",

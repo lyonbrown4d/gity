@@ -3,6 +3,9 @@ name = "gity-standalone"
 version.workspace = true
 edition.workspace = true
 
+[features]
+api-docs = ["gity-platform/api-docs"]
+
 [dependencies]
 gity-platform = { path = "../../crates/gity-platform" }
 anyhow.workspace = true

@@ -32,6 +32,7 @@ pub async fn admin(state: &AppState, headers: &HeaderMap) -> Result<(), AppError
   }
   Ok(())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/users",tag="users",
     description="Requires an authenticated user.",
@@ -58,6 +59,7 @@ async fn list(
     json!({"items":items,"total":total,"page":page,"page_size":page_size}),
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/users/me",tag="users",
     description="Returns the authenticated user profile.",
@@ -68,6 +70,7 @@ async fn me(State(s): State<AppState>, h: HeaderMap) -> Reply {
   let p = auth::principal(&s, &h).await?;
   Ok(ok(s.identity.user_model(p.user_id).await?.map(view_model)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/users/{id}",tag="users",
     description="Requires authentication.",
@@ -84,6 +87,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) ->
       .ok_or_else(|| AppError::not_found("user not found"))?,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/users",tag="users",
     description="Requires a super administrator.",
@@ -140,6 +144,7 @@ pub async fn set_password(s: &AppState, id: i64, password: String) -> Result<(),
   }
   Ok(())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/users/me",tag="users",
     description="Updates the authenticated profile; cannot change administrator status.",
@@ -151,6 +156,7 @@ async fn update_me(State(s): State<AppState>, h: HeaderMap, Json(b): Json<Value>
   let p = auth::principal(&s, &h).await?;
   update_profile(&s, p.user_id, &b, false).await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/users/{id}",tag="users",
     description="Only this user or a super administrator can update the profile.",
@@ -171,6 +177,7 @@ async fn update(
   }
   update_profile(&s, id, &b, p.is_super_admin).await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/users/{id}",tag="users",
     description="Requires a super administrator; referenced users may not be deleted.",
@@ -194,6 +201,7 @@ async fn own_tokens(s: &AppState, h: &HeaderMap, id: i64) -> Result<(), AppError
   }
   Ok(())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/users/{id}/tokens",tag="users",
     description="Only this user or an administrator can list token metadata. Raw tokens and hashes are omitted.",
@@ -220,6 +228,7 @@ async fn tokens(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) ->
     .collect::<Vec<_>>();
   Ok(ok(tokens))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/users/{id}/tokens",tag="users",
     description="Only this user or an administrator; raw token returned once and stored hashed.",

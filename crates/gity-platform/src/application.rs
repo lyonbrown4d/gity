@@ -58,6 +58,9 @@ pub async fn run(role: ApplicationRole) -> anyhow::Result<()> {
   if role == ApplicationRole::Standalone {
     settings.components.standalone = true;
   }
+  if matches!(role, ApplicationRole::Git | ApplicationRole::Worker) {
+    settings.bootstrap.enabled = false;
+  }
   if settings.git_hook.is_none() {
     settings.git_hook = Some(std::env::current_exe()?);
   }

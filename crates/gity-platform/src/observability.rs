@@ -5,6 +5,13 @@ pub async fn request(
   request: Request,
   next: Next,
 ) -> Response {
+  if request.uri().path() != "/mcp"
+    && crate::auth::bearer(request.headers()).is_some_and(|token| token.starts_with("gity_oauth_"))
+  {
+    use axum::response::IntoResponse;
+    return gity_core::AppError::unauthorized("credential audience does not match this API")
+      .into_response();
+  }
   let actor = crate::auth::principal(&state, request.headers())
     .await
     .ok()

@@ -27,7 +27,9 @@
 
 | 组件库 | 作用 |
 | --- | --- |
-| `gity-platform` | 平台 HTTP/SSH、路由适配、FluxDI 应用装配及运行时编排 |
+| `gity-platform` | 平台 HTTP/SSH、路由适配、共享 API 操作目录、FluxDI 应用装配及运行时编排 |
+| `gity-api-contracts` / `gity-api-macros` | 请求上下文、操作与错误契约；从路由宏提取共享应用入口 |
+| `gity-graphql` / `gity-mcp` | async-graphql 与 rmcp 协议适配，共享用例、授权和审计 |
 | `gity-projects` / `gity-collaboration` / `gity-ci` | 项目与仓库访问、Issue/MR 等协作、流水线和任务应用服务及类型化仓储 |
 | `gity-persistence` | 跨上下文的类型化审计快照、IID 计数和模型 JSON 边界转换 |
 | `gity-identity` / `gity-authority` | 身份仓储与服务；内部 OCI/软件包权限 RPC、远程授权适配 |
@@ -40,6 +42,8 @@
 | `gity-core` / `gity-entities` / `gity-ids` | 数据库连接与迁移、基础配置和存储；实体映射；统一 ID 生成 |
 | `gity-search` / `gity-i18n` / `gity-observability` | 搜索、共享语言资产、日志/指标/追踪 |
 | `gity-test-support` | 可回收的容器集成测试依赖 |
+
+API 启动时，`PlatformModule` 在同一 FluxDI 容器中注册操作服务、GraphQL module 和 MCP module，将路由合并到平台监听器。身份组件还提供持久化 OAuth 服务；浏览器授权与管理员配置见[管理员与 MCP 授权](../reference/administration.md)。
 
 ## 谁执行鉴权
 

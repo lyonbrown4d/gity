@@ -89,9 +89,18 @@ fn default_hook_remains_usable_after_running_server_binary_is_replaced() {
       .json(&body)
       .send()
       .unwrap();
-    assert!(response.status().is_success());
+    assert!(
+      response.status().is_success(),
+      "{path}: {}",
+      response.status()
+    );
     response.json::<Value>().unwrap()["data"].clone()
   };
+  post(
+    "/auth/register",
+    "",
+    json!({"username":"default-hook","password":"default-hook-local-only"}),
+  );
   let login = post(
     "/auth/login",
     "",

@@ -40,6 +40,7 @@ pub(super) async fn query(
     .await
     .map_err(git_error)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(post,path="/{id}/search/index/refresh",tag="Repository",params(crate::openapi::schemas::ProjectPath),
     responses((status=200,description="Rebuild bounded search index; maintainer required;409 when indexing disabled",body=crate::openapi::schemas::Envelope<crate::openapi::repository_schemas::IndexStatus>),crate::openapi::schemas::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn refresh(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) -> Reply {

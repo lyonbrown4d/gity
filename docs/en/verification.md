@@ -4,16 +4,24 @@
 
 # Current verification status
 
-This page records completed checks and actual acceptance scope. Debian standalone passed full black-box acceptance; other combinations have no complete acceptance result. Source checks, compilation, source tests, container-specific checks, and full image acceptance are separate evidence. A successful build does not establish functional acceptance.
+This page separates current source verification from retained image evidence. Administrator, GraphQL, MCP, and OAuth changes passed source regression. The current source was not rebuilt for container acceptance, so retained image results do not verify these capabilities in an image.
+
+## Administrator and multi-protocol API checks
+
+Default workspace checks, strict Clippy, Web WASM checks, release API checks, source policy, and the bilingual mdBook build were executed. Default-route tests confirm 404 for documentation and Swagger assets while LFS remains available. Enabling `api-docs` in a release build is rejected by the compiler.
+
+Real application-service tests cover GraphQL project reads, MCP discovery/invocation, project isolation, OAuth resource/scopes, rejection after revocation, PKCE codes, browser consent, refresh rotation, and administrator reauthentication. The refresh race uses two independent database connections, passed 20 repeated runs, and checks descendants inserted after grant revocation. This is a concurrency regression, not a load test.
+
+See the [source validation evidence](../evidence/api-admin-validation.json). Debian/Alpine image acceptance and PostgreSQL/MySQL container checks were not rerun; those entries below are retained records from their listed logs.
 
 ## Completed source-test runs
 
 | Check | Current completed run | Evidence |
 | --- | --- | --- |
-| Workspace tests | **332 passed, 0 failed, 13 ignored by default** | `target/production-blackbox/workspace-tests-final.log`; totals from all test summaries. |
+| Workspace tests | **379 passed, 0 failed, 13 ignored by default** | `target/verification/api-admin/workspace-tests.log`; totals from all test summaries. |
 | PostgreSQL 18 business regression | **81 passed** | PostgreSQL child-test section of `target/production-blackbox/database-regression.log`. |
 | MySQL 8.4 business regression | **81 passed** | `target/production-blackbox/mysql-regression-final.log`. |
-| Latest PostgreSQL/MySQL migration schema contracts | **2 passed** | `target/production-blackbox/migration-databases.log`. |
+| PostgreSQL/MySQL migration schema contracts (retained run) | **2 passed** | `target/production-blackbox/migration-databases.log`. |
 | PostgreSQL/MySQL merge-lock checks | **7 passed each** | `cargo test -p gity-test-support --test merge_guard_databases -- --ignored --test-threads=1`; isolated Testcontainers covering recovery, abort, and REST reference isolation. |
 | GNU tar metadata restoration check | **1 passed** | `target/production-blackbox/backup-metadata-tests.log`. |
 | Real Docker OCI authentication handshake check | **1 passed** | Separate execution of `gateway::docker_handshake_tests::real_docker_requires_authenticated_ping_for_login_and_challenge_for_push`; tool-session evidence, no separately archived log. |
@@ -44,7 +52,7 @@ The GNU tar check covers numeric UID/GID, permissions, extended attributes, ACLs
 
 | Deployment | Base image | Current status |
 | --- | --- | --- |
-| Standalone | Debian | **43 full black-box checks passed**; see [itemized evidence](../evidence/standalone-debian.json). |
+| Standalone | Debian | **43 checks passed for the retained image; current source not rebuilt**; see [itemized evidence](../evidence/standalone-debian.json). |
 | Standalone | Alpine | Image built; full black-box acceptance not executed. |
 | Distributed components | Debian | Incomplete; startup checks stopped at registry configuration validation. |
 | Distributed components | Alpine | Full black-box acceptance not executed. |

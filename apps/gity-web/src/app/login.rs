@@ -2,6 +2,7 @@ use crate::api;
 use leptos::prelude::*;
 use serde_json::json;
 use wasm_bindgen::JsCast;
+
 #[component]
 pub(super) fn Login() -> impl IntoView {
   let busy = RwSignal::new(false);
@@ -30,7 +31,16 @@ pub(super) fn Login() -> impl IntoView {
         Ok(v) => {
           api::save_auth(&v);
           api::store("gity.user_id", &api::text(&v, "user_id"));
-          api::navigate("/app/dashboard");
+          let redirect = web_sys::window()
+            .and_then(|window| {
+              window
+                .location()
+                .pathname()
+                .ok()
+                .map(|path| format!("{path}{}", window.location().search().unwrap_or_default()))
+            })
+            .and_then(|path| api::safe_after_login_redirect(&path));
+          api::navigate(redirect.as_deref().unwrap_or("/app/dashboard"));
         }
         Err(e) => error.set(e),
       }

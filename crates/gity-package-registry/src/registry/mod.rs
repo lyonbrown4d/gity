@@ -13,7 +13,7 @@ mod package_protocols;
 mod package_pypi;
 mod package_pypi_index;
 mod package_storage;
-mod packages;
+pub(crate) mod packages;
 
 pub use crate::openapi::package_schemas;
 use crate::{PackageAction, PackageActor, PackageState};
@@ -90,7 +90,7 @@ fn request_origin(headers: &HeaderMap) -> Result<String, AppError> {
   Ok(format!("{}://{}", scheme, uri.authority().unwrap()))
 }
 
-async fn authorize(
+pub(crate) async fn authorize(
   state: &AppState,
   headers: &HeaderMap,
   project_id: i64,
@@ -110,7 +110,7 @@ async fn authorize_package_write(
   authorize(state, headers, project_id, PackageAction::Write).await
 }
 
-async fn authorize_package_delete(
+pub(crate) async fn authorize_package_delete(
   state: &AppState,
   headers: &HeaderMap,
   project_id: i64,

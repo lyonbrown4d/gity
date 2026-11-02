@@ -1,4 +1,10 @@
+#[cfg(all(feature = "api-docs", any(gity_release, not(debug_assertions))))]
+compile_error!(
+  "api-docs is for development builds only; release artifacts must not expose API documentation"
+);
+
 pub mod access;
+mod api_application;
 pub mod application;
 pub mod auth;
 pub mod ci;
@@ -9,6 +15,7 @@ pub mod features;
 pub mod git_http;
 pub mod lifecycle;
 pub mod maintenance;
+pub mod oauth;
 pub mod observability;
 #[cfg(feature = "oci")]
 pub mod oci_registry;
@@ -41,6 +48,7 @@ pub struct AppState {
   pub settings: Arc<Settings>,
   pub storage: gity_core::Storage,
   pub identity: fluxdi::Shared<gity_identity::IdentityRepository>,
+  pub oauth: fluxdi::Shared<gity_identity::OAuthService>,
   pub collaboration: fluxdi::Shared<gity_collaboration::CollaborationService>,
   pub ci: fluxdi::Shared<gity_ci::CiService>,
   pub projects: fluxdi::Shared<gity_projects::ProjectService>,
@@ -50,6 +58,9 @@ pub struct AppState {
 }
 
 pub fn router(state: AppState) -> Router {
+  router_with_apis(state, Router::new())
+}
+pub(crate) fn router_with_apis(state: AppState, adapters: Router) -> Router {
   let api = Router::new()
     .merge(deployment_api::documented_routes().split_for_parts().0)
     .merge(auth::routes())
@@ -68,8 +79,15 @@ pub fn router(state: AppState) -> Router {
   Router::new()
     .merge(openapi::system_routes().split_for_parts().0)
     .merge(openapi::routes())
+    .merge(if state.settings.api.mcp_enabled {
+      oauth::routes()
+    } else {
+      Router::new()
+    })
+    .merge(registry::lfs_protocol_routes().split_for_parts().0)
     .nest("/api/v1", api)
     .merge(git_http::routes())
+    .merge(adapters.with_state::<AppState>(()))
     .fallback(fallback)
     .layer(axum::middleware::from_fn_with_state(
       state.clone(),
@@ -83,6 +101,16 @@ async fn fallback(
 ) -> Result<axum::response::Response, gity_core::AppError> {
   use axum::response::IntoResponse;
   use tower::ServiceExt;
+  if request.uri().path() == "/mcp"
+    || request.uri().path().starts_with("/.well-known/oauth-")
+    || request.uri().path().starts_with("/oauth/") && request.uri().path() != "/oauth/consent"
+    || request.uri().path() == "/openapi.json"
+    || request.uri().path() == "/docs"
+    || request.uri().path().starts_with("/docs/")
+    || request.uri().path().starts_with("/swagger-ui")
+  {
+    return Err(gity_core::AppError::not_found("endpoint not found"));
+  }
   if registry::is_lfs_path(request.uri().path()) {
     return registry::handle_lfs(state, request).await;
   }

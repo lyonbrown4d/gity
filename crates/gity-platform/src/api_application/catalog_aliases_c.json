@@ -1,0 +1,201 @@
+{
+  "canonical_aliases": [
+    {
+      "handler": "features/releases.rs#list",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#remove",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#unlink",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#update",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/tags.rs#create_tag",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/tags.rs#delete_tag",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/tags.rs#tags",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/wiki.rs#create",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/wiki.rs#detail",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/wiki.rs#list",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/wiki.rs#remove",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/wiki.rs#update",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "repository/protection.rs#protect",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/protection.rs#unprotect",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/protection.rs#update",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#blob",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#branch_protections",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#branches",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#commits",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#languages",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1",
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#readme",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#search",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/read_routes.rs#tree",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/search.rs#refresh",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "repository/write_routes.rs#branches",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/write_routes.rs#delete_branch",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/write_routes.rs#file_commits",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    },
+    {
+      "handler": "repository/write_routes.rs#files",
+      "canonical_prefix": "/api/v1/projects/{id}/repository",
+      "alias_prefixes": [
+        "/api/v1/repos/{id}"
+      ]
+    }
+  ]
+}

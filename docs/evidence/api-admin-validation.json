@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-02",
+  "scope": "Rust source and native/in-process integration; no new container acceptance",
+  "workspace": {
+    "passed": 379,
+    "failed": 0,
+    "ignored": 13
+  },
+  "refresh_race_rounds": 20,
+  "checks": [
+    {
+      "name": "workspace-tests",
+      "command": "cargo test --workspace --no-fail-fast",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/workspace-tests.log",
+      "sha256": "0aa50091492503c28a04cd863191f47f8e7171f206d2207c9a05082b77631811"
+    },
+    {
+      "name": "refresh-race-20-runs",
+      "command": "repeat concurrent refresh regression 20 times",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/refresh-race-20-runs.log",
+      "sha256": "fd21e5ad370052def2f621f88b10ae08d6bed2039ef17c3a7944e0568ca7d822"
+    },
+    {
+      "name": "clippy",
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/clippy.log",
+      "sha256": "0b357bf87a38b035575fe5dae245e412c181eaa2472f13d1dd4f1693d2dda033"
+    },
+    {
+      "name": "workspace-check",
+      "command": "cargo check --workspace",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/workspace-check.log",
+      "sha256": "f626a63f629a662a747430bcfa8326d8d9903602801c98e7fecc55a07a548ef1"
+    },
+    {
+      "name": "release-check",
+      "command": "cargo check -p gity-api --release",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/release-check.log",
+      "sha256": "af14a19ffa58817ac99dd139c98dd45be81861b2c0550cd0ff63b6cb8d802138"
+    },
+    {
+      "name": "release-docs-guard",
+      "command": "cargo check -p gity-api --release --features api-docs",
+      "result": "expected release-only compile rejection",
+      "local_log": "target/verification/api-admin/release-docs-guard.log",
+      "sha256": "aef29cd160834b5cce4ac44ab904963ca5385dcd19142fed2875285200092c31"
+    },
+    {
+      "name": "web-wasm-check",
+      "command": "cargo check -p gity-web --target wasm32-unknown-unknown",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/web-wasm-check.log",
+      "sha256": "b9d2c0390664b9ac9671cce5f82c3bc904a8b5d9e969330d455cf066b1224965"
+    },
+    {
+      "name": "dev-docs-test",
+      "command": "cargo test -p gity-platform --features api-docs --lib openapi::tests::swagger_serves_vendored_assets_and_raw_openapi_json_without_cdn",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/dev-docs-test.log",
+      "sha256": "8b56c295f2d4f7f4a4aa38da2e07a042b93d36a562df1113d2d196cf0491eab4"
+    },
+    {
+      "name": "dev-docs-clippy",
+      "command": "cargo clippy -p gity-platform --features api-docs --all-targets -- -D warnings",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/dev-docs-clippy.log",
+      "sha256": "a1ddab4db7393a2df64aa02722014d63126ada63f1cae84f6dc8ca8c67e8d2cf"
+    },
+    {
+      "name": "release-route-policy",
+      "command": "cargo test -p gity-platform --lib api_application::tests::release_policy_excludes_docs_even_with_spa_fallback_and_preserves_lfs",
+      "result": "pass",
+      "local_log": "target/verification/api-admin/release-route-policy.log",
+      "sha256": "b600f1cdf65709ecb0dca9ce6835d137f552791d139baf7fa6aefc111c808687"
+    }
+  ],
+  "not_executed": [
+    "Debian/Alpine image black-box acceptance",
+    "Distributed deployment acceptance",
+    "PostgreSQL/MySQL container regression for this change",
+    "Load testing"
+  ],
+  "additional_checks": {
+    "cargo_fmt": "pass",
+    "source_policy": "pass",
+    "third_party_editor_assets": "6 verified",
+    "mdbook_local_assets": "4 verified",
+    "bilingual_changed_links": "pass",
+    "mdbook_build": "pass"
+  }
+}

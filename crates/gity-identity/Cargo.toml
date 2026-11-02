@@ -4,7 +4,25 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+oxide-auth.workspace = true
+oxide-auth-async.workspace = true
+
 gity-entities = { path = "../gity-entities" }
+gity-core = { path = "../gity-core" }
 sea-orm.workspace = true
+thiserror.workspace = true
 chrono.workspace = true
+rand = "0.10"
+sha2.workspace = true
+base64.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+url = "2"
 fluxdi.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+gity-migrations = { path = "../gity-migrations" }
+tokio.workspace = true
+tempfile.workspace = true

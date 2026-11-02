@@ -28,6 +28,7 @@ pub struct RegistryPolicy {
 pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   utoipa_axum::router::OpenApiRouter::new().routes(utoipa_axum::routes!(get, put))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(get,path="/projects/{id}/registry/settings",tag="container registry",params(api::ProjectPath),
   responses((status=200,body=api::Envelope<RegistryPolicy>,description="Project container registry policy"),api::Errors),security(("bearer"=[])))]
 async fn get(
@@ -56,6 +57,7 @@ async fn get(
     |_| AppError::internal("serialize registry policy"),
   )?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(put,path="/projects/{id}/registry/settings",tag="container registry",params(api::ProjectPath),request_body=RegistryPolicy,
   responses((status=200,body=api::Envelope<RegistryPolicy>,description="Update hosted or read-only mirror policy"),api::Errors),security(("bearer"=[])))]
 async fn put(

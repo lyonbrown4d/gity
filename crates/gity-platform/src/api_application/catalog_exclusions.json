@@ -1,0 +1,94 @@
+{
+  "excluded": {
+    "authentication_flow": {
+      "reason": "Credentials, sessions, and registration flows are excluded from the user-facing business-operation catalog.",
+      "handlers": [
+        "auth.rs#login",
+        "auth.rs#logout",
+        "auth.rs#refresh",
+        "auth.rs#register",
+        "oauth/authorization.rs#authorize",
+        "oauth/authorization.rs#register",
+        "oauth/consent.rs#decide",
+        "oauth/consent.rs#pending",
+        "oauth/metadata.rs#authorization_metadata",
+        "oauth/metadata.rs#mcp_resource_metadata",
+        "oauth/metadata.rs#resource_metadata",
+        "oauth/tokens.rs#revoke",
+        "oauth/tokens.rs#token"
+      ]
+    },
+    "protocol_flow": {
+      "reason": "Git, LFS, package registry wire protocols, and raw attachment transfer routes retain their HTTP protocol behavior and are excluded from business operations.",
+      "handlers": [
+        "features/attachments.rs#draft",
+        "features/attachments.rs#raw",
+        "features/attachments.rs#upload",
+        "git_http/mod.rs#advertise",
+        "git_http/mod.rs#receive",
+        "git_http/mod.rs#upload",
+        "gity-package-registry/registry/package_cargo.rs#config",
+        "gity-package-registry/registry/package_cargo.rs#download",
+        "gity-package-registry/registry/package_cargo.rs#index",
+        "gity-package-registry/registry/package_cargo_publish.rs#publish",
+        "gity-package-registry/registry/package_go.rs#proxy",
+        "gity-package-registry/registry/package_metadata.rs#npm",
+        "gity-package-registry/registry/package_metadata.rs#npm_publish",
+        "gity-package-registry/registry/package_metadata.rs#nuget",
+        "gity-package-registry/registry/package_npm_tags.rs#delete_tag",
+        "gity-package-registry/registry/package_npm_tags.rs#set_tag",
+        "gity-package-registry/registry/package_nuget.rs#download",
+        "gity-package-registry/registry/package_nuget.rs#push",
+        "gity-package-registry/registry/package_nuget.rs#relist",
+        "gity-package-registry/registry/package_nuget.rs#unlist",
+        "gity-package-registry/registry/package_nuget.rs#versions",
+        "gity-package-registry/registry/package_nuget_registration.rs#registration",
+        "gity-package-registry/registry/package_nuget_registration.rs#registration_version",
+        "gity-package-registry/registry/package_nuget_search.rs#search",
+        "gity-package-registry/registry/package_protocols.rs#download",
+        "gity-package-registry/registry/package_protocols.rs#maven_download",
+        "gity-package-registry/registry/package_protocols.rs#maven_publish",
+        "gity-package-registry/registry/package_protocols.rs#publish",
+        "gity-package-registry/registry/package_pypi.rs#publish",
+        "gity-package-registry/registry/package_pypi_index.rs#simple_index",
+        "gity-package-registry/registry/package_pypi_index.rs#simple_package",
+        "gity-package-registry/registry/packages.rs#content",
+        "gity-package-registry/registry/packages.rs#download",
+        "gity-package-registry/registry/packages.rs#download_named",
+        "gity-package-registry/registry/packages.rs#upload_json",
+        "registry/lfs_objects.rs#create_lock",
+        "registry/lfs_objects.rs#locks",
+        "registry/lfs_objects.rs#objects",
+        "registry/lfs_objects.rs#unlock",
+        "registry/lfs_protocol.rs#batch",
+        "registry/lfs_protocol.rs#create_lock",
+        "registry/lfs_protocol.rs#download",
+        "registry/lfs_protocol.rs#locks",
+        "registry/lfs_protocol.rs#unlock",
+        "registry/lfs_protocol.rs#upload",
+        "registry/lfs_protocol.rs#verify"
+      ]
+    },
+    "runner_flow": {
+      "reason": "Runner lease, job claim, trace, source, and artifact agent protocols are excluded from user-facing business operations.",
+      "handlers": [
+        "ci/artifacts.rs#upload",
+        "ci/claims.rs#claim",
+        "ci/claims.rs#complete",
+        "ci/claims.rs#fail",
+        "ci/runners.rs#heartbeat",
+        "ci/trace.rs#append",
+        "ci/trace.rs#source",
+        "ci/trace.rs#source_stream"
+      ]
+    },
+    "data_transfer": {
+      "reason": "Base64 file upload/download bodies are data-transfer flows; MCP and GraphQL expose metadata operations while byte content stays on the REST transfer endpoints.",
+      "handlers": [
+        "ci/artifacts.rs#download",
+        "features/attachments.rs#create",
+        "features/attachments.rs#detail"
+      ]
+    }
+  }
+}

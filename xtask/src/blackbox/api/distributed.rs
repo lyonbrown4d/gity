@@ -228,28 +228,41 @@ fn check_git_only_image(root: &Path, args: &BlackboxArgs, reporter: &mut Reporte
     "--no-TTY",
     "git-server",
     "curl",
-    "--fail",
     "--silent",
+    "--output",
+    "/dev/null",
+    "--write-out",
+    "%{http_code}",
     "http://127.0.0.1:8080/openapi.json",
   ]);
-  let output = super::super::process::run_output(&mut command, "inspect Git-only image API")?;
-  let document: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-  let paths = document["paths"]
-    .as_object()
-    .ok_or_else(|| anyhow::anyhow!("Git-only image did not return OpenAPI paths"))?;
+  let output =
+    super::super::process::run_output(&mut command, "inspect Git-only image documentation policy")?;
   anyhow::ensure!(
-    !paths.is_empty(),
-    "Git-only image returned empty API documentation"
+    output.stdout == b"404",
+    "Git-only release exposes documentation"
   );
+  let mut capability = std::process::Command::new("docker");
+  super::super::runtime::configure_compose(&mut capability, root, args)?;
+  capability.args([
+    "exec",
+    "--no-TTY",
+    "git-server",
+    "curl",
+    "--silent",
+    "--fail",
+    "http://127.0.0.1:8080/api/v1/capabilities",
+  ]);
+  let output =
+    super::super::process::run_output(&mut capability, "inspect Git-only runtime capabilities")?;
+  let response: serde_json::Value = serde_json::from_slice(&output.stdout)?;
   anyhow::ensure!(
-    !paths
-      .keys()
-      .any(|path| path.contains("/packages") || path.contains("/projects/{id}/registry")),
-    "Git-only image unexpectedly includes package or OCI APIs"
+    response["data"]["package_registry"] == false
+      && response["data"]["container_registry"] == false,
+    "Git-only image must not expose package or container registry capabilities"
   );
   reporter.pass(
-    "git-only-image-excludes-registries",
-    "Git collaboration image excludes package and OCI API routes",
+    "git-only-release-documentation-disabled",
+    "Git-only release documentation returns 404",
   );
   Ok(())
 }

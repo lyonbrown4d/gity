@@ -1,4 +1,5 @@
 use crate::AppState;
+pub(crate) mod bootstrap;
 mod challenge;
 mod sessions;
 use crate::openapi::{schemas as api, user_schemas as spec};
@@ -46,6 +47,20 @@ pub async fn principal(state: &AppState, headers: &HeaderMap) -> Result<Principa
   principal_token(state, token).await
 }
 pub async fn principal_token(state: &AppState, token: &str) -> Result<Principal, AppError> {
+  if token.starts_with("gity_oauth_") {
+    let audience = format!("{}/mcp", state.settings.base_url.trim_end_matches('/'));
+    let identity = state
+      .oauth
+      .validate_bearer(token, &audience)
+      .await
+      .map_err(|_| AppError::unauthorized("invalid or expired credentials"))?
+      .ok_or_else(|| AppError::unauthorized("invalid or expired credentials"))?;
+    return Ok(Principal {
+      user_id: identity.user_id,
+      username: identity.username,
+      is_super_admin: identity.is_super_admin,
+    });
+  }
   let repository = &state.identity;
   if let Some(user) = repository
     .user_for_access_session(&token_hash(token), chrono::Utc::now().naive_utc())
@@ -98,7 +113,7 @@ struct Refresh {
 }
 #[utoipa::path(
     post,path="/auth/login",tag="auth",
-    description="Authenticates a password; an unknown username creates an account, preserving the existing login workflow.",
+    description="Authenticates an existing password-backed account.",
     request_body=Credentials,
     responses((status=200,description="Operation succeeded",body=api::Envelope<spec::Session>),api::Errors),
     security((), ("bearer"=[]))
@@ -113,7 +128,7 @@ async fn login(
     .user_model_by_username(body.username.trim())
     .await?;
   let Some(user) = user else {
-    return create_account(&state, body).await;
+    return Err(AppError::unauthorized("invalid username or password"));
   };
   let encoded = repository.password_hash(user.id).await?.ok_or_else(|| {
     AppError::unauthorized("password not configured; administrator must run set-password")

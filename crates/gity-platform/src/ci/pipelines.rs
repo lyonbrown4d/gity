@@ -19,6 +19,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     .routes(utoipa_axum::routes!(cancel))
     .routes(utoipa_axum::routes!(retry))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/pipelines", tag="ci",
     summary="List the latest 200 project pipelines",
@@ -37,6 +38,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>(),
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/pipelines", tag="ci",
     summary="Create a pipeline pinned to a Git commit",
@@ -61,6 +63,7 @@ async fn create(
   }
   Ok(gity_core::ok(create_pipeline(&s, &project, b).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/ci/lint", tag="ci",
     summary="Validate typed .gity-ci.yml without creating jobs",
@@ -81,6 +84,7 @@ async fn lint(
     Err(e) => Ok(gity_core::ok(json!({"valid":false,"errors":[e.message]}))),
   }
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/pipelines/{pipeline}", tag="ci",
     summary="Get a pipeline configuration and job states",
@@ -92,6 +96,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/pipelines/{pipeline}/jobs", tag="ci",
     summary="List pipeline jobs in dependency order",
@@ -108,6 +113,7 @@ async fn list_jobs(
   pipeline_row(&s, p, i).await?;
   Ok(gity_core::ok(pipeline_jobs(&s, p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/pipelines/{pipeline}/refresh", tag="ci",
     summary="Reconcile pipeline state and release ready jobs",
@@ -121,6 +127,7 @@ async fn refresh(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i6
   refresh_pipeline(&s, i).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/pipelines/{pipeline}/cancel", tag="ci",
     summary="Cancel pending and running pipeline jobs",
@@ -134,6 +141,7 @@ async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   s.ci.cancel_pipeline(p, i).await?;
   Ok(gity_core::ok(pipeline_detail(&s, p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/pipelines/{pipeline}/retry", tag="ci",
     summary="Retry a terminal pipeline with new job attempts",

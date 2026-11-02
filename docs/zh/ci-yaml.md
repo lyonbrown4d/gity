@@ -52,6 +52,6 @@ Runner 流式下载固定提交的源码 ZIP，发送任务心跳、分块日志
 
 ## 接口
 
-项目流水线、YAML 校验、任务重试、取消、Runner 注册、任务领取和产物接口，以运行服务的 `/docs` 为准。接口定义由实际 Axum 路由及 Utoipa 宏收集，下载 `/openapi.json` 可用于契约检查。
+项目流水线、YAML 校验、任务重试、取消、Runner 注册、任务领取和产物接口，参见显式启用 `api-docs` 的开发服务文档。接口定义由实际 Axum 路由及 Utoipa 宏收集；release 不提供文档端点。
 
 </div>

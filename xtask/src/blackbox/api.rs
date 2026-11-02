@@ -1,4 +1,4 @@
-use super::{BlackboxArgs, Mode, Reporter, RunConfig, grant_admin};
+use super::{BlackboxArgs, Reporter, RunConfig, grant_admin};
 use anyhow::{Context, Result, bail};
 use reqwest::{Method, StatusCode, blocking::Client};
 use serde_json::{Value, json};
@@ -10,9 +10,7 @@ mod http;
 mod packages;
 mod web;
 pub(super) use distributed::distributed;
-pub(super) use http::{
-  check_openapi_routes, data, id, request_json, require_denied, require_status,
-};
+pub(super) use http::{data, id, request_json, require_denied, require_status};
 
 pub struct Scenario {
   pub owner_username: String,
@@ -43,21 +41,22 @@ pub fn run(
 
   web::run(root, config, reporter)?;
 
-  let openapi: Value = client
-    .get(format!("{}/openapi.json", config.http_url))
-    .send()
-    .context("request OpenAPI document")?
-    .error_for_status()
-    .context("OpenAPI endpoint returned an error")?
-    .json()
-    .context("decode OpenAPI document")?;
-  check_openapi_routes(&openapi)?;
-  let path_count = openapi["paths"].as_object().map_or(0, |paths| paths.len());
+  for path in [
+    "/docs",
+    "/docs/",
+    "/docs/swagger-ui-bundle.js",
+    "/openapi.json",
+  ] {
+    let response = client.get(format!("{}{path}", config.http_url)).send()?;
+    require_status(
+      response.status(),
+      StatusCode::NOT_FOUND,
+      "release documentation disabled",
+    )?;
+  }
   reporter.pass(
-    "swagger-routes",
-    format!(
-      "OpenAPI contains {path_count} routes including tested auth, Git and package operations"
-    ),
+    "release-documentation-disabled",
+    "Swagger UI, assets and OpenAPI document all return 404",
   );
 
   let suffix = Uuid::now_v7().simple().to_string();
@@ -65,13 +64,11 @@ pub fn run(
   let owner_password = Uuid::new_v4().simple().to_string();
   let owner_register = register(&client, config, &owner_username, &owner_password)?;
   let owner_org = id(&owner_register["organization_id"], "owner organization")?;
-  if args.mode == Mode::Distributed {
-    grant_admin(root, args, &owner_username)?;
-    reporter.pass(
-      "distributed-admin-provision",
-      "new test account granted admin by local operator command",
-    );
-  }
+  grant_admin(root, args, &owner_username)?;
+  reporter.pass(
+    "explicit-admin-provision",
+    "new ordinary test account granted admin by the local operator command",
+  );
   let owner_token = login(&client, config, &owner_username, &owner_password)?;
   reporter.remember_secret(&owner_password);
   reporter.remember_secret(&owner_token);

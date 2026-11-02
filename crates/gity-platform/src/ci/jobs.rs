@@ -16,6 +16,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     .routes(utoipa_axum::routes!(super::artifacts::list))
     .routes(utoipa_axum::routes!(super::artifacts::download))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/jobs", tag="ci",
     summary="Enqueue a script or noop project job",
@@ -105,6 +106,7 @@ async fn create(
   );
   Ok(gity_core::ok(public_job(row)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/jobs", tag="ci",
     summary="List the latest 200 project jobs without secrets",
@@ -124,6 +126,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>(),
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/jobs/{job}", tag="ci",
     summary="Get a project job without environment secrets",
@@ -135,6 +138,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
   Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/jobs/{job}/cancel", tag="ci",
     summary="Cancel a live project job and revoke its lease",
@@ -148,6 +152,7 @@ async fn cancel(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64
   s.ci.cancel_job(p, j).await?;
   Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/jobs/{job}/retry", tag="ci",
     summary="Retry a failed or canceled job and release dependents",
@@ -160,6 +165,7 @@ async fn retry(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64,
   s.ci.retry_job(p, j).await?;
   Ok(gity_core::ok(public_job(job_row(&s, p, j).await?)))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/jobs/{job}/trace", tag="ci",
     summary="Get masked job trace output and attempt history",

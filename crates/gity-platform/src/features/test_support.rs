@@ -44,6 +44,14 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
     }
   }
   let state = AppState {
+    oauth: fluxdi::Shared::new(
+      gity_identity::OAuthService::new(
+        db.connection.clone(),
+        settings.oauth.clone(),
+        settings.base_url.clone(),
+      )
+      .unwrap(),
+    ),
     ci: gity_ci::CiModule::new(fluxdi::Shared::new(db.connection.clone()))
       .service()
       .unwrap(),

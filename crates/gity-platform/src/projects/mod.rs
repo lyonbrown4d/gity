@@ -100,6 +100,7 @@ fn required<'a>(b: &'a Value, key: &str) -> Result<&'a str, AppError> {
     .filter(|v| !v.trim().is_empty() && v.len() < 512)
     .ok_or_else(|| AppError::bad_request(format!("{key} required")))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects",tag="projects",
     description="Authenticated users see public/internal projects and their memberships.",
@@ -130,6 +131,7 @@ async fn list(
   }
   Ok(ok(out))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}",tag="projects",
     description="Visibility and membership determine read access.",
@@ -145,6 +147,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) ->
       .project,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/projects/{id}",tag="projects",
     description="Requires maintainer or higher.",
@@ -179,6 +182,7 @@ async fn update(
   let project = s.projects.update(&actor, id, command).await?;
   Ok(ok(project_view(&s, access::project_record(project))))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}",tag="projects",
     description="Marks project pending deletion; owner and exact full_path confirmation required.",

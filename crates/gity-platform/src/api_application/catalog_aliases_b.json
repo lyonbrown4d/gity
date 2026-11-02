@@ -1,0 +1,208 @@
+{
+  "canonical_aliases": [
+    {
+      "handler": "features/issue_collaboration.rs#set_assignees",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/issue_collaboration.rs#set_labels",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/issues.rs#create",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/issues.rs#detail",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1",
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/issues.rs#list",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/issues.rs#update",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/labels.rs#create",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/labels.rs#list",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/labels.rs#remove",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/labels.rs#update",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_execution.rs#abort",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#checks",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#create",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#detail",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#diff",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#list",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#merge",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/merge_requests.rs#update",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#approvals",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#approve",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#assignees",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#comment",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#comments",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#participants",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#reviewers",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/mr_collaboration.rs#unapprove",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#create",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#detail",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    },
+    {
+      "handler": "features/releases.rs#link",
+      "canonical_prefix": "/api/v1/projects",
+      "alias_prefixes": [
+        "/api/v1/repos"
+      ]
+    }
+  ]
+}

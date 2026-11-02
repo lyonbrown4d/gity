@@ -8,6 +8,7 @@ mod guard;
 mod m20261102_000001_latest_schema;
 mod m20261102_000002_personal_ssh_keys;
 mod m20261102_000003_merge_operations;
+mod m20261102_000004_oauth;
 mod schema;
 
 pub use sea_orm_migration;
@@ -21,6 +22,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261102_000001_latest_schema::Migration),
       Box::new(m20261102_000002_personal_ssh_keys::Migration),
       Box::new(m20261102_000003_merge_operations::Migration),
+      Box::new(m20261102_000004_oauth::Migration),
     ]
   }
 }

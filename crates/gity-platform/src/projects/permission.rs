@@ -1,5 +1,5 @@
 use super::*;
-
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/permissions",tag="projects",
     description="Returns effective project/organization role, actions and capabilities for the current user or scoped project token.",

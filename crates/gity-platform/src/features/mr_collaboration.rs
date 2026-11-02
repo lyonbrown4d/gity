@@ -49,6 +49,7 @@ pub(super) async fn child(
   };
   Ok(json!({"merge_request":super::merge_requests::view(row),key:list}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/comments",tag="mr collaboration",
     params(api::IidPath),
@@ -63,6 +64,7 @@ pub(super) async fn comments(
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(child(&s, p, i, MergeCollection::Comments).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/participants",tag="mr collaboration",
     params(api::IidPath),
@@ -77,6 +79,7 @@ pub(super) async fn participants(
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(child(&s, p, i, MergeCollection::Participants).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/approvals",tag="mr collaboration",
     params(api::IidPath),
@@ -91,6 +94,7 @@ pub(super) async fn approvals(
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(child(&s, p, i, MergeCollection::Approvals).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/merge-requests/{iid}/comments",tag="mr collaboration",
     params(api::IidPath),
@@ -142,6 +146,7 @@ pub(super) async fn set_role(
     .await?;
   response(child(&s, p, i, MergeCollection::Participants).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/merge-requests/{iid}/reviewers",tag="mr collaboration",
     params(api::IidPath),
@@ -157,6 +162,7 @@ pub(super) async fn reviewers(
 ) -> Reply {
   set_role(s, h, p, i, b, "reviewer").await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/merge-requests/{iid}/assignees",tag="mr collaboration",
     params(api::IidPath),
@@ -184,6 +190,7 @@ pub(super) async fn approval(s: AppState, h: HeaderMap, p: i64, i: i64, yes: boo
   s.collaboration.approve(p, i, actor.user_id, yes).await?;
   response(child(&s, p, i, MergeCollection::Approvals).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/merge-requests/{iid}/approve",tag="mr collaboration",
     params(api::IidPath),
@@ -197,6 +204,7 @@ pub(super) async fn approve(
 ) -> Reply {
   approval(s, h, p, i, true).await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/merge-requests/{iid}/unapprove",tag="mr collaboration",
     params(api::IidPath),

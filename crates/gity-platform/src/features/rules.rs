@@ -72,6 +72,7 @@ async fn normalize(
   }
   Ok(out)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/merge-request-approval-rules",tag="rules",
     params(api::ProjectPath),
@@ -84,6 +85,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
     json!({"project_id":p,"rules":s.collaboration.approval_rules(p).await?.into_iter().map(model_value).map(view).collect::<Vec<_>>()}),
   )
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/projects/{id}/merge-request-approval-rules",tag="rules",
     params(api::ProjectPath),
@@ -110,6 +112,7 @@ async fn create(
       .await?,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/projects/{id}/merge-request-approval-rules/{rule}",tag="rules",
     params(api::RulePath),
@@ -140,6 +143,7 @@ async fn update(
       .await?,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/projects/{id}/merge-request-approval-rules/{rule}",tag="rules",
     params(api::RulePath),

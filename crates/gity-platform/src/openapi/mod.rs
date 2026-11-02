@@ -70,6 +70,7 @@ pub fn document() -> utoipa::openapi::OpenApi {
   }
   api.merge(crate::git_http::documented_routes().split_for_parts().1);
   api.merge(system::routes().split_for_parts().1);
+  api.merge(crate::oauth::documented_routes().split_for_parts().1);
   api.merge(crate::registry::lfs_protocol_routes().split_for_parts().1);
   api = api.nest(
     "/api/v1",
@@ -102,8 +103,10 @@ pub fn document() -> utoipa::openapi::OpenApi {
   api
 }
 pub fn routes() -> Router<AppState> {
-  Router::from(utoipa_swagger_ui::SwaggerUi::new("/docs").url("/openapi.json", document()))
-    .merge(crate::registry::lfs_protocol_routes().split_for_parts().0)
+  #[cfg(feature = "api-docs")]
+  return Router::from(utoipa_swagger_ui::SwaggerUi::new("/docs").url("/openapi.json", document()));
+  #[cfg(not(feature = "api-docs"))]
+  Router::new()
 }
 /// Legacy aliases reuse their canonical operation and schema.
 pub fn alias(

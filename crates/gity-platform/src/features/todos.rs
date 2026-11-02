@@ -11,6 +11,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     .routes(utoipa_axum::routes!(list))
     .routes(utoipa_axum::routes!(done))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/todos",tag="todos",
     params(("state"=Option<String>,Query,description="pending or done"),("limit"=Option<i64>,Query,description="1–200; defaults to 50")),
@@ -41,6 +42,7 @@ async fn list(
       .collect::<Vec<_>>()
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/todos/{id}/done",tag="todos",
     params(api::TodoPath),

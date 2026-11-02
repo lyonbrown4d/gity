@@ -59,6 +59,7 @@ pub(super) fn view(row: Value) -> Value {
       "updated_at":row["updated_at"],
   })
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues",tag="issues",
     params(api::ProjectPath),
@@ -76,6 +77,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
     .collect();
   response(json!(super::issue_views::list(&s, p, rows).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/issues/{iid}",tag="issues",
     params(api::IidPath),
@@ -86,6 +88,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(super::issue_views::one(&s, p, model_value(&s.collaboration.issue(p, i).await?)).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/issues",tag="issues",
     params(api::ProjectPath),
@@ -144,6 +147,7 @@ async fn create(
   }
   response(view(row))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/issues/{iid}",tag="issues",
     params(api::IidPath),

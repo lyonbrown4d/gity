@@ -65,6 +65,7 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .routes(utoipa_axum::routes!(placement))
     .routes(utoipa_axum::routes!(promote))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(get,path="/capabilities",tag="system",responses((status=200,description="Enabled product capabilities",body=api::Envelope<Capabilities>)))]
 async fn capabilities(State(state): State<AppState>) -> Json<Value> {
   gity_core::ok(json!(Capabilities {
@@ -82,6 +83,7 @@ async fn administrator(state: &AppState, headers: &HeaderMap) -> Result<(), AppE
   }
   Ok(())
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(get,path="/admin/git/repositories/{id}/placement",tag="Git cluster",params(api::ProjectPath),responses((status=200,description="Current fenced repository placement",body=api::Envelope<PlacementView>),api::Errors),security(("bearer"=[])))]
 async fn placement(
   State(state): State<AppState>,
@@ -103,6 +105,7 @@ async fn placement(
   })?;
   Ok(gity_core::ok(json!(view(row))))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(post,path="/admin/git/repositories/{id}/promote",tag="Git cluster",params(api::ProjectPath),request_body=Promote,responses((status=200,description="Fenced primary handover after final replica verification",body=api::Envelope<PlacementView>),api::Errors),security(("bearer"=[])))]
 async fn promote(
   State(state): State<AppState>,

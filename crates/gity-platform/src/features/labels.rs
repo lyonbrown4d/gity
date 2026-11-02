@@ -73,6 +73,7 @@ async fn find(s: &AppState, project: i64, title: &str) -> Result<Option<labels::
 async fn load(s: &AppState, project: i64, label: i64) -> Result<labels::Model, AppError> {
   s.collaboration.label(project, label).await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/labels",tag="labels",
     params(api::ProjectPath),
@@ -85,6 +86,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
   response(json!(rows.iter().map(view).collect::<Vec<_>>()))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/labels",tag="labels",
     params(api::ProjectPath),
@@ -117,6 +119,7 @@ async fn create(
   response(view(&model))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/labels/{label_id}",tag="labels",
     params(api::ProjectPath,("label_id"=i64,Path,description="Project label id")),
@@ -168,6 +171,7 @@ async fn update(
   response(view(&model))
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/labels/{label_id}",tag="labels",
     params(api::ProjectPath,("label_id"=i64,Path,description="Project label id")),

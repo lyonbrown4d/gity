@@ -47,6 +47,7 @@ pub(super) async fn branch(s: &AppState, p: &Value, name: &str) -> Result<String
     .map(|v| string(v, "hash").to_owned())
     .ok_or_else(|| AppError::not_found("merge request branch not found"))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests",tag="merge requests",
     params(api::ProjectPath),
@@ -64,6 +65,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
     .collect::<Vec<_>>();
   response(json!(rows.into_iter().map(view).collect::<Vec<_>>()))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}",tag="merge requests",
     params(api::IidPath),
@@ -74,6 +76,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(model_value(&s.collaboration.merge_request(p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/merge-requests",tag="merge requests",
     params(api::ProjectPath),
@@ -119,6 +122,7 @@ async fn create(
       .await?,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/merge-requests/{iid}",tag="merge requests",
     params(api::IidPath),
@@ -164,6 +168,7 @@ async fn update(
       .await?,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/diff",tag="merge requests",
     params(api::IidPath),
@@ -186,6 +191,7 @@ async fn diff(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, 
     .map_err(git_error)?;
   response(json!({"merge_request":view(row),"diff":diff}))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/checks",tag="merge requests",
     params(api::IidPath),
@@ -199,6 +205,7 @@ async fn checks(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   let row = model_value(&s.collaboration.merge_request(p, i).await?);
   response(super::checks::evaluate(&s, &project, &row).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/merge-requests/{iid}/merge",tag="merge requests",
     params(api::IidPath),

@@ -10,11 +10,12 @@ use gity_ci::{CiModule, CiService};
 use gity_collaboration::{CollaborationModule, CollaborationService};
 use gity_core::{Db, IdGenerator, Settings, Storage, install};
 use gity_git::GitService;
-use gity_identity::{IdentityModule, IdentityRepository};
+use gity_identity::{IdentityModule, IdentityRepository, OAuthModule, OAuthService};
 use gity_projects::{ProjectModule, ProjectService, RepositoryAccessService};
 
 struct ApplicationServices {
   identity: Shared<IdentityRepository>,
+  oauth: Shared<OAuthService>,
   collaboration: Shared<CollaborationService>,
   ci: Shared<CiService>,
   projects: Shared<ProjectService>,
@@ -22,6 +23,7 @@ struct ApplicationServices {
 }
 fn services(
   identity: Shared<IdentityRepository>,
+  oauth: Shared<OAuthService>,
   collaboration: Shared<CollaborationService>,
   ci: Shared<CiService>,
   projects: Shared<ProjectService>,
@@ -29,6 +31,7 @@ fn services(
 ) -> Result<Shared<ApplicationServices>, fluxdi::Error> {
   Ok(Shared::new(ApplicationServices {
     identity,
+    oauth,
     collaboration,
     ci,
     projects,
@@ -100,6 +103,7 @@ fn state(
     storage: (*storage).clone(),
     search: (*search).clone(),
     identity: services.identity.clone(),
+    oauth: services.oauth.clone(),
     collaboration: services.collaboration.clone(),
     ci: services.ci.clone(),
     projects: services.projects.clone(),
@@ -111,6 +115,7 @@ fn state(
 // Missing dependencies, factory types, cycles and root scope are checked by FluxDI.
 static_module! {
     pub struct ServicesModule {
+        import oauth_module: OAuthModule { oauth: OAuthService = service; };
         import identity_module: IdentityModule {
             repository: IdentityRepository;
         };
@@ -125,7 +130,7 @@ static_module! {
             repository_access: RepositoryAccessService;
         };
         #[scope(root)]
-        services: ApplicationServices=services(repository,collaboration,ci,projects,repository_access);
+        services: ApplicationServices=services(repository,oauth,collaboration,ci,projects,repository_access);
     }
 }
 static_module! {
@@ -164,6 +169,11 @@ pub async fn compose(settings: Settings) -> anyhow::Result<(RuntimeModule, AppSt
   #[cfg(not(feature = "packages"))]
   let artifacts = Shared::new(ArtifactBindings {});
   let services = ServicesModule::new(
+    OAuthModule::new(
+      Shared::new(db.connection.clone()),
+      Shared::new(settings.oauth.clone()),
+      Shared::new(settings.base_url.clone()),
+    ),
     identity,
     CollaborationModule::new(connection.clone()),
     CiModule::new(connection.clone()),

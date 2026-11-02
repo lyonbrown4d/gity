@@ -13,6 +13,7 @@ pub(super) async fn org_access(
     model, &role,
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/orgs",tag="projects",
     description="Authenticated users see public/internal organizations and their memberships.",
@@ -52,6 +53,7 @@ pub(super) async fn orgs(State(s): State<AppState>, h: HeaderMap) -> Reply {
   }
   Ok(ok(items))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/orgs/{id}",tag="projects",
     description="Private organization reads require membership.",
@@ -62,6 +64,7 @@ pub(super) async fn orgs(State(s): State<AppState>, h: HeaderMap) -> Reply {
 pub(super) async fn org(State(s): State<AppState>, h: HeaderMap, Path(id): Path<i64>) -> Reply {
   Ok(ok(org_access(&s, &h, id, 0).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     post,path="/orgs",tag="projects",
     description="Creates an organization owned by the current authenticated user.",
@@ -99,6 +102,7 @@ pub(super) async fn create_org(
     super::namespace::organization_record(model, "owner"),
   )))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     patch,path="/orgs/{id}",tag="projects",
     description="Requires organization owner.",
@@ -115,6 +119,7 @@ pub(super) async fn update_org(
 ) -> Reply {
   super::namespace::update(&s, &h, id, &b).await
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     delete,path="/orgs/{id}",tag="projects",
     description="Requires organization owner.",

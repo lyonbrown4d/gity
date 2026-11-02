@@ -61,15 +61,17 @@ try {
     }
     if (-not $ready) { throw "Rust service did not become healthy." }
 
-    $openApi = Invoke-Check "/openapi.json"
-    if ($openApi.Content -notmatch '"openapi"') {
-        throw "The OpenAPI endpoint returned an unexpected document."
+    foreach ($path in @("/openapi.json", "/docs", "/docs/swagger-ui-bundle.js")) {
+        $status = 0
+        try { $response = Invoke-WebRequest -UseBasicParsing "$base$path"; $status = [int]$response.StatusCode }
+        catch { if ($_.Exception.Response) { $status = [int]$_.Exception.Response.StatusCode } else { throw } }
+        if ($status -ne 404) { throw "Release documentation endpoint is exposed: $path (HTTP $status)" }
     }
     $home = Invoke-Check "/"
     if ($home.Content -notmatch "<html") {
         throw "The Rust/Trunk Web root did not return an HTML document."
     }
-    Write-Host "Blackbox smoke passed: health, OpenAPI, and Rust/Trunk Web root."
+    Write-Host "Blackbox smoke passed: health, disabled documentation, and Rust/Trunk Web root."
 } finally {
     Pop-Location
     if ($createdByThisRun) {

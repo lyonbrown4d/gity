@@ -26,6 +26,7 @@ mod merge_requests;
 use controls::ViewControls;
 mod mobile_navigation;
 mod navigation;
+mod oauth_consent;
 mod overview;
 mod packages;
 mod pages;
@@ -43,6 +44,7 @@ mod wiki;
 use login::Login;
 use mobile_navigation::MobileNavigationDrawer;
 use navigation::{AdminMobileNavigation, Navigation};
+use oauth_consent::OAuthConsent;
 use pages::{AdminPage, Page};
 use quick_jump::QuickJump;
 #[cfg(target_arch = "wasm32")]
@@ -104,6 +106,12 @@ pub(super) fn Shell() -> impl IntoView {
       {move || {
           let path = location.pathname.get();
           let search = location.search.get();
+          if path == "/oauth/consent" {
+              if api::storage("gity.access_token").is_empty() {
+                  return view! { <Login /> }.into_any();
+              }
+              return view! { <OAuthConsent search=search.clone() /> }.into_any();
+          }
           if path == "/login" || api::storage("gity.access_token").is_empty() {
               return view! { <Login /> }.into_any();
           }

@@ -38,3 +38,25 @@ observability:
   metrics_enabled: true
   metrics_address: 127.0.0.1:9090
   otlp_endpoint: ""
+bootstrap:
+  enabled: true
+  username: root
+  # Supply a private input file instead of logging or passing a password in CLI arguments.
+  # initial_password_file: /run/secrets/gity_root_password
+api:
+  graphql_enabled: true
+  mcp_enabled: true
+  graphql_introspection: false
+  graphql_max_depth: 12
+  graphql_max_complexity: 200
+  max_request_bytes: 1048576
+  mcp_max_concurrent_requests: 64
+  mcp_request_timeout_seconds: 30
+  mcp_allowed_origins: []
+  mcp_allowed_hosts: []
+oauth:
+  authorization_code_ttl_seconds: 600
+  access_token_ttl_seconds: 3600
+  refresh_token_ttl_seconds: 2592000
+  pending_request_ttl_seconds: 300
+  max_dynamic_clients: 1000

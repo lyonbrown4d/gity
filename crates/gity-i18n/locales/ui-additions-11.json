@@ -1,5 +1,21 @@
 {
   "_version": 2,
+  "Gity authorization": { "en": "Gity authorization", "zh": "Gity 授权" },
+  "Authorize application": { "en": "Authorize application", "zh": "授权应用" },
+  "Review what this application will be able to access.": { "en": "Review what this application will be able to access.", "zh": "请查看此应用将获得的访问权限。" },
+  "Loading authorization request…": { "en": "Loading authorization request…", "zh": "正在加载授权请求…" },
+  "Application": { "en": "Application", "zh": "应用" },
+  "Requested access": { "en": "Requested access", "zh": "请求的权限" },
+  "Resource": { "en": "Resource", "zh": "资源" },
+  "This request asks to use administrator access.": { "en": "This request asks to use administrator access.", "zh": "此请求要求使用管理员权限。" },
+  "Confirm your password": { "en": "Confirm your password", "zh": "确认密码" },
+  "Authorize": { "en": "Authorize", "zh": "授权" },
+  "Deny": { "en": "Deny", "zh": "拒绝" },
+  "Authorization request does not match.": { "en": "Authorization request does not match.", "zh": "授权请求不匹配。" },
+  "Could not read authorization request.": { "en": "Could not read authorization request.", "zh": "无法读取授权请求。" },
+  "Invalid authorization request.": { "en": "Invalid authorization request.", "zh": "授权请求无效。" },
+  "Enter your password to approve administrator access.": { "en": "Enter your password to approve administrator access.", "zh": "请输入密码以批准管理员权限。" },
+  "The authorization callback is invalid.": { "en": "The authorization callback is invalid.", "zh": "授权回调地址无效。" },
   "Member": {
     "en": "Member",
     "zh": "成员"

@@ -12,6 +12,10 @@ members = [
   "apps/gity-standalone",
   "apps/gity-web",
   "apps/gity-worker",
+  "crates/gity-api-macros",
+  "crates/gity-api-contracts",
+  "crates/gity-graphql",
+  "crates/gity-mcp",
   "crates/gity-artifacts",
   "crates/gity-authority",
   "crates/gity-core",
@@ -47,6 +51,15 @@ rust-version = "1.99.1"
 license = "MIT"
 
 [workspace.dependencies]
+inventory = "0.3"
+async-graphql = { version = "=7.2.1", default-features = false, features = ["dynamic-schema", "dataloader", "chrono"] }
+async-graphql-axum = "=7.2.1"
+rmcp = { version = "=3.8.0", default-features = false, features = ["server", "macros", "schemars", "transport-streamable-http-server"] }
+schemars = "1"
+oxide-auth = "=0.6.1"
+oxide-auth-async = "=0.2.1"
+jsonschema = { version = "=0.60.2", default-features = false }
+
 testcontainers = { version = "0.28", features = ["http_wait_plain"] }
 toml = "0.8"
 sha2 = "0.10"

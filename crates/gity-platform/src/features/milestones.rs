@@ -15,6 +15,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
       .routes(utoipa_axum::routes!(detail, update, remove)),
   )
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/milestones",tag="milestones",
     params(api::ProjectPath),
@@ -26,6 +27,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
   let rows = s.collaboration.milestones(p).await?;
   response(json!(rows.into_iter().map(view).collect::<Vec<_>>()))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/milestones/{iid}",tag="milestones",
     params(api::IidPath),
@@ -36,6 +38,7 @@ async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   response(view(find(&s, p, i).await?))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/milestones",tag="milestones",
     params(api::ProjectPath),
@@ -70,6 +73,7 @@ async fn create(
     .await?;
   response(view(row))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/milestones/{iid}",tag="milestones",
     params(api::IidPath),
@@ -103,6 +107,7 @@ async fn update(
   let row = s.collaboration.update_milestone(p, i, change).await?;
   response(view(row))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/milestones/{iid}",tag="milestones",
     params(api::IidPath),

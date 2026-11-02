@@ -33,6 +33,7 @@ async fn page(s: &AppState, p: i64, key: &str) -> Result<Value, AppError> {
     s.collaboration.wiki_page(p, &slug(key)?).await?,
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/wiki/pages",tag="wiki",
     params(api::ProjectPath),
@@ -50,6 +51,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>()
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get,path="/{id}/wiki/pages/{slug}",tag="wiki",
     params(api::WikiPath),
@@ -64,6 +66,7 @@ async fn detail(
   crate::access::project_action(&s, &h, p, ProjectAction::WikiRead).await?;
   response(page(&s, p, &key).await?)
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post,path="/{id}/wiki/pages",tag="wiki",
     params(api::ProjectPath),
@@ -107,6 +110,7 @@ async fn create(
       .await?,
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     patch,path="/{id}/wiki/pages/{slug}",tag="wiki",
     params(api::WikiPath),
@@ -135,6 +139,7 @@ async fn update(
       .await?,
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete,path="/{id}/wiki/pages/{slug}",tag="wiki",
     params(api::WikiPath),

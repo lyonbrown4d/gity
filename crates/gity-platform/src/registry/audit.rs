@@ -8,6 +8,7 @@ use std::collections::HashMap;
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   utoipa_axum::router::OpenApiRouter::new().routes(utoipa_axum::routes!(events))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(
     get,path="/projects/{id}/audit-events",tag="audit",
     params(api::ProjectPath,("limit"=Option<i64>,Query,description="1–200; defaults to 50")),

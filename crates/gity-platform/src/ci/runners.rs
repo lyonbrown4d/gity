@@ -35,6 +35,7 @@ pub(super) fn public_runner(mut row: Value) -> Value {
   row["active"] = json!(flag(&row, "active"));
   row
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/runners", tag="ci",
     summary="List registered project runners without tokens",
@@ -54,6 +55,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
       .collect::<Vec<_>>(),
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     post, path="/{project}/runners", tag="ci",
     summary="Register a project runner and return its token once",
@@ -89,6 +91,7 @@ async fn register(
     json!({"runner":public_runner(row),"token":token}),
   ))
 }
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     delete, path="/{project}/runners/{runner}", tag="ci",
     summary="Revoke and remove a project runner",

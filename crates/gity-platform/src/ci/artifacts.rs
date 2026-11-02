@@ -7,7 +7,6 @@ use axum::{
   http::HeaderMap,
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
-
 #[utoipa::path(
     post, path="/runners/jobs/{job}/artifacts", tag="ci-runner-agent",
     summary="Store a runner artifact up to 64 MiB",
@@ -71,6 +70,7 @@ pub(crate) async fn upload(
   }
 }
 
+#[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
 #[utoipa::path(
     get, path="/{project}/jobs/{job}/artifacts", tag="ci",
     summary="List stored artifacts for a project job",

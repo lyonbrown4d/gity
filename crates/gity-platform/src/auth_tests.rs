@@ -71,20 +71,33 @@ async fn password_sessions_rotate_and_stored_hashes_are_not_bearer_tokens() {
     StatusCode::UNAUTHORIZED
   );
   let login = json!({"username":"newuser","password":"test-password"});
-  let (status, created) = request(&s, "POST", "/auth/login", "", login.clone()).await;
-  assert_eq!(status, StatusCode::OK, "{created}");
   assert_eq!(
-    request(
-      &s,
-      "POST",
-      "/auth/login",
-      "",
-      json!({"username":"newuser","password":"wrong-password"})
-    )
-    .await
-    .0,
+    request(&s, "POST", "/auth/login", "", login.clone())
+      .await
+      .0,
     StatusCode::UNAUTHORIZED
   );
+  assert!(
+    s.identity
+      .user_model_by_username("newuser")
+      .await
+      .unwrap()
+      .is_none()
+  );
+  let (status, registered) = request(&s, "POST", "/auth/register", "", login.clone()).await;
+  assert_eq!(status, StatusCode::OK, "{registered}");
+  let created = request(&s, "POST", "/auth/login", "", login).await.1;
+  assert_eq!(created["code"], 0);
+  assert_eq!(
+    s.identity
+      .user_model_by_username("newuser")
+      .await
+      .unwrap()
+      .unwrap()
+      .is_super_admin,
+    0
+  );
+  assert!(!s.identity.bootstrap_claimed().await.unwrap());
   let refresh = created["data"]["refresh_token"].as_str().unwrap();
   let body = json!({"refresh_token":refresh});
   let (status, rotated) = request(&s, "POST", "/auth/refresh", "", body.clone()).await;

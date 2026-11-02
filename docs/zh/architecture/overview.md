@@ -52,7 +52,7 @@ Web 是编译后的静态资源，由平台 HTTP 服务提供，不是独立的 
 | 操作标识 | UUID v7；秘密凭据使用密码学随机数 |
 | 配置 | 代码默认值 < 文件 < 环境变量 < 显式 CLI |
 | 可观测性 | Tracing、Prometheus、可选 OTLP；各进程分别初始化 |
-| API 文档 | Utoipa 宏生成 OpenAPI，平台提供 `/docs`、`/openapi.json` |
+| API 文档 | Utoipa 宏生成契约；仅 `api-docs` 开发构建提供文档端点 |
 | 多语言 | 前后端复用 `gity-i18n`，服务端语言按请求选择 |
 
 ## 部署与保证范围

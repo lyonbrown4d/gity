@@ -29,6 +29,41 @@ fn explicit_yaml_and_toml_files_use_typed_defaults_and_validation() {
 }
 
 #[test]
+fn bootstrap_configuration_defaults_password_output_under_state_root() {
+  let dir = tempfile::tempdir().unwrap();
+  let config = dir.path().join("bootstrap.yaml");
+  std::fs::write(
+    &config,
+    "storage:\n  root: /srv/gity/state\nbootstrap:\n  username: operator\n  email: admin@example.test\n",
+  )
+  .unwrap();
+  let settings = Settings::try_load(Some(&config)).unwrap();
+  assert!(settings.bootstrap.enabled);
+  assert_eq!(settings.bootstrap.username, "operator");
+  assert_eq!(
+    settings.bootstrap.email.as_deref(),
+    Some("admin@example.test")
+  );
+  assert_eq!(
+    settings.bootstrap.generated_password_file.as_deref(),
+    Some(std::path::Path::new(
+      "/srv/gity/state/bootstrap/admin-password"
+    ))
+  );
+  std::fs::write(
+    &config,
+    "bootstrap:\n  enabled: false\n  generated_password_file: /run/secrets/admin-password\n",
+  )
+  .unwrap();
+  let settings = Settings::try_load(Some(&config)).unwrap();
+  assert!(!settings.bootstrap.enabled);
+  assert_eq!(
+    settings.bootstrap.generated_password_file.as_deref(),
+    Some(std::path::Path::new("/run/secrets/admin-password"))
+  );
+}
+
+#[test]
 fn ssh_listener_uses_typed_configurable_port_and_bounded_limits() {
   let dir = tempfile::tempdir().unwrap();
   let path = dir.path().join("ssh.yaml");
