@@ -6,10 +6,12 @@ import { getApiBaseUrl } from "@/lib/api";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
+import { Toolbar } from "@/components/surface/toolbar";
 import type {
   CreatedRepositoryProjectTokenView,
   RepositoryDeployKeyView,
@@ -263,29 +265,43 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
   }, [repositoryQuery.query.error, accessTokensQuery.query.error, deployTokensQuery.query.error, deployKeysQuery.query.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShieldCheck className="size-4" />
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="size-3.5" />
           {t("Project credentials")}
-        </CardTitle>
-        <CardDescription>{t("Manage project-scoped tokens and deploy keys for Git, packages and automation.")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+        </span>
+      }
+      description={t("Manage project-scoped tokens and deploy keys for Git, packages and automation.")}
+      actions={
+        <Toolbar>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
+            <RefreshCw data-icon="inline-start" />
+            {t("Reload")}
+          </Button>
+        </Toolbar>
+      }
+      flush
+    >
+      <div className="border-b border-border bg-muted/20 px-4 py-3">
         <CloneAutomationGuide
           cloneHttpUrl={cloneHttpUrl}
           packageAutomationCommand={packageAutomationCommand}
           t={t}
           onCopy={copyText}
         />
+      </div>
 
-        {!canAdminCredentials ? (
+      {!canAdminCredentials ? (
+        <div className="border-b border-border px-4 py-3">
           <Alert>
             <AlertDescription>{t("Your current project role can inspect settings, but cannot change project credentials.")}</AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
-        {createdToken ? (
+      {createdToken ? (
+        <div className="border-b border-border px-4 py-3">
           <CreatedTokenGuide
             createdToken={createdToken}
             cloneHttpUrl={cloneHttpUrl}
@@ -295,99 +311,99 @@ export const RepositoryCredentialsPanel = ({ repoId, permissions, t, onError }: 
             onCopyToken={copyCreatedToken}
             onDismiss={() => setCreatedToken(null)}
           />
-        ) : null}
+        </div>
+      ) : null}
 
-        <section className="space-y-3 rounded-md border p-3">
-          <CredentialSectionHeader title={t("Project access tokens")} description={t("Use project tokens for API, repository and package automation scoped to this project.")} onReload={() => void reload()} t={t} />
-          <TokenForm
-            idPrefix="project-access-token"
-            name={accessTokenName}
-            expiresAt={accessTokenExpiresAt}
-            scopes={accessTokenScopesValue}
-            scopeOptions={accessTokenScopes}
-            disabled={!canAdminCredentials || isBusy}
-            namePlaceholder={t("Release bot")}
-            t={t}
-            onSubmit={submitCreateAccessToken}
-            onNameChange={setAccessTokenName}
-            onExpiresAtChange={setAccessTokenExpiresAt}
-            onScopesChange={setAccessTokenScopesValue}
-          />
-          <TokenList
-            tokens={accessTokens}
-            emptyText={t("No project access tokens yet.")}
-            isLoading={accessTokensQuery.query.isFetching && !accessTokensQuery.query.data}
-            disabled={!canAdminCredentials || isBusy}
-            t={t}
-            onRevoke={(token) => void submitRevokeToken(token, "access")}
-          />
-        </section>
+      <section className="border-b border-border">
+        <CredentialSectionHeader title={t("Project access tokens")} description={t("Use project tokens for API, repository and package automation scoped to this project.")} />
+        <TokenForm
+          idPrefix="project-access-token"
+          name={accessTokenName}
+          expiresAt={accessTokenExpiresAt}
+          scopes={accessTokenScopesValue}
+          scopeOptions={accessTokenScopes}
+          disabled={!canAdminCredentials || isBusy}
+          namePlaceholder={t("Release bot")}
+          t={t}
+          onSubmit={submitCreateAccessToken}
+          onNameChange={setAccessTokenName}
+          onExpiresAtChange={setAccessTokenExpiresAt}
+          onScopesChange={setAccessTokenScopesValue}
+        />
+        <TokenList
+          tokens={accessTokens}
+          emptyText={t("No project access tokens yet.")}
+          isLoading={accessTokensQuery.query.isFetching && !accessTokensQuery.query.data}
+          disabled={!canAdminCredentials || isBusy}
+          t={t}
+          onRevoke={(token) => void submitRevokeToken(token, "access")}
+        />
+      </section>
 
-        <section className="space-y-3 rounded-md border p-3">
-          <CredentialSectionHeader title={t("Deploy tokens")} description={t("Use deploy tokens for Git and package pull/push flows without granting full user access.")} onReload={() => void reload()} t={t} />
-          <TokenForm
-            idPrefix="deploy-token"
-            name={deployTokenName}
-            username={deployTokenUsername}
-            expiresAt={deployTokenExpiresAt}
-            scopes={deployTokenScopesValue}
-            scopeOptions={deployTokenScopes}
-            disabled={!canAdminCredentials || isBusy}
-            namePlaceholder={t("Production deploy")}
-            usernamePlaceholder={t("deploy-production")}
-            t={t}
-            onSubmit={submitCreateDeployToken}
-            onNameChange={setDeployTokenName}
-            onUsernameChange={setDeployTokenUsername}
-            onExpiresAtChange={setDeployTokenExpiresAt}
-            onScopesChange={setDeployTokenScopesValue}
-          />
-          <TokenList
-            tokens={deployTokens}
-            emptyText={t("No deploy tokens yet.")}
-            isLoading={deployTokensQuery.query.isFetching && !deployTokensQuery.query.data}
-            disabled={!canAdminCredentials || isBusy}
-            t={t}
-            onRevoke={(token) => void submitRevokeToken(token, "deploy")}
-          />
-        </section>
+      <section className="border-b border-border">
+        <CredentialSectionHeader title={t("Deploy tokens")} description={t("Use deploy tokens for Git and package pull/push flows without granting full user access.")} />
+        <TokenForm
+          idPrefix="deploy-token"
+          name={deployTokenName}
+          username={deployTokenUsername}
+          expiresAt={deployTokenExpiresAt}
+          scopes={deployTokenScopesValue}
+          scopeOptions={deployTokenScopes}
+          disabled={!canAdminCredentials || isBusy}
+          namePlaceholder={t("Production deploy")}
+          usernamePlaceholder={t("deploy-production")}
+          t={t}
+          onSubmit={submitCreateDeployToken}
+          onNameChange={setDeployTokenName}
+          onUsernameChange={setDeployTokenUsername}
+          onExpiresAtChange={setDeployTokenExpiresAt}
+          onScopesChange={setDeployTokenScopesValue}
+        />
+        <TokenList
+          tokens={deployTokens}
+          emptyText={t("No deploy tokens yet.")}
+          isLoading={deployTokensQuery.query.isFetching && !deployTokensQuery.query.data}
+          disabled={!canAdminCredentials || isBusy}
+          t={t}
+          onRevoke={(token) => void submitRevokeToken(token, "deploy")}
+        />
+      </section>
 
-        <section className="space-y-3 rounded-md border p-3">
-          <CredentialSectionHeader title={t("Deploy keys")} description={t("Store SSH public keys for future SSH transport integration and repository deploy policy.")} onReload={() => void reload()} t={t} />
-          <form className="grid gap-3 rounded-md border bg-muted/10 p-3 lg:grid-cols-[220px_1fr_auto]" onSubmit={submitCreateDeployKey}>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground" htmlFor="deploy-key-title">
-                {t("Title")}
-              </Label>
-              <Input id="deploy-key-title" value={deployKeyTitle} onChange={(event) => setDeployKeyTitle(event.target.value)} placeholder={t("Build server")} disabled={!canAdminCredentials || isBusy} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground" htmlFor="deploy-key-public-key">
-                {t("Public key")}
-              </Label>
-              <Textarea id="deploy-key-public-key" value={deployKeyPublicKey} onChange={(event) => setDeployKeyPublicKey(event.target.value)} placeholder="ssh-ed25519 AAAA..." disabled={!canAdminCredentials || isBusy} />
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <Button type="button" variant={deployKeyCanPush ? "secondary" : "outline"} disabled={!canAdminCredentials || isBusy} onClick={() => setDeployKeyCanPush((current) => !current)}>
-                {t("Can push")}
-              </Button>
-              <Button type="submit" disabled={!canAdminCredentials || isBusy || !deployKeyTitle.trim() || !deployKeyPublicKey.trim()}>
-                <Plus className="size-4" />
-                {isCreatingKey ? t("Adding...") : t("Add key")}
-              </Button>
-            </div>
-          </form>
-          <DeployKeyList
-            keys={deployKeys}
-            emptyText={t("No deploy keys yet.")}
-            isLoading={deployKeysQuery.query.isFetching && !deployKeysQuery.query.data}
-            disabled={!canAdminCredentials || isBusy}
-            t={t}
-            onDelete={(key) => void submitDeleteDeployKey(key)}
-          />
-        </section>
-      </CardContent>
-    </Card>
+      <section>
+        <CredentialSectionHeader title={t("Deploy keys")} description={t("Store SSH public keys for future SSH transport integration and repository deploy policy.")} />
+        <form className="grid gap-3 border-b border-border px-4 py-3 lg:grid-cols-[220px_1fr_auto]" onSubmit={submitCreateDeployKey}>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground" htmlFor="deploy-key-title">
+              {t("Title")}
+            </Label>
+            <Input id="deploy-key-title" value={deployKeyTitle} onChange={(event) => setDeployKeyTitle(event.target.value)} placeholder={t("Build server")} disabled={!canAdminCredentials || isBusy} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground" htmlFor="deploy-key-public-key">
+              {t("Public key")}
+            </Label>
+            <Textarea id="deploy-key-public-key" value={deployKeyPublicKey} onChange={(event) => setDeployKeyPublicKey(event.target.value)} placeholder="ssh-ed25519 AAAA..." disabled={!canAdminCredentials || isBusy} />
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <Button type="button" size="sm" variant={deployKeyCanPush ? "secondary" : "outline"} disabled={!canAdminCredentials || isBusy} onClick={() => setDeployKeyCanPush((current) => !current)}>
+              {t("Can push")}
+            </Button>
+            <Button type="submit" size="sm" disabled={!canAdminCredentials || isBusy || !deployKeyTitle.trim() || !deployKeyPublicKey.trim()}>
+              <Plus className="size-4" />
+              {isCreatingKey ? t("Adding...") : t("Add key")}
+            </Button>
+          </div>
+        </form>
+        <DeployKeyList
+          keys={deployKeys}
+          emptyText={t("No deploy keys yet.")}
+          isLoading={deployKeysQuery.query.isFetching && !deployKeysQuery.query.data}
+          disabled={!canAdminCredentials || isBusy}
+          t={t}
+          onDelete={(key) => void submitDeleteDeployKey(key)}
+        />
+      </section>
+    </Section>
   );
 };
 
@@ -416,7 +432,7 @@ const CloneAutomationGuide = ({
   const cloneCommand = cloneHttpUrl ? `git clone ${cloneHttpUrl}` : t("Clone URL is loading...");
 
   return (
-    <section className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
+    <section className="flex flex-col gap-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-1">
           <p className="flex items-center gap-2 font-medium">
@@ -476,8 +492,8 @@ const CloneAutomationGuide = ({
 };
 
 const GuideBlock = ({ title, children }: { title: string; children: React.ReactNode }): JSX.Element => (
-  <div className="flex flex-col gap-2 rounded-md border bg-background/60 p-3">
-    <p className="text-sm font-medium">{title}</p>
+  <div className="flex flex-col gap-2 border-l-2 border-border pl-3">
+    <p className="text-xs font-medium">{title}</p>
     {children}
   </div>
 );
@@ -590,39 +606,29 @@ const CommandLine = ({
   t: (text: string) => string;
   onCopy?: (value: string) => void;
 }): JSX.Element => (
-  <div className="flex flex-col gap-1 rounded-md border bg-background/70 p-2">
+  <div className="flex flex-col gap-1">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       {onCopy ? (
-        <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => onCopy(value)}>
-          <Copy />
+        <Button type="button" size="sm" variant="ghost" className="h-7 px-2" disabled={disabled} onClick={() => onCopy(value)}>
+          <Copy className="size-3.5" />
           {copyLabel ?? t("Copy command")}
         </Button>
       ) : null}
     </div>
-    <code className="break-all rounded bg-muted px-2 py-2 font-mono text-xs">{value}</code>
+    <code className="break-all bg-muted px-2 py-1.5 font-mono text-xs">{value}</code>
   </div>
 );
 const CredentialSectionHeader = ({
   title,
   description,
-  onReload,
-  t,
 }: {
   title: string;
   description: string;
-  onReload: () => void;
-  t: (text: string) => string;
 }) => (
-  <div className="flex flex-wrap items-start justify-between gap-2">
-    <div>
-      <p className="font-medium">{title}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </div>
-    <Button type="button" size="sm" variant="ghost" onClick={onReload}>
-      <RefreshCw className="size-4" />
-      {t("Reload")}
-    </Button>
+  <div className="px-4 py-2.5">
+    <p className="text-sm font-medium">{title}</p>
+    <p className="text-xs text-muted-foreground">{description}</p>
   </div>
 );
 
@@ -659,7 +665,7 @@ const TokenForm = ({
   onExpiresAtChange: (value: string) => void;
   onScopesChange: (value: string[]) => void;
 }) => (
-  <form className="grid gap-3 rounded-md border bg-muted/10 p-3 lg:grid-cols-[220px_220px_1fr_auto]" onSubmit={onSubmit}>
+  <form className="grid gap-3 border-b border-border px-4 py-3 lg:grid-cols-[220px_220px_1fr_auto]" onSubmit={onSubmit}>
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground" htmlFor={`${idPrefix}-name`}>
         {t("Name")}
@@ -681,7 +687,7 @@ const TokenForm = ({
       <Input id={`${idPrefix}-expires`} value={expiresAt} onChange={(event) => onExpiresAtChange(event.target.value)} type="date" disabled={disabled} />
     </div>
     <div className="flex flex-wrap items-end gap-2">
-      <Button type="submit" disabled={disabled || !name.trim() || scopes.length === 0}>
+      <Button type="submit" size="sm" disabled={disabled || !name.trim() || scopes.length === 0}>
         <Plus className="size-4" />
         {t("Create token")}
       </Button>
@@ -738,40 +744,44 @@ const TokenList = ({
   t: (text: string) => string;
   onRevoke: (token: RepositoryProjectTokenView) => void;
 }) => (
-  <div className="space-y-2 rounded-md border p-2">
-    {isLoading ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading credentials...")}</p> : null}
-    {tokens.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">{emptyText}</p> : null}
-    {tokens.map((token) => (
-      <div key={token.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">{token.name}</p>
-            <Badge variant={token.active ? "secondary" : "outline"}>{token.active ? t("active") : t("revoked")}</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">@{token.username || token.id}</p>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {token.scopes.map((scope) => (
-              <Badge key={scope} variant="outline">{t(scope)}</Badge>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t("Expires at")}: {token.expires_at || t("Never")} · {t("Last used")}: {token.last_used_at || t("Never")}
-          </p>
-        </div>
-        <ConfirmAction
-          title={t("Revoke token?")}
-          description={t("Existing automation using this token will stop working immediately.")}
-          confirmLabel={t("Revoke")}
-          cancelLabel={t("Cancel")}
-          onConfirm={() => onRevoke(token)}
-        >
-          <Button type="button" size="sm" variant="outline" disabled={disabled || !token.active}>
-            <Trash2 className="size-4" />
-            {t("Revoke")}
-          </Button>
-        </ConfirmAction>
-      </div>
-    ))}
+  <div>
+    {isLoading ? <p className="px-4 py-2 text-sm text-muted-foreground">{t("Loading credentials...")}</p> : null}
+    {tokens.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">{emptyText}</p> : null}
+    {tokens.length > 0 ? (
+      <DataList>
+        {tokens.map((token) => (
+          <DataRow key={token.id}>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">{token.name}</p>
+                <Badge variant={token.active ? "secondary" : "outline"}>{token.active ? t("active") : t("revoked")}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">@{token.username || token.id}</p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {token.scopes.map((scope) => (
+                  <Badge key={scope} variant="outline">{t(scope)}</Badge>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {t("Expires at")}: {token.expires_at || t("Never")} · {t("Last used")}: {token.last_used_at || t("Never")}
+              </p>
+            </div>
+            <ConfirmAction
+              title={t("Revoke token?")}
+              description={t("Existing automation using this token will stop working immediately.")}
+              confirmLabel={t("Revoke")}
+              cancelLabel={t("Cancel")}
+              onConfirm={() => onRevoke(token)}
+            >
+              <Button type="button" size="sm" variant="outline" disabled={disabled || !token.active}>
+                <Trash2 className="size-4" />
+                {t("Revoke")}
+              </Button>
+            </ConfirmAction>
+          </DataRow>
+        ))}
+      </DataList>
+    ) : null}
   </div>
 );
 
@@ -790,33 +800,37 @@ const DeployKeyList = ({
   t: (text: string) => string;
   onDelete: (key: RepositoryDeployKeyView) => void;
 }) => (
-  <div className="space-y-2 rounded-md border p-2">
-    {isLoading ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading deploy keys...")}</p> : null}
-    {keys.length === 0 ? <p className="px-2 py-2 text-sm text-muted-foreground">{emptyText}</p> : null}
-    {keys.map((key) => (
-      <div key={key.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">{key.title}</p>
-            {key.can_push ? <Badge variant="secondary">{t("can push")}</Badge> : <Badge variant="outline">{t("read only")}</Badge>}
-          </div>
-          <p className="text-xs text-muted-foreground">{key.fingerprint}</p>
-          <p className="mt-2 max-w-5xl break-all font-mono text-xs text-muted-foreground">{key.public_key}</p>
-        </div>
-        <ConfirmAction
-          title={t("Delete deploy key?")}
-          description={t("Deployments using this key will no longer be trusted by this project.")}
-          confirmLabel={t("Delete")}
-          cancelLabel={t("Cancel")}
-          onConfirm={() => onDelete(key)}
-        >
-          <Button type="button" size="sm" variant="outline" disabled={disabled}>
-            <Trash2 className="size-4" />
-            {t("Delete")}
-          </Button>
-        </ConfirmAction>
-      </div>
-    ))}
+  <div>
+    {isLoading ? <p className="px-4 py-2 text-sm text-muted-foreground">{t("Loading deploy keys...")}</p> : null}
+    {keys.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">{emptyText}</p> : null}
+    {keys.length > 0 ? (
+      <DataList>
+        {keys.map((key) => (
+          <DataRow key={key.id}>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">{key.title}</p>
+                {key.can_push ? <Badge variant="secondary">{t("can push")}</Badge> : <Badge variant="outline">{t("read only")}</Badge>}
+              </div>
+              <p className="text-xs text-muted-foreground">{key.fingerprint}</p>
+              <p className="mt-1.5 max-w-5xl break-all font-mono text-xs text-muted-foreground">{key.public_key}</p>
+            </div>
+            <ConfirmAction
+              title={t("Delete deploy key?")}
+              description={t("Deployments using this key will no longer be trusted by this project.")}
+              confirmLabel={t("Delete")}
+              cancelLabel={t("Cancel")}
+              onConfirm={() => onDelete(key)}
+            >
+              <Button type="button" size="sm" variant="outline" disabled={disabled}>
+                <Trash2 className="size-4" />
+                {t("Delete")}
+              </Button>
+            </ConfirmAction>
+          </DataRow>
+        ))}
+      </DataList>
+    ) : null}
   </div>
 );
 

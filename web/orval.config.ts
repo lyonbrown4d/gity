@@ -10,6 +10,15 @@ export default defineConfig({
       mode: "tags-split",
       mock: false,
       clean: true,
+      override: {
+        fetch: {
+          includeHttpResponseReturnType: false,
+        },
+        mutator: {
+          path: "./src/lib/orval-fetch.ts",
+          name: "customFetch",
+        },
+      },
     },
   },
 });

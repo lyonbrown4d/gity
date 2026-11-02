@@ -1,21 +1,27 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useList, useOne } from "@refinedev/core";
 import { ArrowRight, Building2, FolderGit2, GitBranch, Inbox, ShieldCheck } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ActivityFeed } from "@/components/activity/activity-feed";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { StatCard } from "@/components/surface/stat-card";
+import { Section } from "@/components/surface/section";
 import type { OrganizationView, RepositoryView, UserView } from "@/pages/types";
+import { useActivity } from "./use-activity";
 import { useTodoList } from "./use-todos";
 
 export function AppDashboardPage(): JSX.Element {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const userQuery = useOne<UserView>({ resource: "profile", id: "me" });
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const repoQuery = useList<RepositoryView>({ resource: "my-projects" });
   const todoQuery = useTodoList("pending");
+  const activity = useActivity(8);
 
   const user = userQuery.result ?? null;
   const orgs = orgQuery.result.data ?? [];
@@ -32,6 +38,7 @@ export function AppDashboardPage(): JSX.Element {
           ? todoQuery.query.error.message
           : null;
   const roleLabel = user?.is_super_admin ? t("Super Admin") : t("User");
+  const activityError = activity.query.error instanceof Error ? activity.query.error.message : null;
 
   const statusItems = [
     {
@@ -62,8 +69,8 @@ export function AppDashboardPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-4 page-enter">
-      <section className="overflow-hidden rounded-lg border border-border/80 bg-card shadow-sm" aria-labelledby="dashboard-title">
-        <div className="flex flex-col gap-4 border-b border-border/70 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+      <section className="overflow-hidden rounded-md border border-border bg-card" aria-labelledby="dashboard-title">
+        <div className="flex flex-col gap-4 border-b border-border px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
@@ -80,18 +87,9 @@ export function AppDashboardPage(): JSX.Element {
             <Button asChild size="sm" variant="outline"><Link to="/app/profile">{t("Edit Profile")}</Link></Button>
           </div>
         </div>
-        <div className="grid divide-y divide-border/70 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
-          {statusItems.map(({ icon: Icon, label, value, detail }) => (
-            <div key={label} role="group" aria-label={label} className="flex items-center gap-3 px-4 py-3 sm:px-5">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Icon className="size-4" aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-xs text-muted-foreground">{label}</p>
-                <p className="truncate text-sm font-semibold">{value}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title={detail}>{detail}</p>
-              </div>
-            </div>
+        <div className="grid gap-2 px-4 py-3 sm:grid-cols-2 sm:px-5 xl:grid-cols-4">
+          {statusItems.map((item) => (
+            <StatCard key={item.label} {...item} />
           ))}
         </div>
       </section>
@@ -99,68 +97,90 @@ export function AppDashboardPage(): JSX.Element {
       {errorMessage ? <Alert variant="destructive"><AlertDescription>{errorMessage}</AlertDescription></Alert> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
-        <Card className="overflow-hidden shadow-sm">
-          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0 border-b border-border/70 p-4 sm:px-5">
-            <div>
-              <CardTitle className="text-base">{t("Recent Projects")}</CardTitle>
-              <CardDescription className="mt-1">{t("Fast access to the repositories you can operate.")}</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/app/projects">{t("View all")}<ArrowRight aria-hidden="true" /></Link>
+        <Section
+          title={t("Recent Projects")}
+          description={t("Fast access to the repositories you can operate.")}
+          flush
+          actions={
+            <Button variant="ghost" size="sm" onClick={() => navigate("/app/projects")}>
+              {t("View all")}
+              <ArrowRight aria-hidden="true" />
             </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? <ProjectListSkeleton /> : recentRepos.length === 0 ? (
-              <div className="px-5 py-8 text-sm text-muted-foreground">{t("No projects available.")}</div>
-            ) : recentRepos.map((repo) => (
-              <Link
-                key={repo.id}
-                to={`/app/projects/${repo.organization_id}/${repo.id}`}
-                className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-3 text-sm transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <FolderGit2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{repo.name}</span>
-                    <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                      <GitBranch className="size-3" aria-hidden="true" />{repo.key} / {repo.default_branch}
+          }
+        >
+          {isLoading ? <ProjectListSkeleton /> : recentRepos.length === 0 ? (
+            <div className="px-4 py-8 text-sm text-muted-foreground">{t("No projects available.")}</div>
+          ) : (
+            <DataList>
+              {recentRepos.map((repo) => (
+                <DataRow
+                  key={repo.id}
+                  onClick={() => navigate(`/app/projects/${repo.organization_id}/${repo.id}`)}
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
+                    <FolderGit2 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{repo.name}</span>
+                      <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                        <GitBranch className="size-3" aria-hidden="true" />{repo.key} / {repo.default_branch}
+                      </span>
                     </span>
                   </span>
-                </span>
-                <Badge variant="secondary" className="shrink-0">{repo.visibility}</Badge>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+                  <Badge variant="secondary" className="shrink-0">{repo.visibility}</Badge>
+                </DataRow>
+              ))}
+            </DataList>
+          )}
+        </Section>
 
-        <Card className="overflow-hidden shadow-sm">
-          <CardHeader className="border-b border-border/70 p-4 sm:px-5">
-            <CardTitle className="text-base">{t("My Organizations")}</CardTitle>
-            <CardDescription>{t("Organizations you can operate in.")}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? <OrganizationListSkeleton /> : orgs.length === 0 ? (
-              <div className="px-5 py-8 text-sm text-muted-foreground">{t("No organizations available.")}</div>
-            ) : orgs.map((org) => (
-              <div key={org.id} className="flex items-center justify-between gap-3 border-b border-border/70 px-4 py-3 last:border-b-0 sm:px-5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{org.name}</p>
-                  <p className="truncate font-mono text-xs text-muted-foreground">{org.key}</p>
-                </div>
-                <Badge variant="outline">{org.role}</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <Section title={t("My Organizations")} description={t("Organizations you can operate in.")} flush>
+          {isLoading ? <OrganizationListSkeleton /> : orgs.length === 0 ? (
+            <div className="px-4 py-8 text-sm text-muted-foreground">{t("No organizations available.")}</div>
+          ) : (
+            <DataList>
+              {orgs.map((org) => (
+                <DataRow key={org.id}>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{org.name}</p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">{org.key}</p>
+                  </div>
+                  <Badge variant="outline">{org.role}</Badge>
+                </DataRow>
+              ))}
+            </DataList>
+          )}
+        </Section>
       </div>
+
+      <Section
+        title={t("Recent activity")}
+        description={t("Latest events across the projects you can access.")}
+        flush
+        actions={
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/app/activity">
+              {t("View all")}
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
+        }
+      >
+        <ActivityFeed
+          items={activity.items}
+          isLoading={activity.query.isLoading}
+          error={activityError}
+          emptyText={t("No recent activity yet.")}
+          skeletonRows={4}
+        />
+      </Section>
     </div>
   );
 }
 
 function ProjectListSkeleton(): JSX.Element {
-  return <div className="space-y-px p-3">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-14 w-full" />)}</div>;
+  return <div className="space-y-2 p-3">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-12 w-full" />)}</div>;
 }
 
 function OrganizationListSkeleton(): JSX.Element {
-  return <div className="space-y-px p-3">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-12 w-full" />)}</div>;
+  return <div className="space-y-2 p-3">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-10 w-full" />)}</div>;
 }

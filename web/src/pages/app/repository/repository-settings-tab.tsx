@@ -1,7 +1,7 @@
 import { ConfirmAction } from "@/components/common/confirm-action";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section } from "@/components/surface/section";
 import type { RepositoryView } from "@/pages/types";
 import { RepositoryCredentialsPanel } from "./repository-credentials-panel";
 import { RepositoryMembersPanel } from "./repository-members-panel";
@@ -27,36 +27,28 @@ export const RepositorySettingsTab = ({
   const canDeleteProject = permissions.projectDelete;
 
   return (
-    <div className="space-y-4">
-      <Card className="card-enter">
-        <CardHeader>
-          <CardTitle>{t("Settings")}</CardTitle>
-          <CardDescription>{t("Project metadata and danger zone.")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-md border p-3 text-sm">
-            <p>
-              <span className="text-muted-foreground">{t("Project UUID")}:</span>{" "}
-              <span className="font-mono text-xs">{repository.uuid}</span>
-            </p>
-            <p>
-              <span className="text-muted-foreground">{t("Project key")}:</span> {repository.key}
-            </p>
-            <p>
-              <span className="text-muted-foreground">{t("Visibility")}:</span> {repository.visibility}
-            </p>
-            <p>
-              <span className="text-muted-foreground">{t("Default branch")}:</span> {repository.default_branch}
-            </p>
-          </div>
+    <div className="flex flex-col gap-4">
+      <Section
+        title={t("Settings")}
+        description={t("Project metadata and danger zone.")}
+      >
+        <div className="flex flex-col gap-4">
+          <dl className="divide-y divide-border border-y border-border">
+            <Property label={t("Project UUID")}>
+              <span className="break-all font-mono text-xs">{repository.uuid}</span>
+            </Property>
+            <Property label={t("Project key")}>{repository.key}</Property>
+            <Property label={t("Visibility")}>{repository.visibility}</Property>
+            <Property label={t("Default branch")}>{repository.default_branch}</Property>
+          </dl>
 
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3">
+          <div className="border border-destructive/40 bg-destructive/10 px-4 py-3">
             <p className="text-sm font-medium text-destructive">{t("Danger zone")}</p>
             <p className="mt-1 text-xs text-destructive/80">
               {t("Deleting a project is irreversible.")}
             </p>
             {!canDeleteProject ? (
-              <Alert className="mt-3 bg-background/70">
+              <Alert className="mt-3">
                 <AlertDescription>{t("Only project owners can delete this project.")}</AlertDescription>
               </Alert>
             ) : null}
@@ -75,8 +67,8 @@ export const RepositorySettingsTab = ({
               </Button>
             </ConfirmAction>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
       <RepositoryMembersPanel
         repoId={repository.id}
@@ -94,3 +86,10 @@ export const RepositorySettingsTab = ({
     </div>
   );
 };
+
+const Property = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="flex items-start gap-3 py-2">
+    <dt className="w-28 shrink-0 text-xs text-muted-foreground">{label}</dt>
+    <dd className="min-w-0 flex-1 text-sm">{children}</dd>
+  </div>
+);

@@ -4,11 +4,12 @@ import { useCustom, useCustomMutation } from "@refinedev/core";
 import { ConfirmAction } from "@/components/common/confirm-action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
 import { cn } from "@/lib/utils";
 import type { RepositoryRunnerView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
@@ -117,19 +118,41 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
   }, [runnersQuery.query.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <CardTitle>{t("Runners")}</CardTitle>
-        <CardDescription>{t("Register external runners and inspect project runner health.")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <RunnerStat label={t("Registered runners")} value={runners.length} description={runners.length > 0 ? t("Available to this project") : t("No capacity yet")} />
-          <RunnerStat label={t("Online runners")} value={runners.filter((item) => item.status === "online").length} description={t("Heartbeat received recently")} active />
-          <RunnerStat label={t("Offline runners")} value={runners.filter((item) => item.status !== "online").length} description={t("Needs runner attention")} />
-          <RunnerStat label={t("Active runners")} value={runners.filter((item) => item.active).length} description={t("Eligible to claim jobs")} active />
+    <Section
+      className="card-enter"
+      title={t("Runners")}
+      description={t("Register external runners and inspect project runner health.")}
+      flush
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={canAdminRunners ? "secondary" : "outline"}>
+            {t("Role")}: {t(permissions.roleLabel)}
+          </Badge>
+          <Button
+            type="button"
+            size="sm"
+            variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canAdminRunners}
+            onClick={() => setComposerOpen((current) => !current)}
+          >
+            <Plus data-icon="inline-start" />
+            {isComposerOpen ? t("Hide runner form") : t("Register runner")}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void loadRunners()}>
+            <RefreshCw data-icon="inline-start" />
+            {t("Reload")}
+          </Button>
         </div>
+      }
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+        <RunnerStat label={t("Registered runners")} value={runners.length} description={runners.length > 0 ? t("Available to this project") : t("No capacity yet")} />
+        <RunnerStat label={t("Online runners")} value={runners.filter((item) => item.status === "online").length} description={t("Heartbeat received recently")} active />
+        <RunnerStat label={t("Offline runners")} value={runners.filter((item) => item.status !== "online").length} description={t("Needs runner attention")} />
+        <RunnerStat label={t("Active runners")} value={runners.filter((item) => item.active).length} description={t("Eligible to claim jobs")} active />
+      </div>
 
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
         <RunnerTrustGuide t={t} />
 
         {lastToken ? (
@@ -142,27 +165,6 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
           </Alert>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant={isComposerOpen ? "secondary" : "outline"}
-            disabled={!canAdminRunners}
-            onClick={() => setComposerOpen((current) => !current)}
-          >
-            <Plus data-icon="inline-start" />
-            {isComposerOpen ? t("Hide runner form") : t("Register runner")}
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={canAdminRunners ? "secondary" : "outline"}>
-              {t("Role")}: {t(permissions.roleLabel)}
-            </Badge>
-            <Button type="button" size="sm" variant="ghost" onClick={() => void loadRunners()}>
-              <RefreshCw data-icon="inline-start" />
-              {t("Reload")}
-            </Button>
-          </div>
-        </div>
-
         {!canAdminRunners ? (
           <Alert>
             <AlertDescription>{t("Your current project role can inspect runners, but cannot register or delete them.")}</AlertDescription>
@@ -170,7 +172,7 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
         ) : null}
 
         {isComposerOpen ? (
-          <form className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3" onSubmit={submitRegisterRunner}>
+          <form className="flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3" onSubmit={submitRegisterRunner}>
             <div className="grid gap-3 md:grid-cols-[1fr_240px]">
               <div className="flex flex-col gap-1">
                 <Label className="text-xs text-muted-foreground" htmlFor="runner-name">
@@ -207,70 +209,71 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={!canAdminRunners || isRegistering}>
+              <Button type="submit" size="sm" disabled={!canAdminRunners || isRegistering}>
                 {isRegistering ? t("Registering runner...") : t("Register runner")}
               </Button>
             </div>
           </form>
         ) : null}
+      </div>
 
-        <div className="flex flex-col gap-2 rounded-md border p-2">
-          {isLoadingRunners ? <RunnerListSkeleton /> : null}
-          {!isLoadingRunners && runners.length === 0 ? (
-            <RunnerEmptyState
-              canAdmin={canAdminRunners}
-              t={t}
-              onRegister={() => setComposerOpen(true)}
-            />
-          ) : null}
-          {runners.map((runner) => (
-            <div
-              key={runner.id}
-              className={cn(
-                "flex flex-col gap-3 rounded-md border p-3",
-                runner.status === "online" ? "border-primary/30 bg-primary/5" : "bg-background/60",
-                !runner.active ? "opacity-80" : undefined,
-              )}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate font-medium">{runner.name}</p>
-                    <RunnerStatusBadge runner={runner} t={t} />
-                    <Badge variant={runner.active ? "secondary" : "outline"}>{runner.active ? t("active") : t("paused")}</Badge>
-                  </div>
-                  {runner.description ? <p className="text-sm text-muted-foreground">{runner.description}</p> : null}
-                  <p className="text-xs text-muted-foreground">{getRunnerHealthDescription(runner, t)}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">#{runner.id}</Badge>
-                    {parseRunnerTags(runner.tags).map((tag) => (
-                      <Badge key={tag} variant="outline">{tag}</Badge>
-                    ))}
-                  </div>
-                  <RunnerOperationalDiagnostics runner={runner} t={t} />
-                </div>
-                <ConfirmAction
-                  title={t("Delete runner \"{name}\"?").replace("{name}", runner.name)}
-                  description={t("This action cannot be undone.")}
-                  confirmLabel={t("Delete")}
-                  cancelLabel={t("Cancel")}
-                  onConfirm={() => void submitDeleteRunner(runner)}
-                >
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!canAdminRunners || isDeleting}
-                  >
-                    <Trash2 data-icon="inline-start" />
-                    {t("Delete")}
-                  </Button>
-                </ConfirmAction>
-              </div>
-            </div>
-          ))}
+      {isLoadingRunners ? (
+        <div className="px-4 py-3"><RunnerListSkeleton /></div>
+      ) : runners.length === 0 ? (
+        <div className="px-4 py-3">
+          <RunnerEmptyState
+            canAdmin={canAdminRunners}
+            t={t}
+            onRegister={() => setComposerOpen(true)}
+          />
         </div>
+      ) : (
+        <DataList>
+          {runners.map((runner) => (
+            <DataRow key={runner.id}>
+              <div className={cn("flex w-full flex-col gap-2", !runner.active ? "opacity-70" : undefined)}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-medium">{runner.name}</p>
+                      <RunnerStatusBadge runner={runner} t={t} />
+                      <Badge variant={runner.active ? "secondary" : "outline"}>{runner.active ? t("active") : t("paused")}</Badge>
+                    </div>
+                    {runner.description ? <p className="text-xs text-muted-foreground">{runner.description}</p> : null}
+                    <p className="text-xs text-muted-foreground">{getRunnerHealthDescription(runner, t)}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">#{runner.id}</Badge>
+                      {parseRunnerTags(runner.tags).map((tag) => (
+                        <Badge key={tag} variant="outline">{tag}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <ConfirmAction
+                    title={t("Delete runner \"{name}\"?").replace("{name}", runner.name)}
+                    description={t("This action cannot be undone.")}
+                    confirmLabel={t("Delete")}
+                    cancelLabel={t("Cancel")}
+                    onConfirm={() => void submitDeleteRunner(runner)}
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!canAdminRunners || isDeleting}
+                    >
+                      <Trash2 data-icon="inline-start" />
+                      {t("Delete")}
+                    </Button>
+                  </ConfirmAction>
+                </div>
+                <RunnerOperationalDiagnostics runner={runner} t={t} />
+              </div>
+            </DataRow>
+          ))}
+        </DataList>
+      )}
 
+      <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
         <Alert className="bg-muted/20">
           <AlertTitle>{t("Runner protocol")}</AlertTitle>
           <AlertDescription className="flex flex-col gap-2">
@@ -280,19 +283,17 @@ export const RepositoryRunnersTab = ({ repoId, permissions, t, onError }: Reposi
         </Alert>
 
         <RepositoryCIVariablesPanel repoId={repoId} permissions={permissions} t={t} onError={onError} />
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 };
 
 const RunnerStat = ({ label, value, description, active = false }: { label: string; value: number; description: string; active?: boolean }) => (
-  <Card className={cn("shadow-none", active ? "border-primary/30 bg-primary/5" : "bg-muted/20")}>
-    <CardContent className="flex flex-col gap-1 p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold">{value}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </CardContent>
-  </Card>
+  <div className={cn("flex flex-col gap-0.5 px-4 py-2.5", active ? "bg-primary/5" : undefined)}>
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-sm font-semibold">{value}</p>
+    <p className="text-xs text-muted-foreground">{description}</p>
+  </div>
 );
 
 const RunnerTrustGuide = ({ t }: { t: (text: string) => string }) => (
@@ -307,7 +308,7 @@ const RunnerTrustGuide = ({ t }: { t: (text: string) => string }) => (
 );
 
 const RunnerGuideItem = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-md border bg-background px-3 py-2">
+  <div className="flex flex-col gap-0.5">
     <p className="text-xs font-medium">{label}</p>
     <p className="text-xs text-muted-foreground">{value}</p>
   </div>

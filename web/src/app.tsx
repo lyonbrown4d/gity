@@ -36,6 +36,9 @@ const AppRepositoriesPage = lazy(() =>
 const AppTodosPage = lazy(() =>
   import("@/pages/app/todos-page").then((module) => ({ default: module.AppTodosPage })),
 );
+const AppActivityPage = lazy(() =>
+  import("@/pages/app/activity-page").then((module) => ({ default: module.AppActivityPage })),
+);
 const RepositoryDetailPage = lazy(() =>
   import("@/pages/app/repository-detail-page").then((module) => ({ default: module.RepositoryDetailPage })),
 );
@@ -103,6 +106,7 @@ export function App(): JSX.Element {
               >
                 <Route path="/app/dashboard" element={<AppDashboardPage />} />
                 <Route path="/app/todos" element={<AppTodosPage />} />
+                <Route path="/app/activity" element={<AppActivityPage />} />
                 <Route path="/app/projects" element={<AppRepositoriesPage />} />
                 <Route path="/app/repositories" element={<Navigate to="/app/projects" replace />} />
                 <Route path="/app/projects/:organizationId/:projectId" element={<RepositoryDetailPage />} />

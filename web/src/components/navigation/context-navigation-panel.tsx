@@ -1,5 +1,5 @@
 import {
-  Boxes, Building2, FolderGit2, Gauge, GitBranch, Inbox, ShieldCheck, User, Users,
+  Activity, Boxes, Building2, FolderGit2, Gauge, GitBranch, Inbox, ShieldCheck, User, Users,
 } from "lucide-react";
 import {
   SidebarContent, SidebarFooter, SidebarHeader,
@@ -68,6 +68,7 @@ export function ContextNavigationPanel({
 function WorkspaceNavigation({ onNavigate, t }: NavigationProps): JSX.Element {
   return <ContextNavigationGroup label={t("Workspace")} items={[
     { title: t("Dashboard"), url: "/app/dashboard", icon: Gauge },
+    { title: t("Activity"), url: "/app/activity", icon: Activity },
     { title: t("Profile"), url: "/app/profile", icon: User },
   ]} onNavigate={onNavigate} />;
 }

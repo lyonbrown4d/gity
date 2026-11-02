@@ -4,12 +4,14 @@ import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
+import { Toolbar } from "@/components/surface/toolbar";
 import { getApiBaseUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
@@ -231,28 +233,17 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
   }, [packages, selectedPackageId]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>{t("Package Registry")}</CardTitle>
-            <CardDescription>{t("Publish generic project artifacts and inspect package versions.")}</CardDescription>
-          </div>
+    <Section
+      title={t("Package Registry")}
+      description={t("Publish generic project artifacts and inspect package versions.")}
+      actions={
+        <Toolbar>
           <Badge variant={canWritePackages ? "secondary" : "outline"}>
             {canWritePackages ? t("Upload enabled") : t("Read only")}
           </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <PackageStat label={t("Packages")} value={packages.length} />
-          <PackageStat label={t("Versions")} value={packageDetail?.versions.length ?? 0} />
-          <PackageStat label={t("Files")} value={totalFiles} />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
+            size="sm"
             variant={isComposerOpen ? "secondary" : "default"}
             disabled={!canWritePackages}
             onClick={() => setComposerOpen((current) => !current)}
@@ -264,20 +255,30 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
             <RefreshCw data-icon="inline-start" />
             {t("Reload")}
           </Button>
-        </div>
+        </Toolbar>
+      }
+      flush
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <PackageStat label={t("Packages")} value={packages.length} />
+        <PackageStat label={t("Versions")} value={packageDetail?.versions.length ?? 0} />
+        <PackageStat label={t("Files")} value={totalFiles} />
+      </div>
 
-        {!canWritePackages ? (
+      {!canWritePackages ? (
+        <div className="border-b border-border px-4 py-3">
           <Alert>
             <AlertTitle>{t("Package registry is read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect packages, but cannot upload them.")}</AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
         {isComposerOpen ? (
-          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitUpload}>
+          <form className="flex flex-col gap-3 border-b border-border px-4 py-3" onSubmit={submitUpload}>
             <div className="grid gap-3 md:grid-cols-[180px_1fr_180px]">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-type">{t("Package type")}</Label>
+                <Label htmlFor="package-type" className="text-xs text-muted-foreground">{t("Package type")}</Label>
                 <Select value={packageType} onValueChange={setPackageType}>
                   <SelectTrigger id="package-type">
                     <SelectValue />
@@ -293,7 +294,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-name">{t("Package name")}</Label>
+                <Label htmlFor="package-name" className="text-xs text-muted-foreground">{t("Package name")}</Label>
                 <Input
                   id="package-name"
                   value={packageName}
@@ -302,7 +303,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-version">{t("Version")}</Label>
+                <Label htmlFor="package-version" className="text-xs text-muted-foreground">{t("Version")}</Label>
                 <Input
                   id="package-version"
                   value={version}
@@ -313,7 +314,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
             </div>
             <div className="grid gap-3 md:grid-cols-[1fr_1fr_200px]">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-file-name">{t("File name")}</Label>
+                <Label htmlFor="package-file-name" className="text-xs text-muted-foreground">{t("File name")}</Label>
                 <Input
                   id="package-file-name"
                   value={fileName}
@@ -322,7 +323,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-file-path">{t("File path optional")}</Label>
+                <Label htmlFor="package-file-path" className="text-xs text-muted-foreground">{t("File path optional")}</Label>
                 <Input
                   id="package-file-path"
                   value={filePath}
@@ -331,7 +332,7 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="package-content-type">{t("Content type")}</Label>
+                <Label htmlFor="package-content-type" className="text-xs text-muted-foreground">{t("Content type")}</Label>
                 <Input
                   id="package-content-type"
                   value={contentType}
@@ -341,14 +342,14 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="package-file">{t("Package file")}</Label>
+              <Label htmlFor="package-file" className="text-xs text-muted-foreground">{t("Package file")}</Label>
               <Input id="package-file" type="file" onChange={(event) => void selectPackageFile(event)} />
               {fileContentBase64 ? (
                 <p className="text-xs text-muted-foreground">{t("Selected file content will be uploaded as base64.")}</p>
               ) : null}
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="package-content">{t("Inline file content fallback")}</Label>
+              <Label htmlFor="package-content" className="text-xs text-muted-foreground">{t("Inline file content fallback")}</Label>
               <Textarea
                 id="package-content"
                 className="min-h-32"
@@ -358,53 +359,57 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
               />
             </div>
             <div className="flex justify-end">
-              <Button type="submit" disabled={!canWritePackages || isUploading}>
+              <Button type="submit" size="sm" disabled={!canWritePackages || isUploading}>
                 {isUploading ? t("Uploading package file...") : t("Upload file")}
               </Button>
             </div>
           </form>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <div className="flex flex-col gap-2 rounded-md border p-2">
-            {isLoadingPackages ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading packages...")}</p> : null}
+        <div className="grid lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="min-w-0 border-b border-border lg:border-b-0 lg:border-r">
+            {isLoadingPackages ? <p className="px-4 py-3 text-sm text-muted-foreground">{t("Loading packages...")}</p> : null}
             {!isLoadingPackages && packages.length === 0 ? (
-              <PackageEmptyState
-                title={t("No packages published yet.")}
-                description={canWritePackages ? t("Upload the first package file to create a version.") : t("Packages will appear here after maintainers publish artifacts.")}
-              />
+              <div className="px-4 py-6">
+                <PackageEmptyState
+                  title={t("No packages published yet.")}
+                  description={canWritePackages ? t("Upload the first package file to create a version.") : t("Packages will appear here after maintainers publish artifacts.")}
+                />
+              </div>
             ) : null}
-            {packages.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={cn(
-                  "flex w-full flex-col gap-2 rounded-md border p-3 text-left transition hover:bg-muted/40",
-                  selectedPackage?.id === item.id ? "border-primary bg-primary/5" : "",
-                )}
-                onClick={() => setSelectedPackageId(item.id)}
-              >
-                <div className="flex items-start gap-2">
-                  <Package className="mt-0.5 size-4 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.type}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {item.updated_at ? formatRelativeTime(item.updated_at) : t("No updates yet")}
-                </p>
-              </button>
-            ))}
+            {packages.length > 0 ? (
+              <DataList>
+                {packages.map((item) => (
+                  <DataRow key={item.id} className="p-0">
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center gap-2 px-4 py-2.5 text-left",
+                        selectedPackage?.id === item.id ? "bg-primary/5" : "",
+                      )}
+                      onClick={() => setSelectedPackageId(item.id)}
+                    >
+                      <Package className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{item.name}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {item.type} · {item.updated_at ? formatRelativeTime(item.updated_at) : t("No updates yet")}
+                        </span>
+                      </span>
+                    </button>
+                  </DataRow>
+                ))}
+              </DataList>
+            ) : null}
           </div>
 
-          <div className="rounded-md border">
+          <div className="min-w-0 border-t border-border lg:border-t-0">
             {selectedPackage ? (
-              <div className="flex flex-col gap-4 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="divide-y divide-border">
+                <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
                   <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-lg font-semibold">{selectedPackage.name}</h3>
+                      <h3 className="truncate text-sm font-semibold">{selectedPackage.name}</h3>
                       <Badge variant="secondary">{selectedPackage.type}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">
@@ -418,18 +423,20 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                   </Button>
                 </div>
 
-                {isLoadingDetail ? <p className="text-sm text-muted-foreground">{t("Loading package detail...")}</p> : null}
+                {isLoadingDetail ? <p className="px-4 py-3 text-sm text-muted-foreground">{t("Loading package detail...")}</p> : null}
                 {!isLoadingDetail && packageDetail?.versions.length === 0 ? (
-                  <Alert>
-                    <AlertTitle>{t("No package versions found.")}</AlertTitle>
-                    <AlertDescription>{t("Upload a package file to create the first version for this package.")}</AlertDescription>
-                  </Alert>
+                  <div className="px-4 py-3">
+                    <Alert>
+                      <AlertTitle>{t("No package versions found.")}</AlertTitle>
+                      <AlertDescription>{t("Upload a package file to create the first version for this package.")}</AlertDescription>
+                    </Alert>
+                  </div>
                 ) : null}
                 {packageDetail?.versions.map((item) => (
-                  <div key={item.version.id} className="flex flex-col gap-2 rounded-md border p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div key={item.version.id}>
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                       <div>
-                        <p className="font-medium">{item.version.version}</p>
+                        <p className="text-sm font-medium">{item.version.version}</p>
                         <p className="text-xs text-muted-foreground">
                           {item.version.updated_at ? formatRelativeTime(item.version.updated_at) : t("No updates yet")}
                         </p>
@@ -478,16 +485,16 @@ export const RepositoryPackagesTab = ({ repoId, permissions, t, onError }: Repos
                 ))}
               </div>
             ) : (
-              <PackageEmptyState
-                className="min-h-64 border-0"
-                title={t("Select or upload a package.")}
-                description={canWritePackages ? t("Upload a package file or select an existing package to inspect versions.") : t("Select an existing package to inspect versions and files.")}
-              />
+              <div className="px-4 py-10">
+                <PackageEmptyState
+                  title={t("Select or upload a package.")}
+                  description={canWritePackages ? t("Upload a package file or select an existing package to inspect versions.") : t("Select an existing package to inspect versions and files.")}
+                />
+              </div>
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </Section>
   );
 };
 
@@ -526,7 +533,7 @@ const PackageProtocolGuide = ({
   }
 
   return (
-    <div className="grid gap-3 rounded-xl border border-border/80 bg-muted/20 p-3 lg:grid-cols-[240px_1fr]">
+    <div className="grid gap-3 border border-border bg-muted/20 p-3 lg:grid-cols-[240px_1fr]">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <Terminal className="size-4 text-primary" />
@@ -554,7 +561,7 @@ const PackageProtocolGuide = ({
         </div>
       </div>
       <div className="grid gap-3 xl:grid-cols-2">
-        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 p-3">
+        <div className="flex flex-col gap-2 border bg-background/80 p-3">
           <div>
             <p className="text-sm font-medium">{activeGuide.title}</p>
             <p className="text-xs text-muted-foreground">{t(activeGuide.description)}</p>
@@ -564,7 +571,7 @@ const PackageProtocolGuide = ({
             <PackageCommandLine key={command} label={t("Publish")} value={command} copiedCommand={copiedCommand} t={t} onCopy={onCopy} />
           ))}
         </div>
-        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 p-3">
+        <div className="flex flex-col gap-2 border bg-background/80 p-3">
           <p className="text-sm font-medium">{t("Install or consume")}</p>
           {activeGuide.installCommands.map((command) => (
             <PackageCommandLine key={command} label={t("Install")} value={command} copiedCommand={copiedCommand} t={t} onCopy={onCopy} />
@@ -602,15 +609,15 @@ const PackageCommandLine = ({
   </div>
 );
 const PackageStat = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex flex-col gap-1 rounded-md border p-3">
+  <div className="px-4 py-2.5">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-lg font-semibold">{value}</p>
+    <p className="mt-0.5 text-sm font-semibold">{value}</p>
   </div>
 );
 
-const PackageEmptyState = ({ title, description, className }: { title: string; description: string; className?: string }) => (
-  <div className={cn("flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center", className)}>
-    <Package className="size-5 text-muted-foreground" />
+const PackageEmptyState = ({ title, description }: { title: string; description: string }) => (
+  <div className="flex flex-col items-center justify-center gap-2 text-center">
+    <Package className="size-4 text-muted-foreground" />
     <div className="flex flex-col gap-1">
       <p className="text-sm font-medium">{title}</p>
       <p className="text-xs text-muted-foreground">{description}</p>

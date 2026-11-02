@@ -5,10 +5,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmAction } from "@/components/common/confirm-action";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
+import { Toolbar } from "@/components/surface/toolbar";
 import { cn } from "@/lib/utils";
 import type { RepositoryWikiPageView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
@@ -231,28 +233,17 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
   }, [draftContent]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>{t("Wiki")}</CardTitle>
-            <CardDescription>{t("Maintain project wiki pages with markdown content.")}</CardDescription>
-          </div>
+    <Section
+      title={t("Wiki")}
+      description={t("Maintain project wiki pages with markdown content.")}
+      actions={
+        <Toolbar>
           <Badge variant={canWriteWiki ? "secondary" : "outline"}>
             {canWriteWiki ? t("Editing enabled") : t("Read only")}
           </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <WikiStat label={t("Wiki pages")} value={pages.length} />
-          <WikiStat label={t("Selected page")} value={selectedPage?.title ?? "--"} />
-          <WikiStat label={t("Format")} value={selectedPage?.format ?? "markdown"} />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
           <Button
             type="button"
+            size="sm"
             variant={isComposerOpen ? "secondary" : "default"}
             disabled={!canWriteWiki}
             onClick={() => setComposerOpen((current) => !current)}
@@ -264,207 +255,218 @@ export const RepositoryWikiTab = ({ repoId, permissions, t, onError }: Repositor
             <RefreshCw data-icon="inline-start" />
             {t("Reload")}
           </Button>
-        </div>
+        </Toolbar>
+      }
+      flush
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <WikiStat label={t("Wiki pages")} value={pages.length} />
+        <WikiStat label={t("Selected page")} value={selectedPage?.title ?? "--"} />
+        <WikiStat label={t("Format")} value={selectedPage?.format ?? "markdown"} />
+      </div>
 
-        {!canWriteWiki ? (
+      {!canWriteWiki ? (
+        <div className="border-b border-border px-4 py-3">
           <Alert>
             <AlertTitle>{t("Wiki is read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect wiki pages, but cannot edit them.")}</AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
-        {isComposerOpen ? (
-          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitCreatePage}>
-            <div className="grid gap-3 md:grid-cols-[1fr_220px_180px]">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="wiki-title">{t("Wiki page title")}</Label>
-                <Input
-                  id="wiki-title"
-                  value={newTitle}
-                  onChange={(event) => setNewTitle(event.target.value)}
-                  placeholder={t("Getting Started")}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="wiki-slug">{t("Slug optional")}</Label>
-                <Input
-                  id="wiki-slug"
-                  value={newSlug}
-                  onChange={(event) => setNewSlug(event.target.value)}
-                  placeholder="getting-started"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="wiki-author-id">{t("Author user ID")}</Label>
-                <Input
-                  id="wiki-author-id"
-                  value={authorUserId}
-                  onChange={(event) => setAuthorUserId(event.target.value)}
-                  placeholder="1"
-                />
-              </div>
-            </div>
+      {isComposerOpen ? (
+        <form className="flex flex-col gap-3 border-b border-border px-4 py-3" onSubmit={submitCreatePage}>
+          <div className="grid gap-3 md:grid-cols-[1fr_220px_180px]">
             <div className="flex flex-col gap-1">
-              <Label htmlFor="wiki-content">{t("Content")}</Label>
-              <Textarea
-                id="wiki-content"
-                className="min-h-44"
-                value={newContent}
-                onChange={(event) => setNewContent(event.target.value)}
-                placeholder="# Getting Started"
+              <Label htmlFor="wiki-title" className="text-xs text-muted-foreground">{t("Wiki page title")}</Label>
+              <Input
+                id="wiki-title"
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder={t("Getting Started")}
               />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={!canWriteWiki || isCreatingPage}>
-                {isCreatingPage ? t("Creating wiki page...") : t("Create wiki page")}
-              </Button>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="wiki-slug" className="text-xs text-muted-foreground">{t("Slug optional")}</Label>
+              <Input
+                id="wiki-slug"
+                value={newSlug}
+                onChange={(event) => setNewSlug(event.target.value)}
+                placeholder="getting-started"
+              />
             </div>
-          </form>
-        ) : null}
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="wiki-author-id" className="text-xs text-muted-foreground">{t("Author user ID")}</Label>
+              <Input
+                id="wiki-author-id"
+                value={authorUserId}
+                onChange={(event) => setAuthorUserId(event.target.value)}
+                placeholder="1"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="wiki-content" className="text-xs text-muted-foreground">{t("Content")}</Label>
+            <Textarea
+              id="wiki-content"
+              className="min-h-44"
+              value={newContent}
+              onChange={(event) => setNewContent(event.target.value)}
+              placeholder="# Getting Started"
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button type="submit" size="sm" disabled={!canWriteWiki || isCreatingPage}>
+              {isCreatingPage ? t("Creating wiki page...") : t("Create wiki page")}
+            </Button>
+          </div>
+        </form>
+      ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
-          <div className="flex flex-col gap-2 rounded-md border p-2">
-            {isLoadingPages ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading wiki pages...")}</p> : null}
-            {!isLoadingPages && pages.length === 0 ? (
+      <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="min-w-0 border-b border-border lg:border-b-0 lg:border-r">
+          {isLoadingPages ? <p className="px-4 py-3 text-sm text-muted-foreground">{t("Loading wiki pages...")}</p> : null}
+          {!isLoadingPages && pages.length === 0 ? (
+            <div className="px-4 py-6">
               <WikiEmptyState
                 title={t("No wiki pages found.")}
                 description={canWriteWiki ? t("Create the first wiki page to document this project.") : t("Wiki pages will appear here after maintainers create them.")}
               />
-            ) : null}
-            {pages.map((page) => (
-              <button
-                key={page.slug}
-                type="button"
-                className={cn(
-                  "flex w-full flex-col gap-2 rounded-md border p-3 text-left transition hover:bg-muted/40",
-                  selectedPage?.slug === page.slug ? "border-primary bg-primary/5" : "",
-                )}
-                onClick={() => setSelectedSlug(page.slug)}
-              >
-                <div className="flex items-start gap-2">
-                  <BookOpen className="mt-0.5 size-4 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{page.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{page.slug}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {page.updated_at ? formatRelativeTime(page.updated_at) : t("Not edited yet")}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          <div className="rounded-md border">
-            {selectedPage ? (
-              <form className="flex flex-col gap-4 p-4" onSubmit={submitUpdatePage}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">{selectedPage.slug}</Badge>
-                      <Badge variant="outline">{selectedPage.format}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t("Last edited by")}: {selectedPage.last_edited_by_user_id || "--"}
-                    </p>
-                  </div>
-                  <ConfirmAction
-                    title={selectedPage ? t("Delete wiki page \"{title}\"?").replace("{title}", selectedPage.title) : t("Delete")}
-                    description={t("This action cannot be undone.")}
-                    confirmLabel={t("Delete")}
-                    cancelLabel={t("Cancel")}
-                    onConfirm={() => void submitDeletePage()}
+            </div>
+          ) : null}
+          {pages.length > 0 ? (
+            <DataList>
+              {pages.map((page) => (
+                <DataRow key={page.slug} className={cn("p-0", selectedPage?.slug === page.slug && "bg-primary/5")}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left"
+                    onClick={() => setSelectedSlug(page.slug)}
                   >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={!canWriteWiki || isDeletingPage}
-                    >
-                      <Trash2 data-icon="inline-start" />
-                      {t("Delete")}
-                    </Button>
-                  </ConfirmAction>
-                </div>
+                    <BookOpen className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{page.title}</span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        {page.slug} · {page.updated_at ? formatRelativeTime(page.updated_at) : t("Not edited yet")}
+                      </span>
+                    </span>
+                  </button>
+                </DataRow>
+              ))}
+            </DataList>
+          ) : null}
+        </div>
 
-                <div className="grid gap-3 md:grid-cols-[1fr_180px]">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="wiki-draft-title">{t("Wiki page title")}</Label>
-                    <Input
-                      id="wiki-draft-title"
-                      value={draftTitle}
-                      disabled={!canWriteWiki}
-                      onChange={(event) => setDraftTitle(event.target.value)}
-                    />
+        <div className="min-w-0">
+          {selectedPage ? (
+            <form className="flex flex-col gap-4 p-4" onSubmit={submitUpdatePage}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">{selectedPage.slug}</Badge>
+                    <Badge variant="outline">{selectedPage.format}</Badge>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="wiki-editor-id">{t("Editor user ID")}</Label>
-                    <Input
-                      id="wiki-editor-id"
-                      value={editorUserId}
-                      disabled={!canWriteWiki}
-                      onChange={(event) => setEditorUserId(event.target.value)}
-                      placeholder="1"
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("Last edited by")}: {selectedPage.last_edited_by_user_id || "--"}
+                  </p>
                 </div>
-
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="wiki-draft-content" className="flex items-center gap-2 text-sm font-medium">
-                      <Edit3 className="size-4" />
-                      {t("Wiki page content")}
-                    </Label>
-                    <Textarea
-                      id="wiki-draft-content"
-                      className="min-h-80"
-                      value={draftContent}
-                      disabled={!canWriteWiki}
-                      onChange={(event) => setDraftContent(event.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Eye className="size-4" />
-                      {t("Preview")}
-                    </div>
-                    <article
-                      className="markdown-body min-h-80 rounded-md border bg-muted/20 p-4"
-                      dangerouslySetInnerHTML={{ __html: previewHtml }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={!canWriteWiki || isUpdatingPage}>
-                    {isUpdatingPage ? t("Saving wiki page...") : t("Save wiki page")}
+                <ConfirmAction
+                  title={selectedPage ? t("Delete wiki page \"{title}\"?").replace("{title}", selectedPage.title) : t("Delete")}
+                  description={t("This action cannot be undone.")}
+                  confirmLabel={t("Delete")}
+                  cancelLabel={t("Cancel")}
+                  onConfirm={() => void submitDeletePage()}
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!canWriteWiki || isDeletingPage}
+                  >
+                    <Trash2 data-icon="inline-start" />
+                    {t("Delete")}
                   </Button>
+                </ConfirmAction>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="wiki-draft-title" className="text-xs text-muted-foreground">{t("Wiki page title")}</Label>
+                  <Input
+                    id="wiki-draft-title"
+                    value={draftTitle}
+                    disabled={!canWriteWiki}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                  />
                 </div>
-              </form>
-            ) : (
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="wiki-editor-id" className="text-xs text-muted-foreground">{t("Editor user ID")}</Label>
+                  <Input
+                    id="wiki-editor-id"
+                    value={editorUserId}
+                    disabled={!canWriteWiki}
+                    onChange={(event) => setEditorUserId(event.target.value)}
+                    placeholder="1"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="wiki-draft-content" className="flex items-center gap-2 text-sm font-medium">
+                    <Edit3 className="size-4" />
+                    {t("Wiki page content")}
+                  </Label>
+                  <Textarea
+                    id="wiki-draft-content"
+                    className="min-h-80"
+                    value={draftContent}
+                    disabled={!canWriteWiki}
+                    onChange={(event) => setDraftContent(event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Eye className="size-4" />
+                    {t("Preview")}
+                  </div>
+                  <article
+                    className="markdown-body min-h-80 border bg-muted/20 p-4"
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" disabled={!canWriteWiki || isUpdatingPage}>
+                  {isUpdatingPage ? t("Saving wiki page...") : t("Save wiki page")}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="px-4 py-10">
               <WikiEmptyState
-                className="min-h-64 border-0"
                 title={t("Select or create a wiki page.")}
                 description={canWriteWiki ? t("Create a wiki page or select one from the list to edit markdown content.") : t("Select a wiki page from the list to preview its content.")}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 };
 
 const WikiStat = ({ label, value }: { label: string; value: number | string }) => (
-  <div className="flex flex-col gap-1 rounded-md border p-3">
+  <div className="px-4 py-2.5">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="truncate text-lg font-semibold">{value}</p>
+    <p className="mt-0.5 truncate text-sm font-semibold">{value}</p>
   </div>
 );
 
-const WikiEmptyState = ({ title, description, className }: { title: string; description: string; className?: string }) => (
-  <div className={cn("flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center", className)}>
-    <BookOpen className="size-5 text-muted-foreground" />
+const WikiEmptyState = ({ title, description }: { title: string; description: string }) => (
+  <div className="flex flex-col items-center justify-center gap-2 text-center">
+    <BookOpen className="size-4 text-muted-foreground" />
     <div className="flex flex-col gap-1">
       <p className="text-sm font-medium">{title}</p>
       <p className="text-xs text-muted-foreground">{description}</p>
@@ -514,4 +516,3 @@ const parseOptionalUserID = (value: string): number | null => {
   }
   return parseRequiredUserID(value);
 };
-

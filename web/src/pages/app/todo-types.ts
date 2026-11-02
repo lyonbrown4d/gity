@@ -7,7 +7,12 @@ export type TodoKind =
   | "issue_commented"
   | "branch_protection_changed"
   | "branch_deleted"
-  | "merge_request_merged";
+  | "merge_request_merged"
+  | "merge_request_commented"
+  | "merge_request_approved"
+  | "merge_request_unapproved"
+  | "merge_request_review_requested"
+  | "merge_request_assigned";
 
 export interface TodoView {
   id: number;

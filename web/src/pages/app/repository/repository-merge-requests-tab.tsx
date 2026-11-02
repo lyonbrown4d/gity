@@ -5,7 +5,9 @@ import { Link } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
+import { Toolbar } from "@/components/surface/toolbar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -531,17 +533,36 @@ export const RepositoryMergeRequestsTab = ({
   }, [approvalsQuery.query.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <CardTitle>{t("Merge Requests")}</CardTitle>
-        <CardDescription>{t("Review branch changes and merge them into protected targets.")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+    <div className="flex flex-col gap-4 page-enter">
+      <section className="overflow-hidden rounded-md border border-border bg-card" aria-labelledby="merge-requests-title">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h2 id="merge-requests-title" className="text-sm font-semibold leading-tight">{t("Merge Requests")}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{t("Review branch changes and merge them into protected targets.")}</p>
+          </div>
+          <Toolbar>
+            <Button
+              type="button"
+              size="sm"
+              variant={isComposerOpen ? "secondary" : "outline"}
+              disabled={!canCreateMergeRequest}
+              onClick={() => setComposerOpen((current) => !current)}
+            >
+              <GitPullRequest data-icon="inline-start" />
+              {isComposerOpen ? t("Hide new merge request form") : t("New merge request")}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => void loadMergeRequests()}>
+              <RefreshCw data-icon="inline-start" />
+              {t("Reload")}
+            </Button>
+          </Toolbar>
+        </div>
+        <div className="grid divide-y divide-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <MergeRequestStat label={t("Open")} value={stats.opened} tone="emerald" />
           <MergeRequestStat label={t("Merged")} value={stats.merged} tone="blue" />
           <MergeRequestStat label={t("Closed")} value={stats.closed} tone="slate" />
         </div>
+      </section>
 
         <div id="merge-request-approval-rules-panel">
           <RepositoryMergeRequestApprovalRulesPanel
@@ -558,184 +579,176 @@ export const RepositoryMergeRequestsTab = ({
 
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
           <div className="flex flex-col gap-3">
-            <div className="rounded-md border p-3">
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
-                <div className="relative md:col-span-2 xl:col-span-1">
-                  <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Section flush className="overflow-hidden">
+              <div className="border-b border-border px-4 py-2.5">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
+                  <div className="relative md:col-span-2 xl:col-span-1">
+                    <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="pl-8"
+                      placeholder={t("Search title, branch, or description")}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                    />
+                  </div>
+                  <Select
+                    value={stateFilter}
+                    onValueChange={(value) => setStateFilter(value as MergeRequestStateFilter)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("Status")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="opened">{t("Open merge requests")}</SelectItem>
+                        <SelectItem value="merged">{t("Merged merge requests")}</SelectItem>
+                        <SelectItem value="closed">{t("Closed merge requests")}</SelectItem>
+                        <SelectItem value="all">{t("All merge requests")}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sourceBranchFilter} onValueChange={(value) => setSourceBranchFilter(value as MergeRequestBranchFilter)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("Source branch")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="all">{t("Any source branch")}</SelectItem>
+                        {sourceBranchOptions.map((branch) => (
+                          <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
+                            {branch.name} ({branch.count})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Select value={targetBranchFilter} onValueChange={(value) => setTargetBranchFilter(value as MergeRequestBranchFilter)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("Target branch")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="all">{t("Any target branch")}</SelectItem>
+                        {targetBranchOptions.map((branch) => (
+                          <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
+                            {branch.name} ({branch.count})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {t("Showing")} {filteredMergeRequests.length} {t("of")} {stats.total} {t("merge requests")}
+                  </span>
+                  {hasMergeRequestFilters ? (
+                    <Button type="button" size="sm" variant="ghost" onClick={resetMergeRequestFilters}>
+                      {t("Clear filters")}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              {!canCreateMergeRequest ? (
+                <div className="border-b border-border px-4 py-2.5">
+                  <Alert>
+                    <AlertDescription>{t("Your current project role can inspect merge requests, but cannot create them.")}</AlertDescription>
+                  </Alert>
+                </div>
+              ) : null}
+
+              {isComposerOpen ? (
+                <form className="flex flex-col gap-2 border-b border-border px-4 py-2.5" onSubmit={submitCreateMergeRequest}>
                   <Input
-                    className="pl-8"
-                    placeholder={t("Search title, branch, or description")}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder={t("Merge request title")}
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    required
                   />
-                </div>
-                <Select
-                  value={stateFilter}
-                  onValueChange={(value) => setStateFilter(value as MergeRequestStateFilter)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Status")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="opened">{t("Open merge requests")}</SelectItem>
-                      <SelectItem value="merged">{t("Merged merge requests")}</SelectItem>
-                      <SelectItem value="closed">{t("Closed merge requests")}</SelectItem>
-                      <SelectItem value="all">{t("All merge requests")}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Select value={sourceBranchFilter} onValueChange={(value) => setSourceBranchFilter(value as MergeRequestBranchFilter)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Source branch")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="all">{t("Any source branch")}</SelectItem>
-                      {sourceBranchOptions.map((branch) => (
-                        <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
-                          {branch.name} ({branch.count})
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Select value={targetBranchFilter} onValueChange={(value) => setTargetBranchFilter(value as MergeRequestBranchFilter)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("Target branch")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="all">{t("Any target branch")}</SelectItem>
-                      {targetBranchOptions.map((branch) => (
-                        <SelectItem key={branch.name} value={mergeRequestBranchFilterValue(branch.name)}>
-                          {branch.name} ({branch.count})
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>
-                  {t("Showing")} {filteredMergeRequests.length} {t("of")} {stats.total} {t("merge requests")}
-                </span>
-                {hasMergeRequestFilters ? (
-                  <Button type="button" size="sm" variant="ghost" onClick={resetMergeRequestFilters}>
-                    {t("Clear filters")}
-                  </Button>
+                  <Textarea
+                    className="min-h-24"
+                    placeholder={t("Describe the merge request (optional)")}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                    <BranchSelect
+                      id="source-branch"
+                      label={t("Source branch")}
+                      value={sourceBranch}
+                      branches={branches}
+                      placeholder={t("Select source branch")}
+                      onChange={setSourceBranch}
+                    />
+                    <BranchSelect
+                      id="target-branch"
+                      label={t("Target branch")}
+                      value={targetBranch}
+                      branches={branches}
+                      placeholder={t("Select target branch")}
+                      onChange={setTargetBranch}
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit" size="sm" disabled={!canCreateMergeRequest || isCreating}>
+                      {isCreating ? t("Creating merge request...") : t("Create merge request")}
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
+              <div>
+                {isLoadingMergeRequests ? (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">{t("Loading merge requests...")}</p>
                 ) : null}
+                {!isLoadingMergeRequests && mergeRequests.length === 0 ? (
+                  <MergeRequestEmptyState
+                    title={t("No merge requests yet.")}
+                    description={canCreateMergeRequest ? t("Create a merge request to start branch review and merge triage.") : t("Merge requests will appear here after they are created.")}
+                    actionLabel={canCreateMergeRequest ? t("Create merge request") : undefined}
+                    onAction={canCreateMergeRequest ? () => setComposerOpen(true) : undefined}
+                  />
+                ) : null}
+                {!isLoadingMergeRequests && mergeRequests.length > 0 && filteredMergeRequests.length === 0 ? (
+                  <MergeRequestEmptyState
+                    title={t("No merge requests match these filters.")}
+                    description={t("Try another state, source branch, target branch, or search term.")}
+                    actionLabel={hasMergeRequestFilters ? t("Clear filters") : undefined}
+                    onAction={hasMergeRequestFilters ? resetMergeRequestFilters : undefined}
+                  />
+                ) : null}
+                <DataList>
+                {filteredMergeRequests.map((mergeRequest) => {
+                  const isSelected = selectedMergeRequest?.iid === mergeRequest.iid;
+                  return (
+                    <MergeRequestListItem
+                      key={mergeRequest.id || mergeRequest.iid}
+                      mergeRequest={mergeRequest}
+                      isSelected={isSelected}
+                      checks={isSelected ? selectedChecksView : null}
+                      approvalsCount={isSelected ? approvals.length : null}
+                      isLoadingChecks={isSelected && checksQuery.query.isFetching}
+                      t={t}
+                      onSelect={() => setSelectedIID(mergeRequest.iid)}
+                    />
+                  );
+                })}
+                </DataList>
               </div>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant={isComposerOpen ? "secondary" : "outline"}
-                disabled={!canCreateMergeRequest}
-                onClick={() => setComposerOpen((current) => !current)}
-              >
-                <GitPullRequest data-icon="inline-start" />
-                {isComposerOpen ? t("Hide new merge request form") : t("New merge request")}
-              </Button>
-              <Button type="button" size="sm" variant="ghost" onClick={() => void loadMergeRequests()}>
-                <RefreshCw data-icon="inline-start" />
-                {t("Reload")}
-              </Button>
-            </div>
-
-            {!canCreateMergeRequest ? (
-              <Alert>
-                <AlertDescription>{t("Your current project role can inspect merge requests, but cannot create them.")}</AlertDescription>
-              </Alert>
-            ) : null}
-
-            {isComposerOpen ? (
-              <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitCreateMergeRequest}>
-                <Input
-                  placeholder={t("Merge request title")}
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  required
-                />
-                <Textarea
-                  className="min-h-24"
-                  placeholder={t("Describe the merge request (optional)")}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-                  <BranchSelect
-                    id="source-branch"
-                    label={t("Source branch")}
-                    value={sourceBranch}
-                    branches={branches}
-                    placeholder={t("Select source branch")}
-                    onChange={setSourceBranch}
-                  />
-                  <BranchSelect
-                    id="target-branch"
-                    label={t("Target branch")}
-                    value={targetBranch}
-                    branches={branches}
-                    placeholder={t("Select target branch")}
-                    onChange={setTargetBranch}
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <Button type="submit" disabled={!canCreateMergeRequest || isCreating}>
-                    {isCreating ? t("Creating merge request...") : t("Create merge request")}
-                  </Button>
-                </div>
-              </form>
-            ) : null}
-
-            <div className="flex flex-col gap-2 rounded-md border p-2">
-              {isLoadingMergeRequests ? (
-                <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading merge requests...")}</p>
-              ) : null}
-              {!isLoadingMergeRequests && mergeRequests.length === 0 ? (
-                <MergeRequestEmptyState
-                  title={t("No merge requests yet.")}
-                  description={canCreateMergeRequest ? t("Create a merge request to start branch review and merge triage.") : t("Merge requests will appear here after they are created.")}
-                  actionLabel={canCreateMergeRequest ? t("Create merge request") : undefined}
-                  onAction={canCreateMergeRequest ? () => setComposerOpen(true) : undefined}
-                />
-              ) : null}
-              {!isLoadingMergeRequests && mergeRequests.length > 0 && filteredMergeRequests.length === 0 ? (
-                <MergeRequestEmptyState
-                  title={t("No merge requests match these filters.")}
-                  description={t("Try another state, source branch, target branch, or search term.")}
-                  actionLabel={hasMergeRequestFilters ? t("Clear filters") : undefined}
-                  onAction={hasMergeRequestFilters ? resetMergeRequestFilters : undefined}
-                />
-              ) : null}
-              {filteredMergeRequests.map((mergeRequest) => {
-                const isSelected = selectedMergeRequest?.iid === mergeRequest.iid;
-                return (
-                  <MergeRequestListItem
-                    key={mergeRequest.id || mergeRequest.iid}
-                    mergeRequest={mergeRequest}
-                    isSelected={isSelected}
-                    checks={isSelected ? selectedChecksView : null}
-                    approvalsCount={isSelected ? approvals.length : null}
-                    isLoadingChecks={isSelected && checksQuery.query.isFetching}
-                    t={t}
-                    onSelect={() => setSelectedIID(mergeRequest.iid)}
-                  />
-                );
-              })}
-            </div>
+            </Section>
           </div>
 
-          <div className="min-w-0 rounded-md border p-3">
+          <div className="flex min-w-0 flex-col gap-3">
             {!selectedMergeRequest ? (
-              <p className="text-sm text-muted-foreground">{t("Select a merge request to inspect the diff.")}</p>
+              <Section flush className="overflow-hidden">
+                <p className="px-4 py-10 text-sm text-muted-foreground">{t("Select a merge request to inspect the diff.")}</p>
+              </Section>
             ) : (
               <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
                   <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">
+                      <h3 className="text-base font-semibold">
                         !{selectedMergeRequest.iid} {selectedMergeRequest.title}
                       </h3>
                       <MergeRequestStateBadge state={selectedMergeRequest.state} t={t} />
@@ -744,7 +757,7 @@ export const RepositoryMergeRequestsTab = ({
                       {selectedMergeRequest.source_branch} → {selectedMergeRequest.target_branch}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <Toolbar>
                     <Button type="button" size="sm" variant="ghost" onClick={() => void loadDiff()}>
                       <RefreshCw data-icon="inline-start" />
                       {t("Reload diff")}
@@ -765,11 +778,11 @@ export const RepositoryMergeRequestsTab = ({
                         {t("Reopen merge request")}
                       </Button>
                     ) : null}
-                  </div>
+                  </Toolbar>
                 </div>
 
                 {selectedMergeRequest.description ? (
-                  <p className="rounded-md border bg-muted/20 px-3 py-2 text-sm">{selectedMergeRequest.description}</p>
+                  <p className="bg-muted/30 px-3 py-2 text-sm">{selectedMergeRequest.description}</p>
                 ) : null}
 
                 <MergeRequestReadinessSummary
@@ -807,16 +820,15 @@ export const RepositoryMergeRequestsTab = ({
                       onReload={() => void loadComments()}
                     />
 
-                    <div className="flex flex-col gap-2">
-                      <p className="text-sm font-medium">{t("Diff")}</p>
+                    <Section title={t("Diff")} flush className="overflow-hidden">
                       {diffQuery.query.isFetching ? (
-                        <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading diff...")}</p>
+                        <p className="px-3 py-2 text-sm text-muted-foreground">{t("Loading diff...")}</p>
                       ) : (
-                        <pre className="max-h-[620px] overflow-auto rounded-md border bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100">
+                        <pre className="max-h-[620px] overflow-auto bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-100">
                           {diffView?.diff?.trim() ? diffView.diff : t("No diff available.")}
                         </pre>
                       )}
-                    </div>
+                    </Section>
                   </div>
 
                   <div className="flex flex-col gap-3">
@@ -868,8 +880,7 @@ export const RepositoryMergeRequestsTab = ({
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 
@@ -884,8 +895,8 @@ const MergeRequestEmptyState = ({
   actionLabel?: string;
   onAction?: () => void;
 }) => (
-  <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center">
-    <p className="font-medium">{title}</p>
+  <div className="px-4 py-10 text-center">
+    <p className="text-sm font-medium">{title}</p>
     <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{description}</p>
     {actionLabel && onAction ? (
       <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onAction}>
@@ -914,33 +925,36 @@ const MergeRequestListItem = ({
 }) => {
   const gateSummary = buildMergeRequestListGateSummary(mergeRequest, checks, approvalsCount, isSelected, isLoadingChecks, t);
   return (
-    <button
-      type="button"
-      className={cn(
-        "w-full rounded-md border p-3 text-left transition hover:bg-muted/40",
-        isSelected ? "border-primary/60 bg-primary/5" : "",
-      )}
-      onClick={onSelect}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="font-medium">
-          !{mergeRequest.iid} {mergeRequest.title}
-        </p>
-        <MergeRequestStateBadge state={mergeRequest.state} t={t} />
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        {mergeRequest.updated_at ? `${t("updated")} ${formatRelativeTime(mergeRequest.updated_at)}` : t("No update timestamp")}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge variant="outline">{t("Source")}: {mergeRequest.source_branch || t("N/A")}</Badge>
-        <Badge variant="outline">{t("Target")}: {mergeRequest.target_branch || t("N/A")}</Badge>
-        <Badge variant={gateSummary.gateVariant}>{gateSummary.gateLabel}</Badge>
-        {gateSummary.approvalLabel ? <Badge variant="secondary">{gateSummary.approvalLabel}</Badge> : null}
-      </div>
-      {gateSummary.blockerDetail ? (
-        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{gateSummary.blockerDetail}</p>
-      ) : null}
-    </button>
+    <DataRow className={cn("items-stretch p-0", isSelected ? "bg-primary/5" : "")}>
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-start gap-3 px-4 py-2.5 text-left"
+        aria-current={isSelected ? "true" : undefined}
+        onClick={onSelect}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="truncate text-sm font-medium">
+              <span className="mr-1.5 font-mono text-xs text-muted-foreground">!{mergeRequest.iid}</span>
+              {mergeRequest.title}
+            </p>
+            <MergeRequestStateBadge state={mergeRequest.state} t={t} />
+          </div>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {mergeRequest.updated_at ? `${t("updated")} ${formatRelativeTime(mergeRequest.updated_at)}` : t("No update timestamp")}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            <Badge variant="outline">{t("Source")}: {mergeRequest.source_branch || t("N/A")}</Badge>
+            <Badge variant="outline">{t("Target")}: {mergeRequest.target_branch || t("N/A")}</Badge>
+            <Badge variant={gateSummary.gateVariant}>{gateSummary.gateLabel}</Badge>
+            {gateSummary.approvalLabel ? <Badge variant="secondary">{gateSummary.approvalLabel}</Badge> : null}
+          </div>
+          {gateSummary.blockerDetail ? (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{gateSummary.blockerDetail}</p>
+          ) : null}
+        </div>
+      </button>
+    </DataRow>
   );
 };
 
@@ -1018,29 +1032,28 @@ const MergeRequestReadinessSummary = ({
   const requiredApprovals = checks?.required_approvals ?? 0;
   const approvalCount = checks?.approval_count ?? approvalsCount;
   return (
-    <div className="rounded-md border bg-card p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-medium">{t("Merge readiness")}</p>
-          <p className="text-xs text-muted-foreground">{t("GitLab-style merge gate summary for reviewers and maintainers.")}</p>
-        </div>
-        <Badge variant={isOpen && checks?.mergeable ? "default" : "secondary"}>{t(statusLabel)}</Badge>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <Section
+      title={t("Merge readiness")}
+      description={t("GitLab-style merge gate summary for reviewers and maintainers.")}
+      actions={<Badge variant={isOpen && checks?.mergeable ? "default" : "secondary"}>{t(statusLabel)}</Badge>}
+      flush
+      className="overflow-hidden"
+    >
+      <div className="grid divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
         <MergeRequestSummaryItem label={t("Approvals")} value={`${approvalCount}/${requiredApprovals}`} detail={currentUserApproved ? t("You approved") : t("Your approval pending")} />
         <MergeRequestSummaryItem label={t("Reviewers")} value={String(reviewersCount)} detail={assigneesCount > 0 ? `${assigneesCount} ${t("assignee(s)")}` : t("No assignee")} />
         <MergeRequestSummaryItem label={t("Pipeline")} value={checks?.pipeline?.status ? t(checks.pipeline.status) : t(checks?.status || "unknown")} detail={checks?.pipeline_required ? t("Required") : t("Optional")} />
         <MergeRequestSummaryItem label={t("Discussion")} value={String(commentsCount)} detail={t("comment(s)")} />
       </div>
-    </div>
+    </Section>
   );
 };
 
 const MergeRequestSummaryItem = ({ label, value, detail }: { label: string; value: string; detail: string }) => (
-  <div className="rounded-md border bg-background/60 px-3 py-2">
+  <div className="px-4 py-2">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-base font-semibold">{value}</p>
-    <p className="text-xs text-muted-foreground">{detail}</p>
+    <p className="text-sm font-semibold tabular-nums">{value}</p>
+    <p className="truncate text-xs text-muted-foreground">{detail}</p>
   </div>
 );
 const MergeRequestChecksPanel = ({
@@ -1140,87 +1153,90 @@ const MergeRequestChecksPanel = ({
   const meta = checks ? checkStatusMeta(checks) : { label: "Not loaded", Icon: Clock3 };
   const Icon = meta.Icon;
   return (
-    <div className="rounded-md border bg-card p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Icon className="size-4" />
-            <p className="font-medium">{t("Merge checks")}</p>
-            <Badge variant={checks?.mergeable ? "default" : checks?.required ? "outline" : "secondary"}>{t(meta.label)}</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {checks?.blocking_reason ? checks.blocking_reason : t("Branch policy and pipeline state for this merge request.")}
-          </p>
-        </div>
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <Icon className="size-4" aria-hidden="true" />
+          {t("Merge checks")}
+          <Badge variant={checks?.mergeable ? "default" : checks?.required ? "outline" : "secondary"}>{t(meta.label)}</Badge>
+        </span>
+      }
+      description={checks?.blocking_reason ? checks.blocking_reason : t("Branch policy and pipeline state for this merge request.")}
+      actions={
         <Button type="button" size="sm" variant="ghost" onClick={onReload} disabled={isLoading}>
           <RefreshCw data-icon="inline-start" />
           {isLoading ? t("Checking...") : t("Reload checks")}
         </Button>
-      </div>
-      {checks ? (
-        <div className="mt-3 grid gap-2 text-xs text-muted-foreground md:grid-cols-2">
-          <CheckLine label={t("Target branch")} value={checks.target_branch || t("N/A")} />
-          <CheckLine label={t("Source commit")} value={checks.source_commit_sha ? shortText(checks.source_commit_sha) : t("N/A")} />
-          <CheckLine label={t("Protected target")} value={checks.target_branch_protected ? t("Yes") : t("No")} />
-          <CheckLine label={t("Pipeline required")} value={checks.pipeline_required ? t("Yes") : t("No")} />
-          <CheckLine label={t("Merge request required")} value={checks.require_merge_request ? t("Yes") : t("No")} />
-          <CheckLine label={t("Pipeline status")} value={checks.pipeline?.status ? t(checks.pipeline.status) : t(checks.status)} />
-        </div>
-      ) : null}
-      {checks?.blockers?.length ? (
-        <div className="mt-3 rounded-md border bg-background/70 px-3 py-2">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">{t("Blocking reasons")}</p>
-          <div className="flex flex-col gap-2">
-            {checks.blockers.map((blocker) => {
-              const blockerHint = renderBlockerHint(blocker.code, blocker.message);
-              return (
-                <div
-                  key={`${blocker.category}:${blocker.code}:${blocker.message}`}
-                  className="flex flex-col gap-1 rounded-md border px-2 py-1.5"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
-                    <span className="text-xs font-medium">{blockerHint.title}</span>
-                  </div>
-                  <ul className="ml-6 list-disc text-muted-foreground text-xs">
-                    {blockerHint.details.map((item, index) => (
-                      <li key={`${item}:${index}`}>{item}</li>
-                    ))}
-                  </ul>
-                  {blockerHint.action ? (
-                    <div className="mt-1">
-                      {renderBlockerAction(blockerHint.action.href, blockerHint.action.label)}
+      }
+      flush
+      className="overflow-hidden"
+    >
+      <div className="flex flex-col gap-2 px-4 py-2.5">
+        {checks ? (
+          <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground md:grid-cols-2">
+            <CheckLine label={t("Target branch")} value={checks.target_branch || t("N/A")} />
+            <CheckLine label={t("Source commit")} value={checks.source_commit_sha ? shortText(checks.source_commit_sha) : t("N/A")} />
+            <CheckLine label={t("Protected target")} value={checks.target_branch_protected ? t("Yes") : t("No")} />
+            <CheckLine label={t("Pipeline required")} value={checks.pipeline_required ? t("Yes") : t("No")} />
+            <CheckLine label={t("Merge request required")} value={checks.require_merge_request ? t("Yes") : t("No")} />
+            <CheckLine label={t("Pipeline status")} value={checks.pipeline?.status ? t(checks.pipeline.status) : t(checks.status)} />
+          </div>
+        ) : null}
+        {checks?.blockers?.length ? (
+          <div className="border-t border-border pt-2">
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t("Blocking reasons")}</p>
+            <div className="flex flex-col gap-1.5">
+              {checks.blockers.map((blocker) => {
+                const blockerHint = renderBlockerHint(blocker.code, blocker.message);
+                return (
+                  <div
+                    key={`${blocker.category}:${blocker.code}:${blocker.message}`}
+                    className="flex flex-col gap-0.5 border-l-2 border-destructive/50 pl-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{t(blocker.category || "policy")}</Badge>
+                      <span className="text-xs font-medium">{blockerHint.title}</span>
                     </div>
-                  ) : null}
-                </div>
-              );
-            })}
+                    <ul className="ml-6 list-disc text-muted-foreground text-xs">
+                      {blockerHint.details.map((item, index) => (
+                        <li key={`${item}:${index}`}>{item}</li>
+                      ))}
+                    </ul>
+                    {blockerHint.action ? (
+                      <div className="mt-1">
+                        {renderBlockerAction(blockerHint.action.href, blockerHint.action.label)}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : null}
-      {checks?.approval_rules?.length ? (
-        <div className="mt-3 flex flex-col gap-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {t("Approval rules")}: {checks.approval_count}/{checks.required_approvals}
-          </p>
-          <div className="grid gap-2 md:grid-cols-2">
-            {checks.approval_rules.map((rule) => (
-              <div key={rule.rule_id || rule.name} className="rounded-md border bg-background/70 px-3 py-2 text-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{rule.name}</span>
-                  <Badge variant={rule.satisfied ? "default" : "outline"}>
-                    {rule.approval_count}/{rule.approvals_required}
-                  </Badge>
+        ) : null}
+        {checks?.approval_rules?.length ? (
+          <div className="flex flex-col gap-1.5 border-t border-border pt-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {t("Approval rules")}: {checks.approval_count}/{checks.required_approvals}
+            </p>
+            <div className="grid gap-1.5 md:grid-cols-2">
+              {checks.approval_rules.map((rule) => (
+                <div key={rule.rule_id || rule.name} className="bg-muted/30 px-2.5 py-1.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{rule.name}</span>
+                    <Badge variant={rule.satisfied ? "default" : "outline"}>
+                      {rule.approval_count}/{rule.approvals_required}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {rule.code_owner ? t("CODEOWNERS") : t("Eligible users")} · {rule.target_branch || "*"}
+                  </p>
                 </div>
-                <p className="mt-1 text-muted-foreground">
-                  {rule.code_owner ? t("CODEOWNERS") : t("Eligible users")} · {rule.target_branch || "*"}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </Section>
   );
 };
 
@@ -1261,21 +1277,24 @@ const MergeRequestParticipantsPanel = ({
   onRemoveAssignee: (userID: string) => void;
   onReload: () => void;
 }) => (
-  <div className="rounded-md border p-3">
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-      <div className="flex flex-col gap-1">
-        <p className="flex items-center gap-2 font-medium">
-          <UserRound className="size-4" />
-          {t("Reviewers and assignees")}
-        </p>
-        <p className="text-xs text-muted-foreground">{t("Assign people who should review or own this merge request.")}</p>
-      </div>
+  <Section
+    title={
+      <span className="flex items-center gap-2">
+        <UserRound className="size-4" aria-hidden="true" />
+        {t("Reviewers and assignees")}
+      </span>
+    }
+    description={t("Assign people who should review or own this merge request.")}
+    actions={
       <Button type="button" size="sm" variant="ghost" onClick={onReload} disabled={isLoading}>
         <RefreshCw data-icon="inline-start" />
         {isLoading ? t("Loading...") : t("Reload")}
       </Button>
-    </div>
-    <div className="grid gap-3 lg:grid-cols-2">
+    }
+    flush
+    className="overflow-hidden"
+  >
+    <div className="grid gap-2 px-4 py-2.5 lg:grid-cols-2">
       <ParticipantRoleSection
         label={t("Reviewers")}
         emptyLabel={t("No reviewers assigned.")}
@@ -1305,7 +1324,7 @@ const MergeRequestParticipantsPanel = ({
         onRemove={onRemoveAssignee}
       />
     </div>
-  </div>
+  </Section>
 );
 
 const ParticipantRoleSection = ({
@@ -1338,8 +1357,8 @@ const ParticipantRoleSection = ({
   const selectedIDs = selected.map((item) => item.user_id);
   const availableUsers = users.filter((user) => !selectedIDs.includes(user.id));
   return (
-    <div className="flex flex-col gap-2 rounded-md border bg-muted/10 p-3">
-      <p className="text-sm font-medium">{label}</p>
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <div className="flex flex-wrap gap-2">
         {selected.length === 0 ? <span className="text-xs text-muted-foreground">{emptyLabel}</span> : null}
         {selected.map((item) => (
@@ -1404,16 +1423,16 @@ const MergeRequestApprovalsPanel = ({
   onUnapprove: () => void;
   onReload: () => void;
 }) => (
-  <div className="rounded-md border p-3">
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <p className="flex items-center gap-2 font-medium">
-          <ThumbsUp className="size-4" />
-          {t("Approvals")}
-        </p>
-        <p className="text-xs text-muted-foreground">{t("Track reviewers who approved this merge request.")}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+  <Section
+    title={
+      <span className="flex items-center gap-2">
+        <ThumbsUp className="size-4" aria-hidden="true" />
+        {t("Approvals")}
+      </span>
+    }
+    description={t("Track reviewers who approved this merge request.")}
+    actions={
+      <Toolbar>
         <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
           <RefreshCw data-icon="inline-start" />
           {isLoading ? t("Loading...") : t("Reload")}
@@ -1427,9 +1446,12 @@ const MergeRequestApprovalsPanel = ({
             {isUpdating ? t("Saving...") : t("Approve")}
           </Button>
         )}
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-2">
+      </Toolbar>
+    }
+    flush
+    className="overflow-hidden"
+  >
+    <div className="flex flex-wrap gap-1.5 px-4 py-2.5">
       {approvals.length === 0 ? <span className="text-xs text-muted-foreground">{t("No approvals yet.")}</span> : null}
       {approvals.map((approval) => (
         <Badge key={approval.id || approval.user_id} variant="secondary" className="gap-2">
@@ -1438,7 +1460,7 @@ const MergeRequestApprovalsPanel = ({
         </Badge>
       ))}
     </div>
-  </div>
+  </Section>
 );
 
 const MergeRequestCommentsPanel = ({
@@ -1464,36 +1486,43 @@ const MergeRequestCommentsPanel = ({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onReload: () => void;
 }) => (
-  <div className="rounded-md border p-3">
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-      <div>
-        <p className="flex items-center gap-2 font-medium">
-          <MessageSquare className="size-4" />
-          {t("Discussion")}
-        </p>
-        <p className="text-xs text-muted-foreground">{t("Review conversation for this merge request.")}</p>
-      </div>
+  <Section
+    title={
+      <span className="flex items-center gap-2">
+        <MessageSquare className="size-4" aria-hidden="true" />
+        {t("Discussion")}
+      </span>
+    }
+    description={t("Review conversation for this merge request.")}
+    actions={
       <Button type="button" size="sm" variant="ghost" disabled={isLoading} onClick={onReload}>
         <RefreshCw data-icon="inline-start" />
         {isLoading ? t("Loading...") : t("Reload")}
       </Button>
-    </div>
-    <div className="flex flex-col gap-2">
-      {isLoading ? <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("Loading comments...")}</p> : null}
-      {!isLoading && comments.length === 0 ? (
-        <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">{t("No comments yet.")}</p>
-      ) : null}
-      {comments.map((comment) => (
-        <div key={comment.id} className="rounded-md border bg-background/60 p-3">
-          <p className="mb-1 text-xs text-muted-foreground">
-            {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
-            {comment.created_at ? ` · ${formatRelativeTime(comment.created_at)}` : ""}
-          </p>
-          <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
-        </div>
-      ))}
-    </div>
-    <form className="mt-3 flex flex-col gap-2" onSubmit={onSubmit}>
+    }
+    flush
+    className="overflow-hidden"
+  >
+    {isLoading ? <p className="px-4 py-2.5 text-sm text-muted-foreground">{t("Loading comments...")}</p> : null}
+    {!isLoading && comments.length === 0 ? (
+      <p className="px-4 py-2.5 text-sm text-muted-foreground">{t("No comments yet.")}</p>
+    ) : null}
+    {comments.length > 0 ? (
+      <DataList>
+        {comments.map((comment) => (
+          <DataRow key={comment.id} className="items-start">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs text-muted-foreground">
+                {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
+                {comment.created_at ? ` · ${formatRelativeTime(comment.created_at)}` : ""}
+              </p>
+              <p className="whitespace-pre-wrap text-sm">{comment.body}</p>
+            </div>
+          </DataRow>
+        ))}
+      </DataList>
+    ) : null}
+    <form className="flex flex-col gap-2 border-t border-border px-4 py-2.5" onSubmit={onSubmit}>
       <Textarea
         className="min-h-24"
         value={newComment}
@@ -1502,12 +1531,12 @@ const MergeRequestCommentsPanel = ({
         onChange={(event) => onChangeNewComment(event.target.value)}
       />
       <div className="flex justify-end">
-        <Button type="submit" disabled={!canComment || isCreating || !newComment.trim()}>
+        <Button type="submit" size="sm" disabled={!canComment || isCreating || !newComment.trim()}>
           {isCreating ? t("Commenting...") : t("Comment")}
         </Button>
       </div>
     </form>
-  </div>
+  </Section>
 );
 
 const BranchSelect = ({
@@ -1546,10 +1575,17 @@ const BranchSelect = ({
   </div>
 );
 
-const MergeRequestStat = ({ label, value }: { label: string; value: number; tone: "emerald" | "blue" | "slate" }) => (
-  <div className="rounded-md border bg-card p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-lg font-semibold">{value}</p>
+const statTone: Record<"emerald" | "blue" | "slate", string> = {
+  emerald: "bg-emerald-500",
+  blue: "bg-blue-500",
+  slate: "bg-slate-400",
+};
+
+const MergeRequestStat = ({ label, value, tone }: { label: string; value: number; tone: "emerald" | "blue" | "slate" }) => (
+  <div className="flex items-center gap-2 px-4 py-2">
+    <span className={cn("size-1.5 shrink-0 rounded-full", statTone[tone])} aria-hidden="true" />
+    <span className="text-xs text-muted-foreground">{label}</span>
+    <span className="ml-auto text-sm font-semibold tabular-nums">{value}</span>
   </div>
 );
 
@@ -1560,9 +1596,9 @@ const MergeRequestStateBadge = ({ state, t }: { state: RepositoryMergeRequestSta
 };
 
 const CheckLine = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-md border bg-background/60 px-2 py-1">
-    <span className="font-medium text-foreground">{label}: </span>
-    <span>{value}</span>
+  <div className="flex items-baseline justify-between gap-3">
+    <span className="shrink-0 text-muted-foreground">{label}</span>
+    <span className="truncate font-medium text-foreground">{value}</span>
   </div>
 );
 

@@ -3,13 +3,14 @@ import { Ban, CheckCircle2, Clock3, Download, FileArchive, GitBranch, Loader2, P
 import { useCustom, useCustomMutation, useDataProvider } from "@refinedev/core";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
 import { cn } from "@/lib/utils";
 import type {
   RepositoryJobArtifactContentView,
@@ -412,19 +413,41 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
   }, [detailQuery.query.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <CardTitle>{t("Pipelines")}</CardTitle>
-        <CardDescription>{t("Track CI pipelines triggered by pushes and merge requests.")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-4">
-          <PipelineStat label={t("Pending")} value={stats.pending} description={stats.pending > 0 ? t("Waiting for execution") : t("No queued pipelines")} status="pending" />
-          <PipelineStat label={t("Running")} value={stats.running} description={stats.running > 0 ? t("Jobs are executing") : t("No active pipelines")} status="running" />
-          <PipelineStat label={t("Succeeded")} value={stats.succeeded} description={stats.succeeded > 0 ? t("Healthy completions") : t("No successes yet")} status="succeeded" />
-          <PipelineStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs investigation") : t("No failures")} status="failed" />
+    <Section
+      className="card-enter"
+      title={t("Pipelines")}
+      description={t("Track CI pipelines triggered by pushes and merge requests.")}
+      flush
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">
+            {t("Role")}: {t(permissions.roleLabel)}
+          </Badge>
+          <Button
+            type="button"
+            size="sm"
+            variant={isComposerOpen ? "secondary" : "outline"}
+            disabled={!canMutateCI}
+            onClick={() => setComposerOpen((current) => !current)}
+          >
+            <Play data-icon="inline-start" />
+            {isComposerOpen ? t("Hide pipeline form") : t("New pipeline")}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void loadPipelines()}>
+            <RefreshCw data-icon="inline-start" />
+            {t("Reload")}
+          </Button>
         </div>
+      }
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-4">
+        <PipelineStat label={t("Pending")} value={stats.pending} description={stats.pending > 0 ? t("Waiting for execution") : t("No queued pipelines")} status="pending" />
+        <PipelineStat label={t("Running")} value={stats.running} description={stats.running > 0 ? t("Jobs are executing") : t("No active pipelines")} status="running" />
+        <PipelineStat label={t("Succeeded")} value={stats.succeeded} description={stats.succeeded > 0 ? t("Healthy completions") : t("No successes yet")} status="succeeded" />
+        <PipelineStat label={t("Failed")} value={stats.failed} description={stats.failed > 0 ? t("Needs investigation") : t("No failures")} status="failed" />
+      </div>
 
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
         <Alert className="bg-muted/20">
           <AlertTitle>{t("Pipeline status summary")}</AlertTitle>
           <AlertDescription className="flex flex-col gap-2">
@@ -445,36 +468,15 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
           </Alert>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant={isComposerOpen ? "secondary" : "outline"}
-            disabled={!canMutateCI}
-            onClick={() => setComposerOpen((current) => !current)}
-          >
-            <Play data-icon="inline-start" />
-            {isComposerOpen ? t("Hide pipeline form") : t("New pipeline")}
-          </Button>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">
-              {t("Role")}: {t(permissions.roleLabel)}
-            </Badge>
-            <Button type="button" size="sm" variant="ghost" onClick={() => void loadPipelines()}>
-              <RefreshCw data-icon="inline-start" />
-              {t("Reload")}
-            </Button>
-          </div>
-        </div>
-
         {isComposerOpen ? (
-          <form className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3" onSubmit={submitCreatePipeline}>
+          <form className="flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3" onSubmit={submitCreatePipeline}>
             <div className="grid gap-3 md:grid-cols-[160px_1fr_1fr]">
               <div className="flex flex-col gap-1">
                 <Label htmlFor="pipeline-source" className="text-xs text-muted-foreground">
                   {t("Source")}
                 </Label>
                 <Select value={pipelineSource} onValueChange={setPipelineSource}>
-                  <SelectTrigger id="pipeline-source">
+                  <SelectTrigger id="pipeline-source" className="h-8 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -536,154 +538,160 @@ export const RepositoryPipelinesTab = ({ repoId, defaultBranch, permissions, t, 
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
                 disabled={!canMutateCI || isLintingPipeline}
                 onClick={() => void submitLintPipeline()}
               >
                 {isLintingPipeline ? t("Linting...") : t("Lint config")}
               </Button>
-              <Button type="submit" disabled={!canMutateCI || isCreatingPipeline}>
+              <Button type="submit" size="sm" disabled={!canMutateCI || isCreatingPipeline}>
                 {isCreatingPipeline ? t("Creating pipeline...") : t("Create pipeline")}
               </Button>
             </div>
           </form>
         ) : null}
+      </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">{t("Pipelines")}</p>
+      <div className="grid xl:grid-cols-[minmax(280px,380px)_1fr]">
+        <div className="border-b border-border xl:border-b-0 xl:border-r">
+          {isLoadingPipelines ? (
+            <div className="px-4 py-3"><PipelineListSkeleton /></div>
+          ) : pipelines.length === 0 ? (
+            <div className="px-4 py-3">
+              <PipelineEmptyState canMutate={canMutateCI} t={t} onCreate={() => setComposerOpen(true)} />
             </div>
-            <div className="flex flex-col gap-2 rounded-md border p-2">
-              {isLoadingPipelines ? <PipelineListSkeleton /> : null}
-              {!isLoadingPipelines && pipelines.length === 0 ? (
-                <PipelineEmptyState canMutate={canMutateCI} t={t} onCreate={() => setComposerOpen(true)} />
-              ) : null}
+          ) : (
+            <DataList>
               {pipelines.map((pipeline) => (
-                <button
+                <DataRow
                   key={pipeline.id}
-                  type="button"
-                  className={cn(
-                    "w-full rounded-md border bg-background/60 p-3 text-left transition hover:bg-muted/40",
-                    visiblePipeline?.id === pipeline.id ? "border-primary/60 bg-primary/5" : undefined,
-                    pipeline.status === "failed" ? "border-destructive/30 bg-destructive/5" : undefined,
-                  )}
-                  aria-pressed={visiblePipeline?.id === pipeline.id}
-                  onClick={() => setSelectedPipelineID(pipeline.id)}
+                  className={visiblePipeline?.id === pipeline.id ? "bg-primary/5" : undefined}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="font-medium">
-                      #{pipeline.iid} {pipeline.name || "pipeline"}
-                    </p>
-                    <PipelineStatusBadge status={pipeline.status} t={t} />
-                  </div>
-                  <p className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                    <GitBranch className="size-3" />
-                    <span>{pipeline.ref_name || t("N/A")}</span>
-                    <span>·</span>
-                    <span>{shortSHA(pipeline.commit_sha)}</span>
-                    {pipeline.updated_at ? <span>· {formatRelativeTime(pipeline.updated_at)}</span> : null}
-                  </p>
-                </button>
+                  <button
+                    type="button"
+                    className="flex w-full flex-col gap-1 text-left"
+                    aria-pressed={visiblePipeline?.id === pipeline.id}
+                    onClick={() => setSelectedPipelineID(pipeline.id)}
+                  >
+                    <span className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="truncate text-sm font-medium">
+                        #{pipeline.iid} {pipeline.name || "pipeline"}
+                      </span>
+                      <PipelineStatusBadge status={pipeline.status} t={t} />
+                    </span>
+                    <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      <GitBranch className="size-3" />
+                      <span>{pipeline.ref_name || t("N/A")}</span>
+                      <span>·</span>
+                      <span>{shortSHA(pipeline.commit_sha)}</span>
+                      {pipeline.updated_at ? <span>· {formatRelativeTime(pipeline.updated_at)}</span> : null}
+                    </span>
+                  </button>
+                </DataRow>
               ))}
-            </div>
-          </div>
+            </DataList>
+          )}
+        </div>
 
-          <div className="min-w-0 rounded-md border p-3">
-            {!visiblePipeline ? (
-              <PipelinePanelEmptyState t={t} />
-            ) : (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">
-                        #{visiblePipeline.iid} {visiblePipeline.name || "pipeline"}
-                      </h3>
-                      <PipelineStatusBadge status={visiblePipeline.status} t={t} />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {t("Source")}: {visiblePipeline.source || t("N/A")} · {t("Ref")}: {visiblePipeline.ref_name || t("N/A")} · {t("Commit")}: {shortSHA(visiblePipeline.commit_sha)}
-                    </p>
-                  </div>
+        <div className="min-w-0 px-4 py-3">
+          {!visiblePipeline ? (
+            <PipelinePanelEmptyState t={t} />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex flex-col gap-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button type="button" size="sm" variant="ghost" onClick={() => void loadDetail()}>
-                      <RefreshCw data-icon="inline-start" />
-                      {t("Reload pipeline")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={!canMutateCI || isRefreshingPipeline}
-                      onClick={() => void submitRefreshPipeline()}
-                    >
-                      <RefreshCw data-icon="inline-start" />
-                      {isRefreshingPipeline ? t("Refreshing...") : t("Refresh state")}
-                    </Button>
-                    {!terminalPipelineStatuses.includes(visiblePipeline.status) ? (
-                      <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isCancelling} onClick={() => void submitCancelPipeline()}>
-                        <Ban data-icon="inline-start" />
-                        {isCancelling ? t("Cancelling...") : t("Cancel pipeline")}
-                      </Button>
-                    ) : null}
-                    {visiblePipeline.status !== "running" ? (
-                      <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isRetrying} onClick={() => void submitRetryPipeline()}>
-                        <Repeat2 data-icon="inline-start" />
-                        {isRetrying ? t("Retrying...") : t("Retry pipeline")}
-                      </Button>
-                    ) : null}
+                    <h3 className="text-base font-semibold">
+                      #{visiblePipeline.iid} {visiblePipeline.name || "pipeline"}
+                    </h3>
+                    <PipelineStatusBadge status={visiblePipeline.status} t={t} />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    {t("Source")}: {visiblePipeline.source || t("N/A")} · {t("Ref")}: {visiblePipeline.ref_name || t("N/A")} · {t("Commit")}: {shortSHA(visiblePipeline.commit_sha)}
+                  </p>
                 </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <PipelineMeta label={t("Config")} value={visiblePipeline.config_source || t("N/A")} />
-                  <PipelineMeta label={t("Started")} value={visiblePipeline.started_at ? formatRelativeTime(visiblePipeline.started_at) : t("N/A")} />
-                  <PipelineMeta label={t("Finished")} value={visiblePipeline.finished_at ? formatRelativeTime(visiblePipeline.finished_at) : t("N/A")} />
-                </div>
-
-                <PipelineDiagnosticsSummary pipeline={visiblePipeline} jobs={pipelineJobs} canMutate={canMutateCI} t={t} />
-
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium">{t("Pipeline jobs")}</p>
-                  {detailQuery.query.isFetching ? <PipelineJobsSkeleton /> : null}
-                  {!detailQuery.query.isFetching && pipelineJobs.length === 0 ? (
-                    <PipelineJobsEmptyState t={t} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant="ghost" onClick={() => void loadDetail()}>
+                    <RefreshCw data-icon="inline-start" />
+                    {t("Reload pipeline")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canMutateCI || isRefreshingPipeline}
+                    onClick={() => void submitRefreshPipeline()}
+                  >
+                    <RefreshCw data-icon="inline-start" />
+                    {isRefreshingPipeline ? t("Refreshing...") : t("Refresh state")}
+                  </Button>
+                  {!terminalPipelineStatuses.includes(visiblePipeline.status) ? (
+                    <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isCancelling} onClick={() => void submitCancelPipeline()}>
+                      <Ban data-icon="inline-start" />
+                      {isCancelling ? t("Cancelling...") : t("Cancel pipeline")}
+                    </Button>
                   ) : null}
-                  {pipelineJobs.map((job) => (
-                    <PipelineJobCard
-                      key={job.pipeline_job.id || job.project_job.id}
-                      item={job}
-                      active={selectedJobID === job.project_job.id}
-                      isCancelling={isCancellingJob}
-                      isRetrying={isRetryingJob}
-                      canMutate={canMutateJobs}
-                      t={t}
-                      onInspect={() => setSelectedJobID(job.project_job.id)}
-                      onCancel={() => void submitCancelJob(job)}
-                      onRetry={() => void submitRetryJob(job)}
-                    />
-                  ))}
+                  {visiblePipeline.status !== "running" ? (
+                    <Button type="button" size="sm" variant="outline" disabled={!canMutateCI || isRetrying} onClick={() => void submitRetryPipeline()}>
+                      <Repeat2 data-icon="inline-start" />
+                      {isRetrying ? t("Retrying...") : t("Retry pipeline")}
+                    </Button>
+                  ) : null}
                 </div>
+              </div>
 
-                {selectedJob ? (
-                  <JobDetailPanel
-                    item={selectedJob}
-                    trace={trace}
-                    artifacts={artifacts}
-                    loadingTrace={traceQuery.query.isFetching}
-                    loadingArtifacts={artifactsQuery.query.isFetching}
-                    t={t}
-                    onReload={() => void loadJobDetail()}
-                    onDownloadArtifact={(artifact) => void downloadArtifact(artifact)}
-                  />
+              <div className="grid gap-3 md:grid-cols-3">
+                <PipelineMeta label={t("Config")} value={visiblePipeline.config_source || t("N/A")} />
+                <PipelineMeta label={t("Started")} value={visiblePipeline.started_at ? formatRelativeTime(visiblePipeline.started_at) : t("N/A")} />
+                <PipelineMeta label={t("Finished")} value={visiblePipeline.finished_at ? formatRelativeTime(visiblePipeline.finished_at) : t("N/A")} />
+              </div>
+
+              <PipelineDiagnosticsSummary pipeline={visiblePipeline} jobs={pipelineJobs} canMutate={canMutateCI} t={t} />
+
+              <div className="flex flex-col gap-2">
+                <p className="text-sm font-medium">{t("Pipeline jobs")}</p>
+                {detailQuery.query.isFetching ? <PipelineJobsSkeleton /> : null}
+                {!detailQuery.query.isFetching && pipelineJobs.length === 0 ? (
+                  <PipelineJobsEmptyState t={t} />
+                ) : null}
+                {pipelineJobs.length > 0 ? (
+                  <DataList className="rounded-md border border-border">
+                    {pipelineJobs.map((job) => (
+                      <PipelineJobCard
+                        key={job.pipeline_job.id || job.project_job.id}
+                        item={job}
+                        active={selectedJobID === job.project_job.id}
+                        isCancelling={isCancellingJob}
+                        isRetrying={isRetryingJob}
+                        canMutate={canMutateJobs}
+                        t={t}
+                        onInspect={() => setSelectedJobID(job.project_job.id)}
+                        onCancel={() => void submitCancelJob(job)}
+                        onRetry={() => void submitRetryJob(job)}
+                      />
+                    ))}
+                  </DataList>
                 ) : null}
               </div>
-            )}
-          </div>
+
+              {selectedJob ? (
+                <JobDetailPanel
+                  item={selectedJob}
+                  trace={trace}
+                  artifacts={artifacts}
+                  loadingTrace={traceQuery.query.isFetching}
+                  loadingArtifacts={artifactsQuery.query.isFetching}
+                  t={t}
+                  onReload={() => void loadJobDetail()}
+                  onDownloadArtifact={(artifact) => void downloadArtifact(artifact)}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   );
 };
 
@@ -698,20 +706,18 @@ const PipelineStat = ({
   description: string;
   status: RepositoryPipelineStatus;
 }) => (
-  <Card className={cn("shadow-none", status === "failed" ? "border-destructive/30 bg-destructive/5" : "bg-muted/20", status === "running" ? "border-primary/30 bg-primary/5" : undefined)}>
-    <CardContent className="flex flex-col gap-1 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <PipelineStatusBadge status={status} t={(text) => text} />
-      </div>
-      <p className="text-2xl font-semibold">{value}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </CardContent>
-  </Card>
+  <div className={cn("flex flex-col gap-0.5 px-4 py-2.5", status === "failed" ? "bg-destructive/5" : undefined, status === "running" ? "bg-primary/5" : undefined)}>
+    <div className="flex items-center justify-between gap-2">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <PipelineStatusBadge status={status} t={(text) => text} />
+    </div>
+    <p className="text-sm font-semibold">{value}</p>
+    <p className="text-xs text-muted-foreground">{description}</p>
+  </div>
 );
 
 const PipelineMeta = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex flex-col gap-1 rounded-md border bg-muted/20 p-3">
+  <div className="min-w-0">
     <p className="text-xs text-muted-foreground">{label}</p>
     <p className="truncate text-sm font-medium">{value}</p>
   </div>
@@ -761,9 +767,9 @@ const PipelineDiagnosticsSummary = ({
 };
 
 const PipelineSummaryPill = ({ label, value, urgent = false }: { label: string; value: string; urgent?: boolean }) => (
-  <div className={cn("rounded-md border bg-background px-3 py-2", urgent ? "border-destructive/30 bg-destructive/10" : undefined)}>
+  <div className="min-w-0">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-sm font-semibold">{value}</p>
+    <p className={cn("text-sm font-semibold", urgent ? "text-destructive" : undefined)}>{value}</p>
   </div>
 );
 
@@ -841,77 +847,79 @@ const PipelineJobCard = ({
   onCancel: () => void;
   onRetry: () => void;
 }) => (
-  <div className={cn("flex flex-col gap-3 rounded-md border p-3", active ? "border-primary/60 bg-primary/5" : "bg-background/60", item.status === "failed" ? "border-destructive/30 bg-destructive/5" : undefined)}>
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0 flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="font-medium">{item.pipeline_job.name || item.pipeline_job.stage || "job"}</p>
-          <PipelineJobStatusBadge status={item.status} t={t} />
+  <DataRow className={cn(active ? "bg-primary/5" : undefined, item.status === "failed" ? "bg-destructive/5" : undefined)}>
+    <div className="flex w-full flex-col gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-medium">{item.pipeline_job.name || item.pipeline_job.stage || "job"}</p>
+            <PipelineJobStatusBadge status={item.status} t={t} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {getPipelineJobStatusDescription(item.status, t)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("Attempts")}: {item.project_job.attempts}/{item.project_job.max_attempts}
+            {item.project_job.locked_by ? ` · ${t("Worker")}: ${item.project_job.locked_by}` : ""}
+            {item.project_job.updated_at ? ` · ${formatRelativeTime(item.project_job.updated_at)}` : ""}
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {getPipelineJobStatusDescription(item.status, t)}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {t("Attempts")}: {item.project_job.attempts}/{item.project_job.max_attempts}
-          {item.project_job.locked_by ? ` · ${t("Worker")}: ${item.project_job.locked_by}` : ""}
-          {item.project_job.updated_at ? ` · ${formatRelativeTime(item.project_job.updated_at)}` : ""}
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{item.pipeline_job.stage || t("N/A")}</Badge>
-        <Button type="button" size="sm" variant="ghost" onClick={onInspect}>
-          <ScrollText data-icon="inline-start" />
-          {t("Logs")}
-        </Button>
-        {!terminalJobStatuses.includes(item.project_job.status) ? (
-          <Button type="button" size="sm" variant="outline" disabled={!canMutate || isCancelling} onClick={onCancel}>
-            <Ban data-icon="inline-start" />
-            {isCancelling ? t("Cancelling...") : t("Cancel")}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">{item.pipeline_job.stage || t("N/A")}</Badge>
+          <Button type="button" size="sm" variant="ghost" onClick={onInspect}>
+            <ScrollText data-icon="inline-start" />
+            {t("Logs")}
           </Button>
-        ) : null}
-        {item.project_job.status !== "running" ? (
-          <Button type="button" size="sm" variant="outline" disabled={!canMutate || isRetrying} onClick={onRetry}>
-            <Repeat2 data-icon="inline-start" />
-            {isRetrying ? t("Retrying...") : t("Retry")}
-          </Button>
-        ) : null}
+          {!terminalJobStatuses.includes(item.project_job.status) ? (
+            <Button type="button" size="sm" variant="outline" disabled={!canMutate || isCancelling} onClick={onCancel}>
+              <Ban data-icon="inline-start" />
+              {isCancelling ? t("Cancelling...") : t("Cancel")}
+            </Button>
+          ) : null}
+          {item.project_job.status !== "running" ? (
+            <Button type="button" size="sm" variant="outline" disabled={!canMutate || isRetrying} onClick={onRetry}>
+              <Repeat2 data-icon="inline-start" />
+              {isRetrying ? t("Retrying...") : t("Retry")}
+            </Button>
+          ) : null}
+        </div>
       </div>
+      {item.needs.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {t("Needs")}: {item.needs.join(", ")}
+        </p>
+      ) : null}
+      {item.tags.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {item.tags.map((tag) => (
+            <Badge key={tag} variant="outline">
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+      {item.script.length > 0 ? (
+        <pre className="overflow-auto rounded-md bg-muted p-2 text-xs">{item.script.join("\n")}</pre>
+      ) : null}
+      {item.artifacts.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {t("Artifacts")}: {item.artifacts.join(", ")}
+        </p>
+      ) : null}
+      {item.status === "failed" || item.status === "blocked" ? (
+        <Alert variant={item.status === "failed" ? "destructive" : "default"} className="bg-muted/20 px-2 py-1 text-xs">
+          <AlertDescription className="text-xs leading-5">
+            {getPipelineJobNextAction(item, t)}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {item.project_job.last_error ? (
+        <Alert variant="destructive" className="px-2 py-1 text-xs">
+          <AlertDescription className="text-xs leading-5">{item.project_job.last_error}</AlertDescription>
+        </Alert>
+      ) : null}
     </div>
-    {item.needs.length > 0 ? (
-      <p className="mt-2 text-xs text-muted-foreground">
-        {t("Needs")}: {item.needs.join(", ")}
-      </p>
-    ) : null}
-    {item.tags.length > 0 ? (
-      <div className="mt-2 flex flex-wrap gap-2">
-        {item.tags.map((tag) => (
-          <Badge key={tag} variant="outline">
-            {tag}
-          </Badge>
-        ))}
-      </div>
-    ) : null}
-    {item.script.length > 0 ? (
-      <pre className="mt-2 overflow-auto rounded-md bg-muted p-2 text-xs">{item.script.join("\n")}</pre>
-    ) : null}
-    {item.artifacts.length > 0 ? (
-      <p className="mt-2 text-xs text-muted-foreground">
-        {t("Artifacts")}: {item.artifacts.join(", ")}
-      </p>
-    ) : null}
-    {item.status === "failed" || item.status === "blocked" ? (
-      <Alert variant={item.status === "failed" ? "destructive" : "default"} className="mt-2 bg-muted/20 px-2 py-1 text-xs">
-        <AlertDescription className="text-xs leading-5">
-          {getPipelineJobNextAction(item, t)}
-        </AlertDescription>
-      </Alert>
-    ) : null}
-    {item.project_job.last_error ? (
-      <Alert variant="destructive" className="mt-2 px-2 py-1 text-xs">
-        <AlertDescription className="text-xs leading-5">{item.project_job.last_error}</AlertDescription>
-      </Alert>
-    ) : null}
-  </div>
+  </DataRow>
 );
 
 const JobDetailPanel = ({
@@ -933,7 +941,7 @@ const JobDetailPanel = ({
   onReload: () => void;
   onDownloadArtifact: (artifact: RepositoryJobArtifactView) => void;
 }) => (
-  <div className="rounded-md border bg-muted/10 p-3">
+  <div className="border-t border-border pt-3">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <div className="flex flex-wrap items-center gap-2">
@@ -981,18 +989,24 @@ const JobDetailPanel = ({
             <AlertDescription>{getPipelineArtifactEmptyMessage(item, t)}</AlertDescription>
           </Alert>
         ) : null}
-        <div className="flex flex-col gap-2">
-          {artifacts.map((artifact) => (
-            <div key={artifact.id} className="rounded-md border bg-background p-2">
-              <p className="truncate text-sm font-medium">{artifact.file_name || artifact.name || "artifact"}</p>
-              <p className="text-xs text-muted-foreground">{formatBytes(artifact.byte_size)}</p>
-              <Button type="button" size="sm" variant="ghost" className="mt-2 w-full justify-start" onClick={() => onDownloadArtifact(artifact)}>
-                <Download data-icon="inline-start" />
-                {t("Download")}
-              </Button>
-            </div>
-          ))}
-        </div>
+        {artifacts.length > 0 ? (
+          <DataList className="rounded-md border border-border">
+            {artifacts.map((artifact) => (
+              <DataRow key={artifact.id}>
+                <div className="flex w-full items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{artifact.file_name || artifact.name || "artifact"}</p>
+                    <p className="text-xs text-muted-foreground">{formatBytes(artifact.byte_size)}</p>
+                  </div>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => onDownloadArtifact(artifact)}>
+                    <Download data-icon="inline-start" />
+                    {t("Download")}
+                  </Button>
+                </div>
+              </DataRow>
+            ))}
+          </DataList>
+        ) : null}
       </div>
     </div>
   </div>

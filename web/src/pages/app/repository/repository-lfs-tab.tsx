@@ -5,11 +5,13 @@ import { ConfirmAction } from "@/components/common/confirm-action";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
+import { Toolbar } from "@/components/surface/toolbar";
 import type { RepositoryLFSLockView, RepositoryLFSObjectView, RepositoryView } from "@/pages/types";
 import { extractErrorMessage, formatRelativeTime } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
@@ -137,182 +139,184 @@ export const RepositoryLFSTab = ({ repoId, repository, permissions, t, onError }
   }, [objectsQuery.query.error, locksQuery.query.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1.5">
-            <CardTitle>{t("Git LFS")}</CardTitle>
-            <CardDescription>{t("Inspect stored LFS objects and manage project file locks.")}</CardDescription>
-          </div>
+    <Section
+      title={t("Git LFS")}
+      description={t("Inspect stored LFS objects and manage project file locks.")}
+      actions={
+        <Toolbar>
           <Badge variant={canWriteLFS ? "secondary" : "outline"}>
             {canWriteLFS ? t("Locks enabled") : t("Read only")}
           </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <LFSStat label={t("Objects")} value={objects.length} />
-          <LFSStat label={t("Storage")} value={formatBytes(totalBytes)} />
-          <LFSStat label={t("Locks")} value={locks.length} />
-        </div>
+          <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
+            <RefreshCw data-icon="inline-start" />
+            {t("Reload")}
+          </Button>
+        </Toolbar>
+      }
+      flush
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <LFSStat label={t("Objects")} value={objects.length} />
+        <LFSStat label={t("Storage")} value={formatBytes(totalBytes)} />
+        <LFSStat label={t("Locks")} value={locks.length} />
+      </div>
 
-        {!canWriteLFS ? (
+      {!canWriteLFS ? (
+        <div className="border-b border-border px-4 py-3">
           <Alert>
             <AlertTitle>{t("LFS locks are read-only")}</AlertTitle>
             <AlertDescription>{t("Your current project role can inspect LFS, but cannot manage locks.")}</AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{t("LFS endpoint")}</p>
-                <p className="break-all text-xs text-muted-foreground">{lfsEndpoint}</p>
-              </div>
-              <Button type="button" size="sm" variant="ghost" onClick={() => void reload()}>
-                <RefreshCw data-icon="inline-start" />
-                {t("Reload")}
-              </Button>
-            </div>
-
-            <div className="rounded-md border">
-              <div className="flex items-center gap-2 border-b px-3 py-2">
-                <Database className="size-4 text-muted-foreground" />
-                <p className="font-medium">{t("Stored objects")}</p>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("OID")}</TableHead>
-                    <TableHead>{t("Size")}</TableHead>
-                    <TableHead>{t("Updated")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoadingObjects ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-sm text-muted-foreground">
-                        {t("Loading LFS objects...")}
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                  {!isLoadingObjects && objects.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3}>
-                        <div className="flex flex-col gap-1 py-3 text-sm">
-                          <span className="font-medium">{t("No LFS objects stored yet.")}</span>
-                          <span className="text-muted-foreground">{t("Tracked large files will appear here after the first LFS push.")}</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                  {objects.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="max-w-[360px] truncate font-mono text-xs">{item.oid}</TableCell>
-                      <TableCell>{formatBytes(item.byte_size)}</TableCell>
-                      <TableCell>{item.updated_at ? formatRelativeTime(item.updated_at) : "--"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="rounded-md border">
-              <div className="flex items-center gap-2 border-b px-3 py-2">
-                <Lock className="size-4 text-muted-foreground" />
-                <p className="font-medium">{t("File locks")}</p>
-              </div>
-              <div className="flex flex-col gap-3 p-3">
-                <form className="grid gap-2 md:grid-cols-[1fr_auto]" onSubmit={submitCreateLock}>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="lfs-lock-path">{t("Lock path")}</Label>
-                    <Input
-                      id="lfs-lock-path"
-                      value={lockPath}
-                      disabled={!canWriteLFS}
-                      onChange={(event) => setLockPath(event.target.value)}
-                      placeholder="assets/design.psd"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button type="submit" disabled={!canWriteLFS || isCreatingLock}>
-                      <Lock data-icon="inline-start" />
-                      {isCreatingLock ? t("Locking...") : t("Create lock")}
-                    </Button>
-                  </div>
-                </form>
-
-                <div className="flex flex-col gap-2">
-                  {isLoadingLocks ? <p className="text-sm text-muted-foreground">{t("Loading LFS locks...")}</p> : null}
-                  {!isLoadingLocks && locks.length === 0 ? (
-                    <LFSEmptyState
-                      title={t("No file locks.")}
-                      description={canWriteLFS ? t("Create a lock to reserve an LFS-managed path before editing.") : t("Active file locks will appear here.")}
-                    />
-                  ) : null}
-                  {locks.map((item) => (
-                    <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 rounded-md border p-3">
-                      <div className="flex min-w-0 flex-col gap-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="break-all font-medium">{item.path}</p>
-                          <Badge variant="secondary">{item.owner.name || t("Unknown owner")}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          #{item.id}
-                          {item.locked_at ? ` · ${formatRelativeTime(item.locked_at)}` : ""}
-                        </p>
-                      </div>
-                      <ConfirmAction
-                        title={t("Unlock \"{path}\"?").replace("{path}", item.path)}
-                        description={t("This force-unlocks the file for the project.")}
-                        confirmLabel={t("Unlock")}
-                        cancelLabel={t("Cancel")}
-                        onConfirm={() => void submitUnlock(item)}
-                      >
-                        <Button type="button" size="sm" variant="outline" disabled={!canWriteLFS || isUnlocking}>
-                          <Unlock data-icon="inline-start" />
-                          {t("Unlock")}
-                        </Button>
-                      </ConfirmAction>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 divide-y divide-border">
+          <div className="px-4 py-3">
+            <p className="text-xs text-muted-foreground">{t("LFS endpoint")}</p>
+            <p className="mt-1 break-all font-mono text-xs">{lfsEndpoint}</p>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-md border bg-muted/20 p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">{t("Client setup")}</p>
-              <Button type="button" size="sm" variant="outline" onClick={() => void copySetupCommand()}>
-                <Copy data-icon="inline-start" />
-                {isCopied ? t("Copied") : t("Copy")}
-              </Button>
+          <div>
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <Database className="size-3.5 text-muted-foreground" />
+              <p className="text-sm font-medium">{t("Stored objects")}</p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("Use standard Git LFS clients against the project clone URL.")}
-            </p>
-            <ScrollArea className="h-44 rounded-md border bg-background">
-              <pre className="p-3 text-xs leading-6">{setupCommand}</pre>
-            </ScrollArea>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("OID")}</TableHead>
+                  <TableHead>{t("Size")}</TableHead>
+                  <TableHead>{t("Updated")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoadingObjects ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-sm text-muted-foreground">
+                      {t("Loading LFS objects...")}
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {!isLoadingObjects && objects.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3}>
+                      <div className="flex flex-col gap-1 py-3 text-sm">
+                        <span className="font-medium">{t("No LFS objects stored yet.")}</span>
+                        <span className="text-muted-foreground">{t("Tracked large files will appear here after the first LFS push.")}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {objects.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="max-w-[360px] truncate font-mono text-xs">{item.oid}</TableCell>
+                    <TableCell>{formatBytes(item.byte_size)}</TableCell>
+                    <TableCell>{item.updated_at ? formatRelativeTime(item.updated_at) : "--"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 px-4 py-2.5">
+              <Lock className="size-3.5 text-muted-foreground" />
+              <p className="text-sm font-medium">{t("File locks")}</p>
+            </div>
+            <form className="grid gap-3 px-4 pb-3 md:grid-cols-[1fr_auto]" onSubmit={submitCreateLock}>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="lfs-lock-path" className="text-xs text-muted-foreground">{t("Lock path")}</Label>
+                <Input
+                  id="lfs-lock-path"
+                  value={lockPath}
+                  disabled={!canWriteLFS}
+                  onChange={(event) => setLockPath(event.target.value)}
+                  placeholder="assets/design.psd"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" size="sm" disabled={!canWriteLFS || isCreatingLock}>
+                  <Lock data-icon="inline-start" />
+                  {isCreatingLock ? t("Locking...") : t("Create lock")}
+                </Button>
+              </div>
+            </form>
+
+            {isLoadingLocks ? (
+              <p className="px-4 pb-3 text-sm text-muted-foreground">{t("Loading LFS locks...")}</p>
+            ) : null}
+            {!isLoadingLocks && locks.length === 0 ? (
+              <div className="px-4 pb-4">
+                <LFSEmptyState
+                  title={t("No file locks.")}
+                  description={canWriteLFS ? t("Create a lock to reserve an LFS-managed path before editing.") : t("Active file locks will appear here.")}
+                />
+              </div>
+            ) : null}
+            {locks.length > 0 ? (
+              <DataList>
+                {locks.map((item) => (
+                  <DataRow key={item.id}>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-all text-sm font-medium">{item.path}</p>
+                        <Badge variant="secondary">{item.owner.name || t("Unknown owner")}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        #{item.id}
+                        {item.locked_at ? ` · ${formatRelativeTime(item.locked_at)}` : ""}
+                      </p>
+                    </div>
+                    <ConfirmAction
+                      title={t("Unlock \"{path}\"?").replace("{path}", item.path)}
+                      description={t("This force-unlocks the file for the project.")}
+                      confirmLabel={t("Unlock")}
+                      cancelLabel={t("Cancel")}
+                      onConfirm={() => void submitUnlock(item)}
+                    >
+                      <Button type="button" size="sm" variant="outline" disabled={!canWriteLFS || isUnlocking}>
+                        <Unlock data-icon="inline-start" />
+                        {t("Unlock")}
+                      </Button>
+                    </ConfirmAction>
+                  </DataRow>
+                ))}
+              </DataList>
+            ) : null}
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <aside className="flex flex-col gap-3 border-t border-border bg-muted/20 px-4 py-3 lg:border-l lg:border-t-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">{t("Client setup")}</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => void copySetupCommand()}>
+              <Copy data-icon="inline-start" />
+              {isCopied ? t("Copied") : t("Copy")}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t("Use standard Git LFS clients against the project clone URL.")}
+          </p>
+          <ScrollArea className="h-44 border bg-background">
+            <pre className="p-3 text-xs leading-6">{setupCommand}</pre>
+          </ScrollArea>
+        </aside>
+      </div>
+    </Section>
   );
 };
 
 const LFSStat = ({ label, value }: { label: string; value: number | string }) => (
-  <div className="flex flex-col gap-1 rounded-md border p-3">
+  <div className="px-4 py-2.5">
     <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-lg font-semibold">{value}</p>
+    <p className="mt-0.5 text-sm font-semibold">{value}</p>
   </div>
 );
 
 const LFSEmptyState = ({ title, description }: { title: string; description: string }) => (
-  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed p-4 text-center">
-    <Lock className="size-5 text-muted-foreground" />
+  <div className="flex flex-col items-center justify-center gap-2 text-center">
+    <Lock className="size-4 text-muted-foreground" />
     <div className="flex flex-col gap-1">
       <p className="text-sm font-medium">{title}</p>
       <p className="text-xs text-muted-foreground">{description}</p>

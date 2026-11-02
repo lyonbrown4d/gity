@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleDot, Search, Tags, UserRound } from "lucide-react";
-import { useCustom, useCustomMutation } from "@refinedev/core";
 import { useNavigate } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  useGetApiV1ProjectsIdIssues,
+  usePatchApiV1ProjectsIdIssuesIidAssignees,
+  usePostApiV1ProjectsIdIssues,
+} from "@/lib/generated/issues/issues";
+import { useGetApiV1Users } from "@/lib/generated/users/users";
+import type { Issue, User } from "@/lib/generated/model";
+import { toApiPathId, toRawJsonId } from "@/lib/api-id";
 import type { RepositoryIssueView, UserView } from "@/pages/types";
 import { buildIssueDetailPath } from "./issue-markdown";
 import { IssueMarkdownEditor } from "./issue-markdown-editor";
 import { extractErrorMessage, formatRelativeTime, toTimestamp, type IssueSortMode } from "./issues-utils";
 import type { RepositoryPermissions } from "./repository-permissions";
-import { isRecord, normalizeBoolean, normalizeOptionalString, normalizeString, resolveArrayPayload, type RawRecord } from "./repository-normalizers";
 import { formatUserLabel } from "./repository-user-utils";
 
 interface RepositoryIssuesTabProps {
@@ -56,36 +63,35 @@ export const RepositoryIssuesTab = ({
   onError,
 }: RepositoryIssuesTabProps): JSX.Element => {
   const navigate = useNavigate();
-  const issuesQuery = useCustom<RepositoryIssueView[]>({
-    url: `/projects/${repoId}/issues`,
-    method: "get",
-    config: {
+  const apiProjectId = toApiPathId(repoId);
+  const issuesQuery = useGetApiV1ProjectsIdIssues(
+    apiProjectId,
+    { state: "all", page: 1, page_size: 100 },
+    {
       query: {
-        status: "all",
-        limit: 100,
+        enabled: Boolean(repoId),
+        refetchOnWindowFocus: false,
       },
     },
-    queryOptions: {
-      enabled: Boolean(repoId),
-      refetchOnWindowFocus: false,
+  );
+  const usersQuery = useGetApiV1Users(
+    { page: 1, page_size: 100 },
+    {
+      query: {
+        enabled: Boolean(repoId),
+        refetchOnWindowFocus: false,
+      },
     },
-  });
-  const usersQuery = useCustom<RawRecord[]>({
-    url: "/users",
-    method: "get",
-    queryOptions: {
-      enabled: Boolean(repoId),
-      refetchOnWindowFocus: false,
-    },
-  });
-  const { mutateAsync: createIssue, mutation: { isPending: isCreatingIssue } } = useCustomMutation<RepositoryIssueView>();
-  const issues = useMemo(
-    () => resolveArrayPayload<RepositoryIssueView>(issuesQuery.result.data),
-    [issuesQuery.result.data],
+  );
+  const createIssueMutation = usePostApiV1ProjectsIdIssues();
+  const setAssigneesMutation = usePatchApiV1ProjectsIdIssuesIidAssignees();
+  const issues = useMemo<RepositoryIssueView[]>(
+    () => (issuesQuery.data?.data.items ?? []).map(toIssueView),
+    [issuesQuery.data],
   );
   const users = useMemo(
-    () => resolveUsers(usersQuery.result.data).map(normalizeUser),
-    [usersQuery.result.data],
+    () => (usersQuery.data?.data.items ?? []).map(toUserView),
+    [usersQuery.data],
   );
   const userByID = useMemo(
     () => new Map(users.map((user) => [user.id, user])),
@@ -130,8 +136,8 @@ export const RepositoryIssuesTab = ({
     }),
     [issues, issueStatusFilter, issueLabelFilter, issueAssigneeFilter, issueSearchQuery, issueSort, userByID],
   );
-  const isLoadingIssues = issuesQuery.query.isFetching && !issuesQuery.query.data;
-  const { mutateAsync: setIssueAssignees } = useCustomMutation<RepositoryIssueView>();
+  const isLoadingIssues = issuesQuery.isFetching && !issuesQuery.data;
+  const isCreatingIssue = createIssueMutation.isPending;
   const canCreateIssue = permissions.issueCreate;
   const hasIssueFilters = issueStatusFilter !== "open"
     || issueLabelFilter !== "all"
@@ -146,7 +152,7 @@ export const RepositoryIssuesTab = ({
   };
 
   const loadIssues = async () => {
-    const result = await issuesQuery.query.refetch();
+    const result = await issuesQuery.refetch();
     if (result.error) {
       onError(extractErrorMessage(result.error));
       return;
@@ -164,21 +170,23 @@ export const RepositoryIssuesTab = ({
 
     onError(null);
     try {
-      const response = await createIssue({
-        url: `/projects/${repoId}/issues`,
-        method: "post",
-        values: {
+      const response = await createIssueMutation.mutateAsync({
+        id: apiProjectId,
+        data: {
           title,
           description: newIssueDescription.trim(),
         },
       });
       const assigneeID = newIssueAssigneeId.trim();
       if (assigneeID) {
-        await setIssueAssignees({
-          url: `/projects/${repoId}/issues/${response.data.number}/assignees`,
-          method: "patch",
-          values: {
-            user_ids: [Number.parseInt(assigneeID, 10)].filter(Number.isFinite),
+        await setAssigneesMutation.mutateAsync({
+          id: apiProjectId,
+          iid: response.data.number,
+          data: {
+            // `UserIds.user_ids` is generated as `number[]` because the spec
+            // models it as int64. `Number()` rounds snowflake IDs past 2^53 and
+            // the backend rejects decimal strings, so emit exact JSON numbers.
+            user_ids: [toRawJsonId(assigneeID)],
           },
         });
       }
@@ -201,115 +209,22 @@ export const RepositoryIssuesTab = ({
   }, [repoId, onError]);
 
   useEffect(() => {
-    const error = issuesQuery.query.error ?? usersQuery.query.error;
+    const error = issuesQuery.error ?? usersQuery.error;
     if (!error) {
       return;
     }
     onError(extractErrorMessage(error));
-  }, [issuesQuery.query.error, usersQuery.query.error, onError]);
+  }, [issuesQuery.error, usersQuery.error, onError]);
 
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <CardTitle>{t("Issues")}</CardTitle>
-        <CardDescription>{t("Track bugs, tasks, ownership, labels, and discussions for this project.")}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <IssueStat label={t("Open")} value={issueStats.open} />
-          <IssueStat label={t("Closed")} value={issueStats.closed} />
-          <IssueStat label={t("Unassigned")} value={issueStats.unassigned} />
-          <IssueStat label={t("Labeled")} value={issueStats.labeled} />
-          <IssueStat label={t("Total")} value={issueStats.total} />
-        </div>
-
-        <div className="rounded-md border p-3">
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px_180px_170px]">
-            <div className="relative md:col-span-2 xl:col-span-1">
-              <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-8"
-                placeholder={t("Search title, label, or assignee")}
-                value={issueSearchQuery}
-                onChange={(event) => setIssueSearchQuery(event.target.value)}
-              />
-            </div>
-            <Select
-              value={issueStatusFilter}
-              onValueChange={(value) => setIssueStatusFilter(value as IssueStatusFilter)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("Status")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="open">{t("Open issues")}</SelectItem>
-                  <SelectItem value="closed">{t("Closed issues")}</SelectItem>
-                  <SelectItem value="all">{t("All issues")}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Select value={issueLabelFilter} onValueChange={(value) => setIssueLabelFilter(value as IssueLabelFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("Label")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">{t("Any label")}</SelectItem>
-                  <SelectItem value="unlabeled">{t("Unlabeled")}</SelectItem>
-                  {issueLabelOptions.map((label) => (
-                    <SelectItem key={label.name} value={issueLabelFilterValue(label.name)}>
-                      {label.name} ({label.count})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Select value={issueAssigneeFilter} onValueChange={(value) => setIssueAssigneeFilter(value as IssueAssigneeFilter)}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("Assignee")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="all">{t("Any assignee")}</SelectItem>
-                  <SelectItem value="unassigned">{t("Unassigned")}</SelectItem>
-                  {issueAssigneeOptions.map((assignee) => (
-                    <SelectItem key={assignee.id} value={issueAssigneeFilterValue(assignee.id)}>
-                      {assignee.label} ({assignee.count})
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Select value={issueSort} onValueChange={(value) => setIssueSort(value as IssueSortMode)}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("Recently updated")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="updated_desc">{t("Recently updated")}</SelectItem>
-                  <SelectItem value="created_desc">{t("Recently created")}</SelectItem>
-                  <SelectItem value="number_desc">{t("Newest number")}</SelectItem>
-                  <SelectItem value="number_asc">{t("Oldest number")}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              {t("Showing")} {filteredIssues.length} {t("of")} {issueStats.total} {t("issues")}
-            </span>
-            {hasIssueFilters ? (
-              <Button type="button" size="sm" variant="ghost" onClick={resetIssueFilters}>
-                {t("Clear filters")}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <Section
+      title={t("Issues")}
+      description={t("Track bugs, tasks, ownership, labels, and discussions for this project.")}
+      actions={
+        <>
           <Button
             type="button"
+            size="sm"
             variant={isIssueComposerOpen ? "secondary" : "outline"}
             disabled={!canCreateIssue}
             onClick={() => setIssueComposerOpen((current) => !current)}
@@ -319,71 +234,173 @@ export const RepositoryIssuesTab = ({
           <Button type="button" size="sm" variant="ghost" onClick={() => void loadIssues()}>
             {t("Reload")}
           </Button>
-        </div>
+        </>
+      }
+      flush
+      className="card-enter overflow-hidden"
+    >
+      <div className="grid divide-y divide-border border-b border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-5">
+        <IssueStat label={t("Open")} value={issueStats.open} />
+        <IssueStat label={t("Closed")} value={issueStats.closed} />
+        <IssueStat label={t("Unassigned")} value={issueStats.unassigned} />
+        <IssueStat label={t("Labeled")} value={issueStats.labeled} />
+        <IssueStat label={t("Total")} value={issueStats.total} />
+      </div>
 
-        {!canCreateIssue ? (
+      <div className="border-b border-border px-4 py-3">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_160px_180px_180px_170px]">
+          <div className="relative md:col-span-2 xl:col-span-1">
+            <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-8 pl-8"
+              placeholder={t("Search title, label, or assignee")}
+              value={issueSearchQuery}
+              onChange={(event) => setIssueSearchQuery(event.target.value)}
+            />
+          </div>
+          <Select
+            value={issueStatusFilter}
+            onValueChange={(value) => setIssueStatusFilter(value as IssueStatusFilter)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder={t("Status")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="open">{t("Open issues")}</SelectItem>
+                <SelectItem value="closed">{t("Closed issues")}</SelectItem>
+                <SelectItem value="all">{t("All issues")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select value={issueLabelFilter} onValueChange={(value) => setIssueLabelFilter(value as IssueLabelFilter)}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder={t("Label")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("Any label")}</SelectItem>
+                <SelectItem value="unlabeled">{t("Unlabeled")}</SelectItem>
+                {issueLabelOptions.map((label) => (
+                  <SelectItem key={label.name} value={issueLabelFilterValue(label.name)}>
+                    {label.name} ({label.count})
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select value={issueAssigneeFilter} onValueChange={(value) => setIssueAssigneeFilter(value as IssueAssigneeFilter)}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder={t("Assignee")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{t("Any assignee")}</SelectItem>
+                <SelectItem value="unassigned">{t("Unassigned")}</SelectItem>
+                {issueAssigneeOptions.map((assignee) => (
+                  <SelectItem key={assignee.id} value={issueAssigneeFilterValue(assignee.id)}>
+                    {assignee.label} ({assignee.count})
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select value={issueSort} onValueChange={(value) => setIssueSort(value as IssueSortMode)}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder={t("Recently updated")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="updated_desc">{t("Recently updated")}</SelectItem>
+                <SelectItem value="created_desc">{t("Recently created")}</SelectItem>
+                <SelectItem value="number_desc">{t("Newest number")}</SelectItem>
+                <SelectItem value="number_asc">{t("Oldest number")}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>
+            {t("Showing")} {filteredIssues.length} {t("of")} {issueStats.total} {t("issues")}
+          </span>
+          {hasIssueFilters ? (
+            <Button type="button" size="sm" variant="ghost" onClick={resetIssueFilters}>
+              {t("Clear filters")}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {!canCreateIssue ? (
+        <div className="border-b border-border px-4 py-3">
           <Alert>
             <AlertDescription>{t("Your current project role can inspect issues, but cannot create them.")}</AlertDescription>
           </Alert>
-        ) : null}
+        </div>
+      ) : null}
 
-        {isIssueComposerOpen ? (
-          <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitCreateIssue}>
-            <Input
-              placeholder={t("Issue title")}
-              value={newIssueTitle}
-              onChange={(event) => setNewIssueTitle(event.target.value)}
-              required
-            />
-            <IssueMarkdownEditor
-              organizationId={organizationId}
-              repoId={repoId}
-              t={t}
-              value={newIssueDescription}
-              placeholder={t("Describe the issue (optional)")}
-              onChange={setNewIssueDescription}
-              onError={onError}
-            />
-            <Select value={newIssueAssigneeId} onValueChange={setNewIssueAssigneeId} disabled={users.length === 0}>
-              <SelectTrigger>
-                <SelectValue placeholder={users.length === 0 ? t("No users available") : t("Assign to user (optional)")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {formatUserLabel(user, user.id)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={!canCreateIssue || isCreatingIssue}>
-                {isCreatingIssue ? t("Creating issue...") : t("Create issue")}
-              </Button>
-            </div>
-          </form>
-        ) : null}
+      {isIssueComposerOpen ? (
+        <form className="flex flex-col gap-2 border-b border-border px-4 py-3" onSubmit={submitCreateIssue}>
+          <Input
+            className="h-8"
+            placeholder={t("Issue title")}
+            value={newIssueTitle}
+            onChange={(event) => setNewIssueTitle(event.target.value)}
+            required
+          />
+          <IssueMarkdownEditor
+            organizationId={organizationId}
+            repoId={repoId}
+            t={t}
+            value={newIssueDescription}
+            placeholder={t("Describe the issue (optional)")}
+            onChange={setNewIssueDescription}
+            onError={onError}
+          />
+          <Select value={newIssueAssigneeId} onValueChange={setNewIssueAssigneeId} disabled={users.length === 0}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder={users.length === 0 ? t("No users available") : t("Assign to user (optional)")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {formatUserLabel(user, user.id)}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={() => setIssueComposerOpen(false)}>
+              {t("Cancel")}
+            </Button>
+            <Button type="submit" size="sm" disabled={!canCreateIssue || isCreatingIssue}>
+              {isCreatingIssue ? t("Creating issue...") : t("Create issue")}
+            </Button>
+          </div>
+        </form>
+      ) : null}
 
-        <div className="flex flex-col gap-2 rounded-md border p-2">
-          {isLoadingIssues ? <p className="px-2 py-2 text-sm text-muted-foreground">{t("Loading issues...")}</p> : null}
-          {!isLoadingIssues && issues.length === 0 ? (
-            <IssueEmptyState
-              title={t("No issues yet.")}
-              description={canCreateIssue ? t("Create the first issue to start triage for this project.") : t("Issues will appear here after they are created.")}
-              actionLabel={canCreateIssue ? t("Create an issue") : undefined}
-              onAction={canCreateIssue ? () => setIssueComposerOpen(true) : undefined}
-            />
-          ) : null}
-          {!isLoadingIssues && issues.length > 0 && filteredIssues.length === 0 ? (
-            <IssueEmptyState
-              title={t("No issues match these filters.")}
-              description={t("Try another state, label, assignee, or search term.")}
-              actionLabel={hasIssueFilters ? t("Clear filters") : undefined}
-              onAction={hasIssueFilters ? resetIssueFilters : undefined}
-            />
-          ) : null}
+      {isLoadingIssues ? <p className="px-4 py-3 text-sm text-muted-foreground">{t("Loading issues...")}</p> : null}
+      {!isLoadingIssues && issues.length === 0 ? (
+        <IssueEmptyState
+          title={t("No issues yet.")}
+          description={canCreateIssue ? t("Create the first issue to start triage for this project.") : t("Issues will appear here after they are created.")}
+          actionLabel={canCreateIssue ? t("Create an issue") : undefined}
+          onAction={canCreateIssue ? () => setIssueComposerOpen(true) : undefined}
+        />
+      ) : null}
+      {!isLoadingIssues && issues.length > 0 && filteredIssues.length === 0 ? (
+        <IssueEmptyState
+          title={t("No issues match these filters.")}
+          description={t("Try another state, label, assignee, or search term.")}
+          actionLabel={hasIssueFilters ? t("Clear filters") : undefined}
+          onAction={hasIssueFilters ? resetIssueFilters : undefined}
+        />
+      ) : null}
+      {filteredIssues.length > 0 ? (
+        <DataList>
           {filteredIssues.map((issue) => (
             <IssueListItem
               key={issue.id}
@@ -393,16 +410,16 @@ export const RepositoryIssuesTab = ({
               onOpen={() => navigate(buildIssueDetailPath(organizationId, repoId, issue.number))}
             />
           ))}
-        </div>
-      </CardContent>
-    </Card>
+        </DataList>
+      ) : null}
+    </Section>
   );
 };
 
 const IssueStat = ({ label, value }: { label: string; value: number }) => (
-  <div className="rounded-md border bg-card p-3">
-    <p className="text-xs text-muted-foreground">{label}</p>
-    <p className="text-lg font-semibold">{value}</p>
+  <div className="flex items-baseline justify-between gap-2 px-4 py-2">
+    <span className="text-xs text-muted-foreground">{label}</span>
+    <span className="text-sm font-semibold tabular-nums">{value}</span>
   </div>
 );
 
@@ -417,8 +434,8 @@ const IssueEmptyState = ({
   actionLabel?: string;
   onAction?: () => void;
 }) => (
-  <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center">
-    <p className="font-medium">{title}</p>
+  <div className="px-4 py-10 text-center">
+    <p className="text-sm font-medium">{title}</p>
     <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">{description}</p>
     {actionLabel && onAction ? (
       <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onAction}>
@@ -441,52 +458,60 @@ const IssueListItem = ({
   const assigneeIDs = issueAssigneeIDs(issue);
   const labels = issue.labels ?? [];
   return (
-    <button
-      type="button"
-      className="w-full rounded-md border p-3 text-left transition hover:bg-muted/40"
-      onClick={onOpen}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium">
-            #{issue.number} {issue.title}
+    <DataRow className="items-stretch p-0">
+      <button
+        type="button"
+        className="flex w-full cursor-pointer items-start gap-4 px-4 py-2.5 text-left"
+        onClick={onOpen}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            <span className="mr-1.5 font-mono text-xs text-muted-foreground">#{issue.number}</span>
+            {issue.title}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("Opened by")} {formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id)}
-            {" · "}
-            {t("updated")} {formatRelativeTime(issue.updated_at)}
+          {issue.description ? (
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{issue.description}</p>
+          ) : null}
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {t("Opened by")} {formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {t("updated")} {formatRelativeTime(issue.updated_at)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1">
+              <UserRound className="size-3" aria-hidden="true" />
+              {assigneeIDs.length > 0
+                ? assigneeIDs.map((userID) => formatUserLabel(userByID.get(userID), userID)).join(", ")
+                : t("Unassigned")}
+            </span>
           </p>
         </div>
-        <Badge variant={issue.status === "open" ? "default" : "secondary"} className="gap-1">
-          <CircleDot className="size-3" />
-          {issue.status === "open" ? t("Open") : t("Closed")}
-        </Badge>
-      </div>
-      {issue.description ? (
-        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{issue.description}</p>
-      ) : null}
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="outline" className="gap-1">
-          <UserRound className="size-3" />
-          {t("Assignee")}: {assigneeIDs.length > 0
-            ? assigneeIDs.map((userID) => formatUserLabel(userByID.get(userID), userID)).join(", ")
-            : t("Unassigned")}
-        </Badge>
-        {labels.length > 0 ? (
-          labels.map((label) => (
-            <Badge key={`${label.id}:${label.name}`} variant="secondary" className="gap-1">
-              <Tags className="size-3" />
-              {label.name}
-            </Badge>
-          ))
-        ) : (
-          <Badge variant="outline" className="gap-1">
-            <Tags className="size-3" />
-            {t("No labels")}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant={issue.status === "open" ? "default" : "secondary"} className="gap-1">
+            <CircleDot className="size-3" aria-hidden="true" />
+            {issue.status === "open" ? t("Open") : t("Closed")}
           </Badge>
-        )}
-      </div>
-    </button>
+          <span className="flex flex-wrap justify-end gap-1">
+            {labels.length > 0 ? (
+              labels.map((label) => (
+                <Badge key={`${label.id}:${label.name}`} variant="secondary" className="gap-1">
+                  <Tags className="size-3" aria-hidden="true" />
+                  {label.name}
+                </Badge>
+              ))
+            ) : (
+              <Badge variant="outline" className="gap-1">
+                <Tags className="size-3" aria-hidden="true" />
+                {t("No labels")}
+              </Badge>
+            )}
+          </span>
+        </div>
+      </button>
+    </DataRow>
   );
 };
 
@@ -620,15 +645,39 @@ const issueMatchesSearch = (
 
 const normalizeIssueSearch = (value: string): string => value.trim().toLowerCase();
 
-const resolveUsers = (payload: unknown): RawRecord[] =>
-  resolveArrayPayload<unknown>(payload).filter(isRecord);
+/**
+ * Orval types `Issue.status` as `string`; the triage UI relies on the narrowed
+ * `"open" | "closed"` union of `RepositoryIssueView`.
+ */
+const toIssueView = (issue: Issue): RepositoryIssueView => ({
+  id: issue.id,
+  repository_id: issue.repository_id,
+  number: issue.number,
+  title: issue.title,
+  description: issue.description,
+  status: issue.status === "closed" ? "closed" : "open",
+  author_user_id: issue.author_user_id,
+  assignee_user_id: issue.assignee_user_id ?? null,
+  assignee_user_ids: issue.assignee_user_ids,
+  labels: issue.labels.map((label) => ({
+    id: label.id,
+    issue_id: label.issue_id,
+    name: label.name,
+    color: label.color,
+    created_at: label.created_at,
+    updated_at: label.updated_at,
+  })),
+  created_at: issue.created_at,
+  updated_at: issue.updated_at,
+  closed_at: issue.closed_at ?? null,
+});
 
-const normalizeUser = (raw: RawRecord): UserView => ({
-  id: normalizeString(raw.id ?? raw.ID),
-  username: normalizeString(raw.username ?? raw.Username),
-  display_name: normalizeOptionalString(raw.display_name ?? raw.DisplayName),
-  email: normalizeString(raw.email ?? raw.Email),
-  status: normalizeString(raw.status ?? raw.Status),
-  is_super_admin: normalizeBoolean(raw.is_super_admin ?? raw.IsSuperAdmin),
+const toUserView = (user: User): UserView => ({
+  id: user.id,
+  username: user.username,
+  display_name: user.display_name || null,
+  email: user.email ?? "",
+  status: user.status,
+  is_super_admin: user.is_super_admin,
 });
 

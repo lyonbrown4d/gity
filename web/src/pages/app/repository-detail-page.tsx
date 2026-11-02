@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { Card, CardContent } from "@/components/ui/card";
+import { Section } from "@/components/surface/section";
 import { RepositoryCodeTab } from "@/pages/app/repository/repository-code-tab";
 import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-create-file-modal";
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
@@ -115,17 +115,15 @@ export const RepositoryDetailPage = (): JSX.Element => {
       ) : null}
 
       {meta.isLoading ? (
-        <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-          {t("Loading...")}
-        </div>
+        <Section>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t("Loading...")}</p>
+        </Section>
       ) : null}
 
       {!meta.isLoading && !meta.repository ? (
-        <Card className="border-dashed shadow-none">
-          <CardContent className="py-10 text-center">
-            <p className="text-sm text-muted-foreground">{t("Project not found in selected organization.")}</p>
-          </CardContent>
-        </Card>
+        <Section>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t("Project not found in selected organization.")}</p>
+        </Section>
       ) : null}
 
       {meta.repository && activeTab === "overview" ? (

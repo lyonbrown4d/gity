@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { Section } from "@/components/surface/section";
 import type { RepositoryBranchView, RepositoryCommitView } from "@/pages/types";
 import { formatTime, shortSha } from "./repository-utils";
 
@@ -23,49 +23,49 @@ export const RepositoryCommitsTab = ({
   onChangeBranchFilter,
 }: RepositoryCommitsTabProps): JSX.Element => {
   return (
-    <Card className="card-enter">
-      <CardHeader>
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <CardTitle>{t("Commits")}</CardTitle>
-            <CardDescription>{t("Recent commit activity in this project.")}</CardDescription>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="branch-filter">{t("Branch")}</Label>
-            <Select value={branchFilter} onValueChange={onChangeBranchFilter}>
-              <SelectTrigger id="branch-filter">
-                <SelectValue placeholder={t("Branch")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("All branches")}</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.name} value={branch.name}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoadingCommits ? <p className="text-sm text-muted-foreground">{t("Loading commits...")}</p> : null}
-        {commits.map((commit) => (
-          <div key={commit.commit_sha} className="rounded-md border p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{shortSha(commit.commit_sha)}</Badge>
-              <Badge variant="secondary">{commit.branch_name}</Badge>
-            </div>
-            <p className="mt-2 text-sm font-medium">{commit.message}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {commit.author_user_id} · {formatTime(commit.created_at)}
-            </p>
-          </div>
-        ))}
-        {!isLoadingCommits && commits.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("No commits found.")}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+    <Section
+      className="card-enter"
+      title={t("Commits")}
+      description={t("Recent commit activity in this project.")}
+      flush
+      actions={
+        <Select value={branchFilter} onValueChange={onChangeBranchFilter}>
+          <SelectTrigger id="branch-filter" className="h-8 w-44 text-xs" aria-label={t("Branch")}>
+            <SelectValue placeholder={t("Branch")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("All branches")}</SelectItem>
+            {branches.map((branch) => (
+              <SelectItem key={branch.name} value={branch.name}>
+                {branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+    >
+      {isLoadingCommits ? (
+        <div className="px-4 py-6 text-sm text-muted-foreground">{t("Loading commits...")}</div>
+      ) : commits.length === 0 ? (
+        <div className="px-4 py-6 text-sm text-muted-foreground">{t("No commits found.")}</div>
+      ) : (
+        <DataList>
+          {commits.map((commit) => (
+            <DataRow key={commit.commit_sha} className="gap-4">
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-sm font-medium">{commit.message}</span>
+                <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="font-mono text-[11px]">{shortSha(commit.commit_sha)}</Badge>
+                  <Badge variant="secondary" className="text-[11px]">{commit.branch_name}</Badge>
+                  <span className="truncate">
+                    {commit.author_user_id} · {formatTime(commit.created_at)}
+                  </span>
+                </span>
+              </span>
+            </DataRow>
+          ))}
+        </DataList>
+      )}
+    </Section>
   );
 };

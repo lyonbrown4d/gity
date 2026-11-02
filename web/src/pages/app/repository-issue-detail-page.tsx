@@ -5,11 +5,12 @@ import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { DataList, DataRow } from "@/components/surface/data-list";
+import { PropertyItem, PropertyPanel } from "@/components/surface/property-panel";
+import { Section } from "@/components/surface/section";
 import type {
   RepositoryIssueAssigneeView,
   RepositoryIssueCommentView,
@@ -361,113 +362,113 @@ export const RepositoryIssueDetailPage = (): JSX.Element => {
       {isLoadingIssue ? <p className="text-sm text-muted-foreground">{t("Loading issue...")}</p> : null}
 
       {!isLoadingIssue && issue ? (
-        <Card className="card-enter">
-          <CardHeader>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle>
-                    #{issue.number} {issue.title}
-                  </CardTitle>
-                  <Badge variant={issue.status === "open" ? "default" : "secondary"}>
-                    {issue.status === "open" ? t("Open") : t("Closed")}
-                  </Badge>
-                </div>
-                <CardDescription>
-                  {t("Opened by")} {formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id)}
-                  {" · "}
-                  {formatRelativeTime(issue.created_at)}
-                  {issue.updated_at ? ` · ${t("updated")} ${formatRelativeTime(issue.updated_at)}` : ""}
-                </CardDescription>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" size="sm" variant="outline" disabled={!canWriteIssue || isUpdatingIssue} onClick={() => void toggleIssueStatus()}>
-                  {issue.status === "open" ? t("Close issue") : t("Reopen issue")}
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => navigate(-1)}>
-                  {t("Back")}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-              <div className="flex min-w-0 flex-col gap-4">
-                <div className="rounded-md border p-3">
-                  {issue.description ? (
-                    <MarkdownContent content={issue.description} organizationId={organizationId} repoId={repoId} />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">{t("No description provided.")}</p>
-                  )}
-                </div>
-
-                <IssueDiscussionPanel
-                  comments={comments}
-                  userByID={userByID}
-                  isLoading={isLoadingComments}
-                  organizationId={organizationId}
-                  repoId={repoId}
-                  t={t}
-                />
-
-                {canCommentIssue ? (
-                  <form className="flex flex-col gap-3 rounded-md border p-3" onSubmit={submitComment}>
-                    <p className="text-sm font-medium">{t("Add a comment")}</p>
-                    <IssueMarkdownEditor
-                      organizationId={organizationId}
-                      repoId={repoId}
-                      issueId={String(issue.number)}
-                      t={t}
-                      value={newComment}
-                      placeholder={t("Comment with markdown, mention #123, or upload files...")}
-                      editorHeight={220}
-                      onChange={setNewComment}
-                      onError={setActionError}
-                    />
-                    <div className="flex justify-end">
-                      <Button type="submit" disabled={isCreatingComment || !newComment.trim()}>
-                        {isCreatingComment ? t("Commenting...") : t("Comment")}
-                      </Button>
-                    </div>
-                  </form>
+        <Section
+          className="card-enter"
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              <span>
+                #{issue.number} {issue.title}
+              </span>
+              <Badge variant={issue.status === "open" ? "default" : "secondary"}>
+                {issue.status === "open" ? t("Open") : t("Closed")}
+              </Badge>
+            </span>
+          }
+          description={
+            <>
+              {t("Opened by")} {formatUserLabel(userByID.get(issue.author_user_id), issue.author_user_id)}
+              {" · "}
+              {formatRelativeTime(issue.created_at)}
+              {issue.updated_at ? ` · ${t("updated")} ${formatRelativeTime(issue.updated_at)}` : ""}
+            </>
+          }
+          actions={
+            <>
+              <Button type="button" size="sm" variant="outline" disabled={!canWriteIssue || isUpdatingIssue} onClick={() => void toggleIssueStatus()}>
+                {issue.status === "open" ? t("Close issue") : t("Reopen issue")}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => navigate(-1)}>
+                {t("Back")}
+              </Button>
+            </>
+          }
+        >
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <div className="text-sm">
+                {issue.description ? (
+                  <MarkdownContent content={issue.description} organizationId={organizationId} repoId={repoId} />
                 ) : (
-                  <Alert>
-                    <AlertDescription>{t("Your current project role can inspect issues, but cannot comment on them.")}</AlertDescription>
-                  </Alert>
+                  <p className="text-sm text-muted-foreground">{t("No description provided.")}</p>
                 )}
               </div>
 
-              <IssueCollaborationPanel
-                issue={issue}
-                assignees={assignees}
-                labels={labels}
-                users={users}
+              <IssueDiscussionPanel
+                comments={comments}
                 userByID={userByID}
-                assigneeDraftUserID={assigneeDraftUserID}
-                labelDraftName={labelDraftName}
-                labelDraftColor={labelDraftColor}
-                isLoading={isLoadingCollaboration}
-                isUpdatingAssignees={isUpdatingAssignees}
-                isUpdatingLabels={isUpdatingLabels}
-                canEdit={canWriteIssue}
+                isLoading={isLoadingComments}
+                organizationId={organizationId}
+                repoId={repoId}
                 t={t}
-                onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
-                onChangeLabelDraftName={setLabelDraftName}
-                onChangeLabelDraftColor={setLabelDraftColor}
-                onAddAssignee={() => {
-                  if (!assigneeDraftUserID) {
-                    return;
-                  }
-                  void updateAssignees(uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
-                }}
-                onRemoveAssignee={(userID) => void updateAssignees(assignees.map((item) => item.user_id).filter((item) => item !== userID))}
-                onAddLabel={() => void addLabel()}
-                onRemoveLabel={(name) => void removeLabel(name)}
-                onReload={() => void loadCollaboration()}
               />
+
+              {canCommentIssue ? (
+                <form className="flex flex-col gap-2" onSubmit={submitComment}>
+                  <p className="text-sm font-medium">{t("Add a comment")}</p>
+                  <IssueMarkdownEditor
+                    organizationId={organizationId}
+                    repoId={repoId}
+                    issueId={String(issue.number)}
+                    t={t}
+                    value={newComment}
+                    placeholder={t("Comment with markdown, mention #123, or upload files...")}
+                    editorHeight={220}
+                    onChange={setNewComment}
+                    onError={setActionError}
+                  />
+                  <div className="flex justify-end">
+                    <Button type="submit" size="sm" disabled={isCreatingComment || !newComment.trim()}>
+                      {isCreatingComment ? t("Commenting...") : t("Comment")}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <Alert>
+                  <AlertDescription>{t("Your current project role can inspect issues, but cannot comment on them.")}</AlertDescription>
+                </Alert>
+              )}
             </div>
-          </CardContent>
-        </Card>
+
+            <IssueCollaborationPanel
+              issue={issue}
+              assignees={assignees}
+              labels={labels}
+              users={users}
+              userByID={userByID}
+              assigneeDraftUserID={assigneeDraftUserID}
+              labelDraftName={labelDraftName}
+              labelDraftColor={labelDraftColor}
+              isLoading={isLoadingCollaboration}
+              isUpdatingAssignees={isUpdatingAssignees}
+              isUpdatingLabels={isUpdatingLabels}
+              canEdit={canWriteIssue}
+              t={t}
+              onChangeAssigneeDraftUserID={setAssigneeDraftUserID}
+              onChangeLabelDraftName={setLabelDraftName}
+              onChangeLabelDraftColor={setLabelDraftColor}
+              onAddAssignee={() => {
+                if (!assigneeDraftUserID) {
+                  return;
+                }
+                void updateAssignees(uniqueStrings([...assignees.map((item) => item.user_id), assigneeDraftUserID]));
+              }}
+              onRemoveAssignee={(userID) => void updateAssignees(assignees.map((item) => item.user_id).filter((item) => item !== userID))}
+              onAddLabel={() => void addLabel()}
+              onRemoveLabel={(name) => void removeLabel(name)}
+              onReload={() => void loadCollaboration()}
+            />
+          </div>
+        </Section>
       ) : null}
     </div>
   );
@@ -489,24 +490,30 @@ const IssueDiscussionPanel = ({
   t: (text: string) => string;
 }) => (
   <div className="flex flex-col gap-2">
-    <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-1.5">
       <p className="text-sm font-medium">{t("Discussion")}</p>
       <Badge variant="outline">{comments.length} {t("comment(s)")}</Badge>
     </div>
-    {isLoading ? <p className="text-xs text-muted-foreground">{t("Loading comments...")}</p> : null}
+    {isLoading ? <p className="py-2 text-xs text-muted-foreground">{t("Loading comments...")}</p> : null}
     {!isLoading && comments.length === 0 ? (
-      <p className="rounded-md border px-3 py-2 text-xs text-muted-foreground">{t("No comments yet.")}</p>
+      <p className="text-xs text-muted-foreground">{t("No comments yet.")}</p>
     ) : null}
-    {comments.map((comment) => (
-      <div key={comment.id} className="rounded-md border p-3">
-        <p className="mb-2 text-xs text-muted-foreground">
-          {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
-          {" · "}
-          {formatRelativeTime(comment.created_at)}
-        </p>
-        <MarkdownContent content={comment.content} organizationId={organizationId} repoId={repoId} />
-      </div>
-    ))}
+    {comments.length > 0 ? (
+      <DataList className="-mx-4 -mt-2">
+        {comments.map((comment) => (
+          <DataRow key={comment.id} className="items-start">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs text-muted-foreground">
+                {formatUserLabel(userByID.get(comment.author_user_id), comment.author_user_id)}
+                {" · "}
+                {formatRelativeTime(comment.created_at)}
+              </p>
+              <MarkdownContent content={comment.content} organizationId={organizationId} repoId={repoId} />
+            </div>
+          </DataRow>
+        ))}
+      </DataList>
+    ) : null}
   </div>
 );
 
@@ -559,9 +566,9 @@ const IssueCollaborationPanel = ({
   const availableUsers = users.filter((user) => !assignedIDs.includes(user.id));
 
   return (
-    <aside className="flex flex-col gap-3 rounded-md border bg-muted/10 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+    <PropertyPanel className="self-start">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border px-3 py-2">
+        <div className="min-w-0">
           <p className="text-sm font-medium">{t("Issue sidebar")}</p>
           <p className="text-xs text-muted-foreground">{t("GitLab-style triage fields for this issue.")}</p>
         </div>
@@ -570,17 +577,18 @@ const IssueCollaborationPanel = ({
         </Button>
       </div>
 
-      <IssueSidebarSection title={t("Status")}>
+      <PropertyItem label={t("Status")}>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={issue.status === "open" ? "default" : "secondary"}>
             {issue.status === "open" ? t("Open") : t("Closed")}
           </Badge>
           {issue.closed_at ? <span className="text-xs text-muted-foreground">{t("Closed")} {formatRelativeTime(issue.closed_at)}</span> : null}
         </div>
-      </IssueSidebarSection>
+      </PropertyItem>
 
-      <IssueSidebarSection title={t("Assignees")}>
-        <div className="flex flex-wrap gap-2">
+      <PropertyItem label={t("Assignees")}>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
           {assignees.length === 0 ? <span className="text-xs text-muted-foreground">{t("No assignees assigned.")}</span> : null}
           {assignees.map((assignee) => (
             <Badge key={assignee.id || assignee.user_id} variant="outline" className="gap-2">
@@ -597,14 +605,13 @@ const IssueCollaborationPanel = ({
               </Button>
             </Badge>
           ))}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
+          </div>
           <Select
             value={assigneeDraftUserID}
             onValueChange={onChangeAssigneeDraftUserID}
             disabled={!canEdit || isUpdatingAssignees || availableUsers.length === 0}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-8">
               <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
             </SelectTrigger>
             <SelectContent>
@@ -617,14 +624,15 @@ const IssueCollaborationPanel = ({
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
+          <Button type="button" size="sm" variant="outline" className="self-end" disabled={!canEdit || isUpdatingAssignees || !assigneeDraftUserID} onClick={onAddAssignee}>
             {isUpdatingAssignees ? t("Saving...") : t("Add")}
           </Button>
         </div>
-      </IssueSidebarSection>
+      </PropertyItem>
 
-      <IssueSidebarSection title={t("Labels")}>
-        <div className="flex flex-wrap gap-2">
+      <PropertyItem label={t("Labels")}>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-1.5">
           {labels.length === 0 ? <span className="text-xs text-muted-foreground">{t("No labels assigned.")}</span> : null}
           {labels.map((label) => (
             <Badge
@@ -646,46 +654,37 @@ const IssueCollaborationPanel = ({
               </Button>
             </Badge>
           ))}
-        </div>
-        <div className="grid gap-2">
+          </div>
           <div className="flex flex-col gap-1">
             <Label className="sr-only" htmlFor="issue-label-name">{t("Label name")}</Label>
             <Input
               id="issue-label-name"
+              className="h-8"
               value={labelDraftName}
               placeholder={t("Label name")}
               disabled={!canEdit}
               onChange={(event) => onChangeLabelDraftName(event.target.value)}
             />
           </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1 xl:grid-cols-[1fr_auto]">
-            <div className="flex flex-col gap-1">
-              <Label className="sr-only" htmlFor="issue-label-color">{t("Label color")}</Label>
-              <Input
-                id="issue-label-color"
-                value={labelDraftColor}
-                placeholder="#2563eb"
-                disabled={!canEdit}
-                onChange={(event) => onChangeLabelDraftColor(event.target.value)}
-              />
-            </div>
-            <Button type="button" size="sm" variant="outline" disabled={!canEdit || isUpdatingLabels || !labelDraftName.trim()} onClick={onAddLabel}>
-              {isUpdatingLabels ? t("Saving...") : t("Add")}
-            </Button>
+          <div className="flex flex-col gap-1">
+            <Label className="sr-only" htmlFor="issue-label-color">{t("Label color")}</Label>
+            <Input
+              id="issue-label-color"
+              className="h-8"
+              value={labelDraftColor}
+              placeholder="#2563eb"
+              disabled={!canEdit}
+              onChange={(event) => onChangeLabelDraftColor(event.target.value)}
+            />
           </div>
+          <Button type="button" size="sm" variant="outline" className="self-end" disabled={!canEdit || isUpdatingLabels || !labelDraftName.trim()} onClick={onAddLabel}>
+            {isUpdatingLabels ? t("Saving...") : t("Add")}
+          </Button>
         </div>
-      </IssueSidebarSection>
-    </aside>
+      </PropertyItem>
+    </PropertyPanel>
   );
 };
-
-const IssueSidebarSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="flex flex-col gap-2">
-    <Separator />
-    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-    {children}
-  </div>
-);
 
 const resolveIssueAssignees = (payload: unknown): RawRecord[] =>
   resolveArrayPayload<unknown>(payload).filter(isRecord);

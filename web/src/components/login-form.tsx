@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 
 interface LoginFormProps extends React.ComponentProps<"div"> {
   onLoginSubmit: (credentials: { username: string; password: string }) => void;
@@ -28,13 +28,13 @@ export function LoginForm({
 
   return (
     <div className={cn("page-enter", className)} {...props}>
-      <Card className="overflow-hidden border-border/80 shadow-xl shadow-foreground/5">
-        <CardContent className="grid p-0 lg:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.25fr)]">
+      <Card className="overflow-hidden rounded-md border-border shadow-none">
+        <div className="grid lg:grid-cols-[minmax(260px,0.75fr)_minmax(0,1.25fr)]">
           <aside className="relative hidden overflow-hidden border-r border-border/70 bg-muted/45 p-6 lg:flex lg:flex-col lg:justify-between">
             <div className="absolute inset-0 gity-soft-grid opacity-35" aria-hidden="true" />
             <div className="relative">
               <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-md border bg-background shadow-sm">
+                <span className="flex size-8 items-center justify-center rounded-md border bg-background">
                   <Braces className="size-4 text-primary" aria-hidden="true" />
                 </span>
                 <div>
@@ -43,9 +43,9 @@ export function LoginForm({
                 </div>
               </div>
 
-              <div className="mt-10 border-y border-border/70 py-4">
+              <div className="mt-8 border-y border-border/70 py-3">
                 <p className="text-xs font-medium text-muted-foreground">{t("Workspace")}</p>
-                <p className="mt-2 text-lg font-semibold leading-snug">
+                <p className="mt-1.5 text-[15px] font-semibold leading-snug">
                   {t("Project activity, organization scope, and account access in one workspace.")}
                 </p>
               </div>
@@ -59,29 +59,29 @@ export function LoginForm({
           </aside>
 
           <form
-            className="bg-card p-6 sm:p-8 lg:p-10"
+            className="bg-card p-6 sm:p-8"
             onSubmit={(event) => {
               event.preventDefault();
               onLoginSubmit({ username, password });
             }}
           >
-            <div className="mx-auto flex max-w-sm flex-col gap-6">
+            <div className="mx-auto flex max-w-sm flex-col gap-5">
               <div>
-                <div className="mb-5 flex items-center gap-2 lg:hidden">
-                  <span className="flex size-8 items-center justify-center rounded-md border bg-muted">
+                <div className="mb-4 flex items-center gap-2 lg:hidden">
+                  <span className="flex size-7 items-center justify-center rounded-md border bg-muted">
                     <Braces className="size-4 text-primary" aria-hidden="true" />
                   </span>
                   <span className="text-sm font-semibold">Gity</span>
                 </div>
                 <p className="text-xs font-medium text-muted-foreground">{t("User Workspace")}</p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight">{t("Welcome back")}</h1>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                <h1 className="mt-1 text-xl font-semibold tracking-tight">{t("Welcome back")}</h1>
+                <p className="mt-1.5 text-sm text-muted-foreground">
                   {t("Sign in to manage projects and organizations.")}
                 </p>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="username">{t("Username / Email")}</Label>
+              <div className="grid gap-1.5">
+                <Label htmlFor="username" className="text-xs">{t("Username / Email")}</Label>
                 <Input
                   id="username"
                   type="text"
@@ -93,9 +93,9 @@ export function LoginForm({
                   autoFocus
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-1.5">
                 <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="password">{t("Password")}</Label>
+                  <Label htmlFor="password" className="text-xs">{t("Password")}</Label>
                   <LockKeyhole className="size-3.5 text-muted-foreground" aria-hidden="true" />
                 </div>
                 <Input
@@ -112,12 +112,12 @@ export function LoginForm({
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               ) : null}
-              <Button type="submit" className="h-10 w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? t("Signing in...") : t("Sign in")}
               </Button>
             </div>
           </form>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );
@@ -125,9 +125,9 @@ export function LoginForm({
 
 function CanvasLine({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }): JSX.Element {
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div className="flex items-center gap-3 py-2.5">
       <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="font-medium">{label}</span>
+      <span className="text-[13px] font-medium">{label}</span>
       <span className="ml-auto text-xs text-muted-foreground">{value}</span>
     </div>
   );
