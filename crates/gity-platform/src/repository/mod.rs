@@ -1,4 +1,5 @@
 mod protection;
+mod lookup;
 mod read;
 mod read_routes;
 mod search;
@@ -21,7 +22,8 @@ pub fn routes() -> Router<AppState> {
 }
 pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   use utoipa_axum::{router::OpenApiRouter, routes};
-  let shared = read_routes::routes()
+  let shared = lookup::routes()
+    .merge(read_routes::routes())
     .merge(write_routes::routes())
     .routes(routes!(protection::protect))
     .routes(routes!(protection::update))

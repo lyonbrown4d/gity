@@ -1,6 +1,9 @@
 //! OpenAPI generated from the same annotated handlers used to register Axum routes.
+pub mod activity_schemas;
 pub mod credential_schemas;
+pub mod discussion_schemas;
 pub mod git_schemas;
+pub mod code_schemas;
 pub mod repository_schemas;
 mod system;
 pub use system::routes as system_routes;
@@ -14,6 +17,7 @@ pub use gity_package_registry::package_schemas;
 pub mod project_schemas;
 pub mod release_schemas;
 pub mod schemas;
+pub mod subscription_schemas;
 pub mod user_schemas;
 pub mod wiki_schemas;
 use crate::AppState;
