@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "apps/gity-api",
+  "apps/gity-cli",
   "apps/gity-gateway",
   "apps/gity-git-hook",
   "apps/gity-git-node",
