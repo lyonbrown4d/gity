@@ -34,6 +34,11 @@ enum Command {
     old: String,
     new: String,
   },
+  /// Print the OpenAPI document without starting the service.
+  Openapi {
+    #[arg(long)]
+    output: Option<std::path::PathBuf>,
+  },
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ApplicationRole {
@@ -45,6 +50,9 @@ pub enum ApplicationRole {
 }
 pub async fn run(role: ApplicationRole) -> anyhow::Result<()> {
   let cli = Cli::parse();
+  if let Some(Command::Openapi { output }) = &cli.command {
+    return export_openapi(output.as_deref());
+  }
   if let Some(Command::Update {
     reference,
     old,
@@ -77,7 +85,10 @@ pub async fn run(role: ApplicationRole) -> anyhow::Result<()> {
     ApplicationRole::Worker => Command::Worker,
     _ => Command::Serve,
   }) {
-    Command::Migrate | Command::SetPassword { .. } | Command::GrantAdmin { .. } => {
+    Command::Openapi { .. }
+    | Command::Migrate
+    | Command::SetPassword { .. }
+    | Command::GrantAdmin { .. } => {
       unreachable!("handled before application composition")
     }
     Command::Worker => {
@@ -106,6 +117,19 @@ pub async fn run(role: ApplicationRole) -> anyhow::Result<()> {
     }
   }
   telemetry.shutdown();
+  Ok(())
+}
+
+/// `openapi` needs neither configuration nor a database connection.
+fn export_openapi(output: Option<&std::path::Path>) -> anyhow::Result<()> {
+  if let Some(path) = output {
+    return crate::openapi::write_document(path);
+  }
+  let json = serde_json::to_string_pretty(&crate::openapi::document())?;
+  use std::io::Write as _;
+  let mut stdout = std::io::stdout().lock();
+  stdout.write_all(json.as_bytes())?;
+  stdout.write_all(b"\n")?;
   Ok(())
 }
 async fn run_components(state: crate::AppState, options: PlatformOptions) -> anyhow::Result<()> {

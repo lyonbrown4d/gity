@@ -16,7 +16,7 @@ pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState
     put,
     path="/projects/{id}/packages/npm/-/package/{name}/dist-tags/{tag}",
     tag="package protocols",
-    params(api::ProjectPath, api::PackageNamePath, api::ProtocolFilePath),
+    params(api::PackageNamePath, ("tag"=String, Path, description="Distribution tag")),
     request_body(content=String),
     responses((status=200,description="npm distribution tag updated"),api::Errors),
     security(("bearer"=[]),("basic"=[]),("private_token"=[]))
@@ -55,7 +55,7 @@ async fn set_tag(
     delete,
     path="/projects/{id}/packages/npm/-/package/{name}/dist-tags/{tag}",
     tag="package protocols",
-    params(api::ProjectPath, api::PackageNamePath, api::ProtocolFilePath),
+    params(api::PackageNamePath, ("tag"=String, Path, description="Distribution tag")),
     responses((status=200,description="npm distribution tag deleted"),api::Errors),
     security(("bearer"=[]),("basic"=[]),("private_token"=[]))
 )]

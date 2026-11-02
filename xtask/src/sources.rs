@@ -5,23 +5,14 @@ pub fn check(root: &Path) -> Result<()> {
   for legacy in [
     "cmd",
     "internal",
-    "web",
     "go.mod",
     "go.sum",
     ".golangci.yml",
     ".goreleaser.yaml",
-    "package.json",
-    "package-lock.json",
-    "pnpm-lock.yaml",
-    "yarn.lock",
-    "bun.lock",
-    "bun.lockb",
-    "vite.config.ts",
-    "vite.config.js",
   ] {
     if root.join(legacy).exists() {
       violations.push(format!(
-        "{legacy}: retired Go/React implementation must not return"
+        "{legacy}: retired Go implementation must not return"
       ));
     }
   }
@@ -39,23 +30,11 @@ fn walk(path: &Path, violations: &mut Vec<String>) -> Result<()> {
     let path = entry.path();
     let kind = entry.file_type()?;
     let name = entry.file_name().to_string_lossy().into_owned();
-    if [
-      "package.json",
-      "package-lock.json",
-      "pnpm-lock.yaml",
-      "yarn.lock",
-      "bun.lock",
-      "bun.lockb",
-    ]
-    .contains(&name.as_str())
-      || path.extension().is_some_and(|ext| {
-        ["go", "ts", "tsx", "jsx", "mjs", "plano"]
-          .iter()
-          .any(|v| ext == *v)
-      })
-    {
+    if path.extension().is_some_and(|ext| {
+      ["go", "plano"].iter().any(|v| ext == *v)
+    }) {
       violations.push(format!(
-        "{}: legacy language or Node build input is forbidden",
+        "{}: retired language input is forbidden",
         path.display()
       ));
     }

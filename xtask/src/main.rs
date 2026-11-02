@@ -1,7 +1,6 @@
 //! Repository tasks intentionally require only Rust tools and native Git.
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use sha2::{Digest, Sha256};
 use std::{path::PathBuf, process::Command};
 mod backup;
 mod blackbox;
@@ -27,9 +26,8 @@ enum Task {
   Test,
   Web,
   Release,
-  VendorCheck,
   SourceCheck,
-  /// Precompress static Web assets with brotli for `ServeDir::precompressed_br`.
+  /// Build the Vite front-end into `dist/web` and precompress its assets.
   Precompress,
   /// Build or preview the mdBook manual.
   Docs {
@@ -48,15 +46,6 @@ enum Task {
   ContainerStats(container_stats::ContainerStatsArgs),
   Blackbox(blackbox::BlackboxArgs),
 }
-#[derive(serde::Deserialize)]
-struct Manifest {
-  files: Vec<Artifact>,
-}
-#[derive(serde::Deserialize)]
-struct Artifact {
-  path: String,
-  sha256: String,
-}
 fn main() -> Result<()> {
   let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     .parent()
@@ -66,7 +55,6 @@ fn main() -> Result<()> {
   match Cli::parse().command.unwrap_or(Task::Check) {
     Task::Docs { serve } => docs::run(&root, serve)?,
     Task::DocsPreprocess { args } => docs_mermaid::run(&args)?,
-    Task::VendorCheck => verify_vendor(&root)?,
     Task::SourceCheck => sources::check(&root)?,
     Task::Precompress => precompress::run(&root)?,
     Task::GitStress(args) => git_stress::run(&root, args)?,
@@ -81,39 +69,22 @@ fn main() -> Result<()> {
     }
     Task::Check => {
       sources::check(&root)?;
-      verify_vendor(&root)?;
       run("cargo", &["fmt", "--all", "--", "--check"])?;
       run("cargo", &["check", "--workspace", "--locked"])?;
-      run(
-        "cargo",
-        &[
-          "check",
-          "-p",
-          "gity-web",
-          "--target",
-          "wasm32-unknown-unknown",
-          "--locked",
-        ],
-      )?;
     }
     Task::Test => {
-      verify_vendor(&root)?;
       run("cargo", &["test", "--workspace", "--locked"])?;
     }
     task @ (Task::Web | Task::Release) => {
-      verify_vendor(&root)?;
       let release = matches!(task, Task::Release);
-      let mut command = Command::new("trunk");
+      let mut command = Command::new("pnpm");
       command
-        .current_dir(root.join("apps/gity-web"))
+        .current_dir(root.join("web"))
         .env("NO_COLOR", "true")
         .arg("build");
-      if release {
-        command.arg("--release");
-      }
       if !command
         .status()
-        .context("install Trunk with `cargo install trunk --locked`")?
+        .context("install pnpm and run `pnpm --dir web install`")?
         .success()
       {
         bail!("Web build failed");
@@ -139,38 +110,6 @@ fn main() -> Result<()> {
       }
     }
   }
-  Ok(())
-}
-fn verify_vendor(root: &std::path::Path) -> Result<()> {
-  let directory = root.join("apps/gity-web/vendor");
-  let manifest: Manifest =
-    toml::from_str(&std::fs::read_to_string(directory.join("manifest.toml"))?)?;
-  let mut expected = std::collections::BTreeSet::new();
-  for artifact in manifest.files {
-    if artifact.path.contains('/') || artifact.path.contains('\\') || artifact.path.starts_with('.')
-    {
-      bail!("invalid vendor manifest path");
-    }
-    let digest = hex::encode(Sha256::digest(
-      std::fs::read(directory.join(&artifact.path))
-        .with_context(|| format!("missing vendor asset {}", artifact.path))?,
-    ));
-    if digest != artifact.sha256 {
-      bail!("vendor asset checksum mismatch: {}", artifact.path);
-    }
-    expected.insert(artifact.path);
-  }
-  for entry in std::fs::read_dir(&directory)? {
-    let entry = entry?;
-    let name = entry.file_name().to_string_lossy().to_string();
-    if entry.file_type()?.is_file()
-      && (name.ends_with(".js") || name.ends_with(".mjs") || name.ends_with(".css"))
-      && !expected.contains(&name)
-    {
-      bail!("untracked vendor asset: {name}");
-    }
-  }
-  println!("Verified {} third-party editor assets", expected.len());
   Ok(())
 }
 fn run(program: &str, args: &[&str]) -> Result<()> {

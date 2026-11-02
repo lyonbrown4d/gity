@@ -64,6 +64,7 @@ serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 argon2 = { version = "0.6", features = ["getrandom"] }
 sha2 = "0.10"
 hex = "0.4"
+rust-embed = { version = "8", features = ["debug-embed"] }
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.13", features = ["json", "multipart"] }
 url = "2"

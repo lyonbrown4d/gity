@@ -140,7 +140,7 @@ async fn index(
 
 #[utoipa::path(
     get,path="/projects/{id}/packages/cargo/crates/{name}/{version}/download",tag="package protocols",
-    params(api::ProjectPath,api::ProtocolFilePath),
+    params(api::PackageNamePath,("version"=String, Path, description="Crate version")),
     responses((status=200,description="Cargo crate archive",body=api::Binary,content_type="application/gzip"),api::Errors),
     security((),("bearer"=[]),("basic"=[]),("private_token"=[]))
 )]

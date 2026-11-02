@@ -9,11 +9,11 @@
 ## 源码与构建
 
 ```sh
+pnpm --dir web install --frozen-lockfile
+pnpm --dir web build
 cargo xtask source-check
-cargo xtask vendor-check
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo check -p gity-web --target wasm32-unknown-unknown --locked
 cargo xtask docs
 ```
 

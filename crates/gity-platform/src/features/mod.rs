@@ -6,6 +6,7 @@ mod issue_collaboration;
 mod paging;
 mod issue_views;
 mod issues;
+mod issues_mutation;
 mod labels;
 mod merge_events;
 pub(crate) use merge_events::recover as recover_merge_operations;

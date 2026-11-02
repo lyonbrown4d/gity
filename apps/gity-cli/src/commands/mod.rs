@@ -2,6 +2,7 @@ pub mod api;
 pub mod auth;
 pub mod completion;
 pub mod issue;
+mod issue_collab;
 pub mod mr;
 pub mod pipeline;
 pub mod project;

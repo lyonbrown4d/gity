@@ -160,3 +160,16 @@ mod legacy_contract_tests;
 mod tests;
 #[cfg(test)]
 mod view_tests;
+
+/// Serializes [`document`] as pretty JSON into `path`, creating parent directories.
+pub fn write_document(path: &std::path::Path) -> anyhow::Result<()> {
+  if let Some(parent) = path
+    .parent()
+    .filter(|parent| !parent.as_os_str().is_empty())
+  {
+    std::fs::create_dir_all(parent)?;
+  }
+  let json = serde_json::to_string_pretty(&document())?;
+  std::fs::write(path, format!("{json}\n"))?;
+  Ok(())
+}

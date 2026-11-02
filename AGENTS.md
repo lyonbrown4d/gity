@@ -4,7 +4,7 @@
 
 - `main` 为唯一主维护分支，服务端、Runner 和 Web 全部以 Rust 版本为准。
 - Rust 整体迁移与本机验收已完成；后续按用户授权直接在 `main` 迭代，完成验证后提交，不能把未完成的变更当作可发布版本。
-- Go 实现、Go 模块、Go 构建发布配置及 React/Refine 遗留实现已删除，不得重新引入；历史版本可从 Git 提交记录追溯。
+- Go 实现、Go 模块与 Go 构建发布配置已删除，不得重新引入；Web 前端已切换回 React 生态，历史版本可从 Git 提交记录追溯。
 - 用现有业务流程、权限规则和 API 使用场景核对迁移完整性；数据结构以最新 Rust 版本为准，不能以返回空数据或无操作成功替代功能。
 - 允许多个 agent 并行落地，但必须明确互不冲突的文件归属，由主 agent 集成并复核结果。
 
@@ -40,7 +40,7 @@
 
 - 当前只交付 Web，不实现桌面端及桌面本地仓库管理。
 - 后端采用 Rust、Axum、Tokio、SeaORM。
-- Web 页面、状态和业务交互采用 Leptos、Rust、WebAssembly。
+- Web 页面、状态和业务交互采用 React 19、TypeScript 与 Vite；后端保持 Rust。
 - Rust 工具链版本必须满足 FluxDI 要求，固定在 `rust-toolchain.toml`。
 - 依赖注入统一使用 `fluxdi`：<https://github.com/lyonbrown4d/fluxdi>。
 - 程序组合入口通过 FluxDI 注册和解析依赖，不能只添加依赖却绕过容器装配。
@@ -60,7 +60,7 @@
 - 分别提供 standalone 与分布式组件模式的 Docker Compose 部署文件；当前都以单机 Docker Compose 为目标。默认 standalone 包含全部业务组件，各角色同时提供 Debian 与 Alpine 基础镜像变体。
 - 镜像黑盒分别验收两种运行架构，覆盖真实 SSH Git、包协议、OCI/mirror、鉴权隔离及故障行为；不能以单体通过推断分布式通过，也不能以 Debian 通过推断 Alpine 通过。
 - S3 集成环境使用 SeaweedFS；应用通过标准 S3 API 访问，验证鉴权、对象读写、Range 和分段上传。
-- i18n 语言资产必须在编译期嵌入后端 Rust 二进制和前端 WASM；运行时不得依赖外部语言文件、语言目录挂载或 CDN 下载。新增资产必须进入 Cargo 的编译依赖追踪。
+- i18n 语言资产必须在编译期嵌入后端 Rust 二进制和前端构建产物；运行时不得依赖外部语言文件、语言目录挂载或 CDN 下载。
 - 前后端复用 `crates/gity-i18n` 的多语言资产、翻译键与参数定义。前端支持语言切换及偏好保存，服务端按请求选择语言；禁止通过全局可变 locale 处理并发请求。验证语言包键和占位符一致性。
 
 ## 多协议 API
@@ -72,20 +72,22 @@
 
 ## 前端工具链与第三方编辑器
 
-- 构建和验证统一使用 Cargo、Trunk 与 Rust/WASM 工具，不保留 Node 构建链。
-- 不保留 `package.json`、npm/pnpm/yarn 锁文件、Vite 配置或 React/TypeScript 业务实现。
-- Monaco、Milkdown 等成熟前端库允许作为第三方预编译静态资产复用。
-- 编辑器的应用侧生命周期、事件连接和业务逻辑使用 Rust 绑定实现。
-- 第三方资产必须记录上游版本、来源、许可证和校验值；生成的 WASM 加载脚本不视为手写业务实现。
-- 不依赖 CDN 提供生产所需的编辑器资源，发布包必须包含所需静态资产。
-- 前端优先复用成熟第三方 Rust/Leptos 组件与浏览器生态，避免自行重写已有的通用能力。
+- Web 使用 React 19、TypeScript、Vite 构建，包管理使用 pnpm 并以锁文件固定版本；不引入 Trunk 或 Leptos。
+- 前端产物由 Vite 构建到 `dist/web`，再由 `rust-embed` 编译进后端二进制；release 构建顺序必须是先构建前端、再编译 Rust。
+- pnpm 使用全局 store，不在仓库内创建 `.pnpm-store`；store 与安装方式固定在 `web/pnpm-workspace.yaml`。
+- 可重建的生成物不提交仓库，包括 `web/openapi.json` 与 `src/lib/generated/`；接口类型与 React Query 客户端通过 `pnpm gen:api`（Orval）从后端 OpenAPI 生成。
+- 前端依赖更新到最新版本；破坏性升级由前端适配，不使用长期滞后的锁版本。
+- `src/components/ui/` 是 shadcn 生成产物，不得手改；定制通过 `src/components/` 下的组合组件实现，升级 shadcn 时直接覆盖 `ui/`。
+- 样式优先使用 Tailwind CSS；自定义样式使用 SCSS（`src/index.scss`），构建链为 sass + PostCSS。
+- 编辑器使用 Monaco 与 Milkdown（npm 依赖），不再维护手工 vendor 的第三方资产；不依赖 CDN。
+- 动效使用 motion，并尊重 `prefers-reduced-motion`；动效不得改变原有布局与视觉规范。
+- 前端优先复用成熟第三方组件与浏览器生态，避免自行重写已有的通用能力。
 - 按组件组织页面；表单、列表、分页、弹窗、状态反馈和编辑器应通过明确的组件接口复用。
-- 组件库必须兼容已选 Leptos 版本和纯 Rust 构建流程，不能重新引入 Node 构建链。
 - 业务权限、数据请求和展示组件职责分开，不为不同页面复制同一组通用交互代码。
 - UI 迁移必须完整还原原有样式、布局、排版及交互状态，不能以通用管理界面替代原产品。
 - 以迁移前版本的实际页面和源码为视觉基准，核对导航、间距、字体、颜色、表格、弹窗、响应式和主题。
 - 复用第三方组件时必须适配原有视觉规范，不能因组件库默认主题改变现有产品外观。
-- 删除旧前端前完成代表性页面的浏览器视觉对照；功能通过不能替代视觉验收。
+- 代表性页面完成浏览器视觉对照后才能认定 UI 变更完成；功能通过不能替代视觉验收。
 
 ## Git 与 CI
 

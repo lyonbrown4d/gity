@@ -1,0 +1,5 @@
+storeDir: ${HOME}/Library/pnpm/store
+packageImportMethod: copy
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': true

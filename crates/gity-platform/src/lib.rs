@@ -28,6 +28,8 @@ pub mod repository;
 pub mod ssh;
 pub mod standalone;
 pub mod users;
+mod users_tokens;
+mod web_assets;
 pub use composition::compose;
 #[cfg(test)]
 mod auth_tests;
@@ -37,7 +39,6 @@ use axum::http::{HeaderValue, header};
 use gity_core::{Db, Settings};
 use gity_git::GitService;
 use std::sync::Arc;
-use tower_http::services::{ServeDir, ServeFile};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -99,8 +100,6 @@ async fn fallback(
   axum::extract::State(state): axum::extract::State<AppState>,
   request: axum::extract::Request,
 ) -> Result<axum::response::Response, gity_core::AppError> {
-  use axum::response::IntoResponse;
-  use tower::ServiceExt;
   if request.uri().path() == "/mcp"
     || request.uri().path().starts_with("/.well-known/oauth-")
     || request.uri().path().starts_with("/oauth/") && request.uri().path() != "/oauth/consent"
@@ -118,22 +117,58 @@ async fn fallback(
     return Err(gity_core::AppError::not_found("endpoint not found"));
   }
   let path = request.uri().path().to_owned();
-  let web = ServeDir::new(&state.settings.web_root)
-    .precompressed_br()
-    .not_found_service(ServeFile::new(state.settings.web_root.join("index.html")));
-  let response = web
-    .oneshot(request)
-    .await
-    .unwrap_or_else(|error| match error {});
-  let mut response = response.into_response();
-  if let Ok(value) = HeaderValue::from_str(cache_control(&path)) {
-    response.headers_mut().insert(header::CACHE_CONTROL, value);
+  let brotli = accepts_brotli(request.headers());
+  let relative = path.trim_start_matches('/');
+  if relative.split('/').any(|segment| segment == "..") {
+    return Err(gity_core::AppError::not_found("asset not found"));
   }
-  vary_on_encoding(response.headers_mut());
+  let asset = web_assets::resolve(relative, brotli).or_else(|| {
+    web_assets::is_spa_route(relative)
+      .then(|| web_assets::resolve("index.html", brotli))
+      .flatten()
+  });
+  let Some(asset) = asset else {
+    return Err(gity_core::AppError::not_found("asset not found"));
+  };
+  let mut response = axum::response::Response::new(axum::body::Body::from(asset.body));
+  let headers = response.headers_mut();
+  headers.insert(
+    header::CONTENT_TYPE,
+    HeaderValue::from_static(asset.content_type),
+  );
+  if let Some(encoding) = asset.encoding
+    && let Ok(value) = HeaderValue::from_str(encoding)
+  {
+    headers.insert(header::CONTENT_ENCODING, value);
+  }
+  if let Ok(value) = HeaderValue::from_str(cache_control(&path)) {
+    headers.insert(header::CACHE_CONTROL, value);
+  }
+  vary_on_encoding(headers);
   Ok(response)
 }
 
-/// `ServeDir` serves `<file>.br` without advertising the encoding choice, so any
+fn accepts_brotli(headers: &axum::http::HeaderMap) -> bool {
+  let Some(value) = headers
+    .get(header::ACCEPT_ENCODING)
+    .and_then(|value| value.to_str().ok())
+  else {
+    return false;
+  };
+  value.split(',').any(|entry| {
+    let mut parts = entry.split(';');
+    let name = parts.next().unwrap_or_default().trim();
+    let refused = parts.any(|parameter| {
+      parameter
+        .trim()
+        .strip_prefix("q=")
+        .is_some_and(|quality| quality.trim().parse::<f32>().is_ok_and(|q| q <= 0.0))
+    });
+    name.eq_ignore_ascii_case("br") && !refused
+  })
+}
+
+/// Serving `<file>.br` itself does not advertise the encoding choice, so any
 /// shared cache would key the plain and compressed variants under one entry.
 fn vary_on_encoding(headers: &mut axum::http::HeaderMap) {
   let existing = headers
@@ -165,11 +200,24 @@ fn cache_control(path: &str) -> &'static str {
   "public, max-age=600"
 }
 
+/// Vite writes `assets/<name>-<8 char hash>.<ext>`, Trunk `<name>-<16 hex>.ext`.
 fn hashed_asset(path: &str) -> bool {
   let file = path.rsplit('/').next().unwrap_or(path);
-  let stem = file.split('.').next().unwrap_or(file);
+  let Some((stem, _)) = file.rsplit_once('.') else {
+    return false;
+  };
   let Some((_, hash)) = stem.rsplit_once('-') else {
     return false;
   };
+  if path.starts_with("/assets/") && is_vite_hash(hash) {
+    return true;
+  }
   hash.len() == 16 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn is_vite_hash(hash: &str) -> bool {
+  hash.len() == 8
+    && hash
+      .bytes()
+      .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }

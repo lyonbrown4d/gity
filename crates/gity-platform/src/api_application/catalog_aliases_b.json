@@ -15,7 +15,7 @@
       ]
     },
     {
-      "handler": "features/issues.rs#create",
+      "handler": "features/issues_mutation.rs#create",
       "canonical_prefix": "/api/v1/projects",
       "alias_prefixes": [
         "/api/v1/repos"
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "handler": "features/issues.rs#update",
+      "handler": "features/issues_mutation.rs#update",
       "canonical_prefix": "/api/v1/projects",
       "alias_prefixes": [
         "/api/v1/repos"
