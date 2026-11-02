@@ -19,6 +19,7 @@ members = [
   "crates/gity-artifacts",
   "crates/gity-authority",
   "crates/gity-client",
+  "crates/gity-code-intel",
   "crates/gity-core",
   "crates/gity-persistence",
   "crates/gity-collaboration",

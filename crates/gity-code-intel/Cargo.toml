@@ -1,0 +1,14 @@
+[package]
+name = "gity-code-intel"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+rmp-serde = "1"
+zstd = "0.13"
+tree-sitter = "0.26"
+tree-sitter-rust = "0.24"
