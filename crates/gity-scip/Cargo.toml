@@ -1,0 +1,25 @@
+[package]
+name = "gity-scip"
+version.workspace = true
+edition.workspace = true
+description = "Precise code intelligence: SCIP index decoding and the local query shard it feeds"
+
+# Generated protobuf docs embed SCIP's own code fences, so doctests are off.
+[lib]
+doctest = false
+
+[dependencies]
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+zstd = "0.13"
+fs2 = "0.4"
+
+[build-dependencies]
+prost-build = "0.14"
+protoc-bin-vendored = "3"
+
+[dev-dependencies]
+tempfile.workspace = true

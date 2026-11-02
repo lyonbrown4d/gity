@@ -3019,6 +3019,7 @@ dependencies = [
  "gity-artifacts",
  "gity-authority",
  "gity-ci",
+ "gity-code-intel",
  "gity-collaboration",
  "gity-core",
  "gity-entities",
@@ -3121,6 +3122,7 @@ dependencies = [
  "clap",
  "config",
  "dotenvy",
+ "gity-code-intel",
  "gity-observability",
  "libc",
  "reqwest",
@@ -3144,6 +3146,22 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "gity-scip"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "fs2",
+ "prost",
+ "prost-build",
+ "protoc-bin-vendored",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "zstd",
 ]
 
 [[package]]

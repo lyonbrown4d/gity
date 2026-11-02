@@ -41,6 +41,7 @@ members = [
   "crates/gity-platform",
   "crates/gity-runtime",
   "crates/gity-search",
+  "crates/gity-scip",
   "crates/gity-test-support",
   "xtask",
 ]
