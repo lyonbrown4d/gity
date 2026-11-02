@@ -21,6 +21,7 @@ fn definition() -> Location {
     column: 8,
     end_line: 3,
     end_column: 11,
+    external: false,
   }
 }
 
@@ -100,10 +101,14 @@ fn hover_returns_documentation_signature_and_scope() {
     hover,
     Hover {
       symbol: support::FOO.to_string(),
+      display_name: "Foo".to_string(),
+      container: "src".to_string(),
+      package: "demo".to_string(),
       kind: gity_scip::SymbolKind::from_code(7),
       documentation: "The Foo type.".to_string(),
       signature: "struct Foo".to_string(),
-      scope: support::BAR.to_string(),
+      scope: "src::bar".to_string(),
+      external: false,
     }
   );
   assert_eq!(hover.kind.name(), "Class");

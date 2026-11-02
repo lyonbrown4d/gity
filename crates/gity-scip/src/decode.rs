@@ -52,6 +52,9 @@ pub fn decode_scip(payload: &[u8], commit: &str) -> Result<Decoded> {
     .iter()
     .map(document)
     .collect::<Result<Vec<DecodedDocument>>>()?;
+  // External symbols carry documentation only, so they never reach a path or a
+  // coverage bit; `Uncovered` still decides whether the caller may trust us.
+  decoded.external = index.external_symbols.iter().map(symbol).collect();
   Ok(decoded)
 }
 

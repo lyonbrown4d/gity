@@ -43,8 +43,10 @@ fn build_writes_every_table_and_the_manifest() {
       paths: 3,
       occurrences: 6,
       symbols: 2,
+      external_symbols: 0,
       references: 5,
       doc_bytes: "The Foo type.struct Foo".len(),
+      text_bytes: 0,
     }
   );
   assert_eq!(

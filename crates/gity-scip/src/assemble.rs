@@ -1,4 +1,4 @@
-//! Builds shard tables from a decoded index and reads them back.
+//! Builds shard tables from a decoded index.
 //!
 //! Ordering rules the query layer relies on:
 //!
@@ -7,21 +7,22 @@
 //!   position lookup is another binary search;
 //! - symbols are sorted by their SCIP string, so symbol lookup is a binary
 //!   search, and occurrence IDs are assigned in path order so CSR entries for
-//!   one symbol come out in repository order.
+//!   one symbol come out in repository order;
+//! - text records are appended in path order, so a path ID indexes its text.
 
-use crate::model::{Decoded, DecodedDocument, PositionEncoding, SymbolRole};
-use crate::tables::{NONE, OccRecord, PathRecord, SymbolRecord};
+use crate::model::{Decoded, DecodedDocument, PositionEncoding};
+use crate::symbols;
+use crate::tables::{NONE, OccRecord, PathRecord, SymbolRecord, TextRecord};
 use crate::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
-
-/// How far back a nested occurrence searches for its enclosing definition.
-const ENCLOSING_WINDOW: usize = 64;
 
 /// Raw table bytes as they arrive from disk.
 pub(crate) struct Raw {
   pub paths: Vec<u8>,
   pub occ: Vec<u8>,
   pub symbols: Vec<u8>,
+  pub external: Vec<u8>,
+  pub texts: Vec<u8>,
   pub docs: Vec<u8>,
   pub refs: Vec<u8>,
   pub coverage: Vec<u8>,
@@ -35,17 +36,14 @@ pub(crate) struct Tables {
   pub occ: Vec<OccRecord>,
   pub symbols: Vec<SymbolRecord>,
   pub symbol_pool: Vec<u8>,
+  pub external: Vec<SymbolRecord>,
+  pub external_pool: Vec<u8>,
+  pub texts: Vec<TextRecord>,
+  pub text_pool: Vec<u8>,
   pub docs: Vec<u8>,
   pub ref_offsets: Vec<u32>,
   pub ref_entries: Vec<u32>,
   pub coverage: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Default)]
-struct Agg {
-  kind: i32,
-  documentation: String,
-  signature: String,
 }
 
 impl Tables {
@@ -65,10 +63,24 @@ impl Tables {
         listed.insert(path);
       }
     }
-    let (symbols, symbol_pool, ids, docs) = assemble_symbols(precise.values().copied());
+    let mut symbol_pool = Vec::new();
+    let mut docs = Vec::new();
+    let (symbols, ids) = symbols::assign(
+      symbols::document_aggregates(precise.values().copied()),
+      &mut symbol_pool,
+      &mut docs,
+    );
+    let mut external_pool = Vec::new();
+    let (external, _) = symbols::assign(
+      symbols::external_aggregates(&decoded.external),
+      &mut external_pool,
+      &mut docs,
+    );
     let mut tables = Self {
       symbols,
       symbol_pool,
+      external,
+      external_pool,
       docs,
       ..Self::default()
     };
@@ -103,9 +115,16 @@ impl Tables {
           })
           .collect();
         records.sort();
-        fill_enclosing(&mut records);
+        symbols::fill_enclosing(&mut records);
         self.occ.extend_from_slice(&records);
       }
+      let text = document.map_or("", |document| document.text.as_str());
+      let text_offset = self.text_pool.len() as u32;
+      self.text_pool.extend_from_slice(text.as_bytes());
+      self.texts.push(TextRecord {
+        text_off: text_offset,
+        text_len: text.len() as u32,
+      });
       let text_off = self.path_pool.len() as u32;
       self.path_pool.extend_from_slice(name.as_bytes());
       let encoding = document.map_or(PositionEncoding::Unspecified, |document| {
@@ -147,73 +166,6 @@ impl Tables {
       }
       *slot += 1;
     }
-  }
-}
-
-/// Collects every symbol string, sorts it, and assigns dense IDs.
-fn assemble_symbols<'a>(
-  documents: impl Iterator<Item = &'a DecodedDocument>,
-) -> (Vec<SymbolRecord>, Vec<u8>, BTreeMap<&'a str, u32>, Vec<u8>) {
-  let mut aggregated: BTreeMap<&'a str, Agg> = BTreeMap::new();
-  for document in documents {
-    for symbol in &document.symbols {
-      if symbol.symbol.is_empty() {
-        continue;
-      }
-      let agg = aggregated.entry(symbol.symbol.as_str()).or_default();
-      if agg.kind == 0 {
-        agg.kind = symbol.kind.code();
-      }
-      if agg.documentation.is_empty() {
-        agg.documentation.clone_from(&symbol.documentation);
-      }
-      if agg.signature.is_empty() {
-        agg.signature.clone_from(&symbol.signature);
-      }
-    }
-    for occurrence in &document.occurrences {
-      if !occurrence.symbol.is_empty() {
-        aggregated.entry(occurrence.symbol.as_str()).or_default();
-      }
-    }
-  }
-  let mut pool = Vec::new();
-  let mut docs = Vec::new();
-  let mut records = Vec::with_capacity(aggregated.len());
-  let mut ids = BTreeMap::new();
-  for (index, (name, agg)) in aggregated.iter().enumerate() {
-    ids.insert(*name, index as u32);
-    let text_off = pool.len() as u32;
-    pool.extend_from_slice(name.as_bytes());
-    let doc_off = docs.len() as u32;
-    docs.extend_from_slice(agg.documentation.as_bytes());
-    let signature_off = docs.len() as u32;
-    docs.extend_from_slice(agg.signature.as_bytes());
-    records.push(SymbolRecord {
-      text_off,
-      text_len: name.len() as u32,
-      kind: agg.kind as u32,
-      doc_off,
-      doc_len: agg.documentation.len() as u32,
-      signature_off,
-      signature_len: agg.signature.len() as u32,
-    });
-  }
-  (records, pool, ids, docs)
-}
-
-/// Points each occurrence at the nearest enclosing definition occurrence.
-fn fill_enclosing(records: &mut [OccRecord]) {
-  for index in 0..records.len() {
-    let start = index.saturating_sub(ENCLOSING_WINDOW);
-    let target = records[index];
-    let enclosing = (start..index).rev().find(|previous| {
-      let candidate = &records[*previous];
-      candidate.symbol != NONE
-        && SymbolRole::from_bits(candidate.roles).is_definition()
-        && candidate.covers(target.start_line, target.start_column)
-    });
-    records[index].enclosing = enclosing.map_or(NONE, |previous| records[previous].symbol);
   }
 }
 

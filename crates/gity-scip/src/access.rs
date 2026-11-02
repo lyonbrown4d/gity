@@ -1,95 +1,26 @@
-//! Read-side accessors over the shard tables.
+//! Path-side accessors: coverage, encoding, stored text, occurrence ranges.
 //!
 //! Every lookup is a binary search or an index into a fixed record, and every
 //! one returns `None`/empty instead of failing: a missing answer must let the
 //! caller degrade, never break a request.
 
-use crate::assemble::{Raw, Tables};
+use crate::answer::{Coverage, Location};
+use crate::assemble::Tables;
 use crate::format::pool_str;
-use crate::model::{Coverage, Location, PositionEncoding, SymbolKind};
-use crate::shard::Counts;
-use crate::tables::{
-  NONE, OccRecord, decode_coverage, decode_docs, decode_occ, decode_paths, decode_refs,
-  decode_symbols,
-};
-use crate::{Error, Result};
+use crate::manifest::Counts;
+use crate::model::PositionEncoding;
+use crate::tables::OccRecord;
 
 impl Tables {
-  /// Reads the six tables, rejecting a set that disagrees with itself.
-  pub(crate) fn decode(raw: Raw) -> Result<Self> {
-    let (paths, path_pool) = decode_paths(&raw.paths)?;
-    let occ = decode_occ(&raw.occ)?;
-    let (symbols, symbol_pool) = decode_symbols(&raw.symbols)?;
-    let docs = decode_docs(&raw.docs)?;
-    let (ref_offsets, ref_entries) = decode_refs(&raw.refs)?;
-    let (path_count, coverage) = decode_coverage(&raw.coverage)?;
-    let tables = Self {
-      paths,
-      path_pool,
-      occ,
-      symbols,
-      symbol_pool,
-      docs,
-      ref_offsets,
-      ref_entries,
-      coverage,
-    };
-    if !tables.consistent(path_count as usize) {
-      return Err(Error::Inconsistent);
-    }
-    Ok(tables)
-  }
-
-  /// Cross-table invariants; a half-written or hand-edited shard fails here.
-  fn consistent(&self, path_count: usize) -> bool {
-    if path_count != self.paths.len() || self.coverage.len() != path_count.div_ceil(8) {
-      return false;
-    }
-    if self.ref_offsets.len() != self.symbols.len() + 1 {
-      return false;
-    }
-    if self.ref_offsets.last().copied() != Some(self.ref_entries.len() as u32) {
-      return false;
-    }
-    if self.ref_offsets.windows(2).any(|pair| pair[0] > pair[1]) {
-      return false;
-    }
-    let mut end = 0u32;
-    for record in &self.paths {
-      if record.occ_first != end {
-        return false;
-      }
-      end = record.occ_first.saturating_add(record.occ_len);
-      if end as usize > self.occ.len() {
-        return false;
-      }
-      if pool_str(&self.path_pool, record.text_off, record.text_len).is_none() {
-        return false;
-      }
-    }
-    if end as usize != self.occ.len() {
-      return false;
-    }
-    if self
-      .occ
-      .iter()
-      .any(|record| record.symbol != NONE && record.symbol as usize >= self.symbols.len())
-    {
-      return false;
-    }
-    self
-      .symbols
-      .iter()
-      .all(|record| pool_str(&self.symbol_pool, record.text_off, record.text_len).is_some())
-  }
-
   pub(crate) fn counts(&self) -> Counts {
     Counts {
       paths: self.paths.len(),
       occurrences: self.occ.len(),
       symbols: self.symbols.len(),
+      external_symbols: self.external.len(),
       references: self.ref_entries.len(),
       doc_bytes: self.docs.len(),
+      text_bytes: self.text_pool.len(),
     }
   }
 
@@ -137,43 +68,13 @@ impl Tables {
       .map(|record| PositionEncoding::from_code(record.encoding as i32))
   }
 
-  pub(crate) fn symbol(&self, symbol_id: u32) -> Option<&str> {
-    let record = self.symbols.get(symbol_id as usize)?;
-    pool_str(&self.symbol_pool, record.text_off, record.text_len)
-  }
-
-  pub(crate) fn find_symbol(&self, symbol: &str) -> Option<u32> {
-    let found = self.symbols.binary_search_by(|record| {
-      pool_str(&self.symbol_pool, record.text_off, record.text_len)
-        .unwrap_or("")
-        .cmp(symbol)
-    });
-    found.ok().map(|index| index as u32)
-  }
-
-  pub(crate) fn kind(&self, symbol_id: u32) -> SymbolKind {
-    self
-      .symbols
-      .get(symbol_id as usize)
-      .map_or(SymbolKind::default(), |record| {
-        SymbolKind::from_code(record.kind as i32)
-      })
-  }
-
-  pub(crate) fn documentation(&self, symbol_id: u32) -> &str {
-    self
-      .symbols
-      .get(symbol_id as usize)
-      .and_then(|record| pool_str(&self.docs, record.doc_off, record.doc_len))
-      .unwrap_or("")
-  }
-
-  pub(crate) fn signature(&self, symbol_id: u32) -> &str {
-    self
-      .symbols
-      .get(symbol_id as usize)
-      .and_then(|record| pool_str(&self.docs, record.signature_off, record.signature_len))
-      .unwrap_or("")
+  /// Source text the indexer shipped with a document, when it shipped any.
+  pub(crate) fn text(&self, path_id: u32) -> Option<&str> {
+    let record = self.texts.get(path_id as usize)?;
+    if record.text_len == 0 {
+      return None;
+    }
+    pool_str(&self.text_pool, record.text_off, record.text_len)
   }
 
   /// First global occurrence ID owned by a path.
@@ -210,6 +111,8 @@ impl Tables {
     self.occ.get(occurrence_id as usize)
   }
 
+  /// In-repository position of an occurrence; `external` stays false here
+  /// because an occurrence always lives in one of our files.
   pub(crate) fn location(&self, occurrence_id: u32) -> Option<Location> {
     let path_id = self.path_of(occurrence_id)?;
     let record = self.occurrence(occurrence_id)?;
@@ -219,21 +122,7 @@ impl Tables {
       column: record.start_column,
       end_line: record.end_line,
       end_column: record.end_column,
+      external: false,
     })
-  }
-
-  /// CSR slice for one symbol: global occurrence IDs in repository order.
-  pub(crate) fn occurrences_of_symbol(&self, symbol_id: u32) -> &[u32] {
-    let index = symbol_id as usize;
-    let Some(start) = self.ref_offsets.get(index).copied() else {
-      return &[];
-    };
-    let Some(end) = self.ref_offsets.get(index + 1).copied() else {
-      return &[];
-    };
-    self
-      .ref_entries
-      .get(start as usize..end as usize)
-      .unwrap_or(&[])
   }
 }

@@ -16,36 +16,61 @@
 //!
 //! ## Answering a cursor request
 //!
-//! [`Shard::definition_at`] and [`Shard::hover`] return [`Answer`], which keeps
-//! two empty-looking outcomes apart:
+//! ```text
+//! let column = shard.normalized_position(path, line, utf8_column)?;
+//! match shard.definition_at(path, line, column) {
+//!   Found(location) if !location.external => jump(location),
+//!   Found(external) => show_hover(shard.hover(path, line, column)),
+//!   Absent => definite: no symbol here,
+//!   Uncovered => lexical fallback,
+//! }
+//! ```
 //!
-//! - [`Answer::Uncovered`]: the precise layer has nothing for this path. Fall
-//!   back to the lexical layer.
-//! - [`Answer::Absent`]: the indexer analysed this file and found no symbol at
-//!   the cursor. This is a definite answer; do not fall back.
+//! [`Answer::Uncovered`] is the only signal that should reach the lexical layer;
+//! [`Answer::Absent`] is an authoritative empty result for a file the indexer
+//! analysed. Keys are 1-based `(line, column)` in the document's own
+//! [`PositionEncoding`], matching `gity-code-intel`'s `Definition`.
 //!
-//! Keys are always 1-based `(line, column)`, matching `gity-code-intel`'s
-//! `Definition` and the editor API.
+//! ## Names and external symbols
+//!
+//! [`symbol_name`] turns a raw SCIP symbol string into display parts, and
+//! [`Hover`] carries them. Symbols defined in dependencies are indexed from
+//! `Index.external_symbols`: they answer hover, never coverage, never a
+//! definition location, and never a phantom reference.
 
 mod access;
+mod answer;
 mod assemble;
 pub mod decode;
 mod format;
+mod manifest;
 pub mod model;
+mod naming;
 mod proto;
 pub mod query;
 pub mod shard;
+mod symbol_access;
+mod symbols;
 mod tables;
+mod verify;
 
+pub use answer::{Answer, Coverage, Hover, Location};
 pub use decode::{MAX_INDEX_BYTES, decode_index, decode_scip};
+pub use manifest::{Counts, CoverageSummary, Manifest};
 pub use model::{
-  Answer, Coverage, Decoded, DecodedDocument, DecodedOccurrence, DecodedSymbol, Hover, Location,
-  PositionEncoding, Span, SymbolKind, SymbolRole,
+  Decoded, DecodedDocument, DecodedOccurrence, DecodedSymbol, PositionEncoding, Span, SymbolKind,
+  SymbolRole,
 };
-pub use shard::{Counts, CoverageSummary, Manifest, Shard};
+pub use naming::{SymbolName, symbol_name};
+pub use shard::Shard;
 
 /// Version of the on-disk shard format; bump when a table layout changes.
-pub const FORMAT_VERSION: u32 = 1;
+///
+/// - 1: paths, occ, symbols, docs, refs, coverage.
+/// - 2: adds `external.bin` and `texts.bin`, and records the position encoding
+///   in the manifest. Version 1 shards are rejected; rebuild them from the
+///   stored `index.scip`, they hold no data of their own.
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Artifact name the runner stores, zstd-compressed, per commit.
 pub const INDEX_FILE: &str = "index.scip";
@@ -63,6 +88,8 @@ pub enum Error {
   },
   #[error("shard lock at {0} is held by another process")]
   Locked(String),
+  #[error("shard format version {found} is not supported (expected {expected})")]
+  Version { found: u32, expected: u32 },
   #[error("decompress index.scip: {0}")]
   Decompress(#[source] std::io::Error),
   #[error("index.scip exceeds the {limit} byte limit after decompression")]

@@ -35,8 +35,10 @@ impl Span {
 /// How a range's character offsets count columns.
 ///
 /// SCIP records this per document because indexers in different languages count
-/// different code units; the shard keeps it so callers can slice source text
-/// with the right unit instead of guessing.
+/// different code units: Go and Rust indexers count UTF-8 bytes, JVM and
+/// JavaScript indexers count UTF-16 code units, Python indexers count `char`s.
+/// The shard stores the raw unit and keeps the encoding next to it, so callers
+/// can convert instead of silently slicing text at the wrong offset.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PositionEncoding {
@@ -74,6 +76,33 @@ impl PositionEncoding {
       Self::Utf32 => "utf32",
     }
   }
+
+  /// Converts a 1-based UTF-8 byte column in `line` to this encoding's unit.
+  ///
+  /// `utf8_column` is what slicing the repository source yields; the result
+  /// compares directly against occurrence spans in the shard. Columns past the
+  /// end of the line clamp to the line end, and a column inside a multi-byte
+  /// character rounds down to its start.
+  pub fn column(self, line: &str, utf8_column: u32) -> u32 {
+    let prefix = prefix_of(line, utf8_column);
+    let units = match self {
+      Self::Utf8 | Self::Unspecified => prefix.len(),
+      Self::Utf16 => prefix.encode_utf16().count(),
+      Self::Utf32 => prefix.chars().count(),
+    };
+    u32::try_from(units).unwrap_or(u32::MAX).saturating_add(1)
+  }
+}
+
+/// The part of `line` before a 1-based UTF-8 byte column, on a char boundary.
+fn prefix_of(line: &str, utf8_column: u32) -> &str {
+  let mut end = usize::try_from(utf8_column.saturating_sub(1))
+    .unwrap_or(usize::MAX)
+    .min(line.len());
+  while !line.is_char_boundary(end) {
+    end -= 1;
+  }
+  &line[..end]
 }
 
 /// What an occurrence does with its symbol, using SCIP's `SymbolRole` bits.
@@ -157,6 +186,8 @@ pub struct DecodedDocument {
   pub position_encoding: PositionEncoding,
   pub occurrences: Vec<DecodedOccurrence>,
   pub symbols: Vec<DecodedSymbol>,
+  /// Source text when the indexer included it. Most indexers omit it; keeping
+  /// it lets column conversion stay exact for the ones that do.
   pub text: String,
 }
 
@@ -167,6 +198,9 @@ pub struct Decoded {
   pub indexer: String,
   pub indexer_version: String,
   pub documents: Vec<DecodedDocument>,
+  /// Symbols defined outside this repository (`Index.external_symbols`), kept
+  /// for hover only: they have no path, no occurrence and no coverage bit.
+  pub external: Vec<DecodedSymbol>,
   /// Paths the runner knows but the indexer did not analyse. Keeping them turns
   /// "unknown file" into "known file, no precise data" for the caller.
   pub uncovered_paths: Vec<String>,
@@ -186,84 +220,4 @@ impl Decoded {
     let last = self.documents.len() - 1;
     &mut self.documents[last]
   }
-}
-
-/// Result of a precise query, keeping "no answer" and "not indexed" apart.
-///
-/// `Uncovered` is the signal to fall back to the lexical layer. `Absent` is a
-/// definite empty result inside a file the indexer did analyse.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Answer<T> {
-  Found(T),
-  Absent,
-  Uncovered,
-}
-
-impl<T> Answer<T> {
-  pub fn is_found(&self) -> bool {
-    matches!(self, Self::Found(_))
-  }
-
-  pub fn is_uncovered(&self) -> bool {
-    matches!(self, Self::Uncovered)
-  }
-
-  pub fn into_option(self) -> Option<T> {
-    match self {
-      Self::Found(value) => Some(value),
-      _ => None,
-    }
-  }
-
-  pub fn map<U>(self, map: impl FnOnce(T) -> U) -> Answer<U> {
-    match self {
-      Self::Found(value) => Answer::Found(map(value)),
-      Self::Absent => Answer::Absent,
-      Self::Uncovered => Answer::Uncovered,
-    }
-  }
-}
-
-/// How much the shard knows about a path.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Coverage {
-  /// The indexer analysed the file; empty answers are authoritative.
-  Precise,
-  /// The shard lists the file but holds no precise data for it.
-  Listed,
-  /// The shard never saw the path.
-  Unknown,
-}
-
-impl Coverage {
-  pub fn is_precise(self) -> bool {
-    matches!(self, Self::Precise)
-  }
-}
-
-/// A resolved source position in the repository.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Location {
-  pub path: String,
-  pub line: u32,
-  pub column: u32,
-  pub end_line: u32,
-  pub end_column: u32,
-}
-
-impl Location {
-  pub fn span(&self) -> Span {
-    Span::new(self.line, self.column, self.end_line, self.end_column)
-  }
-}
-
-/// What the editor shows when hovering a symbol.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Hover {
-  pub symbol: String,
-  pub kind: SymbolKind,
-  pub documentation: String,
-  pub signature: String,
-  /// Enclosing definition of the hovered occurrence, empty at file root.
-  pub scope: String,
 }

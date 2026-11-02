@@ -7,6 +7,8 @@
 //! paths.bin     GSP1 | count | (text_off, text_len, occ_first, occ_len, encoding) | path pool
 //! occ.bin       GSO1 | count | (start_line, start_col, end_line, end_col, symbol, roles, enclosing)
 //! symbols.bin   GSS1 | count | (text_off, text_len, kind, doc_off, doc_len, sig_off, sig_len) | pool
+//! external.bin  GSX1 | count | same records as symbols.bin | symbol pool
+//! texts.bin     GST1 | count | (text_off, text_len) per path | text pool
 //! docs.bin      GSD1 | length | documentation and signature bytes, flat
 //! refs.bin      GSR1 | symbols | entries | CSR offsets (symbols + 1) | global occurrence IDs
 //! coverage.bin  GSC1 | paths | bitset, one bit per path, MSB-first
@@ -24,6 +26,8 @@ pub(crate) const TAG_SYMBOLS: [u8; 4] = *b"GSS1";
 pub(crate) const TAG_DOCS: [u8; 4] = *b"GSD1";
 pub(crate) const TAG_REFS: [u8; 4] = *b"GSR1";
 pub(crate) const TAG_COVERAGE: [u8; 4] = *b"GSC1";
+pub(crate) const TAG_EXTERNAL: [u8; 4] = *b"GSX1";
+pub(crate) const TAG_TEXTS: [u8; 4] = *b"GST1";
 
 /// Sentinel for "no symbol" in occurrence records.
 pub(crate) const NONE: u32 = u32::MAX;
@@ -65,6 +69,12 @@ pub(crate) struct SymbolRecord {
   pub doc_len: u32,
   pub signature_off: u32,
   pub signature_len: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct TextRecord {
+  pub text_off: u32,
+  pub text_len: u32,
 }
 
 pub(crate) fn encode_paths(records: &[PathRecord], pool: &[u8]) -> Vec<u8> {
@@ -129,7 +139,25 @@ pub(crate) fn decode_occ(bytes: &[u8]) -> Result<Vec<OccRecord>> {
 }
 
 pub(crate) fn encode_symbols(records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
-  let mut writer = Writer::new(TAG_SYMBOLS, records.len() as u32);
+  encode_symbol_records(TAG_SYMBOLS, records, pool)
+}
+
+pub(crate) fn decode_symbols(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
+  decode_symbol_records(bytes, TAG_SYMBOLS, "symbols.bin")
+}
+
+/// External symbols share the record layout but not the table: they have no
+/// occurrence, so symbol IDs and the CSR stay untouched by them.
+pub(crate) fn encode_external(records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
+  encode_symbol_records(TAG_EXTERNAL, records, pool)
+}
+
+pub(crate) fn decode_external(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
+  decode_symbol_records(bytes, TAG_EXTERNAL, "external.bin")
+}
+
+fn encode_symbol_records(tag: [u8; 4], records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
+  let mut writer = Writer::new(tag, records.len() as u32);
   for record in records {
     writer.u32(record.text_off);
     writer.u32(record.text_len);
@@ -143,8 +171,12 @@ pub(crate) fn encode_symbols(records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
   writer.into_bytes()
 }
 
-pub(crate) fn decode_symbols(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
-  let mut reader = Reader::new(bytes, TAG_SYMBOLS, "symbols.bin")?;
+fn decode_symbol_records(
+  bytes: &[u8],
+  tag: [u8; 4],
+  table: &'static str,
+) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
+  let mut reader = Reader::new(bytes, tag, table)?;
   let count = reader.u32()? as usize;
   let mut records = Vec::with_capacity(count.min(1 << 20));
   for _ in 0..count {
@@ -156,6 +188,30 @@ pub(crate) fn decode_symbols(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>
       doc_len: reader.u32()?,
       signature_off: reader.u32()?,
       signature_len: reader.u32()?,
+    });
+  }
+  Ok((records, reader.rest().to_vec()))
+}
+
+/// One record per path, in path-ID order, so text is found without a search.
+pub(crate) fn encode_texts(records: &[TextRecord], pool: &[u8]) -> Vec<u8> {
+  let mut writer = Writer::new(TAG_TEXTS, records.len() as u32);
+  for record in records {
+    writer.u32(record.text_off);
+    writer.u32(record.text_len);
+  }
+  writer.bytes(pool);
+  writer.into_bytes()
+}
+
+pub(crate) fn decode_texts(bytes: &[u8]) -> Result<(Vec<TextRecord>, Vec<u8>)> {
+  let mut reader = Reader::new(bytes, TAG_TEXTS, "texts.bin")?;
+  let count = reader.u32()? as usize;
+  let mut records = Vec::with_capacity(count.min(1 << 20));
+  for _ in 0..count {
+    records.push(TextRecord {
+      text_off: reader.u32()?,
+      text_len: reader.u32()?,
     });
   }
   Ok((records, reader.rest().to_vec()))

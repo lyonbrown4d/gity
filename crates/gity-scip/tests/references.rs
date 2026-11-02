@@ -19,6 +19,7 @@ fn at(path: &str, line: u32, column: u32, end_line: u32, end_column: u32) -> Loc
     column,
     end_line,
     end_column,
+    external: false,
   }
 }
 

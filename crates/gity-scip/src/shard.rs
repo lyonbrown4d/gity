@@ -1,28 +1,32 @@
-//! The on-disk shard: six fixed-layout tables plus the manifest describing them.
+//! The on-disk shard: eight fixed-layout tables plus the manifest describing
+//! them.
 //!
 //! Layout inside one shard directory, next to `gity-code-intel`'s lexical
 //! snapshot so an operator only learns one convention:
 //!
 //! ```text
-//! <dir>/manifest.json   commit, indexer, format version, counts, coverage
+//! <dir>/manifest.json   commit, indexer, format version, encoding, counts
 //! <dir>/paths.bin       sorted paths, each with its occurrence range
 //! <dir>/occ.bin         fixed records, ordered by path then position
-//! <dir>/symbols.bin     sorted symbol strings, kind, doc/signature offsets
+//! <dir>/symbols.bin     sorted repository symbols: kind, doc/signature offsets
+//! <dir>/external.bin    same records for symbols defined in dependencies
+//! <dir>/texts.bin       source text per path, when the indexer shipped it
 //! <dir>/docs.bin        documentation and signature text, flat
 //! <dir>/refs.bin        CSR: symbol -> occurrences
 //! <dir>/coverage.bin    bitset of precisely analysed paths
 //! <dir>/lock            writer/reader coordination
 //! ```
 //!
-//! The manifest is written last and is the commit point. Reads never fail on a
-//! missing or damaged shard: [`Shard::open`] answers `Ok(None)` so the caller
-//! degrades to the lexical layer instead of returning an error to a user.
+//! The manifest is written last and is the commit point. [`Shard::open`] treats
+//! the precise layer as optional and answers `Ok(None)` for anything unusable;
+//! [`Shard::open_strict`] reports the concrete reason instead, for operators and
+//! tests.
 
 use crate::assemble::{Raw, Tables};
-use crate::model::Decoded;
+use crate::manifest::{CoverageSummary, Manifest};
+use crate::model::{Decoded, PositionEncoding};
 use crate::tables;
 use crate::{Error, FORMAT_VERSION, Result};
-use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -31,42 +35,14 @@ const LOCK: &str = "lock";
 const PATHS: &str = "paths.bin";
 const OCC: &str = "occ.bin";
 const SYMBOLS: &str = "symbols.bin";
+const EXTERNAL: &str = "external.bin";
+const TEXTS: &str = "texts.bin";
 const DOCS: &str = "docs.bin";
 const REFS: &str = "refs.bin";
 const COVERAGE: &str = "coverage.bin";
 
-/// What a shard holds; the analogue of the lexical layer's `status.json`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Manifest {
-  pub format_version: u32,
-  pub commit: String,
-  pub indexer: String,
-  pub indexer_version: String,
-  /// RFC 3339, same spelling as the lexical status document.
-  pub indexed_at: String,
-  pub counts: Counts,
-  pub coverage: CoverageSummary,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Counts {
-  pub paths: usize,
-  pub occurrences: usize,
-  pub symbols: usize,
-  /// CSR entries: occurrences that carry a symbol.
-  pub references: usize,
-  pub doc_bytes: usize,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CoverageSummary {
-  pub total_paths: usize,
-  pub precise_paths: usize,
-  /// Paths the runner reported but the indexer did not analyse.
-  pub listed_paths: usize,
-}
-
 /// An open shard: tables resident in memory, manifest for the caller.
+#[derive(Debug)]
 pub struct Shard {
   dir: PathBuf,
   manifest: Manifest,
@@ -96,6 +72,14 @@ impl Shard {
         SYMBOLS,
         tables::encode_symbols(&tables.symbols, &tables.symbol_pool),
       ),
+      (
+        EXTERNAL,
+        tables::encode_external(&tables.external, &tables.external_pool),
+      ),
+      (
+        TEXTS,
+        tables::encode_texts(&tables.texts, &tables.text_pool),
+      ),
       (DOCS, tables::encode_docs(&tables.docs)),
       (
         REFS,
@@ -109,7 +93,6 @@ impl Shard {
     for (name, bytes) in encoded {
       write_atomic(dir, name, &bytes)?;
     }
-    let counts = tables.counts();
     let (precise, listed) = tables.coverage_summary();
     let manifest = Manifest {
       format_version: FORMAT_VERSION,
@@ -117,7 +100,8 @@ impl Shard {
       indexer: decoded.indexer.clone(),
       indexer_version: decoded.indexer_version.clone(),
       indexed_at: timestamp(),
-      counts,
+      position_encoding: encoding_summary(&tables),
+      counts: tables.counts(),
       coverage: CoverageSummary {
         total_paths: tables.counts().paths,
         precise_paths: precise,
@@ -129,24 +113,38 @@ impl Shard {
     Ok(manifest)
   }
 
-  /// Opens a shard, or `Ok(None)` when there is nothing usable to read.
+  /// Opens a shard, or `Ok(None)` whenever the precise layer is unusable.
+  ///
+  /// This is the call site for serving traffic: a missing, truncated, foreign or
+  /// busy shard degrades to the lexical layer instead of failing a request.
   pub fn open(dir: impl AsRef<Path>) -> Result<Option<Shard>> {
+    Ok(Self::open_strict(dir).unwrap_or(None))
+  }
+
+  /// Opens a shard, reporting why an unusable one is unusable.
+  ///
+  /// Returns `Ok(None)` only when no shard was ever written. Everything else is
+  /// an error naming the failure: bad manifest, unsupported format version,
+  /// locked directory, unreadable table, corrupt or inconsistent tables.
+  pub fn open_strict(dir: impl AsRef<Path>) -> Result<Option<Shard>> {
     let dir = dir.as_ref().to_path_buf();
-    let Some(manifest) = read_manifest(&dir) else {
-      return Ok(None);
-    };
-    if manifest.format_version != FORMAT_VERSION {
+    let path = dir.join(MANIFEST);
+    if !path.exists() {
       return Ok(None);
     }
-    let Ok(_lock) = Lock::acquire(&dir, false) else {
-      return Ok(None);
-    };
-    let Some(raw) = read_tables(&dir) else {
-      return Ok(None);
-    };
-    let Ok(tables) = Tables::decode(raw) else {
-      return Ok(None);
-    };
+    let text = std::fs::read_to_string(&path).map_err(|source| Error::Io {
+      path: path.display().to_string(),
+      source,
+    })?;
+    let manifest: Manifest = serde_json::from_str(&text)?;
+    if manifest.format_version != FORMAT_VERSION {
+      return Err(Error::Version {
+        found: manifest.format_version,
+        expected: FORMAT_VERSION,
+      });
+    }
+    let _lock = Lock::acquire(&dir, false)?;
+    let tables = Tables::decode(read_tables(&dir)?)?;
     Ok(Some(Shard {
       dir,
       manifest,
@@ -167,6 +165,23 @@ impl Shard {
   }
 }
 
+/// Dominant column unit of the analysed documents, `mixed` when they disagree.
+fn encoding_summary(tables: &Tables) -> String {
+  let mut seen: Option<PositionEncoding> = None;
+  for path_id in 0..tables.counts().paths as u32 {
+    if !tables.is_precise(path_id) {
+      continue;
+    }
+    let encoding = tables.encoding(path_id).unwrap_or_default();
+    match seen {
+      None => seen = Some(encoding),
+      Some(previous) if previous != encoding => return "mixed".to_string(),
+      Some(_) => {}
+    }
+  }
+  seen.unwrap_or_default().as_str().to_string()
+}
+
 fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> Result<()> {
   let temporary = dir.join(format!("{name}.new"));
   let io = |source| Error::Io {
@@ -174,28 +189,32 @@ fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> Result<()> {
     source,
   };
   std::fs::write(&temporary, bytes).map_err(io)?;
-  std::fs::rename(&temporary, dir.join(name)).map_err(|source| Error::Io {
-    path: dir.join(name).display().to_string(),
+  let target = dir.join(name);
+  std::fs::rename(&temporary, &target).map_err(|source| Error::Io {
+    path: target.display().to_string(),
     source,
   })
 }
 
-fn read_manifest(dir: &Path) -> Option<Manifest> {
-  let text = std::fs::read_to_string(dir.join(MANIFEST)).ok()?;
-  serde_json::from_str(&text).ok()
-}
-
-/// Reads all six tables while the caller holds the shard lock.
-fn read_tables(dir: &Path) -> Option<Raw> {
-  let raw = Raw {
-    paths: std::fs::read(dir.join(PATHS)).ok()?,
-    occ: std::fs::read(dir.join(OCC)).ok()?,
-    symbols: std::fs::read(dir.join(SYMBOLS)).ok()?,
-    docs: std::fs::read(dir.join(DOCS)).ok()?,
-    refs: std::fs::read(dir.join(REFS)).ok()?,
-    coverage: std::fs::read(dir.join(COVERAGE)).ok()?,
+/// Reads all eight tables while the caller holds the shard lock.
+fn read_tables(dir: &Path) -> Result<Raw> {
+  let read = |name: &str| -> Result<Vec<u8>> {
+    let path = dir.join(name);
+    std::fs::read(&path).map_err(|source| Error::Io {
+      path: path.display().to_string(),
+      source,
+    })
   };
-  Some(raw)
+  Ok(Raw {
+    paths: read(PATHS)?,
+    occ: read(OCC)?,
+    symbols: read(SYMBOLS)?,
+    external: read(EXTERNAL)?,
+    texts: read(TEXTS)?,
+    docs: read(DOCS)?,
+    refs: read(REFS)?,
+    coverage: read(COVERAGE)?,
+  })
 }
 
 fn timestamp() -> String {
