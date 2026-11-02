@@ -5,8 +5,11 @@ mod codeowners;
 mod issue_collaboration;
 mod issue_views;
 mod issues;
+mod labels;
 mod merge_events;
 mod merge_requests;
+mod merge_views;
+mod milestones;
 mod mr_collaboration;
 mod project_lock;
 mod releases;
@@ -33,6 +36,8 @@ pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
     .merge(merge_requests::documented_routes())
     .merge(rules::documented_routes())
     .merge(releases::documented_routes())
+    .merge(milestones::documented_routes())
+    .merge(labels::documented_routes())
 }
 fn response(v: Value) -> Reply {
   Ok(gity_core::ok(externalize(v)))
@@ -175,7 +180,16 @@ mod codeowners_http_tests;
 mod merge_tests;
 
 #[cfg(test)]
+mod merge_patch_tests;
+
+#[cfg(test)]
 mod release_tests;
+
+#[cfg(test)]
+mod milestone_tests;
+
+#[cfg(test)]
+mod label_tests;
 
 #[cfg(test)]
 mod token_access_tests;

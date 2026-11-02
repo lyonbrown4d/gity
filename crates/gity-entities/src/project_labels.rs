@@ -1,13 +1,14 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "project_issue_labels")]
+#[sea_orm(table_name = "project_labels")]
 pub struct Model {
   #[sea_orm(primary_key, auto_increment = false)]
   pub id: i64,
-  pub project_issue_id: i64,
-  pub name: String,
-  pub color: Option<String>,
+  pub project_id: i64,
+  pub title: String,
+  pub color: String,
+  pub description: Option<String>,
   pub created_at: chrono::NaiveDateTime,
   pub updated_at: chrono::NaiveDateTime,
 }

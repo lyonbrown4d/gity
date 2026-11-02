@@ -1,5 +1,7 @@
+pub(super) use super::merge_views::{flag, milestone_patch, view};
 pub(super) use super::project_lock::lock;
 use super::*;
+const MR: &str = "project_merge_requests";
 use crate::openapi::{merge_schemas as spec, schemas as api};
 use axum::{
   extract::{Path, State},
@@ -53,14 +55,14 @@ pub(super) async fn branch(s: &AppState, p: &Value, name: &str) -> Result<String
 )]
 async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  response(json!(
-    s.db
-      .all(
-        "SELECT * FROM project_merge_requests WHERE project_id = ? ORDER BY iid DESC",
-        vec![p.into()]
-      )
-      .await?
-  ))
+  let rows = s
+    .db
+    .all(
+      "SELECT * FROM project_merge_requests WHERE project_id = ? ORDER BY iid DESC",
+      vec![p.into()],
+    )
+    .await?;
+  response(json!(rows.into_iter().map(view).collect::<Vec<_>>()))
 }
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}",tag="merge requests",
@@ -70,7 +72,7 @@ async fn list(State(s): State<AppState>, h: HeaderMap, Path(p): Path<i64>) -> Re
 )]
 async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
-  response(scoped(&s, "project_merge_requests", p, i, true).await?)
+  response(scoped(&s, MR, p, i, true).await?)
 }
 #[utoipa::path(
     post,path="/{id}/merge-requests",tag="merge requests",
@@ -97,10 +99,17 @@ async fn create(
       "source_branch and target_branch must be different",
     ));
   }
-  branch(&s, &project, &source).await?;
+  let head_sha = branch(&s, &project, &source).await?;
   branch(&s, &project, &target).await?;
   let iid = s.db.next_iid(p, "merge_request").await?;
-  response(s.db.insert("project_merge_requests",fields(json!({"project_id":p,"iid":iid,"author_user_id":actor.user_id,"title":title,"description":string(&b,"description"),"state":"opened","source_branch":source,"target_branch":target}))).await?)
+  let values = json!({
+    "project_id":p,"iid":iid,"author_user_id":actor.user_id,"title":title,
+    "description":string(&b,"description"),"state":"opened","source_branch":source,
+    "target_branch":target,"head_sha":head_sha,
+    "milestone_id":milestone_patch(&s, p, &b, "milestone_id").await?,
+    "squash":flag(&b,"squash"),"draft":flag(&b,"draft"),
+  });
+  response(view(s.db.insert(MR, fields(values)).await?))
 }
 #[utoipa::path(
     patch,path="/{id}/merge-requests/{iid}",tag="merge requests",
@@ -117,10 +126,11 @@ async fn update(
 ) -> Reply {
   crate::access::project_action(&s, &h, p, ProjectAction::MergeRequestWrite).await?;
   let _guard = lock(p).await;
-  let row = scoped(&s, "project_merge_requests", p, i, true).await?;
+  let row = scoped(&s, MR, p, i, true).await?;
   if b.get("title").is_some() {
     required(&b, "title")?;
   }
+  let mut changes = patch(&b, &["title", "description", "state"]);
   if let Some(state) = b.get("state") {
     if state != "opened" && state != "closed" {
       return Err(AppError::bad_request(
@@ -132,16 +142,22 @@ async fn update(
         "merged merge requests cannot be reopened",
       ));
     }
+    // Closing stamps the time; reopening clears it again.
+    let closed_at = (state == "closed").then(now);
+    changes.insert("closed_at".into(), json!(closed_at));
   }
-  response(
-    s.db
-      .update(
-        "project_merge_requests",
-        number(&row, "id"),
-        patch(&b, &["title", "description", "state"]),
-      )
-      .await?,
-  )
+  for key in ["squash", "draft"] {
+    if let Some(value) = b.get(key).and_then(Value::as_bool) {
+      changes.insert(key.into(), json!(i64::from(value)));
+    }
+  }
+  if b.get("milestone_id").is_some() {
+    changes.insert(
+      "milestone_id".into(),
+      milestone_patch(&s, p, &b, "milestone_id").await?,
+    );
+  }
+  response(view(s.db.update(MR, number(&row, "id"), changes).await?))
 }
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/diff",tag="merge requests",
@@ -153,7 +169,7 @@ async fn diff(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, 
   let project = crate::access::project_action(&s, &h, p, ProjectAction::Read)
     .await?
     .project;
-  let row = scoped(&s, "project_merge_requests", p, i, true).await?;
+  let row = scoped(&s, MR, p, i, true).await?;
   let diff = s
     .git
     .diff_branches(
@@ -163,7 +179,7 @@ async fn diff(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, 
     )
     .await
     .map_err(git_error)?;
-  response(json!({"merge_request":row,"diff":diff}))
+  response(json!({"merge_request":view(row),"diff":diff}))
 }
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/checks",tag="merge requests",
@@ -175,7 +191,7 @@ async fn checks(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64
   let project = crate::access::project_action(&s, &h, p, ProjectAction::Read)
     .await?
     .project;
-  let row = scoped(&s, "project_merge_requests", p, i, true).await?;
+  let row = scoped(&s, MR, p, i, true).await?;
   response(super::checks::evaluate(&s, &project, &row).await?)
 }
 #[utoipa::path(
@@ -196,7 +212,7 @@ async fn merge(
   let actor = authorization.actor()?;
   let project = authorization.project;
   let _guard = lock(p).await;
-  let row = scoped(&s, "project_merge_requests", p, i, true).await?;
+  let row = scoped(&s, MR, p, i, true).await?;
   if string(&row, "state") != "opened" {
     return Err(AppError::conflict("merge request is not opened"));
   }
@@ -241,14 +257,26 @@ async fn merge(
     )
     .await
     .map_err(|e| AppError::conflict(e.to_string()))?;
+  // The target tip is the merge commit; without git proof the sha stays unset.
+  let target = string(&row, "target_branch");
+  let default = string(&project, "default_branch");
+  let sha = s
+    .git
+    .resolve_revision(&repository(&project), target, default)
+    .await
+    .map_err(|error| tracing::warn!(project_id=p,error=%error,"merged commit sha unavailable"))
+    .ok();
   let result = s
     .db
     .update(
-      "project_merge_requests",
+      MR,
       number(&row, "id"),
-      fields(json!({"state":"merged","updated_at":now()})),
+      fields(json!({
+          "state":"merged","merged_at":now(),"merged_by_user_id":actor.user_id,
+          "merge_commit_sha":sha,
+      })),
     )
     .await?;
   super::merge_events::merged(&s, &project, &row, &actor).await?;
-  response(result)
+  response(view(result))
 }

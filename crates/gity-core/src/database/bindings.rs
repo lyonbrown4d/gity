@@ -2,8 +2,8 @@ use sea_orm::Value;
 use std::sync::LazyLock;
 
 /// Preserve legacy SQL schema types when parameters are supplied through JSON.
-/// Only named timestamp columns are converted; arbitrary text is never inspected
-/// as a date merely because its contents resemble one.
+/// Only named timestamp and date columns are converted; arbitrary text is never
+/// inspected as a date merely because its contents resemble one.
 pub(super) fn postgres_values(sql: &str, values: Vec<Value>) -> Vec<Value> {
   static INSERT: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::Regex::new(r#"(?is)^\s*INSERT\s+INTO\s+[\w\"`]+\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)"#)
@@ -56,6 +56,16 @@ pub(super) fn postgres_values(sql: &str, values: Vec<Value>) -> Vec<Value> {
           }
         }
       }
+      if column.as_deref().is_some_and(date_column) {
+        if matches!(&value, Value::String(None)) {
+          return Value::ChronoDate(None);
+        }
+        if let Value::String(Some(text)) = &value
+          && let Ok(date) = chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d")
+        {
+          return Value::ChronoDate(Some(date));
+        }
+      }
       value
     })
     .collect()
@@ -75,8 +85,13 @@ fn timestamp_column(name: &str) -> bool {
     "finished_at",
     "done_at",
     "released_at",
+    "merged_at",
+    "closed_at",
   ]
   .contains(&name)
+}
+fn date_column(name: &str) -> bool {
+  ["due_date", "start_date"].contains(&name)
 }
 
 #[cfg(test)]

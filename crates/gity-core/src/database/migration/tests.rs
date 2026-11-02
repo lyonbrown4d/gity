@@ -23,7 +23,7 @@ fn initial_catalogs_and_component_migrations_cover_latest_schema() {
       .join("\n");
     assert_eq!(initial.matches("CREATE TABLE ").count(), 46);
     assert!(!initial.to_uppercase().contains("ALTER TABLE"));
-    assert_eq!(sql.matches("CREATE TABLE ").count(), 50);
+    assert_eq!(sql.matches("CREATE TABLE ").count(), 53);
     for table in [
       "artifact_storage_deletions",
       "project_npm_dist_tags",

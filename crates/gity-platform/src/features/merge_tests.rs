@@ -33,11 +33,19 @@ async fn merge_requires_current_commit_pipeline_and_non_author_approval() {
     "POST",
     "/projects/20/merge-requests",
     "alice",
-    json!({"title":"Feature","source_branch":"feature","target_branch":"main"}),
+    json!({"title":"Feature","source_branch":"feature","target_branch":"main","squash":true}),
   )
   .await;
   assert_eq!(created.0, StatusCode::OK);
   assert_eq!(created.1["data"]["iid"], 1);
+  assert_eq!(created.1["data"]["squash"], true);
+  assert_eq!(created.1["data"]["draft"], false);
+  let head = s
+    .git
+    .resolve_revision(repo, "feature", "main")
+    .await
+    .unwrap();
+  assert_eq!(created.1["data"]["head_sha"], head.as_str());
   s.db
     .insert(
       "project_branch_protections",
@@ -195,18 +203,20 @@ async fn merge_requires_current_commit_pipeline_and_non_author_approval() {
   .1;
   assert_eq!(checked["data"]["approval_count"], 1);
   assert_eq!(checked["data"]["mergeable"], true);
-  assert_eq!(
-    request(
-      &s,
-      "POST",
-      "/projects/20/merge-requests/1/merge",
-      "bob",
-      json!({})
-    )
-    .await
-    .1["data"]["state"],
-    "merged"
-  );
+  let merged = request(
+    &s,
+    "POST",
+    "/projects/20/merge-requests/1/merge",
+    "bob",
+    json!({}),
+  )
+  .await;
+  assert_eq!(merged.1["data"]["state"], "merged");
+  let tip = s.git.resolve_revision(repo, "main", "main").await.unwrap();
+  assert_eq!(merged.1["data"]["merge_commit_sha"], tip.as_str());
+  assert_eq!(merged.1["data"]["merged_by_user_id"], "2");
+  assert!(merged.1["data"]["merged_at"].is_string());
+  assert!(merged.1["data"]["closed_at"].is_null());
   assert!(
     s.git
       .file_exists(repo, "main", "main", ".gity-ci.yml")

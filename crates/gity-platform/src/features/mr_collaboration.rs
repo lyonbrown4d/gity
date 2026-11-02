@@ -20,7 +20,7 @@ pub(super) async fn child(
       vec![number(&row, "id").into()],
     )
     .await?;
-  Ok(json!({"merge_request":row,key:list}))
+  Ok(json!({"merge_request":super::merge_requests::view(row),key:list}))
 }
 #[utoipa::path(
     get,path="/{id}/merge-requests/{iid}/comments",tag="mr collaboration",

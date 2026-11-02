@@ -22,11 +22,12 @@ pub mod project_iid_counters;
 pub mod project_issue_assignees;
 pub mod project_issue_attachments;
 pub mod project_issue_comments;
-pub mod project_issue_labels;
 pub mod project_issues;
 pub mod project_job_artifacts;
 pub mod project_job_logs;
 pub mod project_jobs;
+pub mod project_label_links;
+pub mod project_labels;
 pub mod project_lfs_locks;
 pub mod project_lfs_objects;
 pub mod project_member_audits;
@@ -37,6 +38,7 @@ pub mod project_merge_request_approvals;
 pub mod project_merge_request_comments;
 pub mod project_merge_request_participants;
 pub mod project_merge_requests;
+pub mod project_milestones;
 pub mod project_npm_dist_tags;
 pub mod project_package_files;
 pub mod project_package_versions;
@@ -69,11 +71,12 @@ application_ids!(
   project_issue_assignees,
   project_issue_attachments,
   project_issue_comments,
-  project_issue_labels,
   project_issues,
   project_job_artifacts,
   project_job_logs,
   project_jobs,
+  project_label_links,
+  project_labels,
   project_lfs_locks,
   project_lfs_objects,
   project_members,
@@ -82,6 +85,7 @@ application_ids!(
   project_merge_request_comments,
   project_merge_request_participants,
   project_merge_requests,
+  project_milestones,
   project_npm_dist_tags,
   project_package_files,
   project_package_versions,

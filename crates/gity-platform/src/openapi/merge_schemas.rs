@@ -12,6 +12,16 @@ pub struct MergeRequest {
   pub state: String,
   pub source_branch: String,
   pub target_branch: String,
+  /// Milestone association serialized as a string identifier.
+  pub milestone_id: Option<String>,
+  pub merged_at: Option<String>,
+  pub merged_by_user_id: Option<String>,
+  pub merge_commit_sha: Option<String>,
+  /// Source branch commit captured when the merge request was created.
+  pub head_sha: Option<String>,
+  pub closed_at: Option<String>,
+  pub squash: bool,
+  pub draft: bool,
   #[serde(flatten)]
   pub timestamps: Timestamps,
 }
@@ -22,12 +32,21 @@ pub struct CreateMergeRequest {
   pub source_branch: String,
   pub target_branch: String,
   pub author_user_id: Option<i64>,
+  pub milestone_id: Option<i64>,
+  /// Squash the source commits into one commit on merge.
+  pub squash: Option<bool>,
+  /// Draft merge requests are not ready for review.
+  pub draft: Option<bool>,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateMergeRequest {
   pub title: Option<String>,
   pub description: Option<String>,
   pub state: Option<String>,
+  /// Omit to keep the milestone; send null to detach it.
+  pub milestone_id: Option<i64>,
+  pub squash: Option<bool>,
+  pub draft: Option<bool>,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct MergeCommand {

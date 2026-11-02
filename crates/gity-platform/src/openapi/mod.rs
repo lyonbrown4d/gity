@@ -5,8 +5,10 @@ pub mod repository_schemas;
 mod system;
 pub use system::routes as system_routes;
 pub mod issue_schemas;
+pub mod label_schemas;
 pub mod lfs_schemas;
 pub mod merge_schemas;
+pub mod milestone_schemas;
 #[cfg(feature = "packages")]
 pub use gity_package_registry::package_schemas;
 pub mod project_schemas;

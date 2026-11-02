@@ -202,7 +202,7 @@ impl Db {
     Ok(())
   }
   pub async fn next_iid(&self, project_id: i64, kind: &str) -> Result<i64, AppError> {
-    if !["issue", "merge_request", "pipeline"].contains(&kind) {
+    if !["issue", "merge_request", "milestone", "pipeline"].contains(&kind) {
       return Err(AppError::bad_request("invalid counter"));
     }
     let sql = match self.backend() {

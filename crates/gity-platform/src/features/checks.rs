@@ -104,6 +104,13 @@ pub(super) async fn evaluate(s: &AppState, p: &Value, mr: &Value) -> Result<Valu
     .unwrap_or(false)
     || has_ci;
   let mut blockers = Vec::new();
+  if number(mr, "draft") != 0 {
+    blockers.push(blocker(
+      "draft",
+      "draft",
+      "merge request is marked as draft",
+    ));
+  }
   let mut status = "not_required".to_owned();
   let mut pipeline = Value::Null;
   if pipeline_required {

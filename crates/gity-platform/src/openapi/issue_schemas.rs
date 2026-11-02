@@ -16,6 +16,14 @@ pub struct Issue {
   pub assignee_user_ids: Vec<String>,
   pub assignees: Vec<Assignee>,
   pub labels: Vec<Label>,
+  pub milestone_id: Option<String>,
+  pub due_date: Option<String>,
+  pub weight: Option<i64>,
+  pub confidential: bool,
+  #[schema(example = "issue")]
+  pub issue_type: String,
+  pub closed_by_user_id: Option<String>,
+  pub closed_at: Option<String>,
   #[serde(flatten)]
   pub timestamps: Timestamps,
 }
@@ -24,6 +32,11 @@ pub struct CreateIssue {
   pub title: String,
   pub description: Option<String>,
   pub author_user_id: Option<i64>,
+  pub milestone_id: Option<i64>,
+  pub due_date: Option<String>,
+  pub weight: Option<i64>,
+  pub confidential: Option<bool>,
+  pub issue_type: Option<String>,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateIssue {
@@ -31,6 +44,11 @@ pub struct UpdateIssue {
   pub description: Option<String>,
   pub state: Option<String>,
   pub status: Option<String>,
+  pub milestone_id: Option<i64>,
+  pub due_date: Option<String>,
+  pub weight: Option<i64>,
+  pub confidential: Option<bool>,
+  pub issue_type: Option<String>,
 }
 #[derive(Serialize, ToSchema)]
 pub struct Comment {
@@ -72,6 +90,7 @@ pub struct Label {
   pub issue_id: String,
   pub name: String,
   pub color: String,
+  pub description: Option<String>,
   #[serde(flatten)]
   pub timestamps: Timestamps,
 }
