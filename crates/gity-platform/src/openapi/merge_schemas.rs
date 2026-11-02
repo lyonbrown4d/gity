@@ -175,3 +175,11 @@ pub struct MergeChecks {
   pub blockers: Vec<CheckBlocker>,
   pub pipeline: Option<crate::ci::pipeline_schemas::Pipeline>,
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct MergeRequestPage {
+  pub items: Vec<MergeRequest>,
+  pub total: u64,
+  pub page: u64,
+  pub page_size: u64,
+}

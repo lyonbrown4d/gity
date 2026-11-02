@@ -73,6 +73,17 @@ pub struct Timestamps {
 pub struct UserIds {
   pub user_ids: Vec<i64>,
 }
+/// Shared list filters for issue and merge request collections.
+#[derive(Deserialize, IntoParams)]
+pub struct ListQuery {
+  /// `open`/`closed` for issues, `opened`/`merged`/`closed` for merge requests; `all` disables the filter.
+  pub state: Option<String>,
+  /// 1-based page number; defaults to 1.
+  pub page: Option<u64>,
+  /// Items per page, 1-100; defaults to 20.
+  pub page_size: Option<u64>,
+}
+
 #[derive(IntoParams)]
 #[into_params(parameter_in=Path)]
 pub struct ProjectPath {

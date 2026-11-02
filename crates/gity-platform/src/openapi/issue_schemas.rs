@@ -132,3 +132,11 @@ pub struct UploadedAttachment {
   pub size: i64,
   pub markdown: String,
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct IssuePage {
+  pub items: Vec<Issue>,
+  pub total: u64,
+  pub page: u64,
+  pub page_size: u64,
+}
