@@ -26,6 +26,22 @@
 //! }
 //! ```
 //!
+//! ## Memory model
+//!
+//! Opening a shard maps its eight table files (`memmap2`) and validates their
+//! structure; queries slice the mapping by offset instead of copying a table into
+//! the heap, so a shard with a million occurrences costs kilobytes of heap per
+//! process. Two consequences worth knowing:
+//!
+//! - [`Shard::resident_bytes`] stays tiny while [`Shard::mapped_bytes`] reports
+//!   the mapped size; page residency is the OS's business. A handle holds one
+//!   file descriptor per table (eight), so callers should cache handles instead
+//!   of opening one per request.
+//! - Shard files are replaced by rename, so a mapping keeps reading the bytes it
+//!   was opened with until the shard is reopened. If someone *truncates* a mapped
+//!   file in place, [`Shard::health`] reports it and every query degrades instead
+//!   of faulting.
+//!
 //! [`Answer::Uncovered`] is the only signal that should reach the lexical layer;
 //! [`Answer::Absent`] is an authoritative empty result for a file the indexer
 //! analysed. Keys are 1-based `(line, column)` in the document's own
@@ -41,18 +57,20 @@
 mod access;
 mod answer;
 mod assemble;
+mod csr;
 pub mod decode;
 mod format;
 mod manifest;
+mod mapped;
 pub mod model;
 mod naming;
 mod proto;
 pub mod query;
+mod read;
 pub mod shard;
 mod symbol_access;
 mod symbols;
 mod tables;
-mod verify;
 
 pub use answer::{Answer, Coverage, Hover, Location};
 pub use decode::{MAX_INDEX_BYTES, decode_index, decode_scip};
@@ -102,6 +120,12 @@ pub enum Error {
   Corrupt { table: &'static str },
   #[error("shard tables disagree with each other; rebuild the shard")]
   Inconsistent,
+  #[error("shard table {table} shrank from {expected} to {found} bytes after it was mapped")]
+  Stale {
+    table: &'static str,
+    expected: u64,
+    found: u64,
+  },
   #[error("{0:?} is not a repository-relative path")]
   Path(String),
   #[error("the index lists document {0:?} more than once")]

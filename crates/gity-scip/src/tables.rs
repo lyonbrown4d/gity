@@ -1,7 +1,7 @@
-//! Record layout and (de)serialisation for the six shard tables.
+//! Record layout, encoders and record parsers for the eight shard tables.
 //!
-//! Every table is fixed-width records plus a pool, so opening a shard is a few
-//! bulk reads and queries never parse text. Layouts, all little-endian:
+//! Every table is fixed-width records plus a pool, so a query reads one record
+//! by offset and never parses text. Layouts, all little-endian:
 //!
 //! ```text
 //! paths.bin     GSP1 | count | (text_off, text_len, occ_first, occ_len, encoding) | path pool
@@ -17,8 +17,7 @@
 //! Offsets are 0-based indices into the corresponding pool. `NONE` marks an
 //! absent occurrence symbol or enclosing symbol.
 
-use crate::Result;
-use crate::format::{Reader, Writer};
+use crate::format::Writer;
 
 pub(crate) const TAG_PATHS: [u8; 4] = *b"GSP1";
 pub(crate) const TAG_OCC: [u8; 4] = *b"GSO1";
@@ -90,22 +89,6 @@ pub(crate) fn encode_paths(records: &[PathRecord], pool: &[u8]) -> Vec<u8> {
   writer.into_bytes()
 }
 
-pub(crate) fn decode_paths(bytes: &[u8]) -> Result<(Vec<PathRecord>, Vec<u8>)> {
-  let mut reader = Reader::new(bytes, TAG_PATHS, "paths.bin")?;
-  let count = reader.u32()? as usize;
-  let mut records = Vec::with_capacity(count.min(1 << 20));
-  for _ in 0..count {
-    records.push(PathRecord {
-      text_off: reader.u32()?,
-      text_len: reader.u32()?,
-      occ_first: reader.u32()?,
-      occ_len: reader.u32()?,
-      encoding: reader.u32()?,
-    });
-  }
-  Ok((records, reader.rest().to_vec()))
-}
-
 pub(crate) fn encode_occ(records: &[OccRecord]) -> Vec<u8> {
   let mut writer = Writer::new(TAG_OCC, records.len() as u32);
   for record in records {
@@ -120,40 +103,14 @@ pub(crate) fn encode_occ(records: &[OccRecord]) -> Vec<u8> {
   writer.into_bytes()
 }
 
-pub(crate) fn decode_occ(bytes: &[u8]) -> Result<Vec<OccRecord>> {
-  let mut reader = Reader::new(bytes, TAG_OCC, "occ.bin")?;
-  let count = reader.u32()? as usize;
-  let mut records = Vec::with_capacity(count.min(1 << 22));
-  for _ in 0..count {
-    records.push(OccRecord {
-      start_line: reader.u32()?,
-      start_column: reader.u32()?,
-      end_line: reader.u32()?,
-      end_column: reader.u32()?,
-      symbol: reader.u32()?,
-      roles: reader.u32()?,
-      enclosing: reader.u32()?,
-    });
-  }
-  Ok(records)
-}
-
 pub(crate) fn encode_symbols(records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
   encode_symbol_records(TAG_SYMBOLS, records, pool)
-}
-
-pub(crate) fn decode_symbols(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
-  decode_symbol_records(bytes, TAG_SYMBOLS, "symbols.bin")
 }
 
 /// External symbols share the record layout but not the table: they have no
 /// occurrence, so symbol IDs and the CSR stay untouched by them.
 pub(crate) fn encode_external(records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
   encode_symbol_records(TAG_EXTERNAL, records, pool)
-}
-
-pub(crate) fn decode_external(bytes: &[u8]) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
-  decode_symbol_records(bytes, TAG_EXTERNAL, "external.bin")
 }
 
 fn encode_symbol_records(tag: [u8; 4], records: &[SymbolRecord], pool: &[u8]) -> Vec<u8> {
@@ -171,28 +128,6 @@ fn encode_symbol_records(tag: [u8; 4], records: &[SymbolRecord], pool: &[u8]) ->
   writer.into_bytes()
 }
 
-fn decode_symbol_records(
-  bytes: &[u8],
-  tag: [u8; 4],
-  table: &'static str,
-) -> Result<(Vec<SymbolRecord>, Vec<u8>)> {
-  let mut reader = Reader::new(bytes, tag, table)?;
-  let count = reader.u32()? as usize;
-  let mut records = Vec::with_capacity(count.min(1 << 20));
-  for _ in 0..count {
-    records.push(SymbolRecord {
-      text_off: reader.u32()?,
-      text_len: reader.u32()?,
-      kind: reader.u32()?,
-      doc_off: reader.u32()?,
-      doc_len: reader.u32()?,
-      signature_off: reader.u32()?,
-      signature_len: reader.u32()?,
-    });
-  }
-  Ok((records, reader.rest().to_vec()))
-}
-
 /// One record per path, in path-ID order, so text is found without a search.
 pub(crate) fn encode_texts(records: &[TextRecord], pool: &[u8]) -> Vec<u8> {
   let mut writer = Writer::new(TAG_TEXTS, records.len() as u32);
@@ -204,29 +139,10 @@ pub(crate) fn encode_texts(records: &[TextRecord], pool: &[u8]) -> Vec<u8> {
   writer.into_bytes()
 }
 
-pub(crate) fn decode_texts(bytes: &[u8]) -> Result<(Vec<TextRecord>, Vec<u8>)> {
-  let mut reader = Reader::new(bytes, TAG_TEXTS, "texts.bin")?;
-  let count = reader.u32()? as usize;
-  let mut records = Vec::with_capacity(count.min(1 << 20));
-  for _ in 0..count {
-    records.push(TextRecord {
-      text_off: reader.u32()?,
-      text_len: reader.u32()?,
-    });
-  }
-  Ok((records, reader.rest().to_vec()))
-}
-
 pub(crate) fn encode_docs(blob: &[u8]) -> Vec<u8> {
   let mut writer = Writer::new(TAG_DOCS, blob.len() as u32);
   writer.bytes(blob);
   writer.into_bytes()
-}
-
-pub(crate) fn decode_docs(bytes: &[u8]) -> Result<Vec<u8>> {
-  let mut reader = Reader::new(bytes, TAG_DOCS, "docs.bin")?;
-  let length = reader.u32()? as usize;
-  Ok(reader.slice(length)?.to_vec())
 }
 
 pub(crate) fn encode_refs(offsets: &[u32], entries: &[u32]) -> Vec<u8> {
@@ -242,29 +158,56 @@ pub(crate) fn encode_refs(offsets: &[u32], entries: &[u32]) -> Vec<u8> {
   writer.into_bytes()
 }
 
-pub(crate) fn decode_refs(bytes: &[u8]) -> Result<(Vec<u32>, Vec<u32>)> {
-  let mut reader = Reader::new(bytes, TAG_REFS, "refs.bin")?;
-  let symbols = reader.u32()? as usize;
-  let entries = reader.u32()? as usize;
-  let mut offsets = Vec::with_capacity(symbols.saturating_add(1).min(1 << 20));
-  for _ in 0..=symbols {
-    offsets.push(reader.u32()?);
-  }
-  let mut ids = Vec::with_capacity(entries.min(1 << 22));
-  for _ in 0..entries {
-    ids.push(reader.u32()?);
-  }
-  Ok((offsets, ids))
-}
-
 pub(crate) fn encode_coverage(path_count: u32, bits: &[u8]) -> Vec<u8> {
   let mut writer = Writer::new(TAG_COVERAGE, path_count);
   writer.bytes(bits);
   writer.into_bytes()
 }
 
-pub(crate) fn decode_coverage(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
-  let mut reader = Reader::new(bytes, TAG_COVERAGE, "coverage.bin")?;
-  let path_count = reader.u32()?;
-  Ok((path_count, reader.rest().to_vec()))
+/// Reads one little-endian `u32` out of a fixed record.
+fn field(bytes: &[u8], index: usize) -> Option<u32> {
+  let start = index.checked_mul(4)?;
+  let chunk = bytes.get(start..start.checked_add(4)?)?;
+  Some(u32::from_le_bytes(chunk.try_into().ok()?))
+}
+
+pub(crate) fn parse_path(bytes: &[u8]) -> Option<PathRecord> {
+  Some(PathRecord {
+    text_off: field(bytes, 0)?,
+    text_len: field(bytes, 1)?,
+    occ_first: field(bytes, 2)?,
+    occ_len: field(bytes, 3)?,
+    encoding: field(bytes, 4)?,
+  })
+}
+
+pub(crate) fn parse_occ(bytes: &[u8]) -> Option<OccRecord> {
+  Some(OccRecord {
+    start_line: field(bytes, 0)?,
+    start_column: field(bytes, 1)?,
+    end_line: field(bytes, 2)?,
+    end_column: field(bytes, 3)?,
+    symbol: field(bytes, 4)?,
+    roles: field(bytes, 5)?,
+    enclosing: field(bytes, 6)?,
+  })
+}
+
+pub(crate) fn parse_symbol(bytes: &[u8]) -> Option<SymbolRecord> {
+  Some(SymbolRecord {
+    text_off: field(bytes, 0)?,
+    text_len: field(bytes, 1)?,
+    kind: field(bytes, 2)?,
+    doc_off: field(bytes, 3)?,
+    doc_len: field(bytes, 4)?,
+    signature_off: field(bytes, 5)?,
+    signature_len: field(bytes, 6)?,
+  })
+}
+
+pub(crate) fn parse_text(bytes: &[u8]) -> Option<TextRecord> {
+  Some(TextRecord {
+    text_off: field(bytes, 0)?,
+    text_len: field(bytes, 1)?,
+  })
 }

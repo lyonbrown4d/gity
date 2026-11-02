@@ -10,23 +10,12 @@
 //!   one symbol come out in repository order;
 //! - text records are appended in path order, so a path ID indexes its text.
 
+use crate::manifest::Counts;
 use crate::model::{Decoded, DecodedDocument, PositionEncoding};
 use crate::symbols;
 use crate::tables::{NONE, OccRecord, PathRecord, SymbolRecord, TextRecord};
 use crate::{Error, Result};
 use std::collections::{BTreeMap, BTreeSet};
-
-/// Raw table bytes as they arrive from disk.
-pub(crate) struct Raw {
-  pub paths: Vec<u8>,
-  pub occ: Vec<u8>,
-  pub symbols: Vec<u8>,
-  pub external: Vec<u8>,
-  pub texts: Vec<u8>,
-  pub docs: Vec<u8>,
-  pub refs: Vec<u8>,
-  pub coverage: Vec<u8>,
-}
 
 /// The shard's in-memory tables; queries never touch the filesystem.
 #[derive(Clone, Debug, Default)]
@@ -87,6 +76,41 @@ impl Tables {
     tables.assemble_paths(&precise, &listed, &ids);
     tables.assemble_refs();
     Ok(tables)
+  }
+
+  pub(crate) fn counts(&self) -> Counts {
+    Counts {
+      paths: self.paths.len(),
+      occurrences: self.occ.len(),
+      symbols: self.symbols.len(),
+      external_symbols: self.external.len(),
+      references: self.ref_entries.len(),
+      doc_bytes: self.docs.len(),
+      text_bytes: self.text_pool.len(),
+    }
+  }
+
+  /// Precise and listed path counts.
+  pub(crate) fn coverage_summary(&self) -> (usize, usize) {
+    let precise = (0..self.paths.len())
+      .filter(|id| self.is_precise(*id as u32))
+      .count();
+    (precise, self.paths.len() - precise)
+  }
+
+  pub(crate) fn is_precise(&self, path_id: u32) -> bool {
+    let index = path_id as usize;
+    self
+      .coverage
+      .get(index / 8)
+      .is_some_and(|byte| byte & (0x80 >> (index % 8)) != 0)
+  }
+
+  pub(crate) fn encoding(&self, path_id: u32) -> Option<PositionEncoding> {
+    self
+      .paths
+      .get(path_id as usize)
+      .map(|record| PositionEncoding::from_code(record.encoding as i32))
   }
 
   fn assemble_paths(

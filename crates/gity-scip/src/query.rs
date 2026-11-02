@@ -5,11 +5,16 @@
 //! [`Shard::normalized_position`] to convert a UTF-8 column first. Every answer
 //! distinguishes "not covered" (degrade to the lexical layer) from "covered,
 //! nothing here" (a definite empty result).
+//!
+//! Each query starts by checking that the mapped files are still at least as long
+//! as when they were mapped. A shard whose files were truncated underneath the
+//! process answers exactly like an unopened one, so the caller degrades instead
+//! of the process faulting on an out-of-range page.
 
 use crate::answer::{Answer, Coverage, Hover, Location};
-use crate::assemble::Tables;
 use crate::model::{PositionEncoding, SymbolRole};
 use crate::naming::symbol_name;
+use crate::read::Store;
 use crate::shard::Shard;
 use crate::tables::NONE;
 
@@ -20,7 +25,10 @@ const COVERING_WINDOW: usize = 256;
 impl Shard {
   /// Whether the precise layer can answer for this path.
   pub fn coverage(&self, path: &str) -> Coverage {
-    self.tables().coverage(path)
+    let Some(store) = self.store() else {
+      return Coverage::Unknown;
+    };
+    store.coverage(path)
   }
 
   /// Resolves the symbol under the cursor to its definition, possibly in
@@ -30,26 +38,28 @@ impl Shard {
   /// is `Found` with `external: true` and the position of the use site: show its
   /// hover documentation instead of navigating.
   pub fn definition_at(&self, path: &str, line: u32, column: u32) -> Answer<Location> {
-    let tables = self.tables();
-    let Some(path_id) = precise_path(tables, path) else {
+    let Some(store) = self.store() else {
       return Answer::Uncovered;
     };
-    let Some(occurrence) = covering(tables, path_id, line, column) else {
+    let Some(path_id) = precise_path(store, path) else {
+      return Answer::Uncovered;
+    };
+    let Some(occurrence) = covering(store, path_id, line, column) else {
       return Answer::Absent;
     };
-    let Some(record) = tables.occurrence(occurrence).copied() else {
+    let Some(record) = store.occurrence(occurrence) else {
       return Answer::Absent;
     };
-    if let Some(location) = definition_location(tables, record.symbol) {
+    if let Some(location) = definition_location(store, record.symbol) {
       return Answer::Found(location);
     }
     // The use site created a repository symbol record for the occurrence, so
     // ask the external table directly: it is what the indexer reported as
     // defined elsewhere.
-    let external = tables
+    let external = store
       .symbol(record.symbol)
-      .is_some_and(|raw| tables.find_external(raw).is_some());
-    match tables.location(occurrence) {
+      .is_some_and(|raw| store.find_external(raw).is_some());
+    match store.location(occurrence) {
       Some(mut location) if external => {
         location.external = true;
         Answer::Found(location)
@@ -64,39 +74,41 @@ impl Shard {
   /// gaps left by this repository's own record, and `external` says whether the
   /// symbol is defined outside the repository.
   pub fn hover(&self, path: &str, line: u32, column: u32) -> Answer<Hover> {
-    let tables = self.tables();
-    let Some(path_id) = precise_path(tables, path) else {
+    let Some(store) = self.store() else {
       return Answer::Uncovered;
     };
-    let Some(occurrence) = covering(tables, path_id, line, column) else {
+    let Some(path_id) = precise_path(store, path) else {
+      return Answer::Uncovered;
+    };
+    let Some(occurrence) = covering(store, path_id, line, column) else {
       return Answer::Absent;
     };
-    let Some(record) = tables.occurrence(occurrence).copied() else {
+    let Some(record) = store.occurrence(occurrence) else {
       return Answer::Absent;
     };
-    let Some(raw) = tables.symbol(record.symbol) else {
+    let Some(raw) = store.symbol(record.symbol) else {
       return Answer::Absent;
     };
     let name = symbol_name(raw);
-    let mut documentation = tables.documentation(record.symbol).to_string();
-    let mut signature = tables.signature(record.symbol).to_string();
-    let mut kind = tables.kind(record.symbol);
-    let external_id = tables.find_external(raw);
+    let mut documentation = store.documentation(record.symbol).to_string();
+    let mut signature = store.signature(record.symbol).to_string();
+    let mut kind = store.kind(record.symbol);
+    let external_id = store.find_external(raw);
     if let Some(external_id) = external_id {
       if documentation.is_empty() {
-        documentation = tables.external_documentation(external_id).to_string();
+        documentation = store.external_documentation(external_id).to_string();
       }
       if signature.is_empty() {
-        signature = tables.external_signature(external_id).to_string();
+        signature = store.external_signature(external_id).to_string();
       }
       if kind.code() == 0 {
-        kind = tables.external_kind(external_id);
+        kind = store.external_kind(external_id);
       }
     }
     // A symbol the repository also declares is ours, even when the indexer
     // listed it as external for other packages.
-    let external = external_id.is_some() && definition_location(tables, record.symbol).is_none();
-    let scope = tables
+    let external = external_id.is_some() && definition_location(store, record.symbol).is_none();
+    let scope = store
       .symbol(record.enclosing)
       .filter(|_| record.enclosing != NONE)
       .map(|enclosing| symbol_name(enclosing).path())
@@ -121,23 +133,22 @@ impl Shard {
   /// never see a reference they cannot open. Symbol strings come from `hover`;
   /// an unknown string yields an empty list rather than an error.
   pub fn references(&self, symbol: &str) -> Vec<Location> {
-    let tables = self.tables();
-    let Some(symbol_id) = tables.find_symbol(symbol) else {
+    let Some(store) = self.store() else {
       return Vec::new();
     };
-    tables
+    let Some(symbol_id) = store.find_symbol(symbol) else {
+      return Vec::new();
+    };
+    store
       .occurrences_of_symbol(symbol_id)
-      .iter()
-      .filter_map(|occurrence| tables.location(*occurrence))
+      .filter_map(|occurrence| store.location(occurrence))
       .collect()
   }
 
   /// Column unit the indexer used for this path's ranges.
   pub fn position_encoding(&self, path: &str) -> Option<PositionEncoding> {
-    let tables = self.tables();
-    tables
-      .find_path(path)
-      .and_then(|path_id| tables.encoding(path_id))
+    let store = self.store()?;
+    store.find_path(path).and_then(|id| store.encoding(id))
   }
 
   /// Converts a 1-based UTF-8 byte column from the repository source into the
@@ -148,16 +159,16 @@ impl Shard {
   /// shipped no text, where the caller must count units from its own copy of the
   /// line.
   pub fn normalized_position(&self, path: &str, line: u32, utf8_column: u32) -> Option<u32> {
-    let tables = self.tables();
-    let path_id = tables.find_path(path)?;
-    let encoding = tables.encoding(path_id)?;
+    let store = self.store()?;
+    let path_id = store.find_path(path)?;
+    let encoding = store.encoding(path_id)?;
     if matches!(
       encoding,
       PositionEncoding::Utf8 | PositionEncoding::Unspecified
     ) {
       return Some(utf8_column.max(1));
     }
-    let line_text = tables
+    let line_text = store
       .text(path_id)?
       .split('\n')
       .nth(usize::try_from(line).ok()?.checked_sub(1)?)?;
@@ -166,44 +177,41 @@ impl Shard {
 
   /// Source text stored with the document, when the indexer shipped it.
   pub fn source_text(&self, path: &str) -> Option<&str> {
-    let tables = self.tables();
-    tables
-      .find_path(path)
-      .and_then(|path_id| tables.text(path_id))
+    let store = self.store()?;
+    store.find_path(path).and_then(|id| store.text(id))
   }
 }
 
-fn precise_path(tables: &Tables, path: &str) -> Option<u32> {
-  let path_id = tables.find_path(path)?;
-  tables.is_precise(path_id).then_some(path_id)
+fn precise_path(store: &Store, path: &str) -> Option<u32> {
+  let path_id = store.find_path(path)?;
+  store.is_precise(path_id).then_some(path_id)
 }
 
-fn definition_location(tables: &Tables, symbol_id: u32) -> Option<Location> {
-  tables
+fn definition_location(store: &Store, symbol_id: u32) -> Option<Location> {
+  store
     .occurrences_of_symbol(symbol_id)
-    .iter()
     .find(|candidate| {
-      tables
-        .occurrence(**candidate)
+      store
+        .occurrence(*candidate)
         .is_some_and(|record| SymbolRole::from_bits(record.roles).is_definition())
     })
-    .and_then(|candidate| tables.location(*candidate))
+    .and_then(|candidate| store.location(candidate))
 }
 
 /// Best covering occurrence found so far, kept as "latest start, tightest end".
 struct Covering {
   start: (u32, u32),
   end: (u32, u32),
-  index: usize,
+  index: u32,
 }
 
 /// Global ID of the innermost occurrence whose span holds the cursor.
-fn covering(tables: &Tables, path_id: u32, line: u32, column: u32) -> Option<u32> {
-  let records = tables.occurrences(path_id);
-  if records.is_empty() {
+fn covering(store: &Store, path_id: u32, line: u32, column: u32) -> Option<u32> {
+  let records = store.occurrences(path_id);
+  if records.len() == 0 {
     return None;
   }
-  let base = tables.occurrence_base(path_id);
+  let base = store.occurrence_base(path_id);
   let limit =
     records.partition_point(|record| (record.start_line, record.start_column) <= (line, column));
   let mut best: Option<Covering> = None;
@@ -212,7 +220,9 @@ fn covering(tables: &Tables, path_id: u32, line: u32, column: u32) -> Option<u32
   while index > 0 && steps < COVERING_WINDOW {
     index -= 1;
     steps += 1;
-    let record = &records[index];
+    let Some(record) = records.get(index) else {
+      break;
+    };
     if record.symbol == NONE || !record.covers(line, column) {
       continue;
     }
@@ -226,5 +236,5 @@ fn covering(tables: &Tables, path_id: u32, line: u32, column: u32) -> Option<u32
       best = Some(Covering { start, end, index });
     }
   }
-  best.map(|found| base + found.index as u32)
+  best.map(|found| base + found.index)
 }

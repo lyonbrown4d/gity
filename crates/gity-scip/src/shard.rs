@@ -1,5 +1,5 @@
 //! The on-disk shard: eight fixed-layout tables plus the manifest describing
-//! them.
+//! them, opened by mapping the files rather than reading them.
 //!
 //! Layout inside one shard directory, next to `gity-code-intel`'s lexical
 //! snapshot so an operator only learns one convention:
@@ -22,9 +22,13 @@
 //! [`Shard::open_strict`] reports the concrete reason instead, for operators and
 //! tests.
 
-use crate::assemble::{Raw, Tables};
+use crate::assemble::Tables;
 use crate::manifest::{CoverageSummary, Manifest};
 use crate::model::{Decoded, PositionEncoding};
+use crate::read::{
+  COVERAGE_FILE, DOCS_FILE, EXTERNAL_FILE, OCC_FILE, PATHS_FILE, REFS_FILE, SYMBOLS_FILE, Store,
+  TEXTS_FILE,
+};
 use crate::tables;
 use crate::{Error, FORMAT_VERSION, Result};
 use std::fs::File;
@@ -32,28 +36,22 @@ use std::path::{Path, PathBuf};
 
 const MANIFEST: &str = "manifest.json";
 const LOCK: &str = "lock";
-const PATHS: &str = "paths.bin";
-const OCC: &str = "occ.bin";
-const SYMBOLS: &str = "symbols.bin";
-const EXTERNAL: &str = "external.bin";
-const TEXTS: &str = "texts.bin";
-const DOCS: &str = "docs.bin";
-const REFS: &str = "refs.bin";
-const COVERAGE: &str = "coverage.bin";
 
-/// An open shard: tables resident in memory, manifest for the caller.
+/// An open shard: mapped tables and the manifest.
 #[derive(Debug)]
 pub struct Shard {
   dir: PathBuf,
   manifest: Manifest,
-  tables: Tables,
+  store: Store,
 }
 
 impl Shard {
   /// Rebuilds the shard from a decoded index, replacing any previous snapshot.
   ///
-  /// Only one writer may build a directory at a time; the lock is advisory and
-  /// released when this call returns.
+  /// Building is the one path that holds whole tables in memory: it assembles the
+  /// records, writes each table to `<name>.new`, renames it into place, and only
+  /// then writes the manifest. Readers keep their mappings of the previous files
+  /// until they reopen, so a rebuild never disturbs a live request.
   pub fn build(dir: impl AsRef<Path>, decoded: &Decoded) -> Result<Manifest> {
     let dir = dir.as_ref();
     let tables = Tables::from_decoded(decoded)?;
@@ -64,29 +62,29 @@ impl Shard {
     let _lock = Lock::acquire(dir, true)?;
     let encoded = [
       (
-        PATHS,
+        PATHS_FILE,
         tables::encode_paths(&tables.paths, &tables.path_pool),
       ),
-      (OCC, tables::encode_occ(&tables.occ)),
+      (OCC_FILE, tables::encode_occ(&tables.occ)),
       (
-        SYMBOLS,
+        SYMBOLS_FILE,
         tables::encode_symbols(&tables.symbols, &tables.symbol_pool),
       ),
       (
-        EXTERNAL,
+        EXTERNAL_FILE,
         tables::encode_external(&tables.external, &tables.external_pool),
       ),
       (
-        TEXTS,
+        TEXTS_FILE,
         tables::encode_texts(&tables.texts, &tables.text_pool),
       ),
-      (DOCS, tables::encode_docs(&tables.docs)),
+      (DOCS_FILE, tables::encode_docs(&tables.docs)),
       (
-        REFS,
+        REFS_FILE,
         tables::encode_refs(&tables.ref_offsets, &tables.ref_entries),
       ),
       (
-        COVERAGE,
+        COVERAGE_FILE,
         tables::encode_coverage(tables.paths.len() as u32, &tables.coverage),
       ),
     ];
@@ -125,7 +123,12 @@ impl Shard {
   ///
   /// Returns `Ok(None)` only when no shard was ever written. Everything else is
   /// an error naming the failure: bad manifest, unsupported format version,
-  /// locked directory, unreadable table, corrupt or inconsistent tables.
+  /// locked directory, missing table, corrupt table, or tables that disagree.
+  ///
+  /// Opening maps the eight table files and validates their structure; it does
+  /// not copy table contents into the heap. The cost is `O(paths + symbols)`
+  /// record parses, not `O(occurrences)`, so a caller that serves many requests
+  /// should keep the handle and reopen only when the manifest changes.
   pub fn open_strict(dir: impl AsRef<Path>) -> Result<Option<Shard>> {
     let dir = dir.as_ref().to_path_buf();
     let path = dir.join(MANIFEST);
@@ -143,13 +146,52 @@ impl Shard {
         expected: FORMAT_VERSION,
       });
     }
+    // The lock only covers opening: mappings survive a rebuild, so holding it
+    // for the shard's lifetime would block writers for no safety gain.
     let _lock = Lock::acquire(&dir, false)?;
-    let tables = Tables::decode(read_tables(&dir)?)?;
+    let store = Store::open(&dir)?;
     Ok(Some(Shard {
       dir,
       manifest,
-      tables,
+      store,
     }))
+  }
+
+  /// Fails when a mapped file shrank after the shard was opened.
+  ///
+  /// Reading past the end of a shrunk mapping would fault the process, so every
+  /// query asks this first and degrades instead of touching the tables.
+  pub fn health(&self) -> Result<()> {
+    match self.store.shrink() {
+      Some((table, expected, found)) => Err(Error::Stale {
+        table,
+        expected,
+        found,
+      }),
+      None => Ok(()),
+    }
+  }
+
+  /// Approximate heap this handle holds.
+  ///
+  /// Table contents are mapped, not copied, so this is a handful of structs plus
+  /// the manifest strings regardless of shard size. Compare with
+  /// [`Shard::mapped_bytes`], which reports the file bytes reachable through the
+  /// mappings.
+  pub fn resident_bytes(&self) -> usize {
+    let manifest = &self.manifest;
+    std::mem::size_of::<Shard>()
+      + self.dir.as_os_str().len()
+      + manifest.commit.len()
+      + manifest.indexer.len()
+      + manifest.indexer_version.len()
+      + manifest.indexed_at.len()
+      + manifest.position_encoding.len()
+  }
+
+  /// Bytes of shard files mapped into this process.
+  pub fn mapped_bytes(&self) -> usize {
+    self.store.mapped_bytes()
   }
 
   pub fn manifest(&self) -> &Manifest {
@@ -160,8 +202,10 @@ impl Shard {
     &self.dir
   }
 
-  pub(crate) fn tables(&self) -> &Tables {
-    &self.tables
+  /// The tables, or `None` when the mapping went stale and must not be read.
+  pub(crate) fn store(&self) -> Option<&Store> {
+    self.health().ok()?;
+    Some(&self.store)
   }
 }
 
@@ -193,27 +237,6 @@ fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> Result<()> {
   std::fs::rename(&temporary, &target).map_err(|source| Error::Io {
     path: target.display().to_string(),
     source,
-  })
-}
-
-/// Reads all eight tables while the caller holds the shard lock.
-fn read_tables(dir: &Path) -> Result<Raw> {
-  let read = |name: &str| -> Result<Vec<u8>> {
-    let path = dir.join(name);
-    std::fs::read(&path).map_err(|source| Error::Io {
-      path: path.display().to_string(),
-      source,
-    })
-  };
-  Ok(Raw {
-    paths: read(PATHS)?,
-    occ: read(OCC)?,
-    symbols: read(SYMBOLS)?,
-    external: read(EXTERNAL)?,
-    texts: read(TEXTS)?,
-    docs: read(DOCS)?,
-    refs: read(REFS)?,
-    coverage: read(COVERAGE)?,
   })
 }
 

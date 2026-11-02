@@ -1,10 +1,8 @@
 //! Fixed-layout binary primitives shared by every shard table.
 //!
 //! Tables are little-endian, start with a four-byte tag and a `u32` record
-//! count, and are read back with bounds checks so a truncated or foreign file
-//! becomes an error instead of a panic.
-
-use crate::{Error, Result};
+//! count. Writing goes through [`Writer`]; reading slices mapped bytes directly
+//! (see [`crate::mapped`]), so there is no cursor to keep in sync.
 
 /// Builds one table: tag, count, fixed records, then a variable-length pool.
 pub(crate) struct Writer {
@@ -29,57 +27,6 @@ impl Writer {
 
   pub(crate) fn into_bytes(self) -> Vec<u8> {
     self.bytes
-  }
-}
-
-/// Reads one table written by [`Writer`].
-pub(crate) struct Reader<'a> {
-  bytes: &'a [u8],
-  position: usize,
-  table: &'static str,
-}
-
-impl<'a> Reader<'a> {
-  pub(crate) fn new(bytes: &'a [u8], tag: [u8; 4], table: &'static str) -> Result<Self> {
-    if bytes.len() < 8 || bytes[..4] != tag {
-      return Err(Error::Corrupt { table });
-    }
-    Ok(Self {
-      bytes,
-      position: 4,
-      table,
-    })
-  }
-
-  pub(crate) fn u32(&mut self) -> Result<u32> {
-    let chunk = self.take(4)?;
-    let mut word = [0u8; 4];
-    word.copy_from_slice(chunk);
-    Ok(u32::from_le_bytes(word))
-  }
-
-  pub(crate) fn slice(&mut self, length: usize) -> Result<&'a [u8]> {
-    self.take(length)
-  }
-
-  /// Everything left in the table, used for string and document pools.
-  pub(crate) fn rest(&mut self) -> &'a [u8] {
-    let rest = &self.bytes[self.position.min(self.bytes.len())..];
-    self.position = self.bytes.len();
-    rest
-  }
-
-  fn take(&mut self, length: usize) -> Result<&'a [u8]> {
-    let end = self
-      .position
-      .checked_add(length)
-      .ok_or(Error::Corrupt { table: self.table })?;
-    if end > self.bytes.len() {
-      return Err(Error::Corrupt { table: self.table });
-    }
-    let chunk = &self.bytes[self.position..end];
-    self.position = end;
-    Ok(chunk)
   }
 }
 

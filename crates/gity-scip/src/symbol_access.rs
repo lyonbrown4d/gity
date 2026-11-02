@@ -1,95 +1,124 @@
 //! Symbol-side accessors: the repository symbol table, the external table, and
 //! the CSR that maps a symbol to the occurrences naming it.
 //!
-//! Both tables are sorted by symbol string, so a lookup is a binary search. They
-//! are separate tables on purpose: only repository symbols own an ID that
-//! occurrences and the CSR reference, so an external symbol can never create a
-//! phantom reference or a phantom definition.
+//! Both tables are sorted by symbol string, so a lookup is a binary search over
+//! mapped records. They are separate tables on purpose: only repository symbols
+//! own an ID that occurrences and the CSR reference, so an external symbol can
+//! never create a phantom reference or a phantom definition.
 
-use crate::assemble::Tables;
 use crate::format::pool_str;
+use crate::mapped::Table;
 use crate::model::SymbolKind;
-use crate::tables::SymbolRecord;
+use crate::read::Store;
+use crate::tables::{SymbolRecord, parse_symbol};
 
-impl Tables {
+/// View of one symbol table plus its string pool.
+struct Symbols<'a> {
+  table: &'a Table,
+  pool: &'a [u8],
+}
+
+impl<'a> Symbols<'a> {
+  fn new(table: &'a Table) -> Self {
+    Self {
+      table,
+      pool: table.pool(),
+    }
+  }
+
+  fn record(&self, id: u32) -> Option<SymbolRecord> {
+    parse_symbol(self.table.record(id)?)
+  }
+
+  fn text(&self, id: u32) -> Option<&'a str> {
+    let record = self.record(id)?;
+    pool_str(self.pool, record.text_off, record.text_len)
+  }
+
+  fn find(&self, symbol: &str) -> Option<u32> {
+    let mut low = 0u32;
+    let mut high = self.table.count();
+    while low < high {
+      let middle = low + (high - low) / 2;
+      match self.text(middle)?.cmp(symbol) {
+        std::cmp::Ordering::Less => low = middle + 1,
+        std::cmp::Ordering::Greater => high = middle,
+        std::cmp::Ordering::Equal => return Some(middle),
+      }
+    }
+    None
+  }
+}
+
+impl Store {
   pub(crate) fn symbol(&self, symbol_id: u32) -> Option<&str> {
-    text_of(&self.symbol_pool, self.symbols.get(symbol_id as usize)?)
+    Symbols::new(&self.symbols).text(symbol_id)
   }
 
   pub(crate) fn find_symbol(&self, symbol: &str) -> Option<u32> {
-    find_in(&self.symbols, &self.symbol_pool, symbol)
+    Symbols::new(&self.symbols).find(symbol)
   }
 
   pub(crate) fn kind(&self, symbol_id: u32) -> SymbolKind {
-    kind_of(self.symbols.get(symbol_id as usize))
+    kind_of(Symbols::new(&self.symbols).record(symbol_id))
   }
 
   pub(crate) fn documentation(&self, symbol_id: u32) -> &str {
-    documentation_of(&self.docs, self.symbols.get(symbol_id as usize))
+    documentation_of(
+      self.docs.bytes(),
+      Symbols::new(&self.symbols).record(symbol_id),
+    )
   }
 
   pub(crate) fn signature(&self, symbol_id: u32) -> &str {
-    signature_of(&self.docs, self.symbols.get(symbol_id as usize))
+    signature_of(
+      self.docs.bytes(),
+      Symbols::new(&self.symbols).record(symbol_id),
+    )
   }
 
   pub(crate) fn find_external(&self, symbol: &str) -> Option<u32> {
-    find_in(&self.external, &self.external_pool, symbol)
+    Symbols::new(&self.external).find(symbol)
   }
 
   pub(crate) fn external_kind(&self, external_id: u32) -> SymbolKind {
-    kind_of(self.external.get(external_id as usize))
+    kind_of(Symbols::new(&self.external).record(external_id))
   }
 
   pub(crate) fn external_documentation(&self, external_id: u32) -> &str {
-    documentation_of(&self.docs, self.external.get(external_id as usize))
+    documentation_of(
+      self.docs.bytes(),
+      Symbols::new(&self.external).record(external_id),
+    )
   }
 
   pub(crate) fn external_signature(&self, external_id: u32) -> &str {
-    signature_of(&self.docs, self.external.get(external_id as usize))
+    signature_of(
+      self.docs.bytes(),
+      Symbols::new(&self.external).record(external_id),
+    )
   }
 
-  /// CSR slice for one symbol: global occurrence IDs in repository order.
-  pub(crate) fn occurrences_of_symbol(&self, symbol_id: u32) -> &[u32] {
-    let index = symbol_id as usize;
-    let Some(start) = self.ref_offsets.get(index).copied() else {
-      return &[];
-    };
-    let Some(end) = self.ref_offsets.get(index + 1).copied() else {
-      return &[];
-    };
-    self
-      .ref_entries
-      .get(start as usize..end as usize)
-      .unwrap_or(&[])
+  /// Global occurrence IDs naming one symbol, in repository order.
+  pub(crate) fn occurrences_of_symbol(&self, symbol_id: u32) -> impl Iterator<Item = u32> + '_ {
+    let range = self.refs.row(symbol_id).unwrap_or(0..0);
+    range.filter_map(move |index| self.refs.entry(index))
   }
 }
 
-fn text_of<'a>(pool: &'a [u8], record: &SymbolRecord) -> Option<&'a str> {
-  pool_str(pool, record.text_off, record.text_len)
-}
-
-fn find_in(records: &[SymbolRecord], pool: &[u8], symbol: &str) -> Option<u32> {
-  let found = records.binary_search_by(|record| {
-    pool_str(pool, record.text_off, record.text_len)
-      .unwrap_or("")
-      .cmp(symbol)
-  });
-  found.ok().map(|index| index as u32)
-}
-
-fn kind_of(record: Option<&SymbolRecord>) -> SymbolKind {
+fn kind_of(record: Option<SymbolRecord>) -> SymbolKind {
   record.map_or(SymbolKind::default(), |record| {
     SymbolKind::from_code(record.kind as i32)
   })
 }
 
-fn documentation_of<'a>(docs: &'a [u8], record: Option<&SymbolRecord>) -> &'a str {
+fn documentation_of(docs: &[u8], record: Option<SymbolRecord>) -> &str {
   record
     .and_then(|record| pool_str(docs, record.doc_off, record.doc_len))
     .unwrap_or("")
 }
 
-fn signature_of<'a>(docs: &'a [u8], record: Option<&SymbolRecord>) -> &'a str {
+fn signature_of(docs: &[u8], record: Option<SymbolRecord>) -> &str {
   record
     .and_then(|record| pool_str(docs, record.signature_off, record.signature_len))
     .unwrap_or("")

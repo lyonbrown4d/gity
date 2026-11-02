@@ -1,56 +1,38 @@
-//! Path-side accessors: coverage, encoding, stored text, occurrence ranges.
+//! Path-side accessors over the mapped tables: coverage, encoding, stored text
+//! and occurrence ranges.
 //!
-//! Every lookup is a binary search or an index into a fixed record, and every
-//! one returns `None`/empty instead of failing: a missing answer must let the
-//! caller degrade, never break a request.
+//! Every lookup is a binary search over mapped records or one record read by
+//! offset, and every one returns `None`/empty instead of failing: a missing
+//! answer must let the caller degrade, never break a request.
 
 use crate::answer::{Coverage, Location};
-use crate::assemble::Tables;
 use crate::format::pool_str;
-use crate::manifest::Counts;
 use crate::model::PositionEncoding;
-use crate::tables::OccRecord;
+use crate::read::Store;
+use crate::tables::{OccRecord, parse_occ, parse_path, parse_text};
 
-impl Tables {
-  pub(crate) fn counts(&self) -> Counts {
-    Counts {
-      paths: self.paths.len(),
-      occurrences: self.occ.len(),
-      symbols: self.symbols.len(),
-      external_symbols: self.external.len(),
-      references: self.ref_entries.len(),
-      doc_bytes: self.docs.len(),
-      text_bytes: self.text_pool.len(),
-    }
-  }
-
-  pub(crate) fn coverage_summary(&self) -> (usize, usize) {
-    let precise = (0..self.paths.len())
-      .filter(|id| self.is_precise(*id as u32))
-      .count();
-    (precise, self.paths.len() - precise)
-  }
-
+impl Store {
   pub(crate) fn is_precise(&self, path_id: u32) -> bool {
-    let index = path_id as usize;
-    self
-      .coverage
-      .get(index / 8)
-      .is_some_and(|byte| byte & (0x80 >> (index % 8)) != 0)
+    self.coverage.contains(path_id)
   }
 
   pub(crate) fn path(&self, path_id: u32) -> Option<&str> {
-    let record = self.paths.get(path_id as usize)?;
-    pool_str(&self.path_pool, record.text_off, record.text_len)
+    let record = parse_path(self.paths.record(path_id)?)?;
+    pool_str(self.paths.pool(), record.text_off, record.text_len)
   }
 
   pub(crate) fn find_path(&self, path: &str) -> Option<u32> {
-    let found = self.paths.binary_search_by(|record| {
-      pool_str(&self.path_pool, record.text_off, record.text_len)
-        .unwrap_or("")
-        .cmp(path)
-    });
-    found.ok().map(|index| index as u32)
+    let mut low = 0u32;
+    let mut high = self.paths.count();
+    while low < high {
+      let middle = low + (high - low) / 2;
+      match self.path(middle)?.cmp(path) {
+        std::cmp::Ordering::Less => low = middle + 1,
+        std::cmp::Ordering::Greater => high = middle,
+        std::cmp::Ordering::Equal => return Some(middle),
+      }
+    }
+    None
   }
 
   pub(crate) fn coverage(&self, path: &str) -> Coverage {
@@ -62,53 +44,63 @@ impl Tables {
   }
 
   pub(crate) fn encoding(&self, path_id: u32) -> Option<PositionEncoding> {
-    self
-      .paths
-      .get(path_id as usize)
-      .map(|record| PositionEncoding::from_code(record.encoding as i32))
+    let record = parse_path(self.paths.record(path_id)?)?;
+    Some(PositionEncoding::from_code(record.encoding as i32))
   }
 
   /// Source text the indexer shipped with a document, when it shipped any.
   pub(crate) fn text(&self, path_id: u32) -> Option<&str> {
-    let record = self.texts.get(path_id as usize)?;
+    let record = parse_text(self.texts.record(path_id)?)?;
     if record.text_len == 0 {
       return None;
     }
-    pool_str(&self.text_pool, record.text_off, record.text_len)
+    pool_str(self.texts.pool(), record.text_off, record.text_len)
   }
 
   /// First global occurrence ID owned by a path.
   pub(crate) fn occurrence_base(&self, path_id: u32) -> u32 {
-    self
-      .paths
-      .get(path_id as usize)
-      .map_or(0, |record| record.occ_first)
+    parse_path(self.paths.record(path_id).unwrap_or(&[])).map_or(0, |record| record.occ_first)
   }
 
-  /// Occurrence records owned by one path, empty for an uncovered path.
-  pub(crate) fn occurrences(&self, path_id: u32) -> &[OccRecord] {
-    let Some(record) = self.paths.get(path_id as usize) else {
-      return &[];
+  /// Occurrence records owned by one path, as a view over the mapping.
+  pub(crate) fn occurrences(&self, path_id: u32) -> PathOccurrences<'_> {
+    let Some(record) = self.paths.record(path_id).and_then(parse_path) else {
+      return PathOccurrences {
+        store: self,
+        first: 0,
+        count: 0,
+      };
     };
-    let start = record.occ_first as usize;
-    let end = start.saturating_add(record.occ_len as usize);
-    self.occ.get(start..end).unwrap_or(&[])
+    PathOccurrences {
+      store: self,
+      first: record.occ_first,
+      count: record.occ_len,
+    }
   }
 
   /// Path owning a global occurrence ID, using the contiguous ranges.
   pub(crate) fn path_of(&self, occurrence_id: u32) -> Option<u32> {
-    let index = self
-      .paths
-      .partition_point(|record| record.occ_first <= occurrence_id);
-    let record = self.paths.get(index.checked_sub(1)?)?;
+    let mut low = 0u32;
+    let mut high = self.paths.count();
+    while low < high {
+      let middle = low + (high - low) / 2;
+      let record = parse_path(self.paths.record(middle)?)?;
+      if record.occ_first <= occurrence_id {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    let candidate = low.checked_sub(1)?;
+    let record = parse_path(self.paths.record(candidate)?)?;
     if occurrence_id < record.occ_first.saturating_add(record.occ_len) {
-      return Some(index as u32 - 1);
+      return Some(candidate);
     }
     None
   }
 
-  pub(crate) fn occurrence(&self, occurrence_id: u32) -> Option<&OccRecord> {
-    self.occ.get(occurrence_id as usize)
+  pub(crate) fn occurrence(&self, occurrence_id: u32) -> Option<OccRecord> {
+    parse_occ(self.occ.record(occurrence_id)?)
   }
 
   /// In-repository position of an occurrence; `external` stays false here
@@ -124,5 +116,44 @@ impl Tables {
       end_column: record.end_column,
       external: false,
     })
+  }
+}
+
+/// One path's slice of the occurrence table, decoded on demand.
+pub(crate) struct PathOccurrences<'a> {
+  store: &'a Store,
+  first: u32,
+  count: u32,
+}
+
+impl PathOccurrences<'_> {
+  pub(crate) fn len(&self) -> u32 {
+    self.count
+  }
+
+  pub(crate) fn get(&self, index: u32) -> Option<OccRecord> {
+    if index >= self.count {
+      return None;
+    }
+    parse_occ(self.store.occ.record(self.first.checked_add(index)?)?)
+  }
+
+  /// Index of the first record for which `predicate` is false; the records are
+  /// ordered by position, so this is a binary search over mapped records.
+  pub(crate) fn partition_point(&self, mut predicate: impl FnMut(OccRecord) -> bool) -> u32 {
+    let mut low = 0u32;
+    let mut high = self.count;
+    while low < high {
+      let middle = low + (high - low) / 2;
+      let Some(record) = self.get(middle) else {
+        return low;
+      };
+      if predicate(record) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    low
   }
 }
