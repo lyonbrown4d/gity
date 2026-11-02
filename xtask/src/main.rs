@@ -9,6 +9,7 @@ mod docs;
 mod docs_mermaid;
 mod git_stress;
 mod k6;
+mod precompress;
 mod sources;
 #[derive(Parser)]
 #[command(about = "Gity Cargo build and verification tasks")]
@@ -24,6 +25,8 @@ enum Task {
   Release,
   VendorCheck,
   SourceCheck,
+  /// Precompress static Web assets with brotli for `ServeDir::precompressed_br`.
+  Precompress,
   /// Build or preview the mdBook manual.
   Docs {
     #[arg(long)]
@@ -61,6 +64,7 @@ fn main() -> Result<()> {
     Task::DocsPreprocess { args } => docs_mermaid::run(&args)?,
     Task::VendorCheck => verify_vendor(&root)?,
     Task::SourceCheck => sources::check(&root)?,
+    Task::Precompress => precompress::run(&root)?,
     Task::GitStress(args) => git_stress::run(&root, args)?,
     Task::K6(args) => k6::run(&root, args)?,
     Task::ContainerStats(args) => container_stats::run(args)?,
@@ -104,6 +108,7 @@ fn main() -> Result<()> {
       {
         bail!("Web build failed");
       }
+      precompress::run(&root)?;
       if release {
         // Build each role separately so Git-only does not inherit full-server features.
         for package in [

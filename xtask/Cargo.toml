@@ -21,3 +21,4 @@ uuid.workspace = true
 tempfile.workspace = true
 dotenvy = "0.15"
 base64 = "0.22"
+brotli = "9"

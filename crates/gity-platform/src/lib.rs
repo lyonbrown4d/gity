@@ -26,6 +26,7 @@ pub use composition::compose;
 mod auth_tests;
 
 use axum::Router;
+use axum::http::{HeaderValue, header};
 use gity_core::{Db, Settings};
 use gity_git::GitService;
 use std::sync::Arc;
@@ -84,11 +85,59 @@ async fn fallback(
   if request.uri().path().starts_with("/api/") || request.uri().path().contains(".git/") {
     return Err(gity_core::AppError::not_found("endpoint not found"));
   }
+  let path = request.uri().path().to_owned();
   let web = ServeDir::new(&state.settings.web_root)
+    .precompressed_br()
     .not_found_service(ServeFile::new(state.settings.web_root.join("index.html")));
   let response = web
     .oneshot(request)
     .await
     .unwrap_or_else(|error| match error {});
-  Ok(response.into_response())
+  let mut response = response.into_response();
+  if let Ok(value) = HeaderValue::from_str(cache_control(&path)) {
+    response.headers_mut().insert(header::CACHE_CONTROL, value);
+  }
+  vary_on_encoding(response.headers_mut());
+  Ok(response)
+}
+
+/// `ServeDir` serves `<file>.br` without advertising the encoding choice, so any
+/// shared cache would key the plain and compressed variants under one entry.
+fn vary_on_encoding(headers: &mut axum::http::HeaderMap) {
+  let existing = headers
+    .get(header::VARY)
+    .and_then(|value| value.to_str().ok())
+    .unwrap_or_default();
+  if existing.to_ascii_lowercase().contains("accept-encoding") {
+    return;
+  }
+  let combined = if existing.is_empty() {
+    "Accept-Encoding".to_owned()
+  } else {
+    format!("{existing}, Accept-Encoding")
+  };
+  if let Ok(value) = HeaderValue::from_str(&combined) {
+    headers.insert(header::VARY, value);
+  }
+}
+
+/// Hashed assets never change under one URL; entries and client routes must revalidate.
+fn cache_control(path: &str) -> &'static str {
+  const IMMUTABLE: &str = "public, max-age=31536000, immutable";
+  if path == "/" || !path.contains('.') {
+    return "no-cache";
+  }
+  if hashed_asset(path) || path.ends_with(".wasm") {
+    return IMMUTABLE;
+  }
+  "public, max-age=600"
+}
+
+fn hashed_asset(path: &str) -> bool {
+  let file = path.rsplit('/').next().unwrap_or(path);
+  let stem = file.split('.').next().unwrap_or(file);
+  let Some((_, hash)) = stem.rsplit_once('-') else {
+    return false;
+  };
+  hash.len() == 16 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
