@@ -56,6 +56,7 @@
 - Swagger UI 与 OpenAPI 文档端点仅用于显式启用 `api-docs` 的开发构建；release 二进制、镜像和 Web 静态产物不得提供或包含 Swagger UI 资源、`/docs`、`/openapi.json` 等文档端点。保留成熟宏用于开发及离线契约生成，不能因此移除 Git LFS 等真实业务协议路由。
 - 接口文档须覆盖实际路由、请求响应、认证与错误结构，随实现同步验证，不能只提供空壳页面。
 - Utoipa 优先使用 `ToSchema`、`OpenApi` 派生宏、`#[utoipa::path]` 和 `utoipa-axum::routes!`；优先关联路由注册与文档收集，避免手写重复接口清单。
+- `utoipa_axum::routes!(A, B)` 只表示“同一 path 的不同 method”；不同 path 必须分行 `.routes(...)` 注册，否则会把多个 GET 叠加到第一个 path，启动时 panic（`Overlapping method route`）。
 - 集成环境优先使用 Docker Compose，覆盖数据库、对象存储及可观测性依赖；提供健康检查、持久化卷、环境变量示例和可复现的启动与验证说明。
 - 分别提供 standalone 与分布式组件模式的 Docker Compose 部署文件；当前都以单机 Docker Compose 为目标。默认 standalone 包含全部业务组件，各角色同时提供 Debian 与 Alpine 基础镜像变体。
 - 镜像黑盒分别验收两种运行架构，覆盖真实 SSH Git、包协议、OCI/mirror、鉴权隔离及故障行为；不能以单体通过推断分布式通过，也不能以 Debian 通过推断 Alpine 通过。
