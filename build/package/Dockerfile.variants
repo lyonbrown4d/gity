@@ -33,20 +33,34 @@ COPY crates ./crates
 COPY xtask ./xtask
 ENV RUSTUP_TOOLCHAIN=1.99.1 CARGO_NET_GIT_FETCH_WITH_CLI=true
 
-FROM toolkit AS web-tools
+# Export the offline contract with an empty embed directory. This tool binary
+# is never shipped; every application binary below embeds the finished Vite build.
+FROM source AS contract
 ARG GITY_BASE
-ENV RUSTUP_TOOLCHAIN=1.99.1
-WORKDIR /src
+ARG CARGO_JOBS=4
 RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
     --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
     --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
-    rustup target add wasm32-unknown-unknown && \
-    cargo install trunk --version 0.21.14 --locked --root /opt/trunk --target-dir /src/target/trunk-install
+    mkdir -p dist/web /out && \
+    CARGO_HTTP_MULTIPLEXING=false CARGO_BUILD_JOBS="${CARGO_JOBS}" cargo run --release --locked -p gity-server -- \
+      openapi --output /out/openapi.json
+
+FROM node:24-bookworm AS web
+RUN npm install --global pnpm@12.15.0
+WORKDIR /src/web
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=gity-pnpm,target=/root/Library/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile
+COPY web ./
+COPY crates/gity-i18n/locales /src/crates/gity-i18n/locales
+COPY --from=contract /out/openapi.json ./openapi.json
+RUN pnpm gen:api && pnpm build
 
 FROM source AS builder
 ARG GITY_BASE
 ARG GITY_ROLE
 ARG CARGO_JOBS=4
+COPY --from=web /src/dist/web /src/dist/web
 RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
     --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
     --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
@@ -63,21 +77,10 @@ RUN --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/reg
       *) echo "unsupported GITY_ROLE" >&2; exit 2 ;; \
     esac; \
     set --; for extra in ${extras}; do set -- "$@" -p "$extra"; done; \
+    touch dist/web; \
     CARGO_HTTP_MULTIPLEXING=false CARGO_BUILD_JOBS="${CARGO_JOBS}" cargo build --release --locked -p "${package}" "$@"; \
     install -Dm0555 "target/release/${binary}" /out/gity; \
     for extra in ${extras}; do install -Dm0555 "target/release/${extra}" "/out/${extra}"; done
-
-FROM web-tools AS web
-ARG CARGO_JOBS=4
-ARG TARGETARCH
-COPY --from=source /src /src
-WORKDIR /src
-RUN --mount=type=cache,id=gity-trunk-tools-${GITY_BASE}-${TARGETARCH},target=/root/.cache/trunk \
-    --mount=type=cache,id=gity-registry-${GITY_BASE},target=/usr/local/cargo/registry \
-    --mount=type=cache,id=gity-git-${GITY_BASE},target=/usr/local/cargo/git \
-    --mount=type=cache,id=gity-target-${GITY_BASE},target=/src/target,sharing=locked \
-    cd /src/apps/gity-web && \
-    CARGO_HTTP_MULTIPLEXING=false CARGO_BUILD_JOBS="${CARGO_JOBS}" NO_COLOR=true /opt/trunk/bin/trunk --skip-version-check build --release
 
 FROM ${RUNTIME_IMAGE} AS runtime
 ARG GITY_BASE=debian
@@ -141,7 +144,7 @@ HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://loca
 FROM app AS registry
 EXPOSE 8081 8082
 COPY --from=angos-engine --chmod=0555 /angos /usr/local/bin/angos
-ENV GITY_REGISTRY__ANGOS__EXECUTABLE=/usr/local/bin/angos
+ENV GITY_REGISTRY_ANGOS__EXECUTABLE=/usr/local/bin/angos
 HEALTHCHECK --interval=10s --timeout=3s --retries=10 CMD curl --fail http://localhost:8081/readyz || exit 1
 
 FROM app AS runner

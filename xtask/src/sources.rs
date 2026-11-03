@@ -30,9 +30,10 @@ fn walk(path: &Path, violations: &mut Vec<String>) -> Result<()> {
     let path = entry.path();
     let kind = entry.file_type()?;
     let name = entry.file_name().to_string_lossy().into_owned();
-    if path.extension().is_some_and(|ext| {
-      ["go", "plano"].iter().any(|v| ext == *v)
-    }) {
+    if path
+      .extension()
+      .is_some_and(|ext| ["go", "plano"].iter().any(|v| ext == *v))
+    {
       violations.push(format!(
         "{}: retired language input is forbidden",
         path.display()

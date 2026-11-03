@@ -1,23 +1,10 @@
 use super::{Reporter, RunConfig};
 use anyhow::{Context, Result, bail};
 use reqwest::{StatusCode, blocking::Client, header::CONTENT_TYPE};
-use serde::Deserialize;
 use std::{collections::BTreeSet, path::Path};
 use url::Url;
 
-#[derive(Deserialize)]
-struct VendorManifest {
-  monaco_version: String,
-  milkdown_version: String,
-  files: Vec<VendorFile>,
-}
-
-#[derive(Deserialize)]
-struct VendorFile {
-  path: String,
-}
-
-pub(super) fn run(root: &Path, config: &RunConfig, reporter: &mut Reporter) -> Result<()> {
+pub(super) fn run(_root: &Path, config: &RunConfig, reporter: &mut Reporter) -> Result<()> {
   let client = Client::builder()
     .timeout(std::time::Duration::from_secs(30))
     .build()?;
@@ -26,7 +13,7 @@ pub(super) fn run(root: &Path, config: &RunConfig, reporter: &mut Reporter) -> R
   let html = String::from_utf8(bytes).context("published Web homepage is not UTF-8")?;
   if !html.to_ascii_lowercase().contains("<!doctype html")
     || !html.contains("Gity")
-    || !html.contains("/vendor/editors.css")
+    || !html.contains("id=\"root\"")
   {
     bail!("published Web homepage is not the expected Gity HTML document");
   }
@@ -37,62 +24,61 @@ pub(super) fn run(root: &Path, config: &RunConfig, reporter: &mut Reporter) -> R
     .filter(|path| extension(path) == Some("js"))
     .cloned()
     .collect::<Vec<_>>();
-  let wasm = references
+  let css = references
     .iter()
-    .filter(|path| extension(path) == Some("wasm"))
+    .filter(|path| extension(path) == Some("css"))
     .cloned()
     .collect::<Vec<_>>();
-  if js.is_empty() || wasm.is_empty() {
-    bail!("published homepage does not reference both its JavaScript loader and WASM module");
+  if js.is_empty() || css.is_empty() {
+    bail!("published React homepage must reference its built JavaScript and CSS assets");
   }
 
   let mut checked = BTreeSet::new();
   checked.insert(index);
-  for path in js.iter().chain(wasm.iter()) {
-    let expected = if extension(path) == Some("wasm") {
-      "application/wasm"
-    } else {
-      "application/javascript"
-    };
-    checked.insert(fetch(&client, &base, path, expected)?.0);
-  }
-
-  let manifest_path = root.join("apps/gity-web/vendor/manifest.toml");
-  let manifest: VendorManifest = toml::from_str(
-    &std::fs::read_to_string(&manifest_path)
-      .with_context(|| format!("read vendor asset manifest {}", manifest_path.display()))?,
-  )
-  .context("parse vendor asset manifest")?;
-  if manifest.monaco_version.trim().is_empty()
-    || manifest.milkdown_version.trim().is_empty()
-    || manifest.files.is_empty()
-  {
-    bail!("vendor asset manifest is missing editor versions or files");
-  }
-  for required in ["editors.css", "editors.js"] {
-    if !manifest.files.iter().any(|file| file.path == required) {
-      bail!("vendor asset manifest is missing {required}");
+  let mut pending = references
+    .into_iter()
+    .map(|path| (base.clone(), path))
+    .collect::<Vec<_>>();
+  let mut editors = false;
+  while let Some((parent, path)) = pending.pop() {
+    let url = parent.join(&path)?;
+    if checked.contains(&url) {
+      continue;
     }
-  }
-  for file in &manifest.files {
-    let path = format!("/vendor/{}", file.path.trim_start_matches('/'));
-    let expected = match extension(&file.path) {
+    let expected = match extension(&path) {
       Some("css") => "text/css",
       Some("js" | "mjs") => "application/javascript",
-      _ => bail!("unsupported vendor asset type in manifest: {}", file.path),
+      _ => bail!("unsupported Vite asset: {path}"),
     };
-    checked.insert(fetch(&client, &base, &path, expected)?.0);
+    if url.origin() != base.origin() {
+      bail!("Web asset escaped the published site origin: {path}");
+    }
+    let (url, bytes) = fetch(&client, &parent, &path, expected)?;
+    editors |= url.path().contains("/editor-");
+    if expected == "application/javascript" {
+      let code = std::str::from_utf8(&bytes).context("Web JavaScript is not UTF-8")?;
+      for reference in static_references(code) {
+        // Vite preload maps use root-relative assets/ paths; static imports
+        // use sibling chunk names. Both must resolve to published local files.
+        let parent = if reference.starts_with("assets/") {
+          base.clone()
+        } else {
+          url.clone()
+        };
+        pending.push((parent, reference));
+      }
+    }
+    checked.insert(url);
+  }
+  if !editors {
+    bail!("published Vite bundle does not include the local editor chunk");
   }
 
   reporter.pass(
     "published-web-static-assets",
     format!(
-      "homepage HTML; {} JS loader(s), {} WASM module(s), and {} vendor assets (Monaco {}, Milkdown {}) returned non-empty resources with expected MIME types",
-      js.len(),
-      wasm.len(),
-      manifest.files.len(),
-      manifest.monaco_version,
-      manifest.milkdown_version
+      "React homepage and {} local Vite JS/CSS assets, including editor chunks, returned non-empty resources with expected MIME types",
+      checked.len() - 1
     ),
   );
   Ok(())
@@ -161,7 +147,10 @@ fn static_references(html: &str) -> BTreeSet<String> {
       (Some(expected), current) if expected == current => {
         let value = html[start..index].trim();
         let value = value.split(['?', '#']).next().unwrap_or_default();
-        if matches!(extension(value), Some("js" | "wasm"))
+        if matches!(extension(value), Some("js" | "mjs" | "css"))
+          && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"-_/.:".contains(&byte))
           && !value.starts_with("data:")
           && !value.contains("://")
         {
@@ -176,5 +165,13 @@ fn static_references(html: &str) -> BTreeSet<String> {
 }
 
 fn extension(path: &str) -> Option<&str> {
-  path.rsplit_once('.')?.1.split(['?', '#', '/']).next()
+  path
+    .split(['?', '#'])
+    .next()?
+    .rsplit_once('.')
+    .map(|(_, ext)| ext)
 }
+
+#[cfg(test)]
+#[path = "web_tests.rs"]
+mod tests;

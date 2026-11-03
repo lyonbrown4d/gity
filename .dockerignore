@@ -14,7 +14,10 @@ coverage.out
 data
 dist
 node_modules
+**/node_modules
 *.log
 
 .tmp-spack-src
 .tmp-spack-wiki
+web/openapi.json
+web/src/lib/generated

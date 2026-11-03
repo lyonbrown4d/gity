@@ -8,7 +8,11 @@ pub(super) fn run(
   reporter: &mut Reporter,
 ) -> Result<()> {
   let mut scenario = api::run(root, args, config, reporter)?;
-  ci::run(root, args, config, &scenario, reporter)?;
+  if args.suite == Suite::Full {
+    ci::run(root, args, config, &scenario, reporter)?;
+  } else {
+    reporter.note("SKIP CI Runner, native package clients and backup/restore: --suite protocols");
+  }
   scenario.git_credential = Some(git::run(root, args, config, &scenario, work, reporter)?);
   git::personal::run(
     config,
@@ -22,7 +26,9 @@ pub(super) fn run(
   )?;
   merge_recovery::run(root, args, config, &scenario, work, reporter)?;
   oci::run(config, &scenario, work, reporter)?;
-  native::run(args, &scenario, work, reporter)?;
+  if args.suite == Suite::Full {
+    native::run(args, &scenario, work, reporter)?;
+  }
   if args.mode == Mode::Distributed {
     api::distributed(
       root,
@@ -37,6 +43,8 @@ pub(super) fn run(
   // Validate live role OS/UID and sample resources before the offline backup
   // intentionally stops the entire source project.
   runtime::capture_images(root, args, reporter)?;
-  backup_restore::run(root, args, config, &scenario, work, reporter)?;
+  if args.suite == Suite::Full {
+    backup_restore::run(root, args, config, &scenario, work, reporter)?;
+  }
   Ok(())
 }

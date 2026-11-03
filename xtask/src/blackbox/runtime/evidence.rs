@@ -1,4 +1,4 @@
-use super::super::{Base, BlackboxArgs, Mode, Reporter, process};
+use super::super::{Base, BlackboxArgs, Mode, Reporter, Suite, process};
 use super::configure_compose;
 use anyhow::{Context, Result, bail};
 use std::{path::Path, process::Command};
@@ -84,12 +84,15 @@ fn capture_role_os(args: &BlackboxArgs) -> Result<Vec<String>> {
       "worker",
       "gateway",
       "registry",
-      "runner",
     ],
   };
+  let mut services = services.to_vec();
+  if args.mode == Mode::Distributed && args.suite == Suite::Full {
+    services.push("runner");
+  }
   let expected = base_name(args.base);
   let mut details = Vec::new();
-  for service in services {
+  for service in &services {
     let project_label = format!("label=com.docker.compose.project={}", args.project);
     let service_label = format!("label=com.docker.compose.service={service}");
     let mut query = Command::new("docker");

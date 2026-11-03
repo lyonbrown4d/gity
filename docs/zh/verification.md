@@ -4,11 +4,30 @@
 
 # 当前验证状态
 
-本页分别记录当前源码检查和留存的镜像验收证据。管理员、GraphQL、MCP 和 OAuth 已通过源码回归；当前源码未重新构建容器验收，不能把留存镜像的结果视为这些能力的镜像验证。
+本页区分本轮协议黑盒、独立集成测试和留存的完整镜像验收。不同范围的结果不能互相替代。
+
+## React 镜像协议验收（2026-11-03）
+
+本轮使用构建开始时固定的 React/Vite 快照，先生成接口客户端、构建 Web，再将资源嵌入 Rust 二进制。并行进行的其他 Web 修改不纳入本轮镜像。执行 `cargo xtask blackbox --suite protocols`，明确跳过 CI Runner、原生语言包客户端和备份恢复。
+
+Alpine 构建通过 Docker 命名上下文复用已校验的同一 Web 产物，仍在 Alpine 原生编译各 Rust 角色；运行验收不复用 Debian 的结果。
+
+| 部署形态 | 基础镜像 | 本轮协议结果 |
+| --- | --- | --- |
+| Standalone | Debian | **28 项通过**，见[逐项证据](../evidence/protocols-standalone-debian-20261103.json)。 |
+| Standalone | Alpine | 用户要求停止，未完成验收。 |
+| 分布式组件 | Debian | Registry 配置前缀导致启动失败；已修改镜像变量，停止前未重跑验收。 |
+| 分布式组件 | Alpine | 用户要求停止，未完成验收。 |
+
+Debian standalone 已覆盖当前 React 资源、账户与项目隔离、Generic 包校验和与 Range、真实 Git HTTP/SSH、个人 SSH 长连接上的权限变更与密钥撤销、MR 故障恢复、OCI 推送与冷拉取、scope/撤销/mount 权限，以及 mirror 冷拉取、重复拉取一致性和只读策略。容器直连 Docker Hub 超时，经本次临时代理验证后重跑通过；未修改全局代理。证据包含实际镜像 ID、平台、运行 UID 和一次资源快照；资源快照不是压力测试。
+
+独立运行的真实 SSH 传输集成测试 **4 项通过**，真实 Docker OCI 握手与 push 专项 **1 项通过**，分布式 Git RPC 的副本路由、fencing 提升与不确定写入修复回归 **1 项通过**。这些结果不能替代其他镜像组合，也不证明 Raft、无损自动故障切换、arm64 或多主机网络。
+
+本轮默认工作区编译、测试工具回归（39 通过、2 默认忽略）、React 构建、Dockerfile 定义检查和 mdBook 构建均通过。源码约束检查仍有两项已有问题：`repository/lookup.rs` 为 311 行；独立测试文件 `code_index/tests_remote.rs` 的命名未被检查器识别。以下其他源码与完整镜像结果为留存记录。
 
 ## 管理员与多协议 API
 
-默认工作区检查、严格 Clippy、Web WASM 检查、release API 检查、源码约束和双语 mdBook 构建均已执行。默认路由测试确认文档和 Swagger 资源返回 404，LFS 继续可用；release 显式启用 `api-docs` 会被编译器拒绝。
+默认工作区检查、严格 Clippy、release API 检查、源码约束和双语 mdBook 构建已有留存记录。默认路由测试确认文档和 Swagger 资源返回 404，LFS 继续可用；release 显式启用 `api-docs` 会被编译器拒绝。
 
 真实应用服务联调覆盖 GraphQL 项目读取、MCP 工具目录与调用、跨项目隔离、OAuth 资源与 scope、撤销后拒绝，以及 PKCE 授权码、浏览器同意、刷新轮换和管理员重新认证。刷新竞态使用两个独立数据库连接，连续重跑 20 轮，并检查撤销后写入的后续令牌仍被拒绝。此并发回归不属于压力测试。
 
@@ -42,13 +61,13 @@ OCI 握手专项可通过 `cargo test -p gity-oci --lib real_docker_requires_aut
 
 GNU tar 专项检查数字 UID/GID、权限、扩展属性、ACL、文件 capabilities、SGID 和 whiteout 设备的往返。它验证归档元数据机制，不能替代数据库、Git、对象存储和秘密配置的完整恢复验收。
 
-## 源码、编译与文档检查
+## 留存的源码、编译与文档检查
 
 - 最新格式检查、源码约束检查、第三方资产检查和 `git diff --check` 已通过。
-- 默认工作区检查、最终 Clippy、Web WASM、mdBook 构建和双语链接检查均通过。
+- 默认工作区检查、最终 Clippy、mdBook 构建和双语链接检查均有通过记录。
 - 默认生产构建与测试构建必须分别核对，不能让 `gity-core/test-fixtures` 掩盖生产依赖错误。
 
-## 镜像完整黑盒范围
+## 镜像完整黑盒范围（留存记录）
 
 | 部署形态 | 基础镜像 | 当前状态 |
 | --- | --- | --- |

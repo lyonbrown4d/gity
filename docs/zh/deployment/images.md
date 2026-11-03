@@ -53,7 +53,7 @@ docker buildx build --load \
 
 ## 构建缓存与验收边界
 
-Dockerfile 将系统构建依赖、Rust 源码和 Web 工具拆成可复用阶段。Debian 使用 BuildKit 缓存 apt 索引和软件包；Alpine 缓存 APK 软件包；Cargo registry、Git checkout 和 target 产物按基础系统分别缓存；target 缓存以排他方式覆盖构建和产物复制，防止并行角色或架构覆盖正在打包的文件。wasm-bindgen、wasm-opt 工具按基础系统和架构缓存。`GITY_ROLE` 与 `CARGO_JOBS` 只影响原生 Cargo 构建步骤。每个角色单独运行 Cargo，避免一个角色的 feature 集合并入另一个角色的构建调用。Trunk 和 `wasm32-unknown-unknown` 在复制 Rust 源码前安装，Web 构建不依赖 native role builder。
+Dockerfile 分别缓存系统依赖、Cargo 依赖和 pnpm 全局 store。构建先用不随镜像交付的契约导出工具生成 OpenAPI，再通过 Orval 生成客户端并构建当前 React/Vite 前端。最后各角色单独编译 Rust，将 `dist/web` 嵌入最终二进制；不使用 Trunk 或 Rust Web 前端。Cargo target 缓存按基础系统隔离，并在编译和复制产物期间排他锁定；`CARGO_JOBS` 限制 Rust 编译并发。
 
 Dockerfile 支持 Debian 与 Alpine 角色组合，但配置存在或 `cargo build` 成功都不能证明最终容器可运行。各组合必须分别执行完整镜像黑盒，实际运行范围见[验证记录](../verification.md)。
 ## 镜像黑盒验收
@@ -67,6 +67,8 @@ cargo xtask blackbox --mode standalone --base debian \
 ```
 
 分别组合 `--mode standalone|distributed` 与 `--base debian|alpine` 执行四次。工具构建实际镜像并启动独立数据卷，检查原生包客户端、Git HTTP/SSH、CI Runner、OCI/mirror 与权限隔离；分布式用例还检查组件故障和 Git 受控提升。默认结束后删除本次项目及其数据卷，拒绝接管已有项目。宿主机需要空闲的 HTTP 8080、SSH 2222 和 OCI 5000 端口、Docker、Git、SSH 和 OpenSSL。
+
+仅验收当前 Web 资源、API、Git HTTP/SSH、MR 恢复、OCI/mirror 及分布式故障时，加 `--suite protocols`。该范围明确跳过 CI Runner、原生语言包客户端和备份恢复；不等同于默认 `--suite full` 的完整验收。输出证据中的 `suite` 字段记录实际范围。
 
 若依赖下载需要代理，可设置 `GITY_BLACKBOX_DOWNLOAD_PROXY=http://容器可达代理:端口`。工具仅接受不含凭据的 HTTP 代理地址，将其传给本次 Compose 服务及临时包客户端；内部服务保持直连。证据记录镜像 ID、实际系统、UID 和一次容器资源快照，失败时另存脱敏日志；快照不等同于压力测试。
 

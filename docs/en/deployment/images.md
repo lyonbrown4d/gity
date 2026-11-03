@@ -53,7 +53,7 @@ docker buildx build --load \
 
 ## Build Cache and Verification Scope
 
-The Dockerfile separates system build dependencies, Rust source, and Web tools into reusable stages. Debian uses BuildKit to cache apt indexes and packages; Alpine caches APK packages; Cargo registry, Git checkouts, and target artifacts are cached separately for each base system; the target cache uses an exclusive lock during builds and artifact copying, preventing parallel roles or architectures from overwriting files being packaged. `wasm-bindgen` and `wasm-opt` tools are cached by base system and architecture. `GITY_ROLE` selects the native Cargo package; `CARGO_JOBS` bounds both native and Web Cargo jobs. Cargo runs separately for each role, so one role's feature set is not included in another role's Cargo build invocation. Trunk and `wasm32-unknown-unknown` are installed before Rust source is copied; the Web build does not depend on the native role builder.
+The Dockerfile caches system dependencies, Cargo dependencies, and the global pnpm store separately. A contract-export tool that is never shipped generates OpenAPI; Orval then generates the client and Vite builds the current React frontend. Each role finally compiles its Rust binary with `dist/web` embedded. Trunk and Rust frontend tooling are not used. Cargo target caches are isolated by base system and exclusively locked during compilation and artifact copying; `CARGO_JOBS` bounds Rust compilation concurrency.
 
 Dockerfile supports Debian and Alpine role combinations, but the presence of configuration or a successful `cargo build` does not prove that the resulting container runs. Run each image and architecture combination independently. See the [Validation Record](../verification.md).
 ## Image Black-Box Acceptance
@@ -67,6 +67,8 @@ cargo xtask blackbox --mode standalone --base debian \
 ```
 
 Run all four combinations of `--mode standalone|distributed` and `--base debian|alpine`. The tool builds the actual images and starts isolated data volumes. It checks native package clients, Git HTTP/SSH, the CI Runner, OCI/mirror, and permission isolation. Distributed runs also check component failures and controlled Git promotion. By default, it removes the project and its data volumes when finished, and refuses to take over an existing project. The host needs available HTTP 8080, SSH 2222, and OCI 5000 ports, plus Docker, Git, SSH, and OpenSSL.
+
+Add `--suite protocols` to check the current Web assets, API, Git HTTP/SSH, MR recovery, OCI/mirror, and distributed failures. This scope explicitly skips the CI Runner, native language package clients, and backup/restore. It is not equivalent to the default `--suite full` acceptance; the evidence records the selected `suite`.
 
 If downloads need a proxy, set `GITY_BLACKBOX_DOWNLOAD_PROXY=http://proxy-reachable-from-container:port`. The tool accepts only an HTTP proxy URL without credentials and passes it to the Compose services in this run and the temporary package client; internal services connect directly. Evidence records image IDs, actual operating systems, UIDs, and one container resource snapshot. On failure, it also saves redacted logs. A snapshot is not a stress test.
 

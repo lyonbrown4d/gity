@@ -1,0 +1,149 @@
+{
+  "suite": "protocols",
+  "mode": "standalone",
+  "base": "debian",
+  "project": "gity-bb-proto-sd-20261103",
+  "checks": [
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "healthy"
+    },
+    {
+      "name": "http-health",
+      "status": "pass",
+      "detail": "HTTP health returned 200"
+    },
+    {
+      "name": "published-web-static-assets",
+      "status": "pass",
+      "detail": "React homepage and 49 local Vite JS/CSS assets, including editor chunks, returned non-empty resources with expected MIME types"
+    },
+    {
+      "name": "release-documentation-disabled",
+      "status": "pass",
+      "detail": "Swagger UI, assets and OpenAPI document all return 404"
+    },
+    {
+      "name": "explicit-admin-provision",
+      "status": "pass",
+      "detail": "new ordinary test account granted admin by the local operator command"
+    },
+    {
+      "name": "registration-and-login",
+      "status": "pass",
+      "detail": "registration, login, and invalid password rejection passed"
+    },
+    {
+      "name": "private-project-and-outsider-denied",
+      "status": "pass",
+      "detail": "created private project 375859436381540352; outsider cannot read it"
+    },
+    {
+      "name": "api-file-commit-read",
+      "status": "pass",
+      "detail": "committed file bytes read back exactly"
+    },
+    {
+      "name": "generic-upload-download-range-sha-conflict-tenant",
+      "status": "pass",
+      "detail": "12582912 bytes; idempotent retry; replacement conflict; exact Range and SHA-256; outsider denied"
+    },
+    {
+      "name": "http-git-clone-push-pull-outsider-denied",
+      "status": "pass",
+      "detail": "two authenticated HTTP clones exchanged exact file bytes; outsider clone was rejected"
+    },
+    {
+      "name": "ssh-clone-push-pull-bad-key-protected-branch",
+      "status": "pass",
+      "detail": "pinned host key, registered writer, unknown-key rejection, and protected push rejection passed"
+    },
+    {
+      "name": "personal-ssh-clone-push-pull",
+      "status": "pass",
+      "detail": "ordinary non-admin developer exchanged exact bytes through pinned real SSH clients; private project and SSH username isolation passed"
+    },
+    {
+      "name": "personal-ssh-live-roles-and-protection",
+      "status": "pass",
+      "detail": "existing SSH connection obeyed maintainer promotion, reporter downgrade, member removal/restoration, protected min-role, no-force, no-delete and require-MR policies"
+    },
+    {
+      "name": "personal-ssh-existing-connection-revocation",
+      "status": "pass",
+      "detail": "revocation denied a new command on the still-live ControlMaster and denied fresh SSH authentication; cross-account/private-key/cross-mode registration checks passed"
+    },
+    {
+      "name": "collaboration-issue-label-milestone",
+      "status": "pass",
+      "detail": "issue comment, assignee, project label, milestone, close/reopen and outsider denials passed"
+    },
+    {
+      "name": "collaboration-mr-review-and-merge",
+      "status": "pass",
+      "detail": "reviewer assignment, comment, approval gate, successful merge and outsider action isolation passed"
+    },
+    {
+      "name": "merge-git-success-db-failure-restart",
+      "status": "pass",
+      "detail": "project 375859479767420928 MR !2: temporary DB trigger rejected completion after Git commit 9323fc0412d22201ce03119b37425026e406e30c; restart recovered that exact SHA while target remained c79f2e85b27eab93967c8b4045a855e229d7c0e3; one audit, notification and completed journal after repeated restart"
+    },
+    {
+      "name": "oci-docker-login",
+      "status": "pass",
+      "detail": "Docker authenticated with an opaque Gity access token"
+    },
+    {
+      "name": "oci-catalog-and-opaque-auth-denials",
+      "status": "pass",
+      "detail": "catalog disabled and invalid token rejected"
+    },
+    {
+      "name": "oci-real-docker-push",
+      "status": "pass",
+      "detail": "Docker pushed manifest and blobs to the Gity registry"
+    },
+    {
+      "name": "oci-project-scoped-mount-acl",
+      "status": "pass",
+      "detail": "inaccessible source fell back to 202 with a new target upload UUID; unauthorized target remained denied; project token explicitly revoked"
+    },
+    {
+      "name": "oci-scopes-revocation-private-mount-acl",
+      "status": "pass",
+      "detail": "private project denied outsider; registry-only token pulled but could not push; package-only and revoked tokens were denied; blob mounts were denied when either source-read or target-write ACL was missing"
+    },
+    {
+      "name": "oci-cold-docker-pull",
+      "status": "pass",
+      "detail": "Docker pulled fixture image sha256:f26df49009ae9a35a6a3fd4b582aff36511de305f6fff1682d0ffe49016bba36"
+    },
+    {
+      "name": "oci-mirror-cold-pull",
+      "status": "pass",
+      "detail": "Gity resolved and cached the configured Docker Hub image"
+    },
+    {
+      "name": "oci-mirror-repeat-pull",
+      "status": "pass",
+      "detail": "repeat mirror pull returned identical image sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f"
+    },
+    {
+      "name": "oci-mirror-private-and-read-only",
+      "status": "pass",
+      "detail": "outsider pull and authenticated push were denied for the mirror project"
+    },
+    {
+      "name": "compose-image-platforms",
+      "status": "pass",
+      "detail": "base=debian images=sha256:2a232a42256f70d78e3cc5d2b5d6b3276710a0de0596c145f627ecfae90282ac linux amd64,sha256:2a5470cf7f6e30ecd2db7853ff932ffa1bc7da208fa51e428a235ecd6d562119 linux amd64 roles=gity=debian,uid=10001"
+    },
+    {
+      "name": "idle-container-stats",
+      "status": "pass",
+      "detail": "gity-bb-proto-sd-20261103-gity-1 7.02% 140.8MiB / 30.52GiB 0.45%\ngity-bb-proto-sd-20261103-docker-1 0.00% 224.7MiB / 30.52GiB 0.72%"
+    }
+  ],
+  "failure": null
+}

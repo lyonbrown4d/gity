@@ -5,7 +5,7 @@ ARG RUST_VERSION=1.99.1
 # approved for Gity; this stage does not copy or build the upstream source tree.
 FROM ghcr.io/project-angos/angos@sha256:1b90f6720c43eb143f519aec4c7bb721f180e74536634b64912085e464c65abd AS angos-engine
 
-FROM rust:${RUST_VERSION}-bookworm AS native
+FROM rust:${RUST_VERSION}-bookworm AS source
 ARG RUST_VERSION
 ARG TARGETARCH
 ARG CARGO_BUILD_JOBS=4
@@ -16,22 +16,32 @@ COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY crates ./crates
 COPY apps ./apps
 COPY xtask ./xtask
-COPY migrations ./migrations
+
+FROM source AS contract
 RUN --mount=type=cache,id=gity-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=gity-target-${TARGETARCH},target=/src/target,sharing=locked \
+    mkdir -p dist/web /out && \
+    cargo run --release --locked -p gity-server -- openapi --output /out/openapi.json
+
+FROM node:24-bookworm AS web
+RUN npm install --global pnpm@12.15.0
+WORKDIR /src/web
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=gity-pnpm,target=/root/Library/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile
+COPY web ./
+COPY crates/gity-i18n/locales /src/crates/gity-i18n/locales
+COPY --from=contract /out/openapi.json ./openapi.json
+RUN pnpm gen:api && pnpm build
+
+FROM source AS native
+COPY --from=web /src/dist/web /src/dist/web
+RUN --mount=type=cache,id=gity-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=gity-target-${TARGETARCH},target=/src/target,sharing=locked \
+    touch dist/web && \
     cargo build --release --locked -p gity-server -p gity-runner -p gity-git-hook -p gity-search-index \
     && mkdir -p /opt/gity-bin \
     && cp target/release/gity-server target/release/gity-runner target/release/gity-git-hook target/release/gity-search-index /opt/gity-bin/
-
-FROM native AS web
-RUN --mount=type=cache,id=gity-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=gity-target-${TARGETARCH},target=/src/target,sharing=locked \
-    rustup target add wasm32-unknown-unknown \
-    && cargo install trunk --version 0.21.14 --locked --target-dir /src/target/trunk-install
-WORKDIR /src/apps/gity-web
-RUN --mount=type=cache,id=gity-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=gity-target-${TARGETARCH},target=/src/target,sharing=locked \
-    NO_COLOR=true trunk build --release
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git openssh-client libssl3 libsqlite3-0 curl tzdata && rm -rf /var/lib/apt/lists/* \

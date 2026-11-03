@@ -4,11 +4,30 @@
 
 # Current verification status
 
-This page separates current source verification from retained image evidence. Administrator, GraphQL, MCP, and OAuth changes passed source regression. The current source was not rebuilt for container acceptance, so retained image results do not verify these capabilities in an image.
+This page separates this run's protocol acceptance, independent integration tests, and retained full-image evidence. Results from different scopes do not replace one another.
+
+## React image protocol acceptance (2026-11-03)
+
+This run freezes the React/Vite snapshot captured when builds started. It generates the API client, builds Web, and embeds the assets in Rust binaries. Concurrent Web changes are excluded from these images. `cargo xtask blackbox --suite protocols` explicitly skips CI Runner execution, native language package clients, and backup/restore.
+
+Alpine builds reuse the same verified Web artifact through a Docker named context while compiling every Rust role natively on Alpine. Runtime acceptance does not reuse Debian results.
+
+| Deployment | Base image | Protocol result in this run |
+| --- | --- | --- |
+| Standalone | Debian | **28 checks passed**; see [itemized evidence](../evidence/protocols-standalone-debian-20261103.json). |
+| Standalone | Alpine | Stopped at the user's request; acceptance incomplete. |
+| Distributed components | Debian | Registry startup failed due to an environment-prefix mismatch; the image variable was corrected, but acceptance was not rerun before stopping. |
+| Distributed components | Alpine | Stopped at the user's request; acceptance incomplete. |
+
+Debian standalone covers current React assets, account/project isolation, Generic package checksums and Range, real Git HTTP/SSH, permission changes and key revocation on existing personal SSH connections, MR fault recovery, OCI push/cold pull, scope/revocation/mount permissions, and mirror cold/repeat pulls and read-only policy. Direct container access to Docker Hub timed out; a rerun passed through a temporary proxy without changing global proxy settings. Evidence includes image IDs, platform, runtime UID, and one resource snapshot, which is not a load test.
+
+Separate real SSH transport integration tests passed **4 checks**, the real Docker OCI handshake/push test passed **1**, and distributed Git RPC regression for replica routing, fenced promotion, and uncertain-write repair passed **1**. These do not validate other image combinations, Raft, lossless automatic failover, arm64, or multi-host networking.
+
+Default workspace compilation, tool regression (39 passed, 2 ignored by default), the React build, Dockerfile definition checks, and mdBook build passed in this run. Source policy still reports two existing issues: `repository/lookup.rs` has 311 lines, and the independent `code_index/tests_remote.rs` filename is not recognized by the checker. Other source and full-image results below are retained records.
 
 ## Administrator and multi-protocol API checks
 
-Default workspace checks, strict Clippy, Web WASM checks, release API checks, source policy, and the bilingual mdBook build were executed. Default-route tests confirm 404 for documentation and Swagger assets while LFS remains available. Enabling `api-docs` in a release build is rejected by the compiler.
+Default workspace checks, strict Clippy, release API checks, source policy, and the bilingual mdBook build have retained evidence. Default-route tests confirm 404 for documentation and Swagger assets while LFS remains available. Enabling `api-docs` in a release build is rejected by the compiler.
 
 Real application-service tests cover GraphQL project reads, MCP discovery/invocation, project isolation, OAuth resource/scopes, rejection after revocation, PKCE codes, browser consent, refresh rotation, and administrator reauthentication. The refresh race uses two independent database connections, passed 20 repeated runs, and checks descendants inserted after grant revocation. This is a concurrency regression, not a load test.
 
@@ -42,13 +61,13 @@ Run the OCI handshake check separately with `cargo test -p gity-oci --lib real_d
 
 The GNU tar check covers numeric UID/GID, permissions, extended attributes, ACLs, file capabilities, SGID, and whiteout devices. It verifies archive metadata handling and does not replace complete recovery of the database, Git, object storage, and secret configuration.
 
-## Source, compilation, and documentation checks
+## Retained source, compilation, and documentation checks
 
 - Latest formatting, source policy, third-party asset checks, and `git diff --check` passed.
-- Default workspace checks, final Clippy, Web WASM, mdBook build, and bilingual link checks passed.
+- Default workspace checks, final Clippy, mdBook build, and bilingual link checks have passing records.
 - Check default production and test builds separately; `gity-core/test-fixtures` must not hide production dependency errors.
 
-## Full image black-box scope
+## Full image black-box scope (retained evidence)
 
 | Deployment | Base image | Current status |
 | --- | --- | --- |

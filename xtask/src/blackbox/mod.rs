@@ -37,8 +37,19 @@ enum ComposeAction {
   UpDown,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Suite {
+  #[default]
+  Full,
+  /// Git HTTP/SSH, OCI and distributed failures; excludes CI, native clients and backup.
+  Protocols,
+}
+
 #[derive(Clone, Args)]
 pub struct BlackboxArgs {
+  #[arg(long, value_enum, default_value_t = Suite::Full)]
+  suite: Suite,
   #[arg(long, value_enum)]
   mode: Mode,
   #[arg(long, value_enum)]
@@ -69,6 +80,7 @@ pub struct BlackboxArgs {
 
 #[derive(Serialize)]
 struct Evidence {
+  suite: Suite,
   mode: Mode,
   base: Base,
   project: String,
@@ -93,9 +105,10 @@ struct Reporter {
 }
 
 impl Reporter {
-  fn new(mode: Mode, base: Base, project: String) -> Self {
+  fn new(mode: Mode, base: Base, project: String, suite: Suite) -> Self {
     Self {
       evidence: Evidence {
+        suite,
         mode,
         base,
         project,
@@ -183,7 +196,7 @@ pub fn run(root: &Path, mut args: BlackboxArgs) -> Result<()> {
     .evidence
     .clone()
     .unwrap_or_else(|| std::env::temp_dir().join(format!("gity-blackbox-{}.json", args.project)));
-  let mut reporter = Reporter::new(args.mode, args.base, args.project.clone());
+  let mut reporter = Reporter::new(args.mode, args.base, args.project.clone(), args.suite);
   let temp = tempfile::Builder::new()
     .prefix(&format!("gity-blackbox-{}-", args.project))
     .tempdir()
