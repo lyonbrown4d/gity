@@ -22,14 +22,14 @@ export const Section = ({
 }: SectionProps): JSX.Element => {
   const hasHeader = Boolean(title || description || actions);
   return (
-    <section className={cn("gity-section", className)}>
+    <section className={cn("gity-section min-w-0", className)}>
       {hasHeader && (
-        <header className="gity-section-header">
-          <div className="min-w-0">
+        <header className="gity-section-header flex-wrap">
+          <div className="min-w-0 flex-[1_1_12rem]">
             {title && <h2 className="gity-section-title">{title}</h2>}
             {description && <p className="gity-section-description">{description}</p>}
           </div>
-          {actions && <div className="gity-section-actions">{actions}</div>}
+          {actions && <div className="gity-section-actions max-w-full flex-wrap">{actions}</div>}
         </header>
       )}
       <div className={flush ? undefined : "gity-section-body"}>{children}</div>

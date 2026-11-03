@@ -1,17 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { JobInspector } from "./job-inspector";
 import { editJob, parseConfig } from "./config-model";
 const source =
   "stages: [build, test]\njobs:\n  build: {stage: build, script: cargo build}\n  test: {stage: test, script: cargo test}\n";
 const config = parseConfig(source).config!;
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
 afterEach(cleanup);
 describe("Task inspector", () => {
-  it("exposes dependency modes and applies an explicit no-dependency job", () => {
+  it("exposes dependency modes and applies an explicit no-dependency job", async () => {
     const apply = vi.fn();
     render(<JobInspector name="test" config={config} onApply={apply} onRemove={vi.fn()} t={(key) => key} />);
-    fireEvent.change(screen.getByLabelText("Dependency mode"), { target: { value: "none" } });
+    const user = userEvent.setup();
+    screen.getByRole("combobox", { name: "Dependency mode" }).focus();
+    await user.keyboard("{Enter}");
+    await user.click(screen.getByRole("option", { name: "No dependencies" }));
     fireEvent.click(screen.getByRole("button", { name: "Apply task changes" }));
     expect(apply).toHaveBeenCalledOnce();
     expect(apply.mock.calls[0][1].needs).toEqual([]);

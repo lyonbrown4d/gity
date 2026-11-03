@@ -1,9 +1,11 @@
 import { FormDialog as Modal } from "@/components/common/form-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
+import { OrganizationMemberUserPicker } from "./organization-member-user-picker";
 import type { OrganizationAdminController } from "./use-organization-admin";
 
 export const OrganizationDialogs = ({ controller }: { controller: OrganizationAdminController }): JSX.Element => {
@@ -72,22 +74,25 @@ export const OrganizationDialogs = ({ controller }: { controller: OrganizationAd
         </form>
       </Modal>
 
-      <Modal open={c.memberForm.open} onClose={c.closeMember} title={t("Add Organization Member")}>
+      <Modal open={c.memberForm.open} onClose={c.closeMember} busy={c.isAddingMember} title={t("Add Organization Member")}>
         <form className="grid gap-3" onSubmit={c.submitMember}>
+          {c.isLoadingUsers ? <p role="status" className="text-sm text-muted-foreground">{t("Loading...")}</p> : null}
+          {c.usersError ? <Alert variant="destructive" role="alert"><AlertDescription className="flex items-center justify-between gap-3">
+            <span>{t("Users could not be loaded.")}</span>
+            <Button type="button" size="sm" variant="outline" disabled={c.isLoadingUsers} onClick={() => void c.retryUsers()}>{t("Retry")}</Button>
+          </AlertDescription></Alert> : null}
+          {c.memberError ? <Alert variant="destructive" role="alert"><AlertDescription>{c.memberError}</AlertDescription></Alert> : null}
           <div className="space-y-2">
-            <Label htmlFor="member-user-id">{t("User ID")}</Label>
-            <Input
-              id="member-user-id"
-              value={c.memberForm.userId}
-              onChange={(event) => c.setMemberForm({ ...c.memberForm, userId: event.target.value })}
-              placeholder="user-id"
-              required
-            />
+            <Label>{t("User")}</Label>
+            <OrganizationMemberUserPicker users={c.users} loading={c.isLoadingUsers} value={c.memberForm.userId}
+              disabled={c.isAddingMember || Boolean(c.usersError)} t={t}
+              onChange={(userId) => c.setMemberForm({ ...c.memberForm, userId })} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="member-role">{t("Role")}</Label>
             <Select
               value={c.memberForm.role}
+              disabled={c.isAddingMember}
               onValueChange={(role) => c.setMemberForm({ ...c.memberForm, role })}
             >
               <SelectTrigger id="member-role"><SelectValue placeholder={t("Role")} /></SelectTrigger>
@@ -98,8 +103,8 @@ export const OrganizationDialogs = ({ controller }: { controller: OrganizationAd
             </Select>
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={c.closeMember}>{t("Cancel")}</Button>
-            <Button type="submit" disabled={c.isAddingMember}>
+            <Button type="button" variant="outline" disabled={c.isAddingMember} onClick={c.closeMember}>{t("Cancel")}</Button>
+            <Button type="submit" disabled={c.isAddingMember || !c.memberForm.userId}>
               {c.isAddingMember ? t("Adding...") : t("Add Member")}
             </Button>
           </div>

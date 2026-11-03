@@ -25,10 +25,14 @@ export const WorkList = ({ items, repos, selectedId, onSelect }: WorkListProps):
   return <DataList>{items.slice(0, 8).map((todo) => {
     const repo = repos.find((item) => item.id === todo.project_id);
     const active = selectedId === todo.id;
-    return <DataRow key={todo.id} onClick={() => onSelect(todo.id)} className={active ? "bg-primary/5 ring-1 ring-inset ring-primary/40" : ""}>
+    return <DataRow key={todo.id} className="p-0">
+      <button type="button" onClick={() => onSelect(todo.id)} aria-pressed={active}
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? "bg-primary/5 ring-1 ring-inset ring-primary/40" : ""}`}>
+
       <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><GitPullRequest className="size-4" aria-hidden="true" /></span>
       <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-medium">{todo.title}</span><Badge variant="outline">{todoKindLabel(todo.kind, t)}</Badge></span><span className="mt-1 block truncate text-xs text-muted-foreground">{repo?.name ?? todo.summary} · {dayjs(todo.created_at).format("MMM D, HH:mm")}</span></span>
       <span className="hidden text-xs text-muted-foreground sm:block">{todo.summary}</span>
+      </button>
     </DataRow>;
   })}</DataList>;
 };

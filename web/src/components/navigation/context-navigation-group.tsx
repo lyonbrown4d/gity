@@ -79,10 +79,10 @@ const ContextLink = ({ item, activeUrl, onNavigate }: {
         asChild
         isActive={active}
         tooltip={item.title}
-        className="h-9 rounded-md px-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
+        className="h-9 rounded-md px-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-primary data-[active=true]:font-medium data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
       >
         <NavLink to={item.url} aria-label={item.title} onClick={onNavigate}>
-          <span className={active ? "flex size-6 items-center justify-center rounded-md bg-sidebar-primary/15 text-sidebar-primary group-data-[collapsible=icon]:size-4" : "flex size-6 items-center justify-center rounded-md group-data-[collapsible=icon]:size-4"}>
+          <span className={active ? "flex size-6 items-center justify-center rounded-md text-inherit group-data-[collapsible=icon]:size-4" : "flex size-6 items-center justify-center rounded-md group-data-[collapsible=icon]:size-4"}>
             <item.icon className="size-3.5 group-data-[collapsible=icon]:size-3" aria-hidden="true" />
           </span>
           <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>

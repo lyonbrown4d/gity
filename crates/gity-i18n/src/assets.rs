@@ -48,5 +48,6 @@ pub const CHUNKS: &[&str] = &[
   include_str!("../locales/ui-design-07.json"),
   include_str!("../locales/ui-design-08.json"),
   include_str!("../locales/global-search.json"),
+  include_str!("../locales/ui-interactions.json"),
   include_str!("../locales/repository-initialization.json"),
 ];

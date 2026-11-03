@@ -22,7 +22,7 @@ export const MergeRequestChecksPanel = ({
   onReload: () => void;
 }) => {
   const getRepoTabPath = (tab: string) => (
-    `/app/projects/${encodeURIComponent(organizationId)}/${encodeURIComponent(repoId)}?tab=${encodeURIComponent(tab)}`
+    `/app/projects/${encodeURIComponent(organizationId)}/${encodeURIComponent(repoId)}/${encodeURIComponent(tab)}`
   );
   const renderBlockerHint = (code: string, message: string) => {
     const commonDetails = [message];
@@ -37,7 +37,7 @@ export const MergeRequestChecksPanel = ({
           ],
           action: {
             label: t("Review approval rules"),
-            href: "#merge-request-approval-rules-panel",
+            href: `/app/projects/${encodeURIComponent(organizationId)}/${encodeURIComponent(repoId)}/merge-requests#merge-request-approval-rules-panel`,
           },
         };
       case "pipeline_repository_missing":
@@ -105,7 +105,7 @@ export const MergeRequestChecksPanel = ({
   return (
     <Section
       title={
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2">
           <Icon className="size-4" aria-hidden="true" />
           {t("Merge checks")}
           <Badge variant={checks?.mergeable ? "default" : checks?.required ? "outline" : "secondary"}>{t(meta.label)}</Badge>
@@ -123,7 +123,7 @@ export const MergeRequestChecksPanel = ({
     >
       <div className="flex flex-col gap-2 px-4 py-2.5">
         {checks ? (
-          <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground md:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground grid-cols-1">
             <CheckLine label={t("Target branch")} value={checks.target_branch || t("N/A")} />
             <CheckLine label={t("Source commit")} value={checks.source_commit_sha ? shortText(checks.source_commit_sha) : t("N/A")} />
             <CheckLine label={t("Protected target")} value={checks.target_branch_protected ? t("Yes") : t("No")} />
@@ -168,7 +168,7 @@ export const MergeRequestChecksPanel = ({
             <p className="text-xs font-medium text-muted-foreground">
               {t("Approval rules")}: {checks.approval_count}/{checks.required_approvals}
             </p>
-            <div className="grid gap-1.5 md:grid-cols-2">
+            <div className="grid gap-1.5 grid-cols-1">
               {checks.approval_rules.map((rule) => (
                 <div key={rule.rule_id || rule.name} className="bg-muted/30 px-2.5 py-1.5 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2">

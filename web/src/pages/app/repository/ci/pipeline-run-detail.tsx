@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { FileCode2, GitBranch } from "lucide-react";
+import { SectionTabs, SectionTabPanel } from "@/components/common/section-tabs";
 import { Button } from "@/components/ui/button";
 import type { CiPipelineDetail } from "@/lib/generated/model/ciPipelineDetail";
 import { parseConfig } from "./config-model";
@@ -43,15 +44,10 @@ export const PipelineRunDetail = ({ detail, t, onOpenJob }: Props) => {
           </span>
         </div>
       </header>
-      <div className="flex gap-2 border-b border-border pb-2">
-        <Button variant={tab === "overview" ? "secondary" : "ghost"} onClick={() => setTab("overview")}>
-          {t("Overview")}
-        </Button>
-        <Button variant={tab === "configuration" ? "secondary" : "ghost"} onClick={() => setTab("configuration")}>
-          <FileCode2 className="mr-1 size-4" />
-          {t("Configuration")}
-        </Button>
-      </div>
+      <SectionTabs label={t("Pipeline sections")} value={tab} onChange={setTab} items={[
+        { value: "overview", label: t("Overview") }, { value: "configuration", label: <><FileCode2 className="mr-1 size-4" />{t("Configuration")}</> },
+      ]}>
+      <SectionTabPanel value={tab}>
       {tab === "configuration" ? (
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="mb-3 text-xs text-muted-foreground">
@@ -153,6 +149,8 @@ export const PipelineRunDetail = ({ detail, t, onOpenJob }: Props) => {
           </aside>
         </div>
       )}
+      </SectionTabPanel>
+      </SectionTabs>
     </section>
   );
 };

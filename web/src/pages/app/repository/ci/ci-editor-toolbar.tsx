@@ -1,5 +1,6 @@
 import { ArrowLeft, FileCode2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BranchPicker } from "@/components/common/branch-picker";
 import { Badge } from "@/components/ui/badge";
 interface Props {
   branch: string;
@@ -38,23 +39,14 @@ export const CIEditorToolbar = ({
           <FileCode2 className="mr-1 size-3" />
           .gity-ci.yml
         </Badge>
-        <select
-          aria-label={t("Branch")}
-          className="h-9 rounded-md border border-input bg-card px-2 text-sm"
-          value={branch}
-          onChange={(event) => onBranch(event.target.value)}
-        >
-          {branches.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </select>
+        <BranchPicker value={branch} branches={branches.map((name) => ({ name }))} onChange={onBranch} t={t} />
         <Badge variant="secondary">{t(dirty ? "Unsaved changes" : "Saved")}</Badge>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant={mode === "canvas" ? "default" : "outline"} onClick={() => onMode("canvas")}>
+        <Button aria-pressed={mode === "canvas"} variant={mode === "canvas" ? "default" : "outline"} onClick={() => onMode("canvas")}>
           {t("Canvas")}
         </Button>
-        <Button variant={mode === "yaml" ? "default" : "outline"} onClick={() => onMode("yaml")}>
+        <Button aria-pressed={mode === "yaml"} variant={mode === "yaml" ? "default" : "outline"} onClick={() => onMode("yaml")}>
           YAML
         </Button>
         <Button variant="outline" disabled={!canValidate} onClick={onValidate}>

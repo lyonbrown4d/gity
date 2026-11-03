@@ -1,0 +1,111 @@
+{
+  "_version": 2,
+  "Advanced options": {
+    "en": "Advanced options",
+    "zh": "高级选项"
+  },
+  "File changes": {
+    "en": "File changes",
+    "zh": "文件变更"
+  },
+  "Merge request": {
+    "en": "Merge request",
+    "zh": "合并请求"
+  },
+  "Merge request sections": {
+    "en": "Merge request sections",
+    "zh": "合并请求分区"
+  },
+  "Merge the source branch into the target branch after the server rechecks permissions and merge conditions.": {
+    "en": "Merge the source branch into the target branch after the server rechecks permissions and merge conditions.",
+    "zh": "服务端重新检查权限和合并条件后，将源分支合并到目标分支。"
+  },
+  "Package details could not be loaded. Try reloading.": {
+    "en": "Package details could not be loaded. Try reloading.",
+    "zh": "软件包详情加载失败，请重试。"
+  },
+  "Packages could not be loaded. Try reloading.": {
+    "en": "Packages could not be loaded. Try reloading.",
+    "zh": "软件包列表加载失败，请重试。"
+  },
+  "Pipeline sections": {
+    "en": "Pipeline sections",
+    "zh": "流水线分区"
+  },
+  "Reading file...": {
+    "en": "Reading file...",
+    "zh": "正在读取文件…"
+  },
+  "Switch branch": {
+    "en": "Switch branch",
+    "zh": "切换分支"
+  },
+  "Choose a file. Package details are filled in automatically and can be adjusted.": {
+    "en": "Choose a file. Package details are filled in automatically and can be adjusted.",
+    "zh": "选择文件，软件包信息将自动填入，你可以按需调整。"
+  },
+  "File name, content type and default path come from the selected file.": {
+    "en": "File name, content type and default path come from the selected file.",
+    "zh": "文件名、内容类型和默认路径将从所选文件自动读取。"
+  },
+  "Filled from the file name": {
+    "en": "Filled from the file name",
+    "zh": "根据文件名自动填入"
+  },
+  "Same as the file name": {
+    "en": "Same as the file name",
+    "zh": "默认使用文件名"
+  },
+  "Choose a file and confirm its package name and version.": {
+    "en": "Choose a file and confirm its package name and version.",
+    "zh": "请选择文件，并确认软件包名称和版本。"
+  },
+  "Custom URL slug": {
+    "en": "Custom URL slug",
+    "zh": "自定义页面地址"
+  },
+  "Leave empty to use the title": {
+    "en": "Leave empty to use the title",
+    "zh": "留空则根据标题生成"
+  },
+  "Give the page a title and write its markdown content. The page URL is based on the title.": {
+    "en": "Give the page a title and write its markdown content. The page URL is based on the title.",
+    "zh": "填写标题和 Markdown 正文，页面地址将根据标题生成。"
+  },
+  "Failed to create wiki page.": {
+    "en": "Failed to create wiki page.",
+    "zh": "创建 Wiki 页面失败。"
+  },
+  "Users could not be loaded.": {
+    "en": "Users could not be loaded.",
+    "zh": "用户列表加载失败。"
+  },
+  "Package name is required": {
+    "en": "Package name is required",
+    "zh": "请填写软件包名称"
+  },
+  "Version is required": {
+    "en": "Version is required",
+    "zh": "请填写版本号"
+  },
+  "Choose one file at a time.": {
+    "en": "Choose one file at a time.",
+    "zh": "每次请选择一个文件。"
+  },
+  "Drop a file here": {
+    "en": "Drop a file here",
+    "zh": "将文件拖到此处"
+  },
+  "Or choose a file from your device.": {
+    "en": "Or choose a file from your device.",
+    "zh": "或从设备中选择一个文件。"
+  },
+  "Choose file": {
+    "en": "Choose file",
+    "zh": "选择文件"
+  },
+  "Replace file": {
+    "en": "Replace file",
+    "zh": "替换文件"
+  }
+}

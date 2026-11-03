@@ -60,7 +60,7 @@ export const MergeRequestParticipantsPanel = ({
     flush
     className="overflow-hidden"
   >
-    <div className="grid gap-2 px-4 py-2.5 lg:grid-cols-2">
+    <div className="grid gap-2 px-4 py-2.5">
       <ParticipantRoleSection
         label={t("Reviewers")}
         emptyLabel={t("No reviewers assigned.")}
@@ -136,6 +136,7 @@ const ParticipantRoleSection = ({
               variant="ghost"
               className="h-4 px-1 text-muted-foreground hover:text-foreground"
               disabled={!canEdit || isUpdating}
+              aria-label={`${t("Remove")} ${formatUserLabel(userByID.get(item.user_id), item.user_id)}`}
               onClick={() => onRemove(item.user_id)}
             >
               x
@@ -143,9 +144,9 @@ const ParticipantRoleSection = ({
           </Badge>
         ))}
       </div>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-2 grid-cols-[minmax(0,1fr)_auto]">
         <Select value={draftUserID} onValueChange={onChangeDraftUserID} disabled={!canEdit || isUpdating || availableUsers.length === 0}>
-          <SelectTrigger>
+          <SelectTrigger className="min-w-0">
             <SelectValue placeholder={availableUsers.length === 0 ? t("No users available") : t("Select user")} />
           </SelectTrigger>
           <SelectContent>

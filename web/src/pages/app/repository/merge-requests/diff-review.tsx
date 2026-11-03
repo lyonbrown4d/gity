@@ -121,7 +121,7 @@ export const DiffReview = ({
   };
 
   return (
-    <div className="overflow-auto bg-background font-mono text-xs leading-6">
+    <div className="overflow-auto bg-background font-mono text-[13px] leading-6">
       {lines.map((line, index) => {
         const key = `${index}:${line.file}`;
         const attached = line.line === null ? [] : threads.filter((thread) =>

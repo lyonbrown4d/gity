@@ -27,6 +27,10 @@ export const useMergeRequestData = ({
     url: `/projects/${repoId}/merge-requests`, method: "get",
     queryOptions: { enabled: Boolean(repoId), refetchOnWindowFocus: false },
   });
+  const detailQuery = useCustom<RawRecord>({
+    url: `/projects/${repoId}/merge-requests/${selectedIID ?? 0}`, method: "get",
+    queryOptions: { enabled, refetchOnWindowFocus: false },
+  });
   const diffQuery = useCustom<RawRecord>({
     url: `/projects/${repoId}/merge-requests/${selectedIID ?? 0}/diff`, method: "get",
     queryOptions: { enabled, refetchOnWindowFocus: false },
@@ -61,8 +65,13 @@ export const useMergeRequestData = ({
     [mergeRequestsQuery.result.data],
   );
   const selectedMergeRequest = useMemo(
-    () => mergeRequests.find((item) => item.iid === selectedIID) ?? null,
-    [mergeRequests, selectedIID],
+    () => {
+      const listed = mergeRequests.find((item) => item.iid === selectedIID);
+      if (listed) return listed;
+      const detail = normalizeMergeRequest(detailQuery.result.data);
+      return detail.iid === selectedIID ? detail : null;
+    },
+    [mergeRequests, selectedIID, detailQuery.result.data],
   );
   const sourceBranchOptions = useMemo(() => buildMergeRequestBranchFilterOptions(mergeRequests, "source_branch"), [mergeRequests]);
   const targetBranchOptions = useMemo(() => buildMergeRequestBranchFilterOptions(mergeRequests, "target_branch"), [mergeRequests]);

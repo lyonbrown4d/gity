@@ -129,6 +129,7 @@ export const RepositoryMergeRequestsTab = ({
 
   return (
     <div className="flex flex-col gap-4 page-enter">
+      {!selectedIID && <>
       <section className="overflow-hidden rounded-md border border-border bg-card" aria-labelledby="merge-requests-title">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -148,10 +149,13 @@ export const RepositoryMergeRequestsTab = ({
           <MergeRequestStat label={t("Closed")} value={stats.closed} tone="muted" />
         </div>
       </section>
-      <div id="merge-request-approval-rules-panel">
+      <details id="merge-request-approval-rules-panel" className="rounded-md border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-medium">{t("Approval rules")}</summary>
         <RepositoryMergeRequestApprovalRulesPanel repoId={repoId} branches={branches} defaultBranch={defaultBranch} users={users} permissions={permissions} t={t} onError={onError} onRulesChanged={() => void loadChecks()} />
-      </div>
-      <div className="grid gap-4 xl:grid-cols-[minmax(280px,420px)_1fr]">
+      </details>
+      </>}
+      <div>
+        {!selectedIID ? (
         <MergeRequestListWorkspace
           t={t} branches={branches} isComposerOpen={isComposerOpen} canCreate={canCreateMergeRequest} isCreating={isCreating}
           onToggleComposer={() => setComposerOpen((current) => !current)} onCreate={submitCreateMergeRequest}
@@ -165,6 +169,7 @@ export const RepositoryMergeRequestsTab = ({
           selectedMergeRequest={selectedMergeRequest} selectedChecks={selectedChecksView} approvalsCount={approvals.length}
           isLoadingChecks={checksQuery.query.isFetching} onSelect={setSelectedIID}
         />
+        ) : (
         <MergeRequestReviewWorkspace
           organizationId={organizationId} repoId={repoId} permissions={permissions} t={t} mergeRequest={selectedMergeRequest}
           checks={selectedChecksView} approvals={approvals} reviewers={reviewers} assignees={assignees} comments={comments}
@@ -187,6 +192,7 @@ export const RepositoryMergeRequestsTab = ({
           onRemoveAssignee={(userID) => void submitSetParticipants("assignee", assignees.map((item) => item.user_id).filter((item) => item !== userID))}
           onApprove={() => void submitApproval(true)} onUnapprove={() => void submitApproval(false)}
         />
+        )}
       </div>
     </div>
   );

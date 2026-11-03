@@ -25,19 +25,7 @@ import {
   type RawRecord,
 } from "../repository-normalizers";
 
-export const resolveMergeRequestList = (payload: unknown): RawRecord[] => {
-  if (Array.isArray(payload)) {
-    return payload.filter(isRecord);
-  }
-  if (!isRecord(payload)) {
-    return [];
-  }
-  const nested = payload.body ?? payload.Body;
-  if (Array.isArray(nested)) {
-    return nested.filter(isRecord);
-  }
-  return [];
-};
+export const resolveMergeRequestList = (payload: unknown): RawRecord[] => resolveArrayPayload(payload).filter(isRecord);
 
 export const normalizeDiffView = (payload: unknown): RepositoryMergeRequestDiffView | null => {
   const raw = isRecord(payload) ? (payload.body ?? payload.Body ?? payload) : null;

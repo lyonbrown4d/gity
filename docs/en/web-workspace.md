@@ -30,6 +30,14 @@ The top-bar palette settings offer light, dark, system mode, and Mineral, Ocean,
 
 shadcn, code and diff editors, logs, and React Flow share semantic tokens. Custom accents are adjusted to readable tones and buttons receive a matching foreground. Status uses text and icons as well as color. Theme changes update mounted Monaco editors.
 
+## Context and interaction
+
+Packages upload in a modal. Selecting or dropping one file supplies its name, content type and size, and suggests a package name and version from the filename. Users confirm or edit the package identity; package type and storage path are under advanced options. react-dropzone manages file selection, while React Hook Form, Zod and shadcn Field manage the form. Upload failures preserve the file and input with an in-dialog error. Uploading prevents duplicate submissions and dismissal; success refreshes the list and selects the uploaded package.
+
+Wiki creation uses a modal. The page URL defaults from the title, while the server derives authors and editors from the authenticated session. Organization administrators select members by name, username or email instead of entering user IDs. Loading and submission errors appear inside the active dialog.
+
+Work items support keyboard selection; filters, search and selection persist in the URL. Code browsing and the CI editor share a searchable branch popover with arrow-key, Enter and Escape support. Review details separate discussion and file changes, preserving the current comment draft when switching sections. Merging requires source/target confirmation and still obeys server authorization and merge gates. CI property panels keep apply and delete controls at the bottom while fields scroll independently.
+
 ## CI editing and execution
 
 React Flow edits tasks and dependency edges in `.gity-ci.yml`; Monaco provides its YAML view. Task properties match the Rust contract: stage, scripts, image, dependencies, variables, runner tags, timeout, and artifact paths. Missing `needs` follows previous stages, while `needs: []` is immediately ready; switching views preserves this distinction.

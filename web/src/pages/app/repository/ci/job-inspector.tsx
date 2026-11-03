@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { SelectControl } from "@/components/common/select-control";
+import { Checkbox } from "@/components/ui/checkbox";
 import { FormDialog } from "@/components/common/form-dialog";
 import { needsOf, stagesOf, type CIConfig, type CIJob } from "./config-model";
 
@@ -67,8 +69,9 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
     }
   };
   return (
-    <aside className="w-full shrink-0 border-t border-border bg-card lg:max-h-[600px] lg:w-80 lg:overflow-auto lg:border-l lg:border-t-0">
-      <form className="space-y-4 p-5" onSubmit={apply}>
+    <aside className="w-full shrink-0 border-t border-border bg-card lg:h-[600px] lg:w-80 lg:border-l lg:border-t-0">
+      <form className="flex h-full min-h-0 flex-col" onSubmit={apply}>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         <h3 className="font-semibold">
           {t("Task configuration")} — {name}
         </h3>
@@ -82,16 +85,8 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
           />
         </Field>
         <Field label={t("Stage")}>
-          <select
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-            aria-label={t("Stage")}
-            value={stage}
-            onChange={(event) => setStage(event.target.value)}
-          >
-            {stagesOf(config).map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
+          <SelectControl label={t("Stage")} value={stage} onChange={setStage}
+            options={stagesOf(config).map((item) => ({ value: item, label: item }))} />
         </Field>
         <Field label={t("Image")}>
           <Input
@@ -102,16 +97,9 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
           />
         </Field>
         <Field label={t("Dependency mode")}>
-          <select
-            aria-label={t("Dependency mode")}
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-            value={mode}
-            onChange={(event) => setMode(event.target.value)}
-          >
-            <option value="stage">{t("Follow stages")}</option>
-            <option value="explicit">{t("Explicit dependencies")}</option>
-            <option value="none">{t("No dependencies")}</option>
-          </select>
+          <SelectControl label={t("Dependency mode")} value={mode} onChange={setMode} options={[
+            { value: "stage", label: t("Follow stages") }, { value: "explicit", label: t("Explicit dependencies") }, { value: "none", label: t("No dependencies") },
+          ]} />
         </Field>
         {mode === "explicit" && (
           <fieldset className="max-h-36 space-y-2 overflow-auto rounded-md border border-border p-3">
@@ -123,11 +111,10 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
               )
               .map(([other]) => (
                 <label key={other} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={needs.includes(other)}
-                    onChange={(event) =>
-                      setNeeds(event.target.checked ? [...needs, other] : needs.filter((need) => need !== other))
+                    onCheckedChange={(checked) =>
+                      setNeeds(checked === true ? [...needs, other] : needs.filter((need) => need !== other))
                     }
                   />
                   {other}
@@ -136,15 +123,9 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
           </fieldset>
         )}
         <Field label={t("Script format")}>
-          <select
-            aria-label={t("Script format")}
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-            value={scriptMode}
-            onChange={(event) => setScriptMode(event.target.value)}
-          >
-            <option value="single">{t("Single script")}</option>
-            <option value="list">{t("One command per line")}</option>
-          </select>
+          <SelectControl label={t("Script format")} value={scriptMode} onChange={setScriptMode} options={[
+            { value: "single", label: t("Single script") }, { value: "list", label: t("One command per line") },
+          ]} />
         </Field>
         <Field label={t("Script")}>
           <Textarea
@@ -201,7 +182,8 @@ export const JobInspector = ({ name, config, onApply, onRemove, t }: Props) => {
             {error}
           </p>
         )}
-        <div className="flex gap-2">
+        </div>
+        <div className="flex shrink-0 gap-2 border-t border-border bg-card p-4">
           <Button type="submit" className="flex-1">
             {t("Apply task changes")}
           </Button>

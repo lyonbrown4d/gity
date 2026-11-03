@@ -1,9 +1,6 @@
-import { useMemo, useState } from "react";
-import { FilePlus2, GitBranch, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { FilePlus2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BranchPicker } from "@/components/common/branch-picker";
 import type {
   RepositoryBlobView,
   RepositoryBranchView,
@@ -63,11 +60,6 @@ export const RepositoryCodeTab = ({
   onToggleTreeDirectory, onOpenFileAtLine, onSearch, setSearchQuery,
   setSearchPath, setSearchMatchCase, setSearchRegex, onRefreshLanguages,
 }: RepositoryCodeTabProps): JSX.Element => {
-  const [branchQuery, setBranchQuery] = useState("");
-  const filteredBranches = useMemo(() => {
-    const query = branchQuery.trim().toLocaleLowerCase();
-    return query ? branches.filter((branch) => branch.name.toLocaleLowerCase().includes(query)) : branches;
-  }, [branches, branchQuery]);
   const isEmptyRepository = !isLoadingTree && treeNodes.length === 0 && !selectedBlob && !readmePreview;
 
   return (
@@ -80,37 +72,8 @@ export const RepositoryCodeTab = ({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="code-branch-search" className="sr-only">{t("Search branches")}</Label>
-            <input
-              id="code-branch-search"
-              className="h-8 w-32 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-40"
-              placeholder={t("Search branches")}
-              value={branchQuery}
-              onChange={(event) => setBranchQuery(event.target.value)}
-            />
-          </div>
-          <Label htmlFor="code-branch-select" className="sr-only">{t("Branch")}</Label>
-          <Select value={codeBranch} onValueChange={(value) => { onChangeCodeBranch(value); setBranchQuery(""); }}>
-            <SelectTrigger id="code-branch-select" className="h-8 w-44 font-mono text-xs">
-              <GitBranch className="size-3.5" />
-              <SelectValue placeholder={t("Branch")} />
-            </SelectTrigger>
-            <SelectContent>
-              {filteredBranches.map((branch) => (
-                <SelectItem key={branch.name} value={branch.name}>
-                  <span className="flex items-center gap-2">
-                    <span>{branch.name}</span>
-                    {branch.is_protected ? <ShieldCheck className="size-3.5 text-success" aria-label={t("Protected branch")} /> : null}
-                  </span>
-                </SelectItem>
-              ))}
-              {branches.length === 0 && repository.default_branch ? (
-                <SelectItem value={repository.default_branch}>{repository.default_branch}</SelectItem>
-              ) : null}
-              {filteredBranches.length === 0 && branches.length > 0 ? <SelectItem value="__no_branch_match__" disabled>{t("No branches match.")}</SelectItem> : null}
-            </SelectContent>
-          </Select>
+          <BranchPicker value={codeBranch} t={t} onChange={onChangeCodeBranch}
+            branches={branches.length ? branches.map((branch) => ({ name: branch.name, isProtected: branch.is_protected })) : [{ name: repository.default_branch }]} />
           <Button type="button" size="sm" onClick={onOpenCreateFile} disabled={!canWrite} aria-label={!canWrite ? t("Create file requires repository write access") : undefined}>
             <FilePlus2 data-icon="inline-start" />
             {t("Create file")}

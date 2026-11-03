@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCreate, useDelete, useList, useUpdate } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
-import type { OrganizationMemberView, OrganizationView, RepositoryView } from "@/pages/types";
+import type { OrganizationMemberView, OrganizationView, RepositoryView, UserView } from "@/pages/types";
 
 export const useOrganizationAdmin = () => {
   const { t } = useI18n();
@@ -15,8 +15,14 @@ export const useOrganizationAdmin = () => {
   const updateMutation = useUpdate<OrganizationView>();
   const deleteMutation = useDelete<OrganizationView>();
   const memberMutation = useCreate<OrganizationMemberView>();
+  const memberSubmitBusy = useRef(false);
   const orgQuery = useList<OrganizationView>({ resource: "organizations" });
   const orgs = orgQuery.result.data ?? [];
+  const usersQuery = useList<UserView>({
+    resource: "users",
+    pagination: { mode: "off" },
+    queryOptions: { enabled: memberForm.open },
+  });
 
   useEffect(() => {
     if (!selectedOrg && orgs[0]) setSelectedOrg(orgs[0].id);
@@ -41,7 +47,9 @@ export const useOrganizationAdmin = () => {
   const errorMessage = actionError ?? (queryError instanceof Error ? queryError.message : null);
   const closeCreate = () => setCreateForm({ open: false, key: "", name: "" });
   const closeEdit = () => setEditForm({ open: false, key: "", name: "" });
-  const closeMember = () => setMemberForm({ open: false, userId: "", role: "member" });
+  const closeMember = () => {
+    if (!memberSubmitBusy.current && !memberMutation.mutation.isPending) setMemberForm({ open: false, userId: "", role: "member" });
+  };
   const fail = (error: unknown, fallback: string) => {
     setActionError(error instanceof Error ? error.message : t(fallback));
   };
@@ -114,11 +122,17 @@ export const useOrganizationAdmin = () => {
 
   const submitMember = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (memberSubmitBusy.current || memberMutation.mutation.isPending) return;
     setActionError(null);
     if (!selectedOrg) {
       setActionError(t("Please select an organization first."));
       return;
     }
+    if (!memberForm.userId) {
+      setActionError(t("Select user"));
+      return;
+    }
+    memberSubmitBusy.current = true;
     memberMutation.mutate(
       {
         resource: "organization-members",
@@ -126,10 +140,11 @@ export const useOrganizationAdmin = () => {
       },
       {
         onSuccess: async () => {
-          closeMember();
+          setMemberForm({ open: false, userId: "", role: "member" });
           await membersQuery.query.refetch();
         },
         onError: (error) => fail(error, "Failed to add member"),
+        onSettled: () => { memberSubmitBusy.current = false; },
       },
     );
   };
@@ -137,6 +152,10 @@ export const useOrganizationAdmin = () => {
   return {
     orgs,
     members: membersQuery.result.data ?? [],
+    users: usersQuery.result.data ?? [],
+    isLoadingUsers: usersQuery.query.isLoading || usersQuery.query.isFetching,
+    usersError: usersQuery.query.error instanceof Error ? usersQuery.query.error.message : usersQuery.query.error ? t("Users could not be loaded.") : null,
+    retryUsers: usersQuery.query.refetch,
     repos: reposQuery.result.data ?? [],
     selectedOrg,
     selectedOrgModel,
@@ -148,6 +167,7 @@ export const useOrganizationAdmin = () => {
     editForm,
     setEditForm,
     memberForm,
+    memberError: actionError,
     setMemberForm,
     openEdit,
     closeCreate,

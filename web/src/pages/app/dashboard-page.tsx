@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useList, useOne } from "@refinedev/core";
 import { ArrowRight, GitBranch, Plus, Search } from "lucide-react";
@@ -28,8 +28,16 @@ export const AppDashboardPage = (): JSX.Element => {
   const reposQuery = useList<RepositoryView>({ resource: "my-projects", pagination: { mode: "off" } });
   const todosQuery = useTodoList("pending");
   const activity = useActivity(4);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const selectedId = params.get("work");
+  const search = params.get("q") ?? "";
+  const updateParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  };
+  const setSearch = (value: string) => updateParam("q", value);
+  const setSelectedId = (value: string) => updateParam("work", value);
   const repos = reposQuery.result.data ?? [];
   const todos = todosQuery.todos;
   const filteredTodos = useMemo(() => todos.filter((todo) => {
