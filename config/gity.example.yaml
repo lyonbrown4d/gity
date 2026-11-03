@@ -26,6 +26,11 @@ storage:
 web:
   root: dist/web
 search:
+  global:
+    enabled: true
+    backend: tantivy
+    # For components use opensearch, with endpoint, index, username and password.
+    timeout_seconds: 10
   index_enabled: true
   index_root: data/search-index
   code_index_root: data/code-index

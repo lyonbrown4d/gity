@@ -138,6 +138,7 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
     web_root: dir.path().join("web"),
     observability,
     search: gity_core::SearchConfig {
+      global: Default::default(),
       index_enabled: true,
       index_root: dir.path().join("search"),
       code_index_root: dir.path().join("code-index"),
@@ -152,6 +153,9 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
   };
   let storage = gity_core::Storage::local(&settings.storage_root).unwrap();
   let state = AppState {
+    global_search: fluxdi::Shared::new(
+      crate::global_search::GlobalSearchRuntime::new(&settings, &db).unwrap(),
+    ),
     oauth: fluxdi::Shared::new(
       gity_identity::OAuthService::new(
         db.connection.clone(),

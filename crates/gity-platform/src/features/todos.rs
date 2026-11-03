@@ -33,14 +33,12 @@ async fn list(
     .and_then(|v| v.parse::<i64>().ok())
     .filter(|v| *v > 0 && *v <= 200)
     .unwrap_or(50);
-  response(json!(
-    s.collaboration
-      .todos(actor.user_id, state, limit as u64)
-      .await?
-      .into_iter()
-      .map(model_value)
-      .collect::<Vec<_>>()
-  ))
+  let rows = s
+    .collaboration
+    .todos(actor.user_id, state, limit as u64)
+    .await?;
+  let rows = super::resource_visibility::filter_todos(&s, &h, rows).await?;
+  response(json!(rows.into_iter().map(model_value).collect::<Vec<_>>()))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1")]
 #[utoipa::path(

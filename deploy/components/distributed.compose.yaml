@@ -1,4 +1,8 @@
 services:
+  opensearch:
+    extends:
+      file: ./distributed-infrastructure.compose.yaml
+      service: opensearch
   postgres:
     extends:
       file: ./distributed-infrastructure.compose.yaml
@@ -53,6 +57,7 @@ services:
       service: runner
 
 volumes:
+  opensearch-data:
   postgres-data:
   seaweed-data:
   git-repositories:

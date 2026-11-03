@@ -1,7 +1,7 @@
 x-outbound-proxy-environment: &outbound-proxy-environment
   HTTP_PROXY: ${GITY_OUTBOUND_HTTP_PROXY:-}
   HTTPS_PROXY: ${GITY_OUTBOUND_HTTPS_PROXY:-}
-  NO_PROXY: ${GITY_OUTBOUND_NO_PROXY:-localhost,127.0.0.1,::1,gity,api,git-server,git-node,git-node-2,gateway,registry,worker,runner,seaweed,postgres,docker}
+  NO_PROXY: ${GITY_OUTBOUND_NO_PROXY:-localhost,127.0.0.1,::1,gity,api,git-server,git-node,git-node-2,gateway,registry,worker,runner,seaweed,postgres,opensearch,docker}
 
 services:
   migrate:
@@ -19,6 +19,8 @@ services:
     environment:
       <<: *outbound-proxy-environment
       GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_SEARCH__GLOBAL__USERNAME: admin
+      GITY_SEARCH__GLOBAL__PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?Set a strong OpenSearch administrator password}
       GITY_DATABASE__DRIVER: postgres
       GITY_DATABASE__NODE_ID: "1"
       GITY_STORAGE__DRIVER: s3
@@ -53,6 +55,8 @@ services:
     environment:
       <<: *outbound-proxy-environment
       GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_SEARCH__GLOBAL__USERNAME: admin
+      GITY_SEARCH__GLOBAL__PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?Set a strong OpenSearch administrator password}
       GITY_DATABASE__DRIVER: postgres
       GITY_DATABASE__NODE_ID: "1"
       GITY_STORAGE__DRIVER: s3
@@ -69,6 +73,8 @@ services:
       - ${GITY_TLS_DIR:-./tls}/api-client.key:/run/tls/api-client.key:ro
       - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
     depends_on:
+      opensearch:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       git-node:
@@ -102,6 +108,8 @@ services:
     environment:
       <<: *outbound-proxy-environment
       GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_SEARCH__GLOBAL__USERNAME: admin
+      GITY_SEARCH__GLOBAL__PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?Set a strong OpenSearch administrator password}
       GITY_DATABASE__DRIVER: postgres
       GITY_DATABASE__NODE_ID: "2"
       GITY_HTTP__ADDRESS: 0.0.0.0:8081
@@ -116,6 +124,8 @@ services:
       - ${GITY_TLS_DIR:-./tls}/git-client.key:/run/tls/git-client.key:ro
       - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
     depends_on:
+      opensearch:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       git-node:
@@ -149,6 +159,8 @@ services:
     environment:
       <<: *outbound-proxy-environment
       GITY_DATABASE__DSN: postgres://gity:${POSTGRES_PASSWORD:?Set a random database password}@postgres:5432/gity
+      GITY_SEARCH__GLOBAL__USERNAME: admin
+      GITY_SEARCH__GLOBAL__PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?Set a strong OpenSearch administrator password}
       GITY_DATABASE__DRIVER: postgres
       GITY_DATABASE__NODE_ID: "3"
       GITY_STORAGE__DRIVER: s3
@@ -162,6 +174,8 @@ services:
       - ${GITY_TLS_DIR:-./tls}/worker-client.key:/run/tls/worker-client.key:ro
       - ${GITY_SECRETS_DIR:-./secrets}:/run/secrets:ro
     depends_on:
+      opensearch:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       git-node:

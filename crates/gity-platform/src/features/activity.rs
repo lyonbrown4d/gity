@@ -34,13 +34,9 @@ async fn list(
     .filter(|value| *value > 0)
     .map(|value| value.min(100))
     .unwrap_or(50);
-  let items = s
-    .collaboration
-    .activity(actor.user_id, limit)
-    .await?
-    .into_iter()
-    .map(view)
-    .collect::<Vec<_>>();
+  let items = s.collaboration.activity(actor.user_id, limit).await?;
+  let items = super::resource_visibility::filter_activity(&s, &h, items).await?;
+  let items = items.into_iter().map(view).collect::<Vec<_>>();
   response(json!({"items":items}))
 }
 fn view(item: ActivityItem) -> Value {

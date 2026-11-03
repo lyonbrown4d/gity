@@ -113,6 +113,9 @@ async fn resolve(
   resolved: bool,
 ) -> Reply {
   let authorization = crate::access::project_action(s, h, project, ProjectAction::Read).await?;
+  if matches!(target, DiscussionTarget::Issue) {
+    super::issue_access::authorize(s, h, project, iid, ProjectAction::Read).await?;
+  }
   let actor = authorization.actor()?;
   let can_write = authorization.allows(ProjectAction::IssueWrite)
     || authorization.allows(ProjectAction::MergeRequestWrite);
@@ -143,7 +146,7 @@ pub(super) async fn issue_threads(
   h: HeaderMap,
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(threads(&s, DiscussionTarget::Issue, p, i).await?))
 }
 

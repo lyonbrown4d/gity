@@ -1,0 +1,127 @@
+{
+  "_version": 2,
+  "Searching globally...": {
+    "en": "Searching globally...",
+    "zh": "正在全局搜索…"
+  },
+  "Global search is unavailable. Check your access and try again.": {
+    "en": "Global search is unavailable. Check your access and try again.",
+    "zh": "全局搜索暂不可用，请确认访问权限后重试。"
+  },
+  "No global code or issue results.": {
+    "en": "No global code or issue results.",
+    "zh": "没有匹配的代码或议题。"
+  },
+  "Some results may be missing while the index catches up.": {
+    "en": "Some results may be missing while the index catches up.",
+    "zh": "当前仅显示部分结果，请缩小搜索范围或稍后重试。"
+  },
+  "Unable to load file.": {
+    "en": "Unable to load file.",
+    "zh": "无法加载文件。"
+  },
+  "global search is disabled": {
+    "en": "global search is disabled",
+    "zh": "全局搜索已关闭"
+  },
+  "invalid search identifier": {
+    "en": "invalid search identifier",
+    "zh": "搜索标识符无效"
+  },
+  "credential scope does not permit global search": {
+    "en": "credential scope does not permit global search",
+    "zh": "凭据范围不允许全局搜索"
+  },
+  "invalid search query or limit": {
+    "en": "invalid search query or limit",
+    "zh": "搜索内容或每页条数无效"
+  },
+  "duplicate search type": {
+    "en": "duplicate search type",
+    "zh": "搜索类型不能重复"
+  },
+  "invalid search request": {
+    "en": "invalid search request",
+    "zh": "搜索请求无效"
+  },
+  "search cursor expired; restart search": {
+    "en": "search cursor expired; restart search",
+    "zh": "搜索游标已失效，请重新搜索"
+  },
+  "search scope changed; restart search": {
+    "en": "search scope changed; restart search",
+    "zh": "搜索权限范围已变化，请重新搜索"
+  },
+  "search temporarily unavailable": {
+    "en": "search temporarily unavailable",
+    "zh": "搜索暂不可用"
+  },
+  "search request timed out": {
+    "en": "search request timed out",
+    "zh": "搜索请求超时"
+  },
+  "cannot encode search result": {
+    "en": "cannot encode search result",
+    "zh": "无法生成搜索结果"
+  },
+  "Git search source unavailable": {
+    "en": "Git search source unavailable",
+    "zh": "Git 搜索源暂不可用"
+  },
+  "Git indexing source unavailable": {
+    "en": "Git indexing source unavailable",
+    "zh": "Git 索引源暂不可用"
+  },
+  "global search publication failed": {
+    "en": "global search publication failed",
+    "zh": "全局搜索索引发布失败"
+  },
+  "invalid search project scope": {
+    "en": "invalid search project scope",
+    "zh": "项目搜索范围无效"
+  },
+  "narrow search to an organization or project": {
+    "en": "narrow search to an organization or project",
+    "zh": "请将搜索范围缩小到组织或项目"
+  },
+  "confidential issue scope exceeds 10000 results; narrow the project scope": {
+    "en": "confidential issue scope exceeds 10000 results; narrow the project scope",
+    "zh": "可访问的保密议题超过 10000 条，请缩小项目搜索范围"
+  },
+  "project issue search budget exceeded": {
+    "en": "project issue search budget exceeded",
+    "zh": "项目议题数量超过搜索索引上限"
+  },
+  "project search byte budget exceeded": {
+    "en": "project search byte budget exceeded",
+    "zh": "项目内容超过搜索索引字节上限"
+  },
+  "project search tree budget exceeded": {
+    "en": "project search tree budget exceeded",
+    "zh": "项目 Git 树条目超过搜索索引上限"
+  },
+  "project code search file budget exceeded": {
+    "en": "project code search file budget exceeded",
+    "zh": "项目代码文件数量超过搜索索引上限"
+  },
+  "project code search byte budget exceeded": {
+    "en": "project code search byte budget exceeded",
+    "zh": "项目代码内容超过搜索索引字节上限"
+  },
+  "invalid Git tree response": {
+    "en": "invalid Git tree response",
+    "zh": "Git 目录响应无效"
+  },
+  "invalid Git path": {
+    "en": "invalid Git path",
+    "zh": "Git 文件路径无效"
+  },
+  "Type to search destinations and projects": {
+    "en": "Type to search destinations and projects",
+    "zh": "输入内容以搜索资源与项目入口"
+  },
+  "More matches available. Refine your search.": {
+    "en": "More matches available. Refine your search.",
+    "zh": "还有更多匹配结果，请细化搜索内容。"
+  }
+}

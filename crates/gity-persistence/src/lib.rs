@@ -1,6 +1,7 @@
 //! Typed cross-context persistence primitives. No table-name/JSON CRUD API.
 mod audit;
 mod counters;
+pub mod search_jobs;
 pub use audit::{audit_deploy_key, audit_member, audit_protection, audit_rule, audit_variable};
 pub use counters::{CounterKind, next_iid};
 

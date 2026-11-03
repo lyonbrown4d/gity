@@ -32,7 +32,7 @@ async fn load(s: &AppState, p: i64, i: i64, a: i64) -> Result<Value, AppError> {
     security((), ("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
 async fn list(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(
     s.collaboration
       .attachments(p, i)
@@ -115,7 +115,7 @@ async fn create(
   Path((p, i)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueCreate)
+  let actor = super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueCreate)
     .await?
     .actor()?;
   let content = STANDARD
@@ -145,7 +145,7 @@ async fn detail(
   h: HeaderMap,
   Path((p, i, a)): Path<(i64, i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   let row = load(&s, p, i, a).await?;
   let data = s.storage.get(string(&row, "storage_key")).await?;
   response(json!({"attachment":row,"content_base64":STANDARD.encode(data)}))
@@ -180,7 +180,7 @@ async fn raw(
   h: HeaderMap,
   Path((p, i, a)): Path<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   let row = load(&s, p, i, a).await?;
   bytes(&s, row).await
 }
@@ -196,7 +196,12 @@ async fn draft(
   Path(p): Path<i64>,
   Query(q): Query<HashMap<String, String>>,
 ) -> Result<Response, AppError> {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  let access = crate::access::project_action(&s, &h, p, ProjectAction::IssueCreate).await?;
+  if access.is_project_token() {
+    return Err(AppError::forbidden(
+      "draft attachments require a user identity",
+    ));
+  }
   let key = q
     .get("object_key")
     .ok_or_else(|| AppError::bad_request("object_key is required"))?;
@@ -236,6 +241,9 @@ async fn upload(
     .unwrap_or(0);
   if i < 0 {
     return Err(AppError::bad_request("invalid issue_id"));
+  }
+  if i > 0 {
+    super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueCreate).await?;
   }
   while let Some(field) = multipart
     .next_field()

@@ -6,8 +6,8 @@ pub mod locale;
 mod storage;
 pub use config::{
   ApiConfig, AuthorityConfig, BootstrapConfig, ComponentConfig, GitClusterConfig,
-  GitStorageNodeConfig, MirrorUpstreamConfig, OAuthConfig, ObservabilityConfig, RegistryConfig,
-  SearchConfig, Settings, SshConfig, StorageConfig,
+  GitStorageNodeConfig, GlobalSearchSettings, MirrorUpstreamConfig, OAuthConfig,
+  ObservabilityConfig, RegistryConfig, SearchConfig, Settings, SshConfig, StorageConfig,
 };
 pub use database::Db;
 #[cfg(any(test, feature = "test-fixtures"))]

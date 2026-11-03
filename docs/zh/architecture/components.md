@@ -56,3 +56,7 @@ Standalone 的软件包和 OCI 模块直接使用平台权限适配，不必为�
 源码依据：[Gateway HTTP](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-gateway/src/http_proxy.rs)、[Registry 组合](https://github.com/lyonbrown4d/gity/blob/main/apps/gity-registry/src/main.rs)、[Package module](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-package-registry/src/module.rs)、[应用角色](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-platform/src/application.rs)。
 
 </div>
+
+## 全局搜索
+
+平台通过 FluxDI 装配 `GlobalSearchRuntime`，复用项目与协作应用服务生成权限范围和搜索投影。后台按数据库任务发布版本；查询回查业务源并再次授权。standalone 默认内嵌 Tantivy；组件部署共享 OpenSearch。索引不持有独立授权规则。配置、分页、保密隔离和恢复边界见[全局代码与议题搜索](../global-search.md)。

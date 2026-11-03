@@ -38,6 +38,9 @@ pub(super) async fn run(
     });
   }
   if options.maintenance {
+    let search_state = runtime.state.clone();
+    let search_stop = runtime.stop.clone();
+    tasks.spawn(async move {tokio::select! {result=crate::global_search::worker::run(search_state)=>result,_=search_stop.cancelled()=>Ok(())}});
     let state = runtime.state.clone();
     let stop = runtime.stop.clone();
     tasks.spawn(async move { tokio::select! { result = crate::maintenance::run(state) => result, _ = stop.cancelled() => Ok(()) } });

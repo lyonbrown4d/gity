@@ -4,6 +4,7 @@ mod attachments;
 mod checks;
 mod codeowners;
 mod discussions;
+pub(crate) mod issue_access;
 mod issue_collaboration;
 mod issue_views;
 mod issues;
@@ -18,11 +19,17 @@ mod milestones;
 mod mr_collaboration;
 mod project_lock;
 mod releases;
+mod resource_visibility;
 mod rules;
+mod subscription_views;
 mod subscriptions;
 mod tags;
 mod todos;
 pub(crate) use todos::{Notification, notify as notify_event};
+#[cfg(test)]
+mod confidential_tests;
+#[cfg(test)]
+mod resource_visibility_tests;
 mod wiki;
 
 use crate::{AppState, access::ProjectAction};

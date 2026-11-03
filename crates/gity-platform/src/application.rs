@@ -78,6 +78,17 @@ pub async fn run(role: ApplicationRole) -> anyhow::Result<()> {
   {
     return administer(&settings, command).await;
   }
+  if settings.search.global.enabled
+    && settings.search.global.backend == "tantivy"
+    && (matches!(
+      role,
+      ApplicationRole::Api | ApplicationRole::Git | ApplicationRole::Worker
+    ) || matches!(cli.command, Some(Command::Worker)))
+  {
+    anyhow::bail!(
+      "component deployments require search.global.backend=opensearch (or disable global search); Tantivy requires one standalone process and its persistent index volume"
+    );
+  }
   let telemetry = crate::observability::init(&settings.observability)?;
   let (_injector, state) = compose(settings).await?;
   match cli.command.unwrap_or(match role {

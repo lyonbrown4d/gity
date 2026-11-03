@@ -1,12 +1,13 @@
 use super::test_support::{fixture, request};
 use super::*;
 use axum::http::StatusCode;
-use gity_entities::project_audit_events;
-use sea_orm::{ActiveModelTrait, Set};
+use gity_entities::{project_audit_events, project_issues};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 /// Audit rows carry no `updated_at` column, so they are inserted through the
 /// same typed model the application writes them with.
-async fn record(s: &AppState, id: i64, project: i64, name: &str, actor: i64, at: &str) {
+async fn record(s: &AppState, id: i64, project: i64, name: &str, actor: i64, at: &str) -> i64 {
+  let target_id = ensure_issue_target(s, project).await;
   project_audit_events::ActiveModel {
     id: Set(id),
     project_id: Set(project),
@@ -15,7 +16,7 @@ async fn record(s: &AppState, id: i64, project: i64, name: &str, actor: i64, at:
     action: Set("comment_issue".to_owned()),
     actor_user_id: Set(actor),
     target_type: Set("issue".to_owned()),
-    target_id: Set("501".to_owned()),
+    target_id: Set(target_id.to_string()),
     summary: Set(format!("{name} recorded")),
     payload: Set("{}".to_owned()),
     created_at: Set(
@@ -25,6 +26,42 @@ async fn record(s: &AppState, id: i64, project: i64, name: &str, actor: i64, at:
   .insert(&s.db.connection)
   .await
   .unwrap();
+  target_id
+}
+
+async fn ensure_issue_target(s: &AppState, project: i64) -> i64 {
+  if let Some(issue) = project_issues::Entity::find()
+    .filter(project_issues::Column::ProjectId.eq(project))
+    .one(&s.db.connection)
+    .await
+    .unwrap()
+  {
+    return issue.id;
+  }
+  let now = chrono::Utc::now().naive_utc();
+  let issue = project_issues::ActiveModel {
+    id: Set(gity_core::new_id()),
+    project_id: Set(project),
+    iid: Set(1),
+    author_user_id: Set(1),
+    title: Set("Activity test issue".to_owned()),
+    description: Set(None),
+    state: Set("opened".to_owned()),
+    milestone_id: Set(None),
+    due_date: Set(None),
+    weight: Set(None),
+    confidential: Set(0),
+    closed_by_user_id: Set(None),
+    closed_at: Set(None),
+    updated_by_user_id: Set(None),
+    issue_type: Set("issue".to_owned()),
+    created_at: Set(now),
+    updated_at: Set(now),
+  }
+  .insert(&s.db.connection)
+  .await
+  .unwrap();
+  issue.id
 }
 
 fn items(body: &Value) -> &Vec<Value> {
@@ -52,7 +89,7 @@ async fn activity_feed_scopes_events_to_readable_projects() {
     "2026-01-02 09:00:00",
   )
   .await;
-  record(
+  let project30_issue = record(
     &s,
     9003,
     30,
@@ -75,7 +112,7 @@ async fn activity_feed_scopes_events_to_readable_projects() {
   assert_eq!(feed[0]["organization_id"], "10");
   assert_eq!(feed[0]["project_path"], "team/p30");
   assert_eq!(feed[0]["target_type"], "issue");
-  assert_eq!(feed[0]["target_id"], "501");
+  assert_eq!(feed[0]["target_id"], project30_issue.to_string());
   assert_eq!(feed[0]["action"], "comment_issue");
   assert_eq!(feed[0]["summary"], "project.merge_requests.merge recorded");
   assert!(
@@ -134,7 +171,7 @@ async fn activity_feed_includes_public_and_organization_projects() {
   s.db
     .insert(
       "organization_members",
-      fields(json!({"organization_id":10,"user_id":3,"role":"member"})),
+      fields(json!({"organization_id":10,"user_id":3,"role":"guest"})),
     )
     .await
     .unwrap();

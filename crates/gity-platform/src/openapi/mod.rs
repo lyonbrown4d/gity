@@ -37,6 +37,12 @@ pub fn document() -> utoipa::openapi::OpenApi {
   let mut api = BaseApi::openapi();
   api = api.nest(
     "/api/v1",
+    crate::global_search::documented_routes()
+      .split_for_parts()
+      .1,
+  );
+  api = api.nest(
+    "/api/v1",
     crate::auth::documented_routes().split_for_parts().1,
   );
   api = api.nest(

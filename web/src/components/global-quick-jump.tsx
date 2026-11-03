@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useList } from "@refinedev/core";
 import { CornerDownLeft, Search } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import { useGlobalQuickJumpSearch } from "@/components/quick-jump/use-global-quick-jump-search";
+import { toGlobalSearchQuickJumpItem } from "@/components/quick-jump/global-search-model";
 import {
   buildQuickJumpGroups,
   parseCurrentProjectRoute,
@@ -33,6 +35,7 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const globalSearch = useGlobalQuickJumpSearch(query, open);
   const projectQuery = useList<RepositoryView>({
     resource: "my-projects",
     pagination: { currentPage: 1, pageSize: 30 },
@@ -45,6 +48,23 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
     () => buildQuickJumpGroups({ canAccessAdmin, currentProjectRoute, projects, t }),
     [canAccessAdmin, currentProjectRoute, projects, t],
   );
+  const globalItems = useMemo(
+    () => globalSearch.items
+      .map((item) => toGlobalSearchQuickJumpItem(item))
+      .filter((item): item is NonNullable<typeof item> => item !== null),
+    [globalSearch.items],
+  );
+  const visibleGroups = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    if (!needle) return groups;
+    return groups
+      .map((group) => ({ ...group, items: group.items.filter((item) => quickJumpValue(item).toLocaleLowerCase().includes(needle)) }))
+      .filter((group) => group.items.length > 0);
+  }, [groups, query]);
+  const globalGroups = useMemo(() => [
+    { id: "global-issues", title: t("Issues"), items: globalItems.filter((item) => item.id.startsWith("global-issue:")) },
+    { id: "global-code", title: t("Code"), items: globalItems.filter((item) => item.id.startsWith("global-code:")) },
+  ].filter((group) => group.items.length > 0), [globalItems, t]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -98,7 +118,7 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
             <DialogTitle>{t("Quick jump")}</DialogTitle>
             <DialogDescription>{t("Search projects, repository sections, and workspace destinations.")}</DialogDescription>
           </DialogHeader>
-          <Command loop>
+          <Command loop shouldFilter={false}>
             <CommandInput
               value={query}
               onValueChange={setQuery}
@@ -107,11 +127,17 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
             />
             <CommandList className="max-h-[min(60vh,32rem)] px-1 py-2">
               <CommandEmpty>
-                {projectQuery.query.isError
+                {globalSearch.isSearching
+                  ? t("Searching globally...")
+                  : globalSearch.error
+                    ? t("Global search is unavailable. Check your access and try again.")
+                    : projectQuery.query.isError
                   ? t("Project shortcuts could not be loaded, but global navigation is still available.")
                   : t("No quick jump results.")}
               </CommandEmpty>
-              {groups.map((group, index) => (
+              {globalSearch.isSearching ? <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("Searching globally...")}</p> : null}
+              {globalSearch.isEmpty ? <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("No global code or issue results.")}</p> : null}
+              {visibleGroups.map((group, index) => (
                 <div key={group.id}>
                   {index > 0 ? <CommandSeparator /> : null}
                   <CommandGroup heading={group.title}>
@@ -133,9 +159,34 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
                   </CommandGroup>
                 </div>
               ))}
+              {globalGroups.map((group) => (
+                <div key={group.id}>
+                  <CommandSeparator />
+                  <CommandGroup heading={group.title}>
+                    {group.items.map((item) => (
+                      <CommandItem
+                        key={item.id}
+                        value={quickJumpValue(item)}
+                        keywords={item.keywords}
+                        onSelect={() => openItem(item)}
+                        className="items-start py-2.5"
+                      >
+                        <item.icon aria-hidden="true" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{item.title}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </div>
+              ))}
+              {globalSearch.error ? <p role="alert" className="px-3 py-2 text-xs text-destructive">{t("Global search is unavailable. Check your access and try again.")}</p> : null}
+              {globalSearch.hasMore ? <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("More matches available. Refine your search.")}</p> : null}
+              {globalSearch.partial && globalGroups.length > 0 ? <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("Some results may be missing while the index catches up.")}</p> : null}
             </CommandList>
             <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
-              <span>{t("Type to filter destinations")}</span>
+              <span>{t("Type to search destinations and projects")}</span>
               <span className="flex items-center gap-1.5">
                 <Kbd>↑</Kbd>
                 <Kbd>↓</Kbd>

@@ -114,6 +114,11 @@ pub async fn repository_changed(s: &AppState, p: &Value, reference: &str, sha: &
   let Ok(id) = projects::id(&p["id"]) else {
     return;
   };
+  if s.settings.search.global.enabled {
+    if let Err(error) = s.global_search.jobs.mark_dirty(id).await {
+      tracing::warn!(error=%error,project_id=id,"global search enqueue failed; reconciliation will retry");
+    }
+  }
   if let Err(error) = crate::ci::create_push_pipeline(s, id, reference, sha).await {
     tracing::error!(error=%error,project_id=id,reference,"push pipeline creation failed");
   }

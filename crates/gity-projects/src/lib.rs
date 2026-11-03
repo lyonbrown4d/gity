@@ -12,6 +12,8 @@ mod project;
 mod protection;
 mod queries;
 mod search_queries;
+mod search_scope;
+pub use search_scope::SearchProject;
 mod validation;
 mod variables;
 

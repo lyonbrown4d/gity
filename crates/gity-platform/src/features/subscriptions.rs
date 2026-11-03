@@ -2,6 +2,7 @@
 //!
 //! Subscriptions are personal: the authenticated user always owns the row, and
 //! reads still require project read access.
+use super::subscription_views::{preference_view, state_view, subscription_view};
 use super::*;
 use crate::openapi::{schemas as api, subscription_schemas as spec};
 use axum::{
@@ -9,10 +10,9 @@ use axum::{
   http::HeaderMap,
 };
 use gity_collaboration::domain::{
-  ISSUE_TARGET, MERGE_REQUEST_TARGET, NotificationPreferenceChange, NotificationPreferenceState,
-  SubscriptionCommand, SubscriptionFilter, SubscriptionState,
+  ISSUE_TARGET, MERGE_REQUEST_TARGET, NotificationPreferenceChange, SubscriptionCommand,
+  SubscriptionFilter,
 };
-use gity_entities::project_subscriptions as subscriptions;
 use std::collections::HashMap;
 
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
@@ -46,6 +46,9 @@ async fn project_subscription(
   action: ProjectAction,
   subscribe: Option<bool>,
 ) -> Reply {
+  if target_type == ISSUE_TARGET {
+    super::issue_access::authorize(s, h, project, iid, action).await?;
+  }
   let actor = crate::access::project_action(s, h, project, action)
     .await?
     .actor()?;
@@ -181,6 +184,7 @@ async fn list(
     .collaboration
     .subscriptions(actor.user_id, filter(&q)?)
     .await?;
+  let rows = super::resource_visibility::filter_subscriptions(&s, &h, rows).await?;
   response(json!(
     rows.into_iter().map(subscription_view).collect::<Vec<_>>()
   ))
@@ -251,38 +255,4 @@ fn filter(q: &HashMap<String, String>) -> Result<SubscriptionFilter, AppError> {
     target_type,
     target_id,
   })
-}
-
-fn subscription_view(row: subscriptions::Model) -> Value {
-  json!({
-    "project_id": row.project_id,
-    "target_type": row.target_type,
-    "target_id": row.target_id,
-    "created_at": stamp(row.created_at),
-  })
-}
-
-fn state_view(state: SubscriptionState) -> Value {
-  json!({
-    "project_id": state.project_id,
-    "target_type": state.target_type,
-    "target_id": state.target_id,
-    "subscribed": state.subscribed,
-  })
-}
-
-fn preference_view(state: NotificationPreferenceState) -> Value {
-  json!({
-    "kind": state.kind,
-    "enabled": state.enabled,
-    "explicit": state.explicit,
-    "created_at": state.created_at.map(stamp),
-    "updated_at": state.updated_at.map(stamp),
-  })
-}
-
-fn stamp(value: chrono::NaiveDateTime) -> String {
-  value
-    .and_utc()
-    .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }

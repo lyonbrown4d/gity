@@ -11,6 +11,7 @@ mod m20261102_000003_merge_operations;
 mod m20261102_000004_oauth;
 mod m20261102_000005_subscriptions;
 mod m20261102_000006_discussions;
+mod m20261102_000007_search_index_jobs;
 mod schema;
 
 pub use sea_orm_migration;
@@ -27,6 +28,7 @@ impl MigratorTrait for Migrator {
       Box::new(m20261102_000004_oauth::Migration),
       Box::new(m20261102_000005_subscriptions::Migration),
       Box::new(m20261102_000006_discussions::Migration),
+      Box::new(m20261102_000007_search_index_jobs::Migration),
     ]
   }
 }

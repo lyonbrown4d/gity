@@ -16,6 +16,7 @@ mod queries;
 mod release_links;
 mod releases;
 mod repository;
+mod search_visibility;
 mod subscriptions;
 mod wiki_pages;
 

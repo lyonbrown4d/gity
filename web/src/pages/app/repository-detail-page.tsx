@@ -6,6 +6,7 @@ import { useTheme } from "@/lib/theme";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Section } from "@/components/surface/section";
+import { RepositoryPinnedSource, parsePinnedSourceTarget } from "@/pages/app/repository/workspace/repository-pinned-source";
 import { RepositoryCodeTab } from "@/pages/app/repository/repository-code-tab";
 import { RepositoryCreateFileModal } from "@/pages/app/repository/repository-create-file-modal";
 import { RepositoryHeaderCard } from "@/pages/app/repository/repository-header-card";
@@ -25,6 +26,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   const params = useParams<{ organizationId: string; projectId?: string; repoId?: string }>();
   const organizationId = params.organizationId ?? "";
   const repoId = params.projectId ?? params.repoId ?? "";
+  const pinnedSource = parsePinnedSourceTarget(`?${searchParams.toString()}`);
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "overview");
   const editorTheme = theme === "dark" ? "vs-dark" : "vs";
@@ -46,7 +48,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
     onDeleted: () => navigate("/app/projects", { replace: true }),
   });
   const source = useRepositorySourceController({
-    repoId,
+    repoId: pinnedSource ? "" : repoId,
     activeTab,
     defaultBranch: meta.repository?.default_branch ?? null,
     branches: meta.branches,
@@ -140,7 +142,11 @@ export const RepositoryDetailPage = (): JSX.Element => {
         />
       ) : null}
 
-      {meta.repository && activeTab === "code" ? (
+      {meta.repository && activeTab === "code" && pinnedSource ? (
+        <RepositoryPinnedSource key={`${repoId}:${searchParams.toString()}`} repository={meta.repository} target={pinnedSource}
+          t={t} editorTheme={editorTheme} onBrowse={() => setSearchParams({ tab: "code" }, { replace: true })} />
+      ) : null}
+      {meta.repository && activeTab === "code" && !pinnedSource ? (
         <RepositoryCodeTab
           t={t}
           repository={meta.repository}

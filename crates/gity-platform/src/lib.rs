@@ -14,6 +14,7 @@ pub mod deployment_api;
 pub mod events;
 pub mod features;
 pub mod git_http;
+pub mod global_search;
 pub mod lifecycle;
 pub mod maintenance;
 pub mod oauth;
@@ -47,6 +48,7 @@ pub struct AppState {
   pub git: GitService,
   pub git_cluster: Option<gity_git_cluster::GitClusterModule>,
   pub search: gity_search::SearchIndex,
+  pub global_search: fluxdi::Shared<global_search::GlobalSearchRuntime>,
   pub code_index: gity_code_intel::Store,
   pub settings: Arc<Settings>,
   pub storage: gity_core::Storage,
@@ -71,6 +73,7 @@ pub(crate) fn router_with_apis(state: AppState, adapters: Router) -> Router {
     .merge(projects::routes())
     .merge(repository::routes())
     .merge(features::routes())
+    .merge(global_search::documented_routes().split_for_parts().0)
     .merge(registry::routes())
     .merge(ci::routes());
   #[cfg(feature = "packages")]

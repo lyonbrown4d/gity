@@ -2992,10 +2992,13 @@ dependencies = [
  "chrono",
  "gity-core",
  "gity-entities",
+ "gity-migrations",
+ "gity-test-support",
  "sea-orm",
  "serde",
  "serde_json",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -3173,8 +3176,10 @@ dependencies = [
  "fs2",
  "git2",
  "gity-git",
+ "reqwest",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tantivy",
  "tempfile",
  "tokio",

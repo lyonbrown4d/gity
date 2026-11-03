@@ -56,7 +56,8 @@ pub(crate) fn build() -> Result<Vec<CatalogOperation>, String> {
     if !names.insert(name.clone()) {
       return Err(format!("duplicate application operation name: {name}"));
     }
-    let kind = if key.0 == "get" || key.0 == "head" {
+    let kind = if key.0 == "get" || key.0 == "head" || (key.0 == "post" && path == "/api/v1/search")
+    {
       OperationKind::Query
     } else {
       OperationKind::Mutation

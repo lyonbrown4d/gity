@@ -98,7 +98,7 @@ pub(super) async fn update(
   Path((p, i)): Path<(i64, i64)>,
   Json(mut b): Json<Value>,
 ) -> Reply {
-  let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite)
+  let actor = super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueWrite)
     .await?
     .actor()?;
   let existing = s.collaboration.issue(p, i).await?;

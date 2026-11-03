@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-03",
+  "scope": "Permission-scoped global code and issue search, Tantivy/OpenSearch, revocation and confidential issue isolation",
+  "application_tests": {
+    "working_tree": { "passed": 140, "failed": 0 },
+    "isolated_change_snapshot": { "passed": 137, "failed": 0 },
+    "global_search_regression_cases": 6
+  },
+  "index_jobs": {
+    "sqlite_cases_passed": 2,
+    "postgresql_testcontainer_cases_passed": 1,
+    "mysql_testcontainer_cases_passed": 1,
+    "checks": ["101-character namespace token", "coalesced dirty generations", "lease recovery", "publication", "late completion fencing"]
+  },
+  "search_engine_tests": {
+    "local_cases_passed": 6,
+    "opensearch_contract_cases_passed": 1,
+    "image": "public.ecr.aws/opensearchproject/opensearch:3.9.0",
+    "image_digest": "sha256:3b55f6b6249cfdb92b52ee59adc8a266203ba9ef9f5d82544fad6f1af2f3609e",
+    "checks": ["HTTP BasicAuth", "mapping initialization", "batched writes", "exact substring after ngram candidates", "long Unicode paths", "namespace scope", "project scope", "confidential issue filtering", "author/assignee ID exception", "PIT and search_after", "namespace deletion"],
+    "remote_test_ignored_by_default": true,
+    "dedicated_test_container_removed": true
+  },
+  "web": {
+    "working_tree_unit_cases_passed": 68,
+    "isolated_feature_unit_cases_passed": 8,
+    "mocked_api_playwright_cases_passed": 1,
+    "browser_visual_review": ["grouped quick search results", "fixed-commit source and highlighted line"],
+    "typecheck": "passed",
+    "lint": "passed",
+    "production_build": "passed",
+    "build_notes": ["Existing Sass import deprecations and editor chunk-size warning remain"]
+  },
+  "i18n_cases_passed": 6,
+  "workspace_default_build_check": "passed",
+  "source_check": "passed",
+  "format_check": "passed",
+  "mdbook_build": "passed",
+  "distributed_compose_config": "passed",
+  "not_run": ["standalone/distributed image black-box matrix", "Debian/Alpine matrix", "CI Runner acceptance", "multi-host or Raft acceptance"],
+  "documentation_review": {
+    "rules": "project-documentation-standard and technical-writing-standard built-in references",
+    "external_writing_dependencies": "tech-doc-style-chinese and zh-tech-writing were not installed; no claim that their checks ran"
+  },
+  "concurrent_work": "Only search changes are staged; unrelated work and generated API files remain outside this change."
+}

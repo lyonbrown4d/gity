@@ -10,6 +10,9 @@ sea-orm.workspace = true
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+gity-migrations = { path = "../gity-migrations" }
+gity-test-support = { path = "../gity-test-support" }

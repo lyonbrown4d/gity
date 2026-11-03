@@ -80,15 +80,14 @@ async fn list(
   Path(p): Path<i64>,
   Query(params): Query<api::ListQuery>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  let authorization = crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
   let state = params.state.as_deref().unwrap_or("all");
   if !matches!(state, "open" | "closed" | "all") {
     return Err(AppError::bad_request("state must be open, closed or all"));
   }
   let (page, page_size, offset) = super::paging::window(&params)?;
-  let rows = s
-    .collaboration
-    .issues(p)
+  let models = s.collaboration.issues(p).await?;
+  let rows = super::issue_access::filter(&s, &authorization, models)
     .await?
     .into_iter()
     .map(model_value)
@@ -125,7 +124,7 @@ async fn list(
     security((), ("bearer"=[]), ("basic"=[]), ("private_token"=[]))
 )]
 async fn detail(State(s): State<AppState>, h: HeaderMap, Path((p, i)): Path<(i64, i64)>) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(super::issue_views::one(&s, p, model_value(&s.collaboration.issue(p, i).await?)).await?)
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
@@ -141,7 +140,7 @@ async fn timeline(
   h: HeaderMap,
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(super::issue_views::timeline(&s, p, i).await?))
 }
 

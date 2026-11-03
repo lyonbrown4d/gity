@@ -56,7 +56,7 @@ pub(super) async fn comments(
   h: HeaderMap,
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(children(&s, p, i, IssueCollection::Comments).await?))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
@@ -71,7 +71,7 @@ pub(super) async fn assignees(
   h: HeaderMap,
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(children(&s, p, i, IssueCollection::Assignees).await?))
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects")]
@@ -86,7 +86,7 @@ pub(super) async fn labels(
   h: HeaderMap,
   Path((p, i)): Path<(i64, i64)>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::Read).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   response(json!(issue_labels(&s, p, i).await?))
 }
 /// Labels of one issue, resolved through project definitions and label links.
@@ -110,7 +110,7 @@ pub(super) async fn comment(
   Path((p, i)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueComment)
+  let actor = super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueComment)
     .await?
     .actor()?;
   let issue = model_value(&s.collaboration.issue(p, i).await?);
@@ -169,6 +169,7 @@ pub(super) async fn update_comment(
   Path((p, i, c)): Path<(i64, i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   let current = s.collaboration.issue_comment(p, i, c).await?;
   let (comment, write) = (ProjectAction::IssueComment, ProjectAction::IssueWrite);
   authorize_comment(&s, &h, p, current.author_user_id, comment, write).await?;
@@ -196,6 +197,7 @@ pub(super) async fn delete_comment(
   h: HeaderMap,
   Path((p, i, c)): Path<(i64, i64, i64)>,
 ) -> Reply {
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::Read).await?;
   let current = s.collaboration.issue_comment(p, i, c).await?;
   let (comment, write) = (ProjectAction::IssueComment, ProjectAction::IssueWrite);
   authorize_comment(&s, &h, p, current.author_user_id, comment, write).await?;
@@ -216,7 +218,7 @@ pub(super) async fn set_assignees(
   Path((p, i)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  let actor = crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite)
+  let actor = super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueWrite)
     .await?
     .actor()?;
   let row = model_value(&s.collaboration.issue(p, i).await?);
@@ -257,7 +259,7 @@ pub(super) async fn set_labels(
   Path((p, i)): Path<(i64, i64)>,
   Json(b): Json<Value>,
 ) -> Reply {
-  crate::access::project_action(&s, &h, p, ProjectAction::IssueWrite).await?;
+  super::issue_access::authorize(&s, &h, p, i, ProjectAction::IssueWrite).await?;
   s.collaboration.replace_labels(p, i, requested(&b)?).await?;
   response(json!(issue_labels(&s, p, i).await?))
 }

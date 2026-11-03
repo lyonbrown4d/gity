@@ -4,11 +4,13 @@ pub use api::ApiConfig;
 mod bootstrap;
 mod cluster;
 mod components;
+mod global_search;
 mod oauth;
 mod ssh;
 pub use bootstrap::BootstrapConfig;
 pub use cluster::{GitClusterConfig, GitStorageNodeConfig};
 pub use components::{AuthorityConfig, ComponentConfig, MirrorUpstreamConfig, RegistryConfig};
+pub use global_search::GlobalSearchSettings;
 pub use oauth::OAuthConfig;
 use serde::Deserialize;
 pub use ssh::SshConfig;
@@ -39,6 +41,8 @@ pub struct Settings {
 }
 #[derive(Clone, Deserialize)]
 pub struct SearchConfig {
+  #[serde(default)]
+  pub global: GlobalSearchSettings,
   pub index_enabled: bool,
   pub index_root: PathBuf,
   /// Root of the code-intelligence store written by the indexer job.
@@ -197,7 +201,8 @@ impl Settings {
     if raw.database.node_id >= 1024 {
       return Err(AppError::bad_request("database.node_id must be 0–1023"));
     }
-    if raw.search.refresh_interval_seconds == 0
+    if !raw.search.global.validate()
+      || raw.search.refresh_interval_seconds == 0
       || raw.search.max_files_per_project == 0
       || raw.search.max_files_per_project > 100_000
       || raw.search.max_file_size_bytes == 0

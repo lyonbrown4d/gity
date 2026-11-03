@@ -1,4 +1,26 @@
 services:
+  opensearch:
+    image: public.ecr.aws/opensearchproject/opensearch:3.9.0
+    environment:
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:?Set a strong OpenSearch administrator password}
+      plugins.security.ssl.http.enabled: "false"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --user \"admin:$$OPENSEARCH_INITIAL_ADMIN_PASSWORD\" http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+
   postgres:
     image: postgres:18.1-alpine
     environment:

@@ -66,6 +66,16 @@ fn code_index(settings: Shared<Settings>) -> Result<Shared<CodeIndexStore>, flux
     .map(Shared::new)
     .map_err(|e| fluxdi::Error::factory_failed("CodeIndexStore", &e.to_string()))
 }
+fn global_search(
+  settings: Shared<Settings>,
+  database: Shared<Db>,
+) -> Result<Shared<crate::global_search::GlobalSearchRuntime>, fluxdi::Error> {
+  crate::global_search::GlobalSearchRuntime::new(&settings, &database)
+    .map(Shared::new)
+    .map_err(|_| {
+      fluxdi::Error::factory_failed("GlobalSearchRuntime", "invalid global search configuration")
+    })
+}
 
 struct Backend {
   git: GitService,
@@ -92,12 +102,17 @@ fn backend(
 fn git(backend: Shared<Backend>) -> Result<Shared<GitService>, fluxdi::Error> {
   Ok(Shared::new(backend.git.clone()))
 }
+#[expect(
+  clippy::too_many_arguments,
+  reason = "FluxDI factory dependencies remain explicit"
+)]
 fn state(
   db: Shared<Db>,
   backend: Shared<Backend>,
   settings: Shared<Settings>,
   storage: Shared<Storage>,
   search: Shared<SearchIndex>,
+  global_search: Shared<crate::global_search::GlobalSearchRuntime>,
   code_index: Shared<CodeIndexStore>,
   services: Shared<ApplicationServices>,
   _artifacts: Shared<ArtifactBindings>,
@@ -109,6 +124,7 @@ fn state(
     settings,
     storage: (*storage).clone(),
     search: (*search).clone(),
+    global_search,
     code_index: (*code_index).clone(),
     identity: services.identity.clone(),
     oauth: services.oauth.clone(),
@@ -145,7 +161,9 @@ static_module! {
     pub struct RuntimeModule {
         import services_module: ServicesModule { services: ApplicationServices; };
         #[scope(root)]
-        state:AppState=state(database,backend,settings,storage,search,code_index,services,artifacts);
+        state:AppState=state(database,backend,settings,storage,search,global_search,code_index,services,artifacts);
+        #[scope(root)]
+        global_search:crate::global_search::GlobalSearchRuntime=global_search(settings,database);
         #[scope(root)]
         git:GitService=git(backend);
         #[scope(root)]

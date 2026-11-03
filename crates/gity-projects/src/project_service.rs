@@ -8,7 +8,7 @@ use gity_entities::{organization_members, organizations, project_members, projec
 /// Application boundary: validate commands before executing atomic repository operations.
 #[derive(Clone)]
 pub struct ProjectService {
-  repository: ProjectRepository,
+  pub(crate) repository: ProjectRepository,
 }
 impl ProjectService {
   pub(crate) fn new(repository: ProjectRepository) -> Self {

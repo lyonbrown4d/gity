@@ -56,3 +56,7 @@ Standalone package and OCI modules use local platform authorization adapters. Gi
 Sources: [Gateway HTTP forwarding](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-gateway/src/http_proxy.rs), [Registry composition](https://github.com/lyonbrown4d/gity/blob/main/apps/gity-registry/src/main.rs), [Package module](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-package-registry/src/module.rs), [application roles](https://github.com/lyonbrown4d/gity/blob/main/crates/gity-platform/src/application.rs).
 
 </div>
+
+## Global search
+
+FluxDI composes `GlobalSearchRuntime` in the platform. It reuses project and collaboration application services for permissions and projections. Background database tasks publish index versions; queries reload source data and reauthorize. Standalone defaults to embedded Tantivy; component deployments share OpenSearch. The index owns no independent authorization policy. See [global code and issue search](../global-search.md) for configuration, cursors, confidentiality, and recovery boundaries.

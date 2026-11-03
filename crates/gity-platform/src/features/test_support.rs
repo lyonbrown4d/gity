@@ -10,6 +10,7 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
   let mut settings = gity_core::Settings::load();
   settings.repo_root = dir.path().join("repos");
   settings.storage_root = dir.path().join("storage");
+  settings.search.index_root = dir.path().join("search");
   settings.search.code_index_root = dir.path().join("code-index");
   tokio::fs::create_dir_all(&settings.repo_root)
     .await
@@ -45,6 +46,9 @@ pub(crate) async fn fixture() -> (tempfile::TempDir, AppState) {
     }
   }
   let state = AppState {
+    global_search: fluxdi::Shared::new(
+      crate::global_search::GlobalSearchRuntime::new(&settings, &db).unwrap(),
+    ),
     oauth: fluxdi::Shared::new(
       gity_identity::OAuthService::new(
         db.connection.clone(),

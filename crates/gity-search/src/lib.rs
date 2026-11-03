@@ -1,6 +1,11 @@
 //! Persistent, commit-pinned candidate indexes. Live Git matching remains the
 //! authoritative contract for line numbers, case, Unicode, and substring results.
 mod build;
+pub mod global;
+mod global_config;
+mod global_index;
+mod global_opensearch;
+mod global_tantivy;
 mod query;
 mod schema;
 use anyhow::{Context, Result, bail};
@@ -12,6 +17,9 @@ use std::{
   path::{Path, PathBuf},
   sync::Arc,
 };
+
+pub use global_config::{BackendKind, GlobalSearchConfig};
+pub use global_index::GlobalIndex;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {

@@ -59,6 +59,7 @@ pub mod project_subscriptions;
 pub mod project_todos;
 pub mod project_wiki_pages;
 pub mod projects;
+pub mod search_index_jobs;
 pub mod user_access_tokens;
 pub mod user_notification_preferences;
 pub mod user_passwords;
