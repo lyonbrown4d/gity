@@ -1,8 +1,10 @@
 use crate::openapi::{project_schemas as spec, schemas as api};
 mod creation;
+mod initialization;
 mod members;
 mod namespace;
 mod permission;
+mod templates;
 use permission::permissions;
 mod views;
 use views::{organization_view, project_view};
@@ -26,6 +28,8 @@ pub fn routes() -> Router<AppState> {
 }
 pub fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
   let mut router = utoipa_axum::router::OpenApiRouter::new()
+    .routes(utoipa_axum::routes!(templates::licenses))
+    .routes(utoipa_axum::routes!(templates::gitignores))
     .routes(utoipa_axum::routes!(list, creation::create))
     .routes(utoipa_axum::routes!(detail, update, remove))
     .routes(utoipa_axum::routes!(permission::permissions))
@@ -227,3 +231,6 @@ fn description(body: &Value) -> Result<Option<String>, AppError> {
     _ => Err(AppError::bad_request("description must be a string")),
   }
 }
+
+#[cfg(test)]
+mod initialization_tests;

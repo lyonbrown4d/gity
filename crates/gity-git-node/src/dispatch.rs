@@ -14,9 +14,12 @@ impl GitNodeService {
     stop: CancellationToken,
   ) -> Result<Value> {
     match operation {
-      GitOperation::InitBare { initial_branch } => {
+      GitOperation::InitBare {
+        initial_branch,
+        initial_commit,
+      } => {
         self
-          .initialize_primary(repo, request_epoch, &initial_branch)
+          .initialize_primary(repo, request_epoch, &initial_branch, initial_commit)
           .await
       }
       GitOperation::ReferenceSnapshot => {

@@ -3,8 +3,10 @@ use crate::{
   state::{RepositoryRole, RepositoryState},
 };
 use anyhow::{Context, Result, ensure};
+use gity_git_wire::InitialCommit;
 use gity_git_wire::ReferenceSnapshot;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 impl GitNodeService {
   pub(crate) async fn initialize_primary(
@@ -12,9 +14,16 @@ impl GitNodeService {
     repo: &str,
     request_epoch: u64,
     initial_branch: &str,
+    initial_commit: Option<InitialCommit>,
   ) -> Result<Value> {
     ensure!(request_epoch == 1, "new repositories must start at epoch 1");
-    self.git.validate_initial_branch(initial_branch)?;
+    self
+      .git
+      .validate_initial_commit(initial_branch, initial_commit.as_ref())?;
+    let fingerprint = initial_commit
+      .as_ref()
+      .map(|commit| commit_fingerprint(commit))
+      .transpose()?;
     self.allow_write().map_err(anyhow::Error::msg)?;
     match self.load_repository_state(repo)? {
       None => {
@@ -26,9 +35,13 @@ impl GitNodeService {
             role: RepositoryRole::InitializingPrimary,
             epoch: 1,
             initial_branch: Some(initial_branch.to_owned()),
+            initial_commit_sha256: fingerprint.clone(),
           },
         )?;
-        self.git.init_bare(repo, initial_branch).await?;
+        self
+          .git
+          .init_bare_with_commit(repo, initial_branch, initial_commit.clone())
+          .await?;
       }
       Some(state) if state.role == RepositoryRole::InitializingPrimary => {
         ensure!(state.epoch == 1, "stale primary initialization epoch");
@@ -36,14 +49,21 @@ impl GitNodeService {
           state.initial_branch.as_deref() == Some(initial_branch),
           "primary initialization branch does not match its durable marker"
         );
+        ensure!(
+          state.initial_commit_sha256 == fingerprint,
+          "primary initialization files do not match their durable marker"
+        );
         let path = self.git.repository_path(repo)?;
         if path.exists() {
           self
             .git
-            .resume_bare_initialization(repo, initial_branch)
+            .resume_bare_initialization_with_commit(repo, initial_branch, initial_commit.clone())
             .await?;
         } else {
-          self.git.init_bare(repo, initial_branch).await?;
+          self
+            .git
+            .init_bare_with_commit(repo, initial_branch, initial_commit.clone())
+            .await?;
         }
       }
       Some(_) => anyhow::bail!("repository is already managed"),
@@ -58,6 +78,7 @@ impl GitNodeService {
         role: RepositoryRole::Primary,
         epoch: 1,
         initial_branch: None,
+        initial_commit_sha256: None,
       },
     )?;
     Ok(Value::Null)
@@ -94,6 +115,7 @@ impl GitNodeService {
         role: RepositoryRole::Fenced,
         epoch: next_epoch,
         initial_branch: None,
+        initial_commit_sha256: None,
       },
     )?;
     Ok(snapshot)
@@ -132,8 +154,14 @@ impl GitNodeService {
         role: RepositoryRole::Primary,
         epoch,
         initial_branch: None,
+        initial_commit_sha256: None,
       },
     )?;
     Ok(snapshot)
   }
+}
+
+fn commit_fingerprint(commit: &InitialCommit) -> Result<String> {
+  let encoded = serde_json::to_vec(commit)?;
+  Ok(format!("{:x}", Sha256::digest(encoded)))
 }

@@ -24,6 +24,8 @@ pub(crate) struct RepositoryState {
   pub epoch: u64,
   #[serde(default)]
   pub initial_branch: Option<String>,
+  #[serde(default)]
+  pub initial_commit_sha256: Option<String>,
 }
 
 impl GitNodeService {

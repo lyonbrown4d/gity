@@ -37,6 +37,9 @@ impl From<RepositoryKey> for String {
 pub enum GitOperation {
   InitBare {
     initial_branch: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    initial_commit: Option<InitialCommit>,
   },
   FileExists {
     revision: String,
@@ -130,6 +133,21 @@ pub enum GitOperation {
   ActivatePrimary {
     epoch: u64,
   },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InitialCommit {
+  pub files: Vec<InitialFile>,
+  pub author_name: String,
+  pub author_email: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InitialFile {
+  pub path: String,
+  pub content: String,
 }
 impl GitOperation {
   pub fn is_control(&self) -> bool {

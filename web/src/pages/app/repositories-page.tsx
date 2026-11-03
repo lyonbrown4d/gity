@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useCreate, useDelete, useList } from "@refinedev/core";
 import { Building2, FolderGit2, Plus, ShieldCheck } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   type ProjectDraft,
 } from "./workspace/create-project-dialog";
 import { ProjectWorkspace } from "./workspace/project-workspace";
+import { useGitignoreTemplates, useLicenseTemplates } from "./workspace/use-license-templates";
 
 export const AppRepositoriesPage = (): JSX.Element => {
   const { t } = useI18n();
@@ -27,6 +28,9 @@ export const AppRepositoriesPage = (): JSX.Element => {
   };
   const [draft, setDraft] = useState<ProjectDraft>(() => createProjectDraft());
   const [actionError, setActionError] = useState<string | null>(null);
+  const submitLock = useRef(false);
+  const licenseQuery = useLicenseTemplates();
+  const gitignoreQuery = useGitignoreTemplates();
   const { mutate: createRepository, mutation: { isPending: isCreating } } = useCreate<RepositoryView>();
   const { mutate: deleteRepository, mutation: { isPending: isDeleting } } = useDelete<RepositoryView>();
   const orgQuery = useList<OrganizationView>({ resource: "organizations", pagination: { mode: "off" } });
@@ -63,9 +67,22 @@ export const AppRepositoriesPage = (): JSX.Element => {
 
   const submitCreate = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitLock.current || isCreating || isDeleting) return;
+    submitLock.current = true;
     setActionError(null);
     if (!draft.ownerOrganizationId) {
+      submitLock.current = false;
       setActionError(t("Please select an organization first."));
+      return;
+    }
+    if (draft.licenseTemplate !== "none" && !licenseQuery.templates.some((item) => item.id === draft.licenseTemplate)) {
+      submitLock.current = false;
+      setActionError(t("Could not load license templates."));
+      return;
+    }
+    if (draft.gitignoreTemplate !== "none" && !gitignoreQuery.templates.some((item) => item.id === draft.gitignoreTemplate)) {
+      submitLock.current = false;
+      setActionError(t("Could not load .gitignore templates."));
       return;
     }
     createRepository(
@@ -81,10 +98,16 @@ export const AppRepositoriesPage = (): JSX.Element => {
           default_branch: draft.defaultBranch || undefined,
           gitignore_template: draft.gitignoreTemplate === "none" ? undefined : draft.gitignoreTemplate,
           license_template: draft.licenseTemplate === "none" ? undefined : draft.licenseTemplate,
+          initialize_with_readme: draft.initializeWithReadme,
+          license_copyright_holder: !["mit", "bsd-2-clause", "bsd-3-clause"].includes(draft.licenseTemplate)
+            || !draft.licenseCopyrightHolder.trim()
+            ? undefined
+            : draft.licenseCopyrightHolder.trim(),
         },
       },
       {
         onSuccess: async () => {
+          submitLock.current = false;
           const ownerOrganizationId = draft.ownerOrganizationId;
           const ownerChanged = ownerOrganizationId !== selectedOrg;
           setDraft(createProjectDraft(ownerOrganizationId));
@@ -96,6 +119,7 @@ export const AppRepositoriesPage = (): JSX.Element => {
           }
         },
         onError: (error) => {
+          submitLock.current = false;
           setActionError(error instanceof Error ? error.message : t("Failed to create project"));
         },
       },
@@ -169,6 +193,14 @@ export const AppRepositoriesPage = (): JSX.Element => {
         organizations={orgs}
         draft={draft}
         isSubmitting={isCreating || isDeleting}
+        licenseTemplates={licenseQuery.templates}
+        gitignoreTemplates={gitignoreQuery.templates}
+        isLoadingLicenses={licenseQuery.query.isLoading}
+        isLoadingGitignores={gitignoreQuery.query.isLoading}
+        licenseError={licenseQuery.query.error ? t("Could not load license templates.") : null}
+        gitignoreError={gitignoreQuery.query.error ? t("Could not load .gitignore templates.") : null}
+        onRetryLicenses={() => { void licenseQuery.query.refetch(); }}
+        onRetryGitignores={() => { void gitignoreQuery.query.refetch(); }}
         onDraftChange={setDraft}
         onClose={() => setCreateModalOpen(false)}
         onSubmit={submitCreate}

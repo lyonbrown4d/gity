@@ -2,6 +2,8 @@ pub(crate) use crate::references::validate_ref;
 use crate::{commit, validate_path, GitService};
 #[path = "file_commit.rs"]
 mod file_commit;
+#[path = "initializer.rs"]
+mod initializer;
 use anyhow::{bail, Context, Result};
 use git2::{Repository, Signature};
 use serde::{Deserialize, Serialize};
@@ -44,19 +46,41 @@ impl GitService {
     validate_ref(branch, "heads").map(|_| ())
   }
 
+  pub fn validate_initial_commit(
+    &self,
+    branch: &str,
+    initial_commit: Option<&gity_git_wire::InitialCommit>,
+  ) -> Result<()> {
+    initializer::validate(branch, initial_commit)
+  }
+
   pub async fn init_bare(&self, repo: &str, initial_branch: &str) -> Result<()> {
+    self.init_bare_with_commit(repo, initial_branch, None).await
+  }
+
+  pub async fn init_bare_with_commit(
+    &self,
+    repo: &str,
+    initial_branch: &str,
+    initial_commit: Option<gity_git_wire::InitialCommit>,
+  ) -> Result<()> {
+    self.validate_initial_commit(initial_branch, initial_commit.as_ref())?;
     if self.remote.is_some() {
       return self
         .execute_remote(
           repo,
           gity_git_wire::GitOperation::InitBare {
             initial_branch: initial_branch.into(),
+            initial_commit,
           },
         )
         .await;
     }
-    validate_ref(initial_branch, "heads")?;
-    let (path, branch) = (self.repository_path(repo)?, initial_branch.to_owned());
+    let (path, branch, initial_commit) = (
+      self.repository_path(repo)?,
+      initial_branch.to_owned(),
+      initial_commit,
+    );
     tokio::task::spawn_blocking(move || -> Result<()> {
       if path.exists() {
         bail!("repository path already exists");
@@ -67,7 +91,8 @@ impl GitService {
         .initial_head(&branch)
         .mkdir(true)
         .mkpath(true);
-      Repository::init_opts(path, &opts)?;
+      let repository = Repository::init_opts(path, &opts)?;
+      initializer::initialize(&repository, &branch, initial_commit.as_ref())?;
       Ok(())
     })
     .await??;
@@ -75,8 +100,24 @@ impl GitService {
   }
 
   pub async fn resume_bare_initialization(&self, repo: &str, initial_branch: &str) -> Result<()> {
+    self
+      .resume_bare_initialization_with_commit(repo, initial_branch, None)
+      .await
+  }
+
+  pub async fn resume_bare_initialization_with_commit(
+    &self,
+    repo: &str,
+    initial_branch: &str,
+    initial_commit: Option<gity_git_wire::InitialCommit>,
+  ) -> Result<()> {
+    initializer::validate(initial_branch, initial_commit.as_ref())?;
     validate_ref(initial_branch, "heads")?;
-    let (path, branch) = (self.repository_path(repo)?, initial_branch.to_owned());
+    let (path, branch, initial_commit) = (
+      self.repository_path(repo)?,
+      initial_branch.to_owned(),
+      initial_commit,
+    );
     tokio::task::spawn_blocking(move || -> Result<()> {
       let metadata = std::fs::symlink_metadata(&path)?;
       anyhow::ensure!(
@@ -85,7 +126,8 @@ impl GitService {
       );
       let mut opts = git2::RepositoryInitOptions::new();
       opts.bare(true).initial_head(&branch);
-      Repository::init_opts(path, &opts)?;
+      let repository = Repository::init_opts(path, &opts)?;
+      initializer::initialize(&repository, &branch, initial_commit.as_ref())?;
       Ok(())
     })
     .await??;

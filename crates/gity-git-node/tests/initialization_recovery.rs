@@ -1,7 +1,8 @@
 mod support;
 
 use gity_git::CreateFileCommitInput;
-use gity_git_wire::GitOperation;
+use gity_git_wire::{GitOperation, InitialCommit, InitialFile};
+use sha2::{Digest, Sha256};
 use std::fs;
 use support::{remote, settings, start_node};
 
@@ -18,6 +19,73 @@ fn write_marker(root: &std::path::Path, role: &str, epoch: u64, branch: Option<&
     .to_string(),
   )
   .unwrap();
+}
+
+fn initial_commit(content: &str) -> InitialCommit {
+  InitialCommit {
+    files: vec![InitialFile {
+      path: "README.md".into(),
+      content: content.into(),
+    }],
+    author_name: "Recovery Test".into(),
+    author_email: "recovery@example.test".into(),
+  }
+}
+
+fn write_initial_marker(root: &std::path::Path, commit: &InitialCommit) {
+  let state = root.join(".gity-node-state");
+  fs::create_dir_all(&state).unwrap();
+  let hash = format!("{:x}", Sha256::digest(serde_json::to_vec(commit).unwrap()));
+  fs::write(
+    state.join("42.json"),
+    serde_json::json!({
+      "role": "initializing_primary",
+      "epoch": 1,
+      "initial_branch": "main",
+      "initial_commit_sha256": hash,
+    })
+    .to_string(),
+  )
+  .unwrap();
+}
+
+#[tokio::test]
+async fn primary_initialization_recovers_matching_initial_commit_and_rejects_mismatch() {
+  for (name, stored, requested, succeeds) in [
+    ("matching", "seed", "seed", true),
+    ("different", "other", "seed", false),
+  ] {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("repos");
+    fs::create_dir_all(&root).unwrap();
+    let existing = gity_git::GitService::new(&root, "git");
+    existing
+      .init_bare_with_commit("42.git", "main", Some(initial_commit(stored)))
+      .await
+      .unwrap();
+    write_initial_marker(&root, &initial_commit(requested));
+    let node = start_node(settings(name, root, "git".into())).await;
+    let result = node
+      .client
+      .execute(
+        "42.git",
+        GitOperation::InitBare {
+          initial_branch: "main".into(),
+          initial_commit: Some(initial_commit(requested)),
+        },
+      )
+      .await;
+    assert_eq!(result.is_ok(), succeeds);
+    let count = std::process::Command::new("git")
+      .args(["--git-dir"])
+      .arg(&node.settings.repo_root.join("42.git"))
+      .args(["rev-list", "--count", "main"])
+      .output()
+      .unwrap();
+    assert!(count.status.success());
+    assert_eq!(String::from_utf8_lossy(&count.stdout).trim(), "1");
+    node.stop().await;
+  }
 }
 
 #[tokio::test]
@@ -57,6 +125,7 @@ async fn primary_initialization_resumes_owned_partial_directory_after_restart() 
       "42.git",
       GitOperation::InitBare {
         initial_branch: "main".into(),
+        initial_commit: None,
       },
     )
     .await
@@ -143,6 +212,7 @@ async fn initialization_refuses_an_unmarked_existing_directory() {
         "42.git",
         GitOperation::InitBare {
           initial_branch: "main".into(),
+          initial_commit: None,
         },
       )
       .await

@@ -1,0 +1,103 @@
+{
+  "source": "SPDX License List Data",
+  "repository": "https://github.com/spdx/license-list-data",
+  "revision": "v3.27.0",
+  "license_texts": {
+    "MIT": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MIT.txt",
+      "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5"
+    },
+    "Apache-2.0": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/Apache-2.0.txt",
+      "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+    },
+    "GPL-3.0-only": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/GPL-3.0-only.txt",
+      "sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0"
+    },
+    "AGPL-3.0-only": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/AGPL-3.0-only.txt",
+      "sha256": "d8a6cc31abc16b6748c7a21f21611f5a1ec33f67d22ca23d7da1c19b95496bee"
+    },
+    "BSD-2-Clause": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/BSD-2-Clause.txt",
+      "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df"
+    },
+    "BSD-3-Clause": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/BSD-3-Clause.txt",
+      "sha256": "5a93d5831e1297ab10fe643e1a631e83be392896da14ee2951285a79012df69d"
+    },
+    "MPL-2.0": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/MPL-2.0.txt",
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+    },
+    "Unlicense": {
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/v3.27.0/text/Unlicense.txt",
+      "sha256": "0bdebfeda07d45dada625ae1317c6f833186e798b171d0db640bcf32e92a8240"
+    }
+  },
+  "gitignore_templates": {
+    "repository": "https://github.com/github/gitignore",
+    "revision": "6bb5af7a1b050e5add3a71b6e6365c93498822ac",
+    "commit_url": "https://github.com/github/gitignore/commit/6bb5af7a1b050e5add3a71b6e6365c93498822ac",
+    "license": {
+      "spdx_id": "CC0-1.0",
+      "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/LICENSE",
+      "sha256": "36ffd9dc085d529a7e60e1276d73ae5a030b020313e6c5408593a6ae2af39673"
+    },
+    "files": {
+      "Rust.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Rust.gitignore",
+        "sha256": "26431918e449693f4385438e3955a1e078dbc9a4c78e68d8e6caf7a21647b1ff"
+      },
+      "Node.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Node.gitignore",
+        "sha256": "c005855bbdbd73acfb5fae712c85beedc9954c9a84216e461f367c73b86e17c4"
+      },
+      "Python.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Python.gitignore",
+        "sha256": "8fe7404f26a2e8f0e52705c80563152d8a5b9ef15663053c4e408aa027f1545f"
+      },
+      "Go.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Go.gitignore",
+        "sha256": "16c7d7ad8c23ef27ccc8fe3c605752024a4d353f7e0b745defad7e6b0430b719"
+      },
+      "Java.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Java.gitignore",
+        "sha256": "affbdc2a83b7d656b98cb2f77f6c33e8ce8221919ea1a50d803b19647588f07d"
+      },
+      "C++.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/C++.gitignore",
+        "sha256": "3f81ebc82c21e07e8da6423d679e6231d473d892a99d6335af49eea4c754ac27"
+      },
+      "VisualStudio.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/VisualStudio.gitignore",
+        "sha256": "de0b241457fbbf7a9bf487676ac98cc61fe7cd434bb21b0e4dba70927ed96cd9"
+      },
+      "Dart.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Dart.gitignore",
+        "sha256": "3c595f036c815016a402184639ac4439478b2ade04680b4f756f5fe46ecf6f9d"
+      },
+      "Swift.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Swift.gitignore",
+        "sha256": "c9981d2b6add12673e979f04c6a57abc1e1224ce4a0125ccea01f9084322ab0c"
+      },
+      "Kotlin.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Kotlin.gitignore",
+        "sha256": "43e491c602975b1e646e3d3d17454f1a6ac939e50219dee3565366295967f3da"
+      },
+      "Ruby.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Ruby.gitignore",
+        "sha256": "f88885ba4c505a17cc766a113429b3203ee3736e2b26dbcfe26c928019bf7758"
+      },
+      "Unity.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Unity.gitignore",
+        "sha256": "d4b939421dddf7f586f4d958083200b436ab3bc0998ceef4339c4ef40bf3a2b3"
+      },
+      "Android.gitignore": {
+        "url": "https://raw.githubusercontent.com/github/gitignore/6bb5af7a1b050e5add3a71b6e6365c93498822ac/Android.gitignore",
+        "sha256": "193fb77d83fedc3949975083881f91ad351bb02d5e0b02026510a733db2a76ba"
+      }
+    }
+  }
+}

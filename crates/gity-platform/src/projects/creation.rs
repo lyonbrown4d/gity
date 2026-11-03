@@ -21,15 +21,26 @@ pub(super) async fn create(State(s): State<AppState>, h: HeaderMap, Json(b): Jso
   s.git
     .validate_initial_branch(branch)
     .map_err(|_| AppError::bad_request("invalid default branch"))?;
+  let organization_id = id(&b["organization_id"])?;
+  let description = description(&b)?;
+  let options = super::initialization::Initialization::parse(&b)?;
+  let (organization, _) = s.projects.organization(&actor, organization_id, 30).await?;
+  let files = options.files(name, description.as_deref(), &organization.name)?;
+  let has_initial_commit = !files.is_empty();
+  let initial_commit = has_initial_commit.then(|| gity_git::InitialCommit {
+    files,
+    author_name: actor.username.clone(),
+    author_email: format!("{}@users.noreply.gity.local", actor.user_id),
+  });
   let model = s
     .projects
     .create(
       &actor,
       gity_projects::CreateProject {
-        organization_id: id(&b["organization_id"])?,
+        organization_id,
         name: name.into(),
         path_key,
-        description: description(&b)?,
+        description,
         visibility: visibility(&b)?.into(),
         default_branch: branch.into(),
       },
@@ -39,7 +50,7 @@ pub(super) async fn create(State(s): State<AppState>, h: HeaderMap, Json(b): Jso
   let row = access::project_record(model);
   if let Err(error) = s
     .git
-    .init_bare(&crate::repository::repo(&row), branch)
+    .init_bare_with_commit(&crate::repository::repo(&row), branch, initial_commit)
     .await
   {
     s.projects
@@ -58,5 +69,30 @@ pub(super) async fn create(State(s): State<AppState>, h: HeaderMap, Json(b): Jso
     crate::events::ProjectChange::Created,
   )
   .await?;
+  if has_initial_commit {
+    // Initial files contain no pipeline configuration. Update search projections
+    // without scheduling a pipeline solely because the repository was created.
+    match s
+      .git
+      .resolve_revision(&crate::repository::repo(&row), branch, "")
+      .await
+    {
+      Ok(sha) => {
+        crate::events::repository_changed_with_options(
+          &s,
+          &row,
+          &format!("refs/heads/{branch}"),
+          &sha,
+          crate::events::RepositoryChangeOptions {
+            skip_pipeline: true,
+          },
+        )
+        .await
+      }
+      Err(error) => {
+        tracing::warn!(project_id,error=%error,"initial commit indexing deferred to reconciliation")
+      }
+    }
+  }
   Ok(ok(project_view(&s, row)))
 }

@@ -58,6 +58,7 @@ impl GitNodeService {
               role: RepositoryRole::InitializingReplica,
               epoch: replica_epoch,
               initial_branch: None,
+              initial_commit_sha256: None,
             },
           )?;
         }
@@ -75,6 +76,7 @@ impl GitNodeService {
             role: RepositoryRole::InitializingReplica,
             epoch: replica_epoch,
             initial_branch: None,
+            initial_commit_sha256: None,
           },
         )?;
         true
@@ -119,6 +121,7 @@ impl GitNodeService {
         role: RepositoryRole::Replica,
         epoch: replica_epoch,
         initial_branch: None,
+        initial_commit_sha256: None,
       },
     )?;
     Ok(received.snapshot)

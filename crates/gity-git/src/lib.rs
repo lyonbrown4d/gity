@@ -23,6 +23,7 @@ mod replication_apply;
 mod search;
 mod ssh;
 mod ssh_policy;
+pub use gity_git_wire::{InitialCommit, InitialFile};
 pub use hooks::check_update;
 pub use matcher::SearchPlan;
 pub use mutations::{CreateFileCommitInput, MergeBranchesInput};

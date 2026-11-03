@@ -11,6 +11,7 @@ mod organizations;
 mod project;
 mod protection;
 mod queries;
+pub mod repository_templates;
 mod search_queries;
 mod search_scope;
 pub use search_scope::SearchProject;

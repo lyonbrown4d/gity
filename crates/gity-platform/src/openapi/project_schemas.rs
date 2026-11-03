@@ -58,6 +58,14 @@ pub struct CreateProject {
   pub visibility: Option<String>,
   pub description: Option<String>,
   pub default_branch: Option<String>,
+  /// Embedded license template ID; omitted or `none` creates no LICENSE.
+  pub license_template: Option<String>,
+  /// MIT/BSD copyright holder; defaults to the owning organization name.
+  pub license_copyright_holder: Option<String>,
+  /// Create README.md in the initial commit. Defaults to false.
+  pub initialize_with_readme: Option<bool>,
+  /// Embedded .gitignore template ID; omitted or `none` creates no .gitignore.
+  pub gitignore_template: Option<String>,
 }
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateProject {

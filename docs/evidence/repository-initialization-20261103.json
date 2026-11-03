@@ -1,0 +1,85 @@
+{
+  "date": "2026-11-03",
+  "scope": [
+    "optional README",
+    "8 license presets",
+    "13 official gitignore presets",
+    "single initial commit",
+    "local and Git-node RPC initialization"
+  ],
+  "sources": {
+    "licenses": "https://github.com/spdx/license-list-data/tree/v3.27.0/text",
+    "gitignore": "https://github.com/github/gitignore/tree/6bb5af7a1b050e5add3a71b6e6365c93498822ac",
+    "provenance": "crates/gity-projects/templates/provenance.json",
+    "verified_asset_hashes": 22
+  },
+  "tests": {
+    "platform_library": {
+      "passed": 146,
+      "failed": 0
+    },
+    "initialization_http_cases": {
+      "passed": 6,
+      "failed": 0
+    },
+    "license_readme_template_cases": {
+      "passed": 7,
+      "failed": 0
+    },
+    "gitignore_template_cases": {
+      "passed": 4,
+      "failed": 0
+    },
+    "native_git_initial_commit_cases": {
+      "passed": 1,
+      "failed": 0
+    },
+    "git_node_rpc_recovery_cases": {
+      "passed": 4,
+      "failed": 0
+    },
+    "i18n_cases": {
+      "passed": 6,
+      "failed": 0
+    },
+    "frontend_catalog_hook_cases": {
+      "passed": 3,
+      "failed": 0
+    },
+    "mocked_api_playwright_cases": {
+      "passed": 1,
+      "failed": 0
+    },
+    "git_node_all_cases": {
+      "passed": 13,
+      "failed": 0
+    }
+  },
+  "checks": {
+    "workspace_default_cargo_check": "passed",
+    "source_check": "passed",
+    "cargo_fmt": "passed",
+    "web_lint": "passed",
+    "web_typecheck": "passed",
+    "web_e2e_typecheck": "passed",
+    "web_production_build": "passed",
+    "mdbook_build": "passed"
+  },
+  "behavior_verified": [
+    "chosen files exist on selected default branch in one root commit",
+    "no options keep repository empty",
+    "unknown options and unauthorized users create no project",
+    "Git failure compensates project creation",
+    "node restart accepts matching initial content and rejects mismatched content",
+    "path depth and invalid signatures rejected before initialization",
+    "legacy empty InitBare request JSON preserved"
+  ],
+  "browser_visual_review": "Node gitignore, MIT license and README selected together in the project creation dialog",
+  "not_run": [
+    "container image acceptance matrix",
+    "multi-host deployment",
+    "CI Runner acceptance"
+  ],
+  "documentation_review": "Built-in project documentation and Chinese technical-writing rules used; external writing dependencies were not installed.",
+  "asset_preservation": "Upstream template bytes are preserved with scoped -text/-whitespace attributes; all 22 staged assets match provenance SHA-256."
+}

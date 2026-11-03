@@ -2,8 +2,11 @@ import { FormDialog } from "@/components/common/form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { GitignoreTemplate } from "@/lib/generated/model/gitignoreTemplate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
+import type { LicenseTemplate } from "@/lib/generated/model/licenseTemplate";
 import type { OrganizationView } from "@/pages/types";
 
 export interface ProjectDraft {
@@ -15,6 +18,8 @@ export interface ProjectDraft {
   visibility: string;
   gitignoreTemplate: string;
   licenseTemplate: string;
+  initializeWithReadme: boolean;
+  licenseCopyrightHolder: string;
 }
 
 export const createProjectDraft = (ownerOrganizationId = ""): ProjectDraft => ({
@@ -26,6 +31,8 @@ export const createProjectDraft = (ownerOrganizationId = ""): ProjectDraft => ({
   visibility: "private",
   gitignoreTemplate: "none",
   licenseTemplate: "none",
+  initializeWithReadme: false,
+  licenseCopyrightHolder: "",
 });
 
 interface CreateProjectDialogProps {
@@ -33,6 +40,14 @@ interface CreateProjectDialogProps {
   organizations: OrganizationView[];
   draft: ProjectDraft;
   isSubmitting: boolean;
+  licenseTemplates: LicenseTemplate[];
+  gitignoreTemplates: GitignoreTemplate[];
+  isLoadingLicenses: boolean;
+  isLoadingGitignores: boolean;
+  licenseError: string | null;
+  gitignoreError: string | null;
+  onRetryLicenses: () => void;
+  onRetryGitignores: () => void;
   onDraftChange: (draft: ProjectDraft) => void;
   onClose: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -43,6 +58,14 @@ export const CreateProjectDialog = ({
   organizations,
   draft,
   isSubmitting,
+  licenseTemplates,
+  gitignoreTemplates,
+  isLoadingLicenses,
+  isLoadingGitignores,
+  licenseError,
+  gitignoreError,
+  onRetryLicenses,
+  onRetryGitignores,
   onDraftChange,
   onClose,
   onSubmit,
@@ -99,13 +122,18 @@ export const CreateProjectDialog = ({
             <SelectTrigger id="repo-gitignore"><SelectValue placeholder={t("Add .gitignore")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t("None")}</SelectItem>
-              <SelectItem value="rust">{t("Rust")}</SelectItem>
-              <SelectItem value="node">{t("Node")}</SelectItem>
-              <SelectItem value="python">{t("Python")}</SelectItem>
-              <SelectItem value="go">{t("Go")}</SelectItem>
-              <SelectItem value="java">{t("Java")}</SelectItem>
+              {gitignoreTemplates.map((template) => (
+                <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          {isLoadingGitignores ? <p className="text-xs text-muted-foreground">{t("Loading .gitignore templates...")}</p> : null}
+          {gitignoreError ? (
+            <div className="flex items-center justify-between gap-2 text-xs text-destructive">
+              <span>{t("Could not load .gitignore templates.")}</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetryGitignores}>{t("Retry")}</Button>
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="repo-license">{t("Add license")}</Label>
@@ -113,11 +141,40 @@ export const CreateProjectDialog = ({
             <SelectTrigger id="repo-license"><SelectValue placeholder={t("Add license")} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t("None")}</SelectItem>
-              <SelectItem value="mit">{t("MIT License")}</SelectItem>
-              <SelectItem value="apache-2.0">{t("Apache License 2.0")}</SelectItem>
-              <SelectItem value="gpl-3.0">{t("GNU GPLv3")}</SelectItem>
+              {licenseTemplates.map((license) => (
+                <SelectItem key={license.id} value={license.id}>{license.name}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          {isLoadingLicenses ? <p className="text-xs text-muted-foreground">{t("Loading license templates...")}</p> : null}
+          {licenseError ? (
+            <div className="flex items-center justify-between gap-2 text-xs text-destructive">
+              <span>{t("Could not load license templates.")}</span>
+              <Button type="button" size="sm" variant="outline" onClick={onRetryLicenses}>{t("Retry")}</Button>
+            </div>
+          ) : null}
+        </div>
+        {isCopyrightOverrideSupported(draft.licenseTemplate) ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="repo-license-copyright-holder">{t("Copyright holder")}</Label>
+            <Input
+              id="repo-license-copyright-holder"
+              placeholder={t("Defaults to the selected organization name.")}
+              value={draft.licenseCopyrightHolder}
+              onChange={(event) => update("licenseCopyrightHolder", event.target.value)}
+            />
+          </div>
+        ) : null}
+        <div className="flex items-start gap-2 md:col-span-2">
+          <Checkbox
+            id="repo-initialize-readme"
+            checked={draft.initializeWithReadme}
+            onCheckedChange={(checked) => update("initializeWithReadme", checked === true)}
+          />
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="repo-initialize-readme">{t("Initialize with a README")}</Label>
+            <p className="text-xs text-muted-foreground">{t("Create the first commit with a README file.")}</p>
+          </div>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border/70 pt-3 md:col-span-2">
           <Button type="button" variant="outline" onClick={onClose}>{t("Cancel")}</Button>
@@ -127,3 +184,6 @@ export const CreateProjectDialog = ({
     </FormDialog>
   );
 };
+
+const isCopyrightOverrideSupported = (templateId: string): boolean =>
+  templateId === "mit" || templateId === "bsd-2-clause" || templateId === "bsd-3-clause";

@@ -1,0 +1,51 @@
+{
+  "_version": 2,
+  "Loading license templates...": {
+    "en": "Loading license templates...",
+    "zh": "正在加载许可证模板…"
+  },
+  "Could not load license templates.": {
+    "en": "Could not load license templates.",
+    "zh": "无法加载许可证模板。"
+  },
+  "Initialize with a README": {
+    "en": "Initialize with a README",
+    "zh": "添加 README 初始化仓库"
+  },
+  "Create the first commit with a README file.": {
+    "en": "Create the first commit with a README file.",
+    "zh": "在首次提交中创建 README 文件。"
+  },
+  "Copyright holder": {
+    "en": "Copyright holder",
+    "zh": "版权所有者"
+  },
+  "Defaults to the selected organization name.": {
+    "en": "Defaults to the selected organization name.",
+    "zh": "默认使用所选组织的名称。"
+  },
+  "invalid repository initialization options": {
+    "en": "invalid repository initialization options",
+    "zh": "仓库初始化选项无效"
+  },
+  "invalid license copyright holder": {
+    "en": "invalid license copyright holder",
+    "zh": "许可证版权所有者信息无效"
+  },
+  "unknown license template": {
+    "en": "unknown license template",
+    "zh": "未知的许可证模板"
+  },
+  "unknown gitignore template": {
+    "en": "unknown gitignore template",
+    "zh": "未知的 .gitignore 模板"
+  },
+  "Loading .gitignore templates...": {
+    "en": "Loading .gitignore templates...",
+    "zh": "正在加载 .gitignore 模板…"
+  },
+  "Could not load .gitignore templates.": {
+    "en": "Could not load .gitignore templates.",
+    "zh": "无法加载 .gitignore 模板。"
+  }
+}

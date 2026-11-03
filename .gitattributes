@@ -15,3 +15,7 @@
 *.tgz binary
 # Preserve upstream documentation bundles, including template-string whitespace.
 docs/shared/vendor/*.js -whitespace
+
+# Preserve pinned third-party template bytes and their provenance checksums.
+crates/gity-projects/templates/*.txt -text -whitespace
+crates/gity-projects/templates/gitignores/* -text -whitespace
