@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Section } from "@/components/surface/section";
 import type { UserView } from "@/pages/types";
 
-export function AppProfilePage(): JSX.Element {
+export const AppProfilePage = (): JSX.Element => {
   const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -110,18 +110,12 @@ export function AppProfilePage(): JSX.Element {
       </div>
     </div>
   );
-}
+};
 
-function ProfileDetail({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }): JSX.Element {
-  return (
-    <div className="gity-list-row">
+const ProfileDetail = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }): JSX.Element => <div className="gity-list-row">
       <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <dt className="w-24 shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0 truncate text-[13px] font-medium">{value}</dd>
-    </div>
-  );
-}
+    </div>;
 
-function ProfileSkeleton(): JSX.Element {
-  return <div className="space-y-px p-3">{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-10 w-full" />)}</div>;
-}
+const ProfileSkeleton = (): JSX.Element => <div className="space-y-px p-3">{[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-10 w-full" />)}</div>;

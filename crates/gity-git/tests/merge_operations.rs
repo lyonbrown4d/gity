@@ -2,6 +2,8 @@ use gity_git::{CreateFileCommitInput, GitService, MergeOperationInput, MergeOper
 
 fn file(branch: &str, name: &str) -> CreateFileCommitInput {
   CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: branch.into(),
     file_path: name.into(),
     content: name.into(),

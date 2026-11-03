@@ -2,17 +2,15 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** Right-hand attribute panel used on detail pages. */
-export function PropertyPanel({
+export const PropertyPanel = ({
   children,
   className,
 }: {
   children: ReactNode;
   className?: string;
-}): JSX.Element {
-  return <aside className={cn("gity-property-panel", className)}>{children}</aside>;
-}
+}): JSX.Element => <aside className={cn("gity-property-panel", className)}>{children}</aside>;
 
-export function PropertyItem({
+export const PropertyItem = ({
   label,
   children,
   className,
@@ -20,11 +18,7 @@ export function PropertyItem({
   label: ReactNode;
   children: ReactNode;
   className?: string;
-}): JSX.Element {
-  return (
-    <div className={cn("gity-property-item", className)}>
+}): JSX.Element => <div className={cn("gity-property-item", className)}>
       <span className="gity-property-label">{label}</span>
       <div className="gity-property-value">{children}</div>
-    </div>
-  );
-}
+    </div>;

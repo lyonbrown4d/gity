@@ -58,7 +58,9 @@ export const resolveOrganizationId = (meta: MetaLike, filters?: CrudFilters): st
   const byMetaSnake = asString(meta?.organization_id);
   const byMetaCamel = asString(meta?.organizationId);
   const byFilter = findFilterValue(filters, "organization_id");
-  return byMetaSnake ?? byMetaCamel ?? byFilter;
+  const candidates = [byMetaSnake, byMetaCamel, byFilter].filter((value): value is string => value !== undefined);
+  if (new Set(candidates).size > 1) throw new Error("Conflicting organization_id filters");
+  return candidates[0];
 };
 
 export const resolveBoolean = (meta: MetaLike, key: string): boolean | undefined => {
@@ -97,26 +99,21 @@ export const resolvePagination = (
     return { page: fallbackPage, pageSize: fallbackPageSize };
   }
 
-  const page = asPositiveInteger(record.current, fallbackPage);
-  const pageSize = Math.min(
-    maxPageSize,
-    asPositiveInteger(record.pageSize, fallbackPageSize),
-  );
+  const page = asPositiveInteger(record.currentPage ?? record.current, fallbackPage);
+  const pageSize = Math.min(maxPageSize, asPositiveInteger(record.pageSize, fallbackPageSize));
   return { page, pageSize };
 };
 
-const isPagePayload = <TData extends BaseRecord = BaseRecord>(
-  value: unknown,
-): value is PagePayload<TData> => {
+const isPagePayload = <TData extends BaseRecord = BaseRecord>(value: unknown): value is PagePayload<TData> => {
   const record = asRecord(value);
   if (!record) {
     return false;
   }
   return (
-    typeof record.total === "number"
-    && typeof record.page === "number"
-    && typeof record.page_size === "number"
-    && Array.isArray(record.items)
+    typeof record.total === "number" &&
+    typeof record.page === "number" &&
+    typeof record.page_size === "number" &&
+    Array.isArray(record.items)
   );
 };
 
@@ -136,10 +133,7 @@ export const normalizeListPayload = <TData extends BaseRecord = BaseRecord>(
     };
   }
 
-  return {
-    data: [],
-    total: 0,
-  };
+  throw new Error("Expected a collection or paginated API response");
 };
 
 export const notSupported = (resource: string, method: string): never => {
@@ -161,12 +155,7 @@ export const filterByIds = <TData extends BaseRecord = BaseRecord>(
   return items.filter((item) => idSet.has(String(item.id)));
 };
 
-export const buildCustomPath = (
-  url: string,
-  query: unknown,
-  filters: unknown,
-  sorters: unknown,
-): string => {
+export const buildCustomPath = (url: string, query: unknown, filters: unknown, sorters: unknown): string => {
   const isAbsolute = url.startsWith("http://") || url.startsWith("https://");
   const base = isAbsolute ? new URL(url) : new URL(url, "http://local.placeholder");
 

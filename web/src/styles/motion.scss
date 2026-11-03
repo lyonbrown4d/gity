@@ -1,0 +1,9 @@
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .card-enter,
+  .action-pop {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

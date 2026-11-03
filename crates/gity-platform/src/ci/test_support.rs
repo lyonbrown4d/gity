@@ -88,6 +88,8 @@ pub(super) async fn fixture() -> (tempfile::TempDir, AppState, Router, String, i
     .create_file_commit(
       &crate::repository::repo(&project),
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: ".gity-ci.yml".into(),
         content: yaml.into(),

@@ -13,7 +13,7 @@ import {
   StatusDot,
 } from "./workspace/console-primitives";
 
-export function AdminOverviewPage(): JSX.Element {
+export const AdminOverviewPage = (): JSX.Element => {
   const { t } = useI18n();
   const orgQuery = useList<OrganizationView>({
     resource: "organizations",
@@ -111,4 +111,4 @@ export function AdminOverviewPage(): JSX.Element {
       </div>
     </div>
   );
-}
+};

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { useMemo } from "react";
+import { Link, useNavigate, useParams, useLocation } from "react-router";
 import { useCustom, usePermissions } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
@@ -20,16 +20,15 @@ import { RepositorySecondaryTabContent } from "@/pages/app/repository/workspace/
 
 export const RepositoryDetailPage = (): JSX.Element => {
   const { t } = useI18n();
-  const { theme } = useTheme();
+  const { editorTheme } = useTheme();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const params = useParams<{ organizationId: string; projectId?: string; repoId?: string }>();
+  const location = useLocation();
+  const params = useParams<{ organizationId: string; projectId?: string; repoId?: string; jobId?: string }>();
   const organizationId = params.organizationId ?? "";
   const repoId = params.projectId ?? params.repoId ?? "";
-  const pinnedSource = parsePinnedSourceTarget(`?${searchParams.toString()}`);
-  const initialTab = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState<RepoTab>(isRepoTab(initialTab) ? initialTab : "overview");
-  const editorTheme = theme === "dark" ? "vs-dark" : "vs";
+  const routeTab = params.jobId ? "jobs" : location.pathname.split("/").filter(Boolean)[4] ?? new URLSearchParams(location.search).get("tab");
+  const pinnedSource = parsePinnedSourceTarget(location.search);
+  const activeTab: RepoTab = isRepoTab(routeTab) ? routeTab : "overview";
   const permissionsQuery = usePermissions<{ isSuperAdmin?: boolean }>({});
   const projectPermissionsQuery = useCustom<RawRecord>({
     url: repoId ? `/projects/${repoId}/permissions` : "/projects/0/permissions",
@@ -62,20 +61,9 @@ export const RepositoryDetailPage = (): JSX.Element => {
     [meta.organization?.role, permissionsQuery.data?.isSuperAdmin, projectPermissionsQuery.result.data],
   );
 
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    setActiveTab(isRepoTab(tab) ? tab : "overview");
-  }, [searchParams]);
-
   const handleChangeTab = (tab: RepoTab) => {
-    setActiveTab(tab);
-    const next = new URLSearchParams(searchParams);
-    if (tab === "overview") {
-      next.delete("tab");
-    } else {
-      next.set("tab", tab);
-    }
-    setSearchParams(next, { replace: true });
+    const base = `/app/projects/${encodeURIComponent(organizationId)}/${encodeURIComponent(repoId)}`;
+    navigate(tab === "overview" ? base : `${base}/${tab}`);
   };
 
   return (
@@ -143,13 +131,14 @@ export const RepositoryDetailPage = (): JSX.Element => {
       ) : null}
 
       {meta.repository && activeTab === "code" && pinnedSource ? (
-        <RepositoryPinnedSource key={`${repoId}:${searchParams.toString()}`} repository={meta.repository} target={pinnedSource}
-          t={t} editorTheme={editorTheme} onBrowse={() => setSearchParams({ tab: "code" }, { replace: true })} />
+        <RepositoryPinnedSource key={`${repoId}:${location.search}`} repository={meta.repository} target={pinnedSource}
+          t={t} editorTheme={editorTheme} onBrowse={() => handleChangeTab("code")} />
       ) : null}
       {meta.repository && activeTab === "code" && !pinnedSource ? (
         <RepositoryCodeTab
           t={t}
           repository={meta.repository}
+          canWrite={repositoryPermissions.repositoryPush}
           branches={meta.branches}
           codeBranch={source.codeBranch}
           treeNodes={source.treeNodes}
@@ -215,7 +204,7 @@ export const RepositoryDetailPage = (): JSX.Element => {
   );
 };
 
-const isRepoTab = (value: string | null): value is RepoTab =>
+const isRepoTab = (value: string | null | undefined): value is RepoTab =>
   value === "overview"
   || value === "code"
   || value === "issues"

@@ -10,14 +10,12 @@ interface ConsolePageHeaderProps {
   actions?: ReactNode;
 }
 
-export function ConsolePageHeader({
+export const ConsolePageHeader = ({
   title,
   description,
   eyebrow,
   actions,
-}: ConsolePageHeaderProps): JSX.Element {
-  return (
-    <header className="flex flex-col gap-3 border-b border-border/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
+}: ConsolePageHeaderProps): JSX.Element => <header className="flex flex-col gap-3 border-b border-border/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {eyebrow ? (
           <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -28,9 +26,7 @@ export function ConsolePageHeader({
         <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">{description}</p>
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
-    </header>
-  );
-}
+    </header>;
 
 interface ConsolePanelProps {
   title: ReactNode;
@@ -41,16 +37,14 @@ interface ConsolePanelProps {
   bodyClassName?: string;
 }
 
-export function ConsolePanel({
+export const ConsolePanel = ({
   title,
   description,
   meta,
   children,
   className,
   bodyClassName,
-}: ConsolePanelProps): JSX.Element {
-  return (
-    <section className={cn("overflow-hidden rounded-md border border-border/80 bg-card", className)}>
+}: ConsolePanelProps): JSX.Element => <section className={cn("overflow-hidden rounded-md border border-border/80 bg-card", className)}>
       <div className="flex min-h-12 items-center justify-between gap-3 border-b border-border/70 bg-muted/25 px-3 py-2">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -59,9 +53,7 @@ export function ConsolePanel({
         {meta ? <div className="shrink-0 font-mono text-[10px] text-muted-foreground">{meta}</div> : null}
       </div>
       <div className={cn("p-3", bodyClassName)}>{children}</div>
-    </section>
-  );
-}
+    </section>;
 
 interface MetricItem {
   label: ReactNode;
@@ -70,9 +62,7 @@ interface MetricItem {
   active?: boolean;
 }
 
-export function MetricStrip({ items }: { items: MetricItem[] }): JSX.Element {
-  return (
-    <dl className="grid overflow-hidden rounded-md border border-border/80 bg-card sm:grid-cols-3">
+export const MetricStrip = ({ items }: { items: MetricItem[] }): JSX.Element => <dl className="grid overflow-hidden rounded-md border border-border/80 bg-card sm:grid-cols-3">
       {items.map((item, index) => (
         <div
           key={index}
@@ -88,34 +78,20 @@ export function MetricStrip({ items }: { items: MetricItem[] }): JSX.Element {
           </dd>
         </div>
       ))}
-    </dl>
-  );
-}
+    </dl>;
 
-export function ConsoleLoadingRows({ rows = 3 }: { rows?: number }): JSX.Element {
-  return (
-    <div className="space-y-2" aria-label="Loading">
+export const ConsoleLoadingRows = ({ rows = 3 }: { rows?: number }): JSX.Element => <div className="space-y-2" aria-label="Loading">
       {Array.from({ length: rows }, (_, index) => (
         <Skeleton key={index} className="h-9 w-full rounded-sm" />
       ))}
-    </div>
-  );
-}
+    </div>;
 
-export function ConsoleEmpty({ children }: { children: ReactNode }): JSX.Element {
-  return (
-    <div className="flex min-h-28 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">
+export const ConsoleEmpty = ({ children }: { children: ReactNode }): JSX.Element => <div className="flex min-h-28 flex-col items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">
       <CircleDotDashed className="size-5" aria-hidden="true" />
       <p>{children}</p>
-    </div>
-  );
-}
+    </div>;
 
-export function StatusDot({ active = true }: { active?: boolean }): JSX.Element {
-  return (
-    <span
+export const StatusDot = ({ active = true }: { active?: boolean }): JSX.Element => <span
       className={cn("inline-block size-1.5 rounded-full bg-muted-foreground/50", active && "bg-primary")}
       aria-hidden="true"
-    />
-  );
-}
+    />;

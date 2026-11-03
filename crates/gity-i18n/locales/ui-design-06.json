@@ -1,0 +1,159 @@
+{
+  "_version": 2,
+  "The server did not return a bounded log segment.": {
+    "en": "The server did not return a bounded log segment.",
+    "zh": "服务器未返回范围受限的日志片段。"
+  },
+  "The stored configuration cannot be displayed as a graph.": {
+    "en": "The stored configuration cannot be displayed as a graph.",
+    "zh": "无法将已保存的配置显示为图形。"
+  },
+  "This protected branch requires a merge request. Select a writable branch.": {
+    "en": "This protected branch requires a merge request. Select a writable branch.",
+    "zh": "此受保护分支需要通过合并请求提交修改。请选择可写分支。"
+  },
+  "This value is visible to admins after entry but marked for protected ref usage; prefer masking deployment secrets too.": {
+    "en": "This value is visible to admins after entry but marked for protected ref usage; prefer masking deployment secrets too.",
+    "zh": "输入后管理员仍可查看此值，但它只用于受保护的引用；部署凭据建议同时启用隐藏。"
+  },
+  "This value will be hidden after save and redacted from logs. Masked values must be at least 8 characters.": {
+    "en": "This value will be hidden after save and redacted from logs. Masked values must be at least 8 characters.",
+    "zh": "保存后将隐藏该值并在日志中脱敏。隐藏变量的值至少需要 8 个字符。"
+  },
+  "This value will be hidden after save, redacted from logs, and marked for protected ref usage.": {
+    "en": "This value will be hidden after save, redacted from logs, and marked for protected ref usage.",
+    "zh": "保存后将隐藏该值并在日志中脱敏，同时标记为仅供受保护的引用使用。"
+  },
+  "Timeout (seconds)": {
+    "en": "Timeout (seconds)",
+    "zh": "超时时间（秒）"
+  },
+  "Try another state, label, assignee, or search term.": {
+    "en": "Try another state, label, assignee, or search term.",
+    "zh": "请尝试其他状态、标签、指派人或搜索词。"
+  },
+  "Type to filter destinations": {
+    "en": "Type to filter destinations",
+    "zh": "输入内容筛选入口"
+  },
+  "Unmasked variables are easier to diagnose but should only contain non-secret runtime configuration.": {
+    "en": "Unmasked variables are easier to diagnose but should only contain non-secret runtime configuration.",
+    "zh": "未隐藏的变量便于排查问题，但只能用于不含秘密信息的运行时配置。"
+  },
+  "Unsaved changes": {
+    "en": "Unsaved changes",
+    "zh": "未保存的修改"
+  },
+  "Updating...": {
+    "en": "Updating...",
+    "zh": "正在更新..."
+  },
+  "Upload a package file or select an existing package to inspect versions.": {
+    "en": "Upload a package file or select an existing package to inspect versions.",
+    "zh": "上传包文件，或选择已有的包以查看版本。"
+  },
+  "Upload the first package file to create a version.": {
+    "en": "Upload the first package file to create a version.",
+    "zh": "上传第一个包文件以创建版本。"
+  },
+  "Use repository version": {
+    "en": "Use repository version",
+    "zh": "使用仓库版本"
+  },
+  "Validate configuration": {
+    "en": "Validate configuration",
+    "zh": "校验配置"
+  },
+  "View activity": {
+    "en": "View activity",
+    "zh": "查看动态"
+  },
+  "View job logs": {
+    "en": "View job logs",
+    "zh": "查看任务日志"
+  },
+  "View logs": {
+    "en": "View logs",
+    "zh": "查看日志"
+  },
+  "View source": {
+    "en": "View source",
+    "zh": "查看源文件"
+  },
+  "Visible variable; use for non-secret configuration only.": {
+    "en": "Visible variable; use for non-secret configuration only.",
+    "zh": "可见变量；仅用于不含秘密信息的配置。"
+  },
+  "Waiting for review or merge": {
+    "en": "Waiting for review or merge",
+    "zh": "等待审查或合并"
+  },
+  "Work details": {
+    "en": "Work details",
+    "zh": "事项详情"
+  },
+  "Work is unavailable until the request succeeds.": {
+    "en": "Work is unavailable until the request succeeds.",
+    "zh": "请求成功后即可查看待办事项。"
+  },
+  "Write a comment on this line...": {
+    "en": "Write a comment on this line...",
+    "zh": "针对这一行发表评论..."
+  },
+  "Write access": {
+    "en": "Write access",
+    "zh": "可写"
+  },
+  "You do not have permission to merge this request.": {
+    "en": "You do not have permission to merge this request.",
+    "zh": "你没有权限合并此请求。"
+  },
+  "Your pending work and recent projects.": {
+    "en": "Your pending work and recent projects.",
+    "zh": "查看待办事项和最近访问的项目。"
+  },
+  "Your role cannot push to this protected branch. Select a writable branch.": {
+    "en": "Your role cannot push to this protected branch. Select a writable branch.",
+    "zh": "你当前的角色无法推送到此受保护分支，请选择可写分支。"
+  },
+  "Your work could not be loaded.": {
+    "en": "Your work could not be loaded.",
+    "zh": "无法加载待办事项。"
+  },
+  "all": {
+    "en": "all",
+    "zh": "全部"
+  },
+  "breadcrumb": {
+    "en": "breadcrumb",
+    "zh": "面包屑导航"
+  },
+  "canceled": {
+    "en": "canceled",
+    "zh": "已取消"
+  },
+  "failed job(s)": {
+    "en": "failed job(s)",
+    "zh": "条失败任务"
+  },
+  "failed pipeline(s)": {
+    "en": "failed pipeline(s)",
+    "zh": "条失败流水线"
+  },
+  "inactive runner(s)": {
+    "en": "inactive runner(s)",
+    "zh": "个未启用的 Runner"
+  },
+  "issues": {
+    "en": "issues",
+    "zh": "个议题"
+  },
+  "navigate": {
+    "en": "navigate",
+    "zh": "导航"
+  },
+  "result(s)": {
+    "en": "result(s)",
+    "zh": "条结果"
+  }
+}

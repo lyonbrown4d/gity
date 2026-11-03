@@ -1,0 +1,63 @@
+{
+  "_version": 2,
+  "All pending": {
+    "en": "All pending",
+    "zh": "全部待办"
+  },
+  "Review requests": {
+    "en": "Review requests",
+    "zh": "待我评审"
+  },
+  "Assigned to me": {
+    "en": "Assigned to me",
+    "zh": "分配给我"
+  },
+  "Project created": {
+    "en": "Project created",
+    "zh": "项目已创建"
+  },
+  "Issue created": {
+    "en": "Issue created",
+    "zh": "议题已创建"
+  },
+  "Issue assigned": {
+    "en": "Issue assigned",
+    "zh": "议题已分配"
+  },
+  "Issue commented": {
+    "en": "Issue commented",
+    "zh": "议题有新评论"
+  },
+  "Branch protection changed": {
+    "en": "Branch protection changed",
+    "zh": "分支保护已变更"
+  },
+  "Branch deleted": {
+    "en": "Branch deleted",
+    "zh": "分支已删除"
+  },
+  "Merge request merged": {
+    "en": "Merge request merged",
+    "zh": "合并请求已合并"
+  },
+  "Merge request commented": {
+    "en": "Merge request commented",
+    "zh": "合并请求有新评论"
+  },
+  "Merge request approved": {
+    "en": "Merge request approved",
+    "zh": "合并请求已批准"
+  },
+  "Merge request approval removed": {
+    "en": "Merge request approval removed",
+    "zh": "合并请求批准已撤销"
+  },
+  "Merge request review requested": {
+    "en": "Merge request review requested",
+    "zh": "请求你评审合并请求"
+  },
+  "Merge request assigned": {
+    "en": "Merge request assigned",
+    "zh": "合并请求已分配"
+  }
+}

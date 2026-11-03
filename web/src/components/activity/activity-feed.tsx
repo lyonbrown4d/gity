@@ -30,20 +30,20 @@ const eventIcons: Array<{ prefix: string; icon: ActivityIconComponent }> = [
 ];
 
 /** Picks the row icon from the `event_name` prefix, falling back to a generic event. */
-export function activityIcon(eventName: string): ActivityIconComponent {
+export const activityIcon = (eventName: string): ActivityIconComponent => {
   const name = eventName.trim().toLowerCase();
   return eventIcons.find((entry) => name.startsWith(entry.prefix))?.icon ?? Activity;
-}
+};
 
 /** Normalizes the `/activity` payload; the Orval client can replace this once generated. */
-export function toActivityItems(payload: unknown): ActivityItem[] {
+export const toActivityItems = (payload: unknown): ActivityItem[] => {
   const rows = activityRows(payload);
   return rows
     .map((row) => normalizeActivityItem(row))
     .filter((item) => item.id !== "" || item.summary !== "" || item.eventName !== "");
-}
+};
 
-function activityRows(payload: unknown): Record<string, unknown>[] {
+const activityRows = (payload: unknown): Record<string, unknown>[] => {
   if (Array.isArray(payload)) {
     return payload.filter(isRecord);
   }
@@ -59,13 +59,11 @@ function activityRows(payload: unknown): Record<string, unknown>[] {
   }
   const items = payload.items ?? payload.Items;
   return Array.isArray(items) ? items.filter(isRecord) : [];
-}
+};
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-function text(value: unknown): string {
+const text = (value: unknown): string => {
   if (typeof value === "string") {
     return value.trim();
   }
@@ -73,9 +71,9 @@ function text(value: unknown): string {
     return String(value);
   }
   return "";
-}
+};
 
-function normalizeActivityItem(row: Record<string, unknown>): ActivityItem {
+const normalizeActivityItem = (row: Record<string, unknown>): ActivityItem => {
   const actorId = text(row.actor_user_id);
   const eventName = text(row.event_name);
   return {
@@ -92,7 +90,7 @@ function normalizeActivityItem(row: Record<string, unknown>): ActivityItem {
     summary: text(row.summary) || text(row.action) || eventName,
     createdAt: text(row.created_at),
   };
-}
+};
 
 interface ActivityFeedProps {
   items: ActivityItem[];
@@ -103,13 +101,13 @@ interface ActivityFeedProps {
 }
 
 /** Divided activity rows shared by the dashboard preview and the activity page. */
-export function ActivityFeed({
+export const ActivityFeed = ({
   items,
   emptyText,
   isLoading = false,
   error = null,
   skeletonRows = 4,
-}: ActivityFeedProps): JSX.Element {
+}: ActivityFeedProps): JSX.Element => {
   const navigate = useNavigate();
   if (isLoading) {
     return (
@@ -162,4 +160,4 @@ export function ActivityFeed({
       })}
     </DataList>
   );
-}
+};

@@ -2,6 +2,8 @@ use gity_git::{CreateFileCommitInput, GitService};
 
 fn input(path: String) -> CreateFileCommitInput {
   CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: "main".into(),
     file_path: path,
     content: "content".into(),

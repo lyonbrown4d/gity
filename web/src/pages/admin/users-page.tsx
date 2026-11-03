@@ -7,7 +7,7 @@ import { UserDialogs } from "./workspace/user-dialogs";
 import { UserDirectory } from "./workspace/user-directory";
 import { useUserAdmin } from "./workspace/use-user-admin";
 
-export function AdminUsersPage(): JSX.Element {
+export const AdminUsersPage = (): JSX.Element => {
   const { t } = useI18n();
   const c = useUserAdmin();
 
@@ -42,4 +42,4 @@ export function AdminUsersPage(): JSX.Element {
       <UserDialogs controller={c} />
     </div>
   );
-}
+};

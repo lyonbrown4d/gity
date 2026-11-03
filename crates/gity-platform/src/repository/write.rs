@@ -1,4 +1,11 @@
 use super::*;
+#[derive(serde::Deserialize)]
+struct FileCommitRequest {
+  #[serde(flatten)]
+  commit: gity_git::CreateFileCommitInput,
+  #[serde(default)]
+  skip_pipeline: bool,
+}
 pub(super) async fn write(
   State(s): State<AppState>,
   h: HeaderMap,
@@ -43,8 +50,9 @@ pub(super) async fn write(
       if b["branch_name"].as_str().is_none_or(str::is_empty) {
         b["branch_name"] = json!(default_branch(&p));
       }
-      let mut input: gity_git::CreateFileCommitInput =
+      let request: FileCommitRequest =
         serde_json::from_value(b).map_err(|e| AppError::bad_request(e.to_string()))?;
+      let mut input = request.commit;
       check_branch(&s, &h, &p, &input.branch_name, false, false).await?;
       input.author_name = actor.username;
       let user = s.identity.user_model(actor.user_id).await?;
@@ -61,7 +69,16 @@ pub(super) async fn write(
         .create_file_commit(&path, input)
         .await
         .map_err(git_error)?;
-      crate::events::repository_changed(&s, &p, &branch, &sha).await;
+      crate::events::repository_changed_with_options(
+        &s,
+        &p,
+        &branch,
+        &sha,
+        crate::events::RepositoryChangeOptions {
+          skip_pipeline: request.skip_pipeline,
+        },
+      )
+      .await;
       Ok(ok(
         json!({"repository_id":id,"branch_name":branch,"file_path":file,"path":file,"message":message,"commit_sha":sha}),
       ))

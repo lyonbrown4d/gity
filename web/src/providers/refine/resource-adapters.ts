@@ -7,15 +7,15 @@ import type {
   GetOneParams,
   UpdateParams,
 } from "@refinedev/core";
-import { apiRequest } from "@/lib/api";
+import { clientList, validateListFilters } from "./list-behavior";
+import { listUsers, usersByIds } from "./user-list";
+import { generatedRequest } from "./generated-dispatch";
 import {
   asRecord,
   asString,
   filterByIds,
   normalizeListPayload,
   type PagePayload,
-  resolveBoolean,
-  resolvePagination,
   resolveOrganizationId,
   type MetaLike,
   type ResourceAdapter,
@@ -23,100 +23,53 @@ import {
 
 type ListPayload<TData extends BaseRecord = BaseRecord> = TData[] | PagePayload<TData>;
 
-const appendPagination = (
-  query: URLSearchParams,
-  pagination: GetListParams["pagination"],
-  fallbackPageSize: number,
-): void => {
-  const { page, pageSize } = resolvePagination(pagination, 1, fallbackPageSize, 200);
-  query.set("page", String(page));
-  query.set("page_size", String(pageSize));
-};
-
-const resolveFilterIds = (params: GetListParams): string[] =>
-  params.filters
-    ?.filter((item) => "field" in item && item.field === "id" && item.operator === "in")
-    .flatMap((item) => (Array.isArray(item.value) ? item.value : []))
-    .map((item) => String(item)) ?? [];
-
 const organizationsAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
-    const ids = resolveFilterIds(params);
-    const query = new URLSearchParams();
-    if (ids.length === 0) {
-      appendPagination(query, params.pagination, 50);
-    }
-    const path = query.size > 0 ? `/orgs?${query.toString()}` : "/orgs";
-    const payload = await apiRequest<ListPayload<TData>>(path);
-    const list = normalizeListPayload(payload);
-    if (ids.length === 0) {
-      return list;
-    }
-    // The backend does not filter by `ids`; filter locally.
-    const data = filterByIds(list.data, ids);
-    return { data, total: data.length };
+    validateListFilters(params);
+    const payload = await generatedRequest<TData[]>("/orgs");
+    return clientList(payload, params);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => ({
-    data: await apiRequest<TData>(`/orgs/${params.id}`),
+    data: await generatedRequest<TData>(`/orgs/${params.id}`),
   }),
   getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
     // The backend does not filter by `ids`; fetch the visible list and filter locally.
-    const payload = await apiRequest<ListPayload<TData>>("/orgs");
+    const payload = await generatedRequest<ListPayload<TData>>("/orgs");
     return { data: filterByIds(normalizeListPayload(payload).data, params.ids) };
   },
-  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: CreateParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>("/orgs", {
+  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: CreateParams<TVariables>) => {
+    const data = await generatedRequest<TData>("/orgs", {
       method: "POST",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },
-  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: UpdateParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>(`/orgs/${params.id}`, {
+  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: UpdateParams<TVariables>) => {
+    const data = await generatedRequest<TData>(`/orgs/${params.id}`, {
       method: "PATCH",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },
-  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: DeleteOneParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>(`/orgs/${params.id}`, { method: "DELETE" });
+  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: DeleteOneParams<TVariables>) => {
+    const data = await generatedRequest<TData>(`/orgs/${params.id}`, { method: "DELETE" });
     return { data };
   },
 };
 
 const projectsAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
-    const ids = resolveFilterIds(params);
+    validateListFilters(params, ["organization_id"]);
+    if ((params.meta as MetaLike)?.all !== undefined)
+      throw new Error("The projects endpoint does not support the all filter");
     const query = new URLSearchParams();
     const organizationId = resolveOrganizationId(params.meta as MetaLike, params.filters);
-    if (organizationId) {
-      query.set("organization_id", organizationId);
-    }
-    const all = resolveBoolean(params.meta as MetaLike, "all");
-    if (all) {
-      query.set("all", "true");
-    }
-    if (ids.length === 0) {
-      appendPagination(query, params.pagination, 50);
-    }
-    const path = query.size > 0 ? `/projects?${query.toString()}` : "/projects";
-    const payload = await apiRequest<ListPayload<TData>>(path);
-    const list = normalizeListPayload(payload);
-    if (ids.length === 0) {
-      return list;
-    }
-    // The backend does not filter by `ids`; filter locally.
-    const data = filterByIds(list.data, ids);
-    return { data, total: data.length };
+    if (organizationId) query.set("organization_id", organizationId);
+    const payload = await generatedRequest<TData[]>(query.size ? `/projects?${query}` : "/projects");
+    return clientList(payload, params);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => ({
-    data: await apiRequest<TData>(`/projects/${params.id}`),
+    data: await generatedRequest<TData>(`/projects/${params.id}`),
   }),
   getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
     const query = new URLSearchParams();
@@ -124,31 +77,25 @@ const projectsAdapter: ResourceAdapter = {
     if (organizationId) {
       query.set("organization_id", organizationId);
     }
-    const all = resolveBoolean(params.meta as MetaLike, "all");
-    if (all) {
-      query.set("all", "true");
-    }
+    if ((params.meta as MetaLike)?.all !== undefined)
+      throw new Error("The projects endpoint does not support the all filter");
     // The backend does not filter by `ids`; fetch the visible list and filter locally.
-    const payload = await apiRequest<ListPayload<TData>>(`/projects?${query.toString()}`);
+    const payload = await generatedRequest<ListPayload<TData>>(query.size ? `/projects?${query}` : "/projects");
     return { data: filterByIds(normalizeListPayload(payload).data, params.ids) };
   },
-  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: CreateParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>("/projects", {
+  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: CreateParams<TVariables>) => {
+    const data = await generatedRequest<TData>("/projects", {
       method: "POST",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },
-  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: DeleteOneParams<TVariables>,
-  ) => {
+  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: DeleteOneParams<TVariables>) => {
     const meta = asRecord(params.meta as unknown);
     const confirmation = asString(meta?.confirmation);
-    const data = await apiRequest<TData>(`/projects/${params.id}`, {
+    const data = await generatedRequest<TData>(`/projects/${params.id}`, {
       method: "DELETE",
-      body: JSON.stringify(confirmation ? { confirmation } : {}),
+      payload: confirmation ? { confirmation } : {},
     });
     return { data };
   },
@@ -156,105 +103,77 @@ const projectsAdapter: ResourceAdapter = {
 
 const organizationMembersAdapter: ResourceAdapter = {
   getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
+    validateListFilters(params, ["organization_id"]);
     const organizationId = resolveOrganizationId(params.meta as MetaLike, params.filters);
     if (!organizationId) {
       throw new Error("organization_id is required for organization-members");
     }
-    const payload = await apiRequest<ListPayload<TData>>(`/orgs/${organizationId}/members`);
-    return normalizeListPayload(payload);
+    const payload = await generatedRequest<ListPayload<TData>>(`/orgs/${organizationId}/members`);
+    return clientList(normalizeListPayload(payload).data, params);
   },
-  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: CreateParams<TVariables>,
-  ) => {
+  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: CreateParams<TVariables>) => {
     const payload = asRecord(params.variables as unknown);
     const organizationId = asString(payload?.organization_id) ?? asString(payload?.organizationId);
     if (!organizationId) {
       throw new Error("organization_id is required for organization-members");
     }
 
-    const data = await apiRequest<TData>(`/orgs/${organizationId}/members`, {
+    const data = await generatedRequest<TData>(`/orgs/${organizationId}/members`, {
       method: "POST",
-      body: JSON.stringify({
+      payload: {
         user_id: payload?.user_id ?? payload?.userId,
         role: payload?.role,
-      }),
+      },
     });
     return { data };
   },
 };
 
 const usersAdapter: ResourceAdapter = {
-  getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
-    const ids = resolveFilterIds(params);
-    const query = new URLSearchParams();
-    if (ids.length === 0) {
-      appendPagination(query, params.pagination, 100);
-    }
-    const queryString = query.toString();
-    const payload = await apiRequest<ListPayload<TData>>(
-      queryString ? `/users?${queryString}` : "/users",
-    );
-    const list = normalizeListPayload(payload);
-    if (ids.length === 0) {
-      return list;
-    }
-    // The backend does not filter by `ids`; filter locally.
-    const data = filterByIds(list.data, ids);
-    return { data, total: data.length };
-  },
+  getList: listUsers,
   getOne: async <TData extends BaseRecord = BaseRecord>(params: GetOneParams) => {
     if (String(params.id) === "me") {
-      return { data: await apiRequest<TData>("/users/me") };
+      return { data: await generatedRequest<TData>("/users/me") };
     }
-    return { data: await apiRequest<TData>(`/users/${params.id}`) };
+    return { data: await generatedRequest<TData>(`/users/${params.id}`) };
   },
-  getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => {
-    // The backend paginates /users and ignores `ids`; fetch a large page and filter locally.
-    const query = new URLSearchParams({ page: "1", page_size: "100" });
-    const payload = await apiRequest<ListPayload<TData>>(`/users?${query.toString()}`);
-    return { data: filterByIds(normalizeListPayload(payload).data, params.ids) };
-  },
-  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: CreateParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>("/users", {
+  getMany: async <TData extends BaseRecord = BaseRecord>(params: GetManyParams) => ({
+    data: await usersByIds<TData>(params.ids),
+  }),
+  create: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: CreateParams<TVariables>) => {
+    const data = await generatedRequest<TData>("/users", {
       method: "POST",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },
-  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: UpdateParams<TVariables>,
-  ) => {
+  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: UpdateParams<TVariables>) => {
     const target = String(params.id) === "me" ? "/users/me" : `/users/${params.id}`;
-    const data = await apiRequest<TData>(target, {
+    const data = await generatedRequest<TData>(target, {
       method: "PATCH",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },
-  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: DeleteOneParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>(`/users/${params.id}`, { method: "DELETE" });
+  deleteOne: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: DeleteOneParams<TVariables>) => {
+    const data = await generatedRequest<TData>(`/users/${params.id}`, { method: "DELETE" });
     return { data };
   },
 };
 
 const profileAdapter: ResourceAdapter = {
-  getList: async <TData extends BaseRecord = BaseRecord>() => {
-    const me = await apiRequest<TData>("/users/me");
-    return { data: [me], total: 1 };
+  getList: async <TData extends BaseRecord = BaseRecord>(params: GetListParams) => {
+    validateListFilters(params);
+    const me = await generatedRequest<TData>("/users/me");
+    return clientList([me], params);
   },
   getOne: async <TData extends BaseRecord = BaseRecord>() => ({
-    data: await apiRequest<TData>("/users/me"),
+    data: await generatedRequest<TData>("/users/me"),
   }),
-  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(
-    params: UpdateParams<TVariables>,
-  ) => {
-    const data = await apiRequest<TData>("/users/me", {
+  update: async <TData extends BaseRecord = BaseRecord, TVariables = {}>(params: UpdateParams<TVariables>) => {
+    const data = await generatedRequest<TData>("/users/me", {
       method: "PATCH",
-      body: JSON.stringify(params.variables),
+      payload: params.variables,
     });
     return { data };
   },

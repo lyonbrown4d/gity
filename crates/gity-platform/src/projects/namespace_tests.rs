@@ -54,6 +54,8 @@ async fn namespace_rename_preserves_git_ci_descendants_and_atomic_conflict_rollb
     .create_file_commit(
       "20.git",
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: ".gity-ci.yml".into(),
         content: yaml.into(),

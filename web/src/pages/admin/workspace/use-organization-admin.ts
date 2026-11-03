@@ -3,7 +3,7 @@ import { useCreate, useDelete, useList, useUpdate } from "@refinedev/core";
 import { useI18n } from "@/lib/i18n";
 import type { OrganizationMemberView, OrganizationView, RepositoryView } from "@/pages/types";
 
-export function useOrganizationAdmin() {
+export const useOrganizationAdmin = () => {
   const { t } = useI18n();
   const [selectedOrg, setSelectedOrg] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -162,6 +162,6 @@ export function useOrganizationAdmin() {
     isDeleting: deleteMutation.mutation.isPending,
     isAddingMember: memberMutation.mutation.isPending,
   };
-}
+};
 
 export type OrganizationAdminController = ReturnType<typeof useOrganizationAdmin>;

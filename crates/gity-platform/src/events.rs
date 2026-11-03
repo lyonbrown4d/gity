@@ -111,6 +111,21 @@ pub async fn project_change(
 /// A Git mutation has already succeeded. Follow-up failures are observable and
 /// must not report that the accepted commit itself failed.
 pub async fn repository_changed(s: &AppState, p: &Value, reference: &str, sha: &str) {
+  repository_changed_with_options(s, p, reference, sha, RepositoryChangeOptions::default()).await;
+}
+
+#[derive(Default)]
+pub struct RepositoryChangeOptions {
+  pub skip_pipeline: bool,
+}
+
+pub async fn repository_changed_with_options(
+  s: &AppState,
+  p: &Value,
+  reference: &str,
+  sha: &str,
+  options: RepositoryChangeOptions,
+) {
   let Ok(id) = projects::id(&p["id"]) else {
     return;
   };
@@ -119,7 +134,9 @@ pub async fn repository_changed(s: &AppState, p: &Value, reference: &str, sha: &
       tracing::warn!(error=%error,project_id=id,"global search enqueue failed; reconciliation will retry");
     }
   }
-  if let Err(error) = crate::ci::create_push_pipeline(s, id, reference, sha).await {
+  if !options.skip_pipeline
+    && let Err(error) = crate::ci::create_push_pipeline(s, id, reference, sha).await
+  {
     tracing::error!(error=%error,project_id=id,reference,"push pipeline creation failed");
   }
   match crate::code_index::enqueue(s, p, reference, sha).await {

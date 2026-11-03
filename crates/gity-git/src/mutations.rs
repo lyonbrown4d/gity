@@ -1,9 +1,11 @@
 pub(crate) use crate::references::validate_ref;
 use crate::{commit, validate_path, GitService};
+#[path = "file_commit.rs"]
+mod file_commit;
 use anyhow::{bail, Context, Result};
-use git2::{Index, IndexEntry, IndexTime, Oid, Repository, Signature};
+use git2::{Repository, Signature};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct CreateFileCommitInput {
@@ -11,6 +13,12 @@ pub struct CreateFileCommitInput {
   pub file_path: String,
   pub content: String,
   pub message: String,
+  /// Expected branch tip; an empty string explicitly expects an absent branch.
+  #[serde(default)]
+  pub expected_head_sha: Option<String>,
+  /// Only updates an existing blob; requires a nonempty expected branch tip.
+  #[serde(default)]
+  pub update_existing: bool,
   #[serde(default)]
   pub author_name: String,
   #[serde(default)]
@@ -195,74 +203,7 @@ impl GitService {
       bail!("commit message is required");
     }
     let result = self
-      .read(repo, move |r| {
-        let old = r.find_reference(&reference).ok().and_then(|v| v.target());
-        let parent = match old {
-          Some(id) => Some(r.find_commit(id)?),
-          None => r.head().ok().and_then(|head| head.peel_to_commit().ok()),
-        };
-        let mut index = Index::new()?;
-        if let Some(c) = &parent {
-          index.read_tree(&c.tree()?)?;
-        }
-        if index
-          .get_path(std::path::Path::new(&input.file_path), 0)
-          .is_some()
-        {
-          bail!("git file already exists");
-        }
-        // Refuse replacing a subtree or placing a file beneath an existing blob.
-        if let Some(c) = &parent {
-          let tree = c.tree()?;
-          if tree
-            .get_path(std::path::Path::new(&input.file_path))
-            .is_ok()
-          {
-            bail!("git file already exists");
-          }
-          let mut ancestor = std::path::Path::new(&input.file_path).parent();
-          while let Some(path) = ancestor.filter(|p| !p.as_os_str().is_empty()) {
-            if let Ok(entry) = tree.get_path(path) {
-              if entry.kind() != Some(git2::ObjectType::Tree) {
-                bail!("file parent is not a directory");
-              }
-            }
-            ancestor = path.parent();
-          }
-        }
-        let id = r.blob(input.content.as_bytes())?;
-        index.add(&IndexEntry {
-          ctime: IndexTime::new(0, 0),
-          mtime: IndexTime::new(0, 0),
-          dev: 0,
-          ino: 0,
-          mode: 0o100644,
-          uid: 0,
-          gid: 0,
-          file_size: input
-            .content
-            .len()
-            .try_into()
-            .context("file is too large")?,
-          id,
-          flags: 0,
-          flags_extended: 0,
-          path: input.file_path.as_bytes().to_vec(),
-        })?;
-        let tree = r.find_tree(index.write_tree_to(&r)?)?;
-        let signature = signature(&input.author_name, &input.author_email)?;
-        let parents = parent.iter().collect::<Vec<_>>();
-        let id = r.commit(
-          None,
-          &signature,
-          &signature,
-          &input.message,
-          &tree,
-          &parents,
-        )?;
-        update_tip(&r, &reference, id, old)?;
-        Ok(json!({"hash":id.to_string()}))
-      })
+      .read(repo, move |r| file_commit::create(&r, &reference, &input))
       .await?;
     Ok(
       result["hash"]
@@ -282,12 +223,4 @@ pub(crate) fn signature(name: &str, email: &str) -> Result<Signature<'static>> {
       email
     },
   )?)
-}
-fn update_tip(repo: &Repository, reference: &str, id: Oid, old: Option<Oid>) -> Result<()> {
-  if let Some(old) = old {
-    repo.reference_matching(reference, id, true, old, "Gity commit")?;
-  } else {
-    repo.reference(reference, id, false, "Gity initial commit")?;
-  }
-  Ok(())
 }

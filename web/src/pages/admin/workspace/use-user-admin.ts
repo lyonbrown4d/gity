@@ -6,7 +6,7 @@ import type { UserView } from "@/pages/types";
 type UserRole = "user" | "super-admin";
 type UserStatus = "active" | "disabled";
 
-export function useUserAdmin() {
+export const useUserAdmin = () => {
   const { t } = useI18n();
   const [actionError, setActionError] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
@@ -150,6 +150,6 @@ export function useUserAdmin() {
     isUpdating: updateMutation.mutation.isPending,
     isDeleting: deleteMutation.mutation.isPending,
   };
-}
+};
 
 export type UserAdminController = ReturnType<typeof useUserAdmin>;

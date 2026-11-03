@@ -1,0 +1,24 @@
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: "Aptos", "Segoe UI Variable", "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    background: hsl(var(--background));
+    transition: background-color 240ms ease, color 240ms ease;
+  }
+
+  .dark body {
+    background: hsl(var(--background));
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+  }
+}

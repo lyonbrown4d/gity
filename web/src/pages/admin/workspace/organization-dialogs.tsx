@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/lib/i18n";
 import type { OrganizationAdminController } from "./use-organization-admin";
 
-export function OrganizationDialogs({ controller }: { controller: OrganizationAdminController }): JSX.Element {
+export const OrganizationDialogs = ({ controller }: { controller: OrganizationAdminController }): JSX.Element => {
   const { t } = useI18n();
   const c = controller;
 
@@ -107,4 +107,4 @@ export function OrganizationDialogs({ controller }: { controller: OrganizationAd
       </Modal>
     </>
   );
-}
+};

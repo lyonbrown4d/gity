@@ -12,7 +12,7 @@ import { useI18n } from "@/lib/i18n";
 import type { OrganizationView, RepositoryView } from "@/pages/types";
 import { ConsoleEmpty, ConsoleLoadingRows, ConsolePageHeader, ConsolePanel, MetricStrip, StatusDot } from "./workspace/console-primitives";
 
-export function AdminRepositoriesPage(): JSX.Element {
+export const AdminRepositoriesPage = (): JSX.Element => {
   const { t } = useI18n();
   const [selectedOrg, setSelectedOrg] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -155,4 +155,4 @@ export function AdminRepositoriesPage(): JSX.Element {
       </ConsolePanel>
     </div>
   );
-}
+};

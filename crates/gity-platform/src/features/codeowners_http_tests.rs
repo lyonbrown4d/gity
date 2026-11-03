@@ -3,6 +3,8 @@ use super::*;
 use axum::http::StatusCode;
 fn file(branch: &str, path: &str, content: &str) -> gity_git::CreateFileCommitInput {
   gity_git::CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: branch.into(),
     file_path: path.into(),
     content: content.into(),

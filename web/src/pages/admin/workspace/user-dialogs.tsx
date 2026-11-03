@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useI18n } from "@/lib/i18n";
 import type { UserAdminController } from "./use-user-admin";
 
-export function UserDialogs({ controller }: { controller: UserAdminController }): JSX.Element {
+export const UserDialogs = ({ controller }: { controller: UserAdminController }): JSX.Element => {
   const { t } = useI18n();
   const c = controller;
 
@@ -118,7 +118,7 @@ export function UserDialogs({ controller }: { controller: UserAdminController })
       </Modal>
     </>
   );
-}
+};
 
 interface RoleSelectProps {
   id: string;
@@ -126,7 +126,7 @@ interface RoleSelectProps {
   onChange: (value: "user" | "super-admin") => void;
 }
 
-function RoleSelect({ id, value, onChange }: RoleSelectProps): JSX.Element {
+const RoleSelect = ({ id, value, onChange }: RoleSelectProps): JSX.Element => {
   const { t } = useI18n();
   return (
     <div className="space-y-2">
@@ -140,4 +140,4 @@ function RoleSelect({ id, value, onChange }: RoleSelectProps): JSX.Element {
       </Select>
     </div>
   );
-}
+};

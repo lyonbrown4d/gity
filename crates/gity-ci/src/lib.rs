@@ -7,6 +7,8 @@ mod pipelines;
 mod repository;
 mod runners;
 mod trace;
+mod trace_read;
+pub use trace_read::TracePage;
 mod worker;
 pub use domain::*;
 pub use module::CiModule;

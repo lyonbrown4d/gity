@@ -30,6 +30,8 @@ async fn commit(service: &GitService, name: &str, content: &str) {
     .create_file_commit(
       "source.git",
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: name.into(),
         content: content.into(),

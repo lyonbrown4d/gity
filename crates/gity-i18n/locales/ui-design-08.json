@@ -1,0 +1,11 @@
+{
+  "_version": 2,
+  "Loading job...": {
+    "en": "Loading job...",
+    "zh": "正在加载任务…"
+  },
+  "No .gity-ci.yml exists on this branch. This is a new draft.": {
+    "en": "No .gity-ci.yml exists on this branch. This is a new draft.",
+    "zh": "此分支还没有 .gity-ci.yml，当前内容是新草稿。"
+  }
+}

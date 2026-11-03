@@ -29,7 +29,7 @@ interface GlobalQuickJumpProps {
   canAccessAdmin: boolean;
 }
 
-export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.Element {
+export const GlobalQuickJump = ({ canAccessAdmin }: GlobalQuickJumpProps): JSX.Element => {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
@@ -200,4 +200,4 @@ export function GlobalQuickJump({ canAccessAdmin }: GlobalQuickJumpProps): JSX.E
       </Dialog>
     </>
   );
-}
+};

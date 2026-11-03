@@ -1,9 +1,15 @@
 use super::*;
+#[cfg(test)]
+#[path = "file_pipeline_tests.rs"]
+mod file_pipeline_tests;
+#[cfg(test)]
+#[path = "trace_read_tests.rs"]
+mod trace_read_tests;
 use super::{job_schemas as jobs_spec, params};
 use crate::access;
 use crate::openapi::schemas as api;
 use axum::{
-  extract::{Path, State},
+  extract::{Path, Query, State},
   http::HeaderMap,
 };
 pub(super) fn documented_routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
@@ -169,13 +175,41 @@ async fn retry(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64,
 #[utoipa::path(
     get, path="/{project}/jobs/{job}/trace", tag="ci",
     summary="Get masked job trace output and attempt history",
-    params(params::JobPath),
-    responses((status=200,description="Get masked job trace output and attempt history",body=api::Envelope<jobs_spec::Trace>),api::Errors),
+    params(params::JobPath, params::TraceQuery),
+    responses((status=200,description="Get masked job trace output and attempt history; query options enable bounded byte slices",body=api::Envelope<jobs_spec::Trace>),api::Errors),
     security(("bearer"=[]),("private_token"=[]))
 )]
-async fn trace(State(s): State<AppState>, h: HeaderMap, Path((p, j)): Path<(i64, i64)>) -> Reply {
+async fn trace(
+  State(s): State<AppState>,
+  h: HeaderMap,
+  Path((p, j)): Path<(i64, i64)>,
+  Query(query): Query<params::TraceQuery>,
+) -> Reply {
   access::project_action(&s, &h, p, ProjectAction::JobRead).await?;
   let job = job_row(&s, p, j).await?;
+  if query.attempt.is_some() || query.offset.is_some() || query.limit.is_some() {
+    let page = s
+      .ci
+      .trace_page(
+        p,
+        j,
+        query.attempt,
+        query.offset.unwrap_or(0),
+        query.limit.unwrap_or(64 * 1024),
+      )
+      .await?;
+    let log = page.log.map(model_value);
+    let output = log
+      .as_ref()
+      .map(|row| text(row, "output"))
+      .unwrap_or_default();
+    return Ok(gity_core::ok(json!({
+      "job":public_job(job), "attempts":[], "log":log, "output":output,
+      "attempt_summaries":page.attempt_summaries.into_iter().map(model_value).collect::<Vec<_>>(),
+      "attempt":page.attempt, "offset":page.offset, "next_offset":page.next_offset,
+      "total_bytes":page.total_bytes, "has_more":page.has_more, "truncated":page.truncated,
+    })));
+  }
   let logs = s
     .ci
     .logs(p, j)

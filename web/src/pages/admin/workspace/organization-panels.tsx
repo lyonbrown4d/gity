@@ -10,7 +10,7 @@ interface OrganizationPanelsProps {
   isLoading: boolean;
 }
 
-export function OrganizationPanels({ members, repos, isLoading }: OrganizationPanelsProps): JSX.Element {
+export const OrganizationPanels = ({ members, repos, isLoading }: OrganizationPanelsProps): JSX.Element => {
   const { t } = useI18n();
 
   return (
@@ -89,4 +89,4 @@ export function OrganizationPanels({ members, repos, isLoading }: OrganizationPa
       </ConsolePanel>
     </div>
   );
-}
+};

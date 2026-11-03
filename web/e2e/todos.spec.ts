@@ -76,12 +76,11 @@ test("shows generated todos and marks them done from the inbox", async ({ page }
   expect(todoRequests).toContain("GET /todos?state=done&limit=100");
 });
 
-function todoFixture(
+const todoFixture = (
   isDone: boolean,
   title: string,
   project: { id: string; organizationId: string },
-) {
-  return {
+) => ({
     id: 42,
     user_id: 7,
     organization_id: Number(project.organizationId),
@@ -96,9 +95,8 @@ function todoFixture(
     created_at: "2026-10-02T08:00:00Z",
     updated_at: "2026-10-02T08:00:00Z",
     ...(isDone ? { done_at: "2026-10-02T08:05:00Z" } : {}),
-  };
-}
+  });
 
-async function fulfill(route: Route, data: unknown): Promise<void> {
+const fulfill = async (route: Route, data: unknown): Promise<void> => {
   await route.fulfill({ status: 200, json: { code: 0, message: "ok", data } });
-}
+};

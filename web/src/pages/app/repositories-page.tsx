@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useCreate, useDelete, useList } from "@refinedev/core";
 import { Building2, FolderGit2, Plus, ShieldCheck } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -14,15 +15,21 @@ import {
 } from "./workspace/create-project-dialog";
 import { ProjectWorkspace } from "./workspace/project-workspace";
 
-export function AppRepositoriesPage(): JSX.Element {
+export const AppRepositoriesPage = (): JSX.Element => {
   const { t } = useI18n();
   const [selectedOrg, setSelectedOrg] = useState("");
-  const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const isCreateModalOpen = params.get("create") === "1";
+  const setCreateModalOpen = (open: boolean) => {
+    const next = new URLSearchParams(params);
+    if (open) next.set("create", "1"); else next.delete("create");
+    setParams(next);
+  };
   const [draft, setDraft] = useState<ProjectDraft>(() => createProjectDraft());
   const [actionError, setActionError] = useState<string | null>(null);
   const { mutate: createRepository, mutation: { isPending: isCreating } } = useCreate<RepositoryView>();
   const { mutate: deleteRepository, mutation: { isPending: isDeleting } } = useDelete<RepositoryView>();
-  const orgQuery = useList<OrganizationView>({ resource: "organizations" });
+  const orgQuery = useList<OrganizationView>({ resource: "organizations", pagination: { mode: "off" } });
   const orgs = orgQuery.result.data ?? [];
 
   useEffect(() => {
@@ -39,6 +46,7 @@ export function AppRepositoriesPage(): JSX.Element {
 
   const repoQuery = useList<RepositoryView>({
     resource: "my-projects",
+    pagination: { mode: "off" },
     meta: { organization_id: selectedOrg },
     queryOptions: { enabled: Boolean(selectedOrg) },
   });
@@ -167,11 +175,9 @@ export function AppRepositoriesPage(): JSX.Element {
       />
     </div>
   );
-}
+};
 
-function ProjectStatus({ icon: Icon, label, value, mono = false, badge = false }: { icon: LucideIcon; label: string; value: string; mono?: boolean; badge?: boolean }): JSX.Element {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
+const ProjectStatus = ({ icon: Icon, label, value, mono = false, badge = false }: { icon: LucideIcon; label: string; value: string; mono?: boolean; badge?: boolean }): JSX.Element => <div className="flex items-center gap-3 px-4 py-3 sm:px-5">
       <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
@@ -179,6 +185,4 @@ function ProjectStatus({ icon: Icon, label, value, mono = false, badge = false }
           ? <Badge variant="secondary" className="mt-0.5">{value}</Badge>
           : <p className={`truncate text-sm font-semibold ${mono ? "font-mono" : ""}`}>{value}</p>}
       </div>
-    </div>
-  );
-}
+    </div>;

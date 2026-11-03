@@ -1,20 +1,20 @@
 import type { AuthProvider } from "@refinedev/core";
-import { clearTokens, getTokens } from "@/lib/auth-store";
-import { apiRequest, login, logout } from "@/lib/api";
+import { clearTokens, getTokens, setTokens } from "@/lib/auth-store";
+import { generatedRequest } from "./refine/generated-dispatch";
+import type { User } from "@/lib/generated/model/user";
+import type { Session } from "@/lib/generated/model/session";
 import { translateForCurrentLocale } from "@/lib/i18n";
-
-interface CurrentUser {
-  id: string;
-  username: string;
-  email: string;
-  status: string;
-  is_super_admin: boolean;
-}
 
 export const authProvider: AuthProvider = {
   login: async ({ username, password }) => {
     try {
-      await login({ username, password });
+      const session = await generatedRequest<Session>("/auth/login", {
+        method: "POST",
+        payload: { username, password },
+        auth: false,
+        skipRefresh: true,
+      });
+      setTokens({ accessToken: session.token, refreshToken: session.refresh_token });
       return {
         success: true,
         redirectTo: "/app/dashboard",
@@ -30,7 +30,13 @@ export const authProvider: AuthProvider = {
     }
   },
   logout: async () => {
-    await logout();
+    const tokens = getTokens();
+    try {
+      if (tokens)
+        await generatedRequest("/auth/logout", { method: "POST", payload: { refresh_token: tokens.refreshToken } });
+    } finally {
+      clearTokens();
+    }
     return {
       success: true,
       redirectTo: "/login",
@@ -46,7 +52,7 @@ export const authProvider: AuthProvider = {
       };
     }
     try {
-      await apiRequest<CurrentUser>("/users/me");
+      await generatedRequest<User>("/users/me");
       return {
         authenticated: true,
       };
@@ -61,7 +67,7 @@ export const authProvider: AuthProvider = {
   },
   getPermissions: async () => {
     try {
-      const user = await apiRequest<CurrentUser>("/users/me");
+      const user = await generatedRequest<User>("/users/me");
       return {
         isSuperAdmin: user.is_super_admin,
       };
@@ -71,7 +77,7 @@ export const authProvider: AuthProvider = {
   },
   getIdentity: async () => {
     try {
-      const user = await apiRequest<CurrentUser>("/users/me");
+      const user = await generatedRequest<User>("/users/me");
       return {
         id: user.id,
         name: user.username,

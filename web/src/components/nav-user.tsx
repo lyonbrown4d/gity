@@ -19,7 +19,7 @@ interface NavUserProps {
   compact?: boolean;
 }
 
-export function NavUser({ user, onLogout, onNavigate, compact = false }: NavUserProps): JSX.Element {
+export const NavUser = ({ user, onLogout, onNavigate, compact = false }: NavUserProps): JSX.Element => {
   const { t } = useI18n();
   const initials = user.name
     .trim()
@@ -106,4 +106,4 @@ export function NavUser({ user, onLogout, onNavigate, compact = false }: NavUser
       </SidebarMenuItem>
     </SidebarMenu>
   );
-}
+};

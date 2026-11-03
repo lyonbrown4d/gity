@@ -104,23 +104,23 @@ test("drives repository collaboration across search, issues, wiki, pipelines, an
   await expect(page.getByText("You approved").first()).toBeVisible();
 });
 
-function issueNumberFromCurrentURL(page: Page): number {
+const issueNumberFromCurrentURL = (page: Page): number => {
   const match = page.url().match(/\/issues\/(\d+)$/);
   if (!match) {
     throw new Error(`Issue detail URL did not contain an issue number: ${page.url()}`);
   }
   return Number.parseInt(match[1], 10);
-}
+};
 
-async function selectRadixOption(page: Page, label: string, option: string): Promise<void> {
+const selectRadixOption = async (page: Page, label: string, option: string): Promise<void> => {
   await page.getByLabel(label).click();
   await page.getByRole("option", { name: option, exact: true }).click();
-}
+};
 
-async function typeInto(locator: Locator, value: string): Promise<void> {
+const typeInto = async (locator: Locator, value: string): Promise<void> => {
   await locator.click();
   await locator.pressSequentially(value);
   await expect(locator).toHaveValue(value);
-}
+};
 
 

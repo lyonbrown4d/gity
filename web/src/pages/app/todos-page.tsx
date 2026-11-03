@@ -13,7 +13,7 @@ import { useI18n } from "@/lib/i18n";
 import type { TodoState, TodoView } from "./todo-types";
 import { useMarkTodoDone, useTodoList } from "./use-todos";
 
-export function AppTodosPage(): JSX.Element {
+export const AppTodosPage = (): JSX.Element => {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const state: TodoState = searchParams.get("state") === "done" ? "done" : "pending";
@@ -99,9 +99,9 @@ export function AppTodosPage(): JSX.Element {
       </Section>
     </div>
   );
-}
+};
 
-function TodoRow({
+const TodoRow = ({
   todo,
   isMarkingDone,
   onMarkDone,
@@ -109,7 +109,7 @@ function TodoRow({
   todo: TodoView;
   isMarkingDone: boolean;
   onMarkDone: () => void;
-}): JSX.Element {
+}): JSX.Element => {
   const { t } = useI18n();
   const actionUrl = resolveActionUrl(todo);
 
@@ -149,19 +149,15 @@ function TodoRow({
       </div>
     </DataRow>
   );
-}
+};
 
-function TodoLoading(): JSX.Element {
-  return (
-    <div className="divide-y divide-border" aria-label="Loading todos">
+const TodoLoading = (): JSX.Element => <div className="divide-y divide-border" aria-label="Loading todos">
       {[0, 1, 2].map((item) => (
         <div key={item} className="px-4 py-3"><Skeleton className="h-8 w-full" /></div>
       ))}
-    </div>
-  );
-}
+    </div>;
 
-function TodoEmpty({ state }: { state: TodoState }): JSX.Element {
+const TodoEmpty = ({ state }: { state: TodoState }): JSX.Element => {
   const { t } = useI18n();
   return (
     <div className="flex min-h-48 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
@@ -174,7 +170,7 @@ function TodoEmpty({ state }: { state: TodoState }): JSX.Element {
       </p>
     </div>
   );
-}
+};
 
 const formatKind = (kind: string): string => kind.split("_").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" ");
 

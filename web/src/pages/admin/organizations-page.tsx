@@ -11,7 +11,7 @@ import { OrganizationDialogs } from "./workspace/organization-dialogs";
 import { OrganizationPanels } from "./workspace/organization-panels";
 import { useOrganizationAdmin } from "./workspace/use-organization-admin";
 
-export function AdminOrganizationsPage(): JSX.Element {
+export const AdminOrganizationsPage = (): JSX.Element => {
   const { t } = useI18n();
   const c = useOrganizationAdmin();
 
@@ -99,4 +99,4 @@ export function AdminOrganizationsPage(): JSX.Element {
       <OrganizationDialogs controller={c} />
     </div>
   );
-}
+};

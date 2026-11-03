@@ -1,0 +1,56 @@
+.ci-flow {
+  --xy-background-color: hsl(var(--background));
+  --xy-background-pattern-dots-color: hsl(var(--border));
+  --xy-edge-stroke: hsl(var(--muted-foreground));
+  --xy-edge-stroke-selected: hsl(var(--primary));
+  --xy-node-background-color: hsl(var(--card));
+  --xy-node-color: hsl(var(--foreground));
+  --xy-node-border: 1px solid hsl(var(--border));
+  --xy-node-border-radius: var(--radius);
+  --xy-handle-background-color: hsl(var(--card));
+  --xy-handle-border-color: hsl(var(--primary));
+  --xy-controls-button-background-color: hsl(var(--card));
+  --xy-controls-button-background-color-hover: hsl(var(--muted));
+  --xy-controls-button-color: hsl(var(--foreground));
+  --xy-controls-button-border-color: hsl(var(--border));
+  --xy-minimap-background-color: hsl(var(--card));
+  --xy-minimap-node-background-color: hsl(var(--muted));
+  --xy-minimap-mask-background-color: hsl(var(--background) / 0.6);
+  .react-flow__node-stage {
+    background: hsl(var(--muted) / 0.25);
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    color: hsl(var(--muted-foreground));
+    font-size: 13px;
+  }
+  .react-flow__node-job {
+    width: 180px;
+  }
+}
+.ci-task-node {
+  padding: 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  min-height: 130px;
+  &.is-selected {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.12);
+  }
+}
+
+.ci-log,
+.ci-log-line-number {
+  background: hsl(var(--sidebar-background));
+  color: hsl(var(--sidebar-foreground));
+}
+
+.ci-status-success {
+  color: hsl(var(--success));
+  border-color: hsl(var(--success) / 0.25);
+  background: hsl(var(--success) / 0.1);
+}
+.ci-log-match {
+  background: hsl(var(--warning) / 0.2);
+}

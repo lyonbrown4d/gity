@@ -63,6 +63,8 @@ impl Fixture {
       .create_file_commit(
         "20.git",
         gity_git::CreateFileCommitInput {
+          expected_head_sha: None,
+          update_existing: false,
           branch_name: "main".into(),
           file_path: "README.md".into(),
           content: "base\n".into(),

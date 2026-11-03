@@ -14,7 +14,7 @@ interface ObservableStore<T> {
  * Pass `null` while the source is not yet available; the hook then keeps
  * returning `initialValue` without subscribing.
  */
-export function useObservable<T>(observable: Observable<T> | null, initialValue: T): T {
+export const useObservable = <T>(observable: Observable<T> | null, initialValue: T): T => {
   const storeRef = useRef<ObservableStore<T>>({
     value: initialValue,
     listeners: new Set(),
@@ -48,4 +48,4 @@ export function useObservable<T>(observable: Observable<T> | null, initialValue:
     () => store.value,
     () => initialValue,
   );
-}
+};

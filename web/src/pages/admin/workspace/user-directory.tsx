@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { ConsoleLoadingRows, ConsolePanel, StatusDot } from "./console-primitives";
 import type { UserAdminController } from "./use-user-admin";
 
-export function UserDirectory({ controller: c }: { controller: UserAdminController }): JSX.Element {
+export const UserDirectory = ({ controller: c }: { controller: UserAdminController }): JSX.Element => {
   const { t } = useI18n();
 
   return (
@@ -117,4 +117,4 @@ export function UserDirectory({ controller: c }: { controller: UserAdminControll
       </div>
     </ConsolePanel>
   );
-}
+};

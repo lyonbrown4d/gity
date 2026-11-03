@@ -12,14 +12,14 @@ interface SectionProps {
 }
 
 /** Flat panel that replaces the decorative Card on content pages. */
-export function Section({
+export const Section = ({
   title,
   description,
   actions,
   children,
   className,
   flush = false,
-}: SectionProps): JSX.Element {
+}: SectionProps): JSX.Element => {
   const hasHeader = Boolean(title || description || actions);
   return (
     <section className={cn("gity-section", className)}>
@@ -35,4 +35,4 @@ export function Section({
       <div className={flush ? undefined : "gity-section-body"}>{children}</div>
     </section>
   );
-}
+};

@@ -10,7 +10,7 @@ const ACTIVITY_QUERY_KEY = ["activity"] as const;
  * `useCustom` (the data provider hits `/api/v1/activity`). Switch to the
  * generated `useGetActivity` client after `pnpm gen:api` includes it.
  */
-export function useActivity(limit: number) {
+export const useActivity = (limit: number) => {
   const query = useCustom<Record<string, unknown>>({
     url: "/activity",
     method: "get",
@@ -24,4 +24,4 @@ export function useActivity(limit: number) {
 
   const items: ActivityItem[] = toActivityItems(query.result.data);
   return { items, query: query.query };
-}
+};

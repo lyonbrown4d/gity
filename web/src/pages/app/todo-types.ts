@@ -15,10 +15,10 @@ export type TodoKind =
   | "merge_request_assigned";
 
 export interface TodoView {
-  id: number;
-  user_id: number;
-  organization_id: number;
-  project_id: number;
+  id: string;
+  user_id: string;
+  organization_id: string;
+  project_id: string;
   kind: TodoKind;
   state: TodoState;
   target_type: string;
@@ -32,6 +32,6 @@ export interface TodoView {
 }
 
 export interface TodoDoneView {
-  id: number;
+  id: string;
   state: "done";
 }

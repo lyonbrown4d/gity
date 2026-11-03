@@ -66,6 +66,8 @@ async fn remote_reads_mutations_and_streaming_archive_have_no_gateway_repository
     .create_file_commit(
       "42.git",
       CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: "README.md".into(),
         content: content.clone(),

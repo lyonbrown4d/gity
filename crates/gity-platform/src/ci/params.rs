@@ -1,4 +1,16 @@
 use utoipa::IntoParams;
+#[derive(Default, serde::Deserialize, IntoParams)]
+#[into_params(parameter_in=Query)]
+pub struct TraceQuery {
+  /// Select an attempt (otherwise latest persisted attempt). Enables bounded mode.
+  #[param(minimum = 1)]
+  pub attempt: Option<i32>,
+  /// Byte offset. Offsets inside UTF-8 characters advance to the next boundary.
+  pub offset: Option<u64>,
+  /// Maximum returned output bytes, 4–262144; bounded mode defaults to 65536.
+  #[param(minimum = 4, maximum = 262144)]
+  pub limit: Option<u64>,
+}
 #[derive(IntoParams)]
 #[into_params(parameter_in=Path)]
 pub struct ProjectPath {

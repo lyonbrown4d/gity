@@ -7,10 +7,12 @@
     <title>Gity</title>
     <script>
       (() => {
-        const stored = localStorage.getItem("gity.theme");
-        const dark = stored === "dark" || (!stored && matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        try {
+          const mode = JSON.parse(localStorage.getItem("gity.appearance") || "null")?.state?.appearance?.mode || "system";
+          const dark = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        } catch { /* Use the default theme if browser storage is unavailable. */ }
       })();
     </script>
   </head>

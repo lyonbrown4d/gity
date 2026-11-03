@@ -47,7 +47,7 @@ export interface IssueView {
 export const uniqueKey = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-export async function loginByAPI(request: Request, username = uniqueKey("e2e-user")): Promise<AuthSession> {
+export const loginByAPI = async (request: Request, username = uniqueKey("e2e-user")): Promise<AuthSession> => {
   const response = await request.post(`${apiBaseURL}/auth/login`, {
     data: {
       username,
@@ -55,9 +55,9 @@ export async function loginByAPI(request: Request, username = uniqueKey("e2e-use
     },
   });
   return responseData<AuthSession>(response);
-}
+};
 
-export async function authenticatePage(page: Page, session: AuthSession): Promise<void> {
+export const authenticatePage = async (page: Page, session: AuthSession): Promise<void> => {
   await page.goto("/");
   await page.evaluate(
     ({ accessToken, refreshToken }) => {
@@ -66,9 +66,9 @@ export async function authenticatePage(page: Page, session: AuthSession): Promis
     },
     { accessToken: session.token, refreshToken: session.refresh_token },
   );
-}
+};
 
-export async function createOrganization(request: Request, session: AuthSession, key = uniqueKey("org")): Promise<OrganizationView> {
+export const createOrganization = async (request: Request, session: AuthSession, key = uniqueKey("org")): Promise<OrganizationView> => {
   const response = await request.post(`${apiBaseURL}/orgs`, {
     headers: authHeaders(session),
     data: {
@@ -81,14 +81,14 @@ export async function createOrganization(request: Request, session: AuthSession,
     },
   });
   return responseData<OrganizationView>(response);
-}
+};
 
-export async function createProject(
+export const createProject = async (
   request: Request,
   session: AuthSession,
   organization: OrganizationView,
   key = uniqueKey("project"),
-): Promise<ProjectView> {
+): Promise<ProjectView> => {
   const response = await request.post(`${apiBaseURL}/projects`, {
     headers: authHeaders(session),
     data: {
@@ -102,15 +102,15 @@ export async function createProject(
     },
   });
   return responseData<ProjectView>(response);
-}
+};
 
-export async function createBranch(
+export const createBranch = async (
   request: Request,
   session: AuthSession,
   project: ProjectView,
   name: string,
   sourceRef = project.default_branch || "main",
-): Promise<BranchView> {
+): Promise<BranchView> => {
   const response = await request.post(`${apiBaseURL}/projects/${project.id}/repository/branches`, {
     headers: authHeaders(session),
     data: {
@@ -119,9 +119,9 @@ export async function createBranch(
     },
   });
   return responseData<BranchView>(response);
-}
+};
 
-export async function createFileCommit(
+export const createFileCommit = async (
   request: Request,
   session: AuthSession,
   project: ProjectView,
@@ -131,7 +131,7 @@ export async function createFileCommit(
     content?: string;
     message?: string;
   } = {},
-): Promise<void> {
+): Promise<void> => {
   const filePath = options.path ?? "README.md";
   const response = await request.post(`${apiBaseURL}/projects/${project.id}/repository/files`, {
     headers: authHeaders(session),
@@ -145,9 +145,9 @@ export async function createFileCommit(
     },
   });
   await expectOK(response);
-}
+};
 
-export async function createIssue(request: Request, session: AuthSession, project: ProjectView): Promise<IssueView> {
+export const createIssue = async (request: Request, session: AuthSession, project: ProjectView): Promise<IssueView> => {
   const issueTitle = `E2E issue ${uniqueKey("case")}`;
   const response = await request.post(`${apiBaseURL}/projects/${project.id}/issues`, {
     headers: authHeaders(session),
@@ -157,15 +157,15 @@ export async function createIssue(request: Request, session: AuthSession, projec
     },
   });
   return responseData<IssueView>(response);
-}
+};
 
-export async function createIssueComment(
+export const createIssueComment = async (
   request: Request,
   session: AuthSession,
   project: ProjectView,
   issueNumber: number,
   content: string,
-): Promise<void> {
+): Promise<void> => {
   const response = await request.post(`${apiBaseURL}/projects/${project.id}/issues/${issueNumber}/comments`, {
     headers: authHeaders(session),
     data: {
@@ -174,29 +174,27 @@ export async function createIssueComment(
     },
   });
   await expectOK(response);
-}
+};
 
-export async function seedProject(request: Request): Promise<{
+export const seedProject = async (request: Request): Promise<{
   session: AuthSession;
   organization: OrganizationView;
   project: ProjectView;
   issue: IssueView;
-}> {
+}> => {
   const session = await loginByAPI(request);
   const organization = await createOrganization(request, session);
   const project = await createProject(request, session, organization);
   await createFileCommit(request, session, project);
   const issue = await createIssue(request, session, project);
   return { session, organization, project, issue };
-}
+};
 
-function authHeaders(session: AuthSession): Record<string, string> {
-  return {
+const authHeaders = (session: AuthSession): Record<string, string> => ({
     Authorization: `Bearer ${session.token}`,
-  };
-}
+  });
 
-async function responseData<T>(response: APIResponse): Promise<T> {
+const responseData = async <T>(response: APIResponse): Promise<T> => {
   const body = await expectOK(response);
   try {
     const payload = JSON.parse(body) as T | Envelope<T>;
@@ -207,16 +205,14 @@ async function responseData<T>(response: APIResponse): Promise<T> {
   } catch (error) {
     throw new Error(`${response.url()} returned non-JSON response: ${body.slice(0, 200)}`, { cause: error });
   }
-}
+};
 
-async function expectOK(response: APIResponse): Promise<string> {
+const expectOK = async (response: APIResponse): Promise<string> => {
   const body = await response.text();
   expect(response.ok(), `${response.status()} ${response.url()} failed: ${body}`).toBe(true);
   return body;
-}
+};
 
-function isEnvelope<T>(value: T | Envelope<T>): value is Envelope<T> {
-  return typeof value === "object" && value !== null && "data" in value && "code" in value;
-}
+const isEnvelope = <T>(value: T | Envelope<T>): value is Envelope<T> => typeof value === "object" && value !== null && "data" in value && "code" in value;
 
 

@@ -10,6 +10,8 @@ async fn fixture() -> (tempfile::TempDir, GitService) {
     .create_file_commit(
       "test.git",
       CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: "README.md".into(),
         content: "SSH fixture".into(),

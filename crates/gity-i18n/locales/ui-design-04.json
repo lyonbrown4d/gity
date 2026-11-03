@@ -1,0 +1,243 @@
+{
+  "_version": 2,
+  "No update timestamp": {
+    "en": "No update timestamp",
+    "zh": "没有更新时间"
+  },
+  "No updates yet": {
+    "en": "No updates yet",
+    "zh": "暂无更新"
+  },
+  "Ocean": {
+    "en": "Ocean",
+    "zh": "海洋"
+  },
+  "One command per line": {
+    "en": "One command per line",
+    "zh": "每行一个命令"
+  },
+  "Open MRs": {
+    "en": "Open MRs",
+    "zh": "打开的合并请求"
+  },
+  "Open code": {
+    "en": "Open code",
+    "zh": "打开代码"
+  },
+  "Open code to add CI config": {
+    "en": "Open code to add CI config",
+    "zh": "打开代码页面添加 CI 配置"
+  },
+  "Open discussion": {
+    "en": "Open discussion",
+    "zh": "打开讨论"
+  },
+  "Open in YAML": {
+    "en": "Open in YAML",
+    "zh": "在 YAML 中打开"
+  },
+  "Open inbox": {
+    "en": "Open inbox",
+    "zh": "打开收件箱"
+  },
+  "Open item": {
+    "en": "Open item",
+    "zh": "打开事项"
+  },
+  "Open jobs": {
+    "en": "Open jobs",
+    "zh": "打开任务"
+  },
+  "Open pipeline logs from the Pipelines tab.": {
+    "en": "Open pipeline logs from the Pipelines tab.",
+    "zh": "请在流水线标签页打开流水线日志。"
+  },
+  "Open pipelines": {
+    "en": "Open pipelines",
+    "zh": "打开流水线"
+  },
+  "Open project": {
+    "en": "Open project",
+    "zh": "打开项目"
+  },
+  "Open wiki": {
+    "en": "Open wiki",
+    "zh": "打开 Wiki"
+  },
+  "Open workspace activity and project shortcuts.": {
+    "en": "Open workspace activity and project shortcuts.",
+    "zh": "查看工作区动态和项目快捷入口。"
+  },
+  "Or adjust approval rules for the target branch.": {
+    "en": "Or adjust approval rules for the target branch.",
+    "zh": "也可以调整目标分支的审批规则。"
+  },
+  "Package file download is not available.": {
+    "en": "Package file download is not available.",
+    "zh": "无法下载包文件。"
+  },
+  "Package name, version, file name, and content are required": {
+    "en": "Package name, version, file name, and content are required",
+    "zh": "请填写包名称、版本、文件名并选择文件内容"
+  },
+  "Packages will appear here after maintainers publish artifacts.": {
+    "en": "Packages will appear here after maintainers publish artifacts.",
+    "zh": "维护者发布产物后，包会显示在这里。"
+  },
+  "Page background": {
+    "en": "Page background",
+    "zh": "页面背景"
+  },
+  "Palette": {
+    "en": "Palette",
+    "zh": "配色"
+  },
+  "Palette settings": {
+    "en": "Palette settings",
+    "zh": "配色设置"
+  },
+  "Paused runners should not claim jobs until reactivated.": {
+    "en": "Paused runners should not claim jobs until reactivated.",
+    "zh": "Runner 暂停期间不会领取任务，重新启用后才会恢复。"
+  },
+  "Pending project activity assigned to you.": {
+    "en": "Pending project activity assigned to you.",
+    "zh": "分配给你的待处理项目事项。"
+  },
+  "Pipeline did not succeed": {
+    "en": "Pipeline did not succeed",
+    "zh": "流水线未成功"
+  },
+  "Pipeline editor": {
+    "en": "Pipeline editor",
+    "zh": "流水线编辑器"
+  },
+  "Pipeline editor canvas": {
+    "en": "Pipeline editor canvas",
+    "zh": "流水线编辑画布"
+  },
+  "Pipeline execution graph": {
+    "en": "Pipeline execution graph",
+    "zh": "流水线执行图"
+  },
+  "Pipeline not found": {
+    "en": "Pipeline not found",
+    "zh": "未找到流水线"
+  },
+  "Pipeline service is not configured": {
+    "en": "Pipeline service is not configured",
+    "zh": "尚未配置流水线服务"
+  },
+  "Policy check blocked": {
+    "en": "Policy check blocked",
+    "zh": "策略检查未通过"
+  },
+  "Preferences are saved automatically in this browser.": {
+    "en": "Preferences are saved automatically in this browser.",
+    "zh": "偏好设置会自动保存在此浏览器中。"
+  },
+  "Previous match": {
+    "en": "Previous match",
+    "zh": "上一个匹配项"
+  },
+  "Previous segment": {
+    "en": "Previous segment",
+    "zh": "上一段"
+  },
+  "Project access token name is required.": {
+    "en": "Project access token name is required.",
+    "zh": "项目访问令牌名称不能为空。"
+  },
+  "Project files": {
+    "en": "Project files",
+    "zh": "项目文件"
+  },
+  "Project knowledge base exists": {
+    "en": "Project knowledge base exists",
+    "zh": "项目知识库已就绪"
+  },
+  "Project shortcuts could not be loaded, but global navigation is still available.": {
+    "en": "Project shortcuts could not be loaded, but global navigation is still available.",
+    "zh": "无法加载项目快捷入口，但仍可使用全局导航。"
+  },
+  "Project unavailable": {
+    "en": "Project unavailable",
+    "zh": "项目暂不可用"
+  },
+  "Projects are unavailable until the request succeeds.": {
+    "en": "Projects are unavailable until the request succeeds.",
+    "zh": "请求成功后即可查看项目。"
+  },
+  "Projects could not be loaded.": {
+    "en": "Projects could not be loaded.",
+    "zh": "无法加载项目。"
+  },
+  "Protected branch": {
+    "en": "Protected branch",
+    "zh": "受保护分支"
+  },
+  "Protected branch: the server checks push rules when committing.": {
+    "en": "Protected branch: the server checks push rules when committing.",
+    "zh": "受保护分支：提交时由服务器检查推送规则。"
+  },
+  "Publish build artifacts": {
+    "en": "Publish build artifacts",
+    "zh": "发布构建产物"
+  },
+  "Publish package": {
+    "en": "Publish package",
+    "zh": "发布包"
+  },
+  "Push a new commit or fix CI config to trigger a new pipeline.": {
+    "en": "Push a new commit or fix CI config to trigger a new pipeline.",
+    "zh": "推送新提交或修复 CI 配置，以触发新流水线。"
+  },
+  "Push access": {
+    "en": "Push access",
+    "zh": "推送权限"
+  },
+  "Push your code from the command line.": {
+    "en": "Push your code from the command line.",
+    "zh": "从命令行推送代码。"
+  },
+  "Quick entry to project documentation.": {
+    "en": "Quick entry to project documentation.",
+    "zh": "快速查看项目文档。"
+  },
+  "README": {
+    "en": "README",
+    "zh": "README"
+  },
+  "README is binary and cannot be rendered here. Open the code tab to inspect it.": {
+    "en": "README is binary and cannot be rendered here. Open the code tab to inspect it.",
+    "zh": "README 是二进制文件，无法在此渲染。请打开代码标签页查看。"
+  },
+  "Read-only access": {
+    "en": "Read-only access",
+    "zh": "只读"
+  },
+  "Ready to merge": {
+    "en": "Ready to merge",
+    "zh": "可以合并"
+  },
+  "Recent activity": {
+    "en": "Recent activity",
+    "zh": "近期动态"
+  },
+  "Recent activity could not be loaded.": {
+    "en": "Recent activity could not be loaded.",
+    "zh": "无法加载近期动态。"
+  },
+  "Recent projects": {
+    "en": "Recent projects",
+    "zh": "最近访问的项目"
+  },
+  "Recent runs": {
+    "en": "Recent runs",
+    "zh": "最近运行记录"
+  },
+  "Recover unsaved configuration": {
+    "en": "Recover unsaved configuration",
+    "zh": "恢复未保存的配置"
+  }
+}

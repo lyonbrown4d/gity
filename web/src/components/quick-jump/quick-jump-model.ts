@@ -65,12 +65,12 @@ const repositoryDestinations: Array<{
   { tab: "settings", label: "Settings", description: "Project settings, credentials, members, and danger zone.", icon: Settings, keywords: ["credential", "member", "token"] },
 ];
 
-export function buildQuickJumpGroups(input: {
+export const buildQuickJumpGroups = (input: {
   canAccessAdmin: boolean;
   currentProjectRoute: CurrentProjectRoute | null;
   projects: RepositoryView[];
   t: Translate;
-}): QuickJumpGroup[] {
+}): QuickJumpGroup[] => {
   const { canAccessAdmin, currentProjectRoute, projects, t } = input;
   const currentProject = currentProjectRoute
     ? projects.find((project) => project.id === currentProjectRoute.projectId) ?? null
@@ -135,32 +135,26 @@ export function buildQuickJumpGroups(input: {
   }
 
   return groups;
-}
+};
 
-export function parseCurrentProjectRoute(pathname: string): CurrentProjectRoute | null {
+export const parseCurrentProjectRoute = (pathname: string): CurrentProjectRoute | null => {
   const match = /^\/app\/(?:projects|repositories)\/([^/]+)\/([^/]+)/.exec(pathname);
   if (!match) return null;
   return {
     organizationId: decodeURIComponent(match[1]),
     projectId: decodeURIComponent(match[2]),
   };
-}
+};
 
-export function quickJumpValue(item: QuickJumpItem): string {
-  return [item.id, item.title, item.description, item.path, ...item.keywords].join(" ");
-}
+export const quickJumpValue = (item: QuickJumpItem): string => [item.id, item.title, item.description, item.path, ...item.keywords].join(" ");
 
-function quickItem(
+const quickItem = (
   id: string,
   title: string,
   description: string,
   path: string,
   icon: LucideIcon,
   keywords: string[],
-): QuickJumpItem {
-  return { id, title, description, path, icon, keywords };
-}
+): QuickJumpItem => ({ id, title, description, path, icon, keywords });
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
+const isNonEmptyString = (value: unknown): value is string => typeof value === "string" && value.length > 0;

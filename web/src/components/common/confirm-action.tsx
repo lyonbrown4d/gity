@@ -24,7 +24,7 @@ interface ConfirmActionProps {
   onConfirm: (verification?: string) => void;
 }
 
-export function ConfirmAction({
+export const ConfirmAction = ({
   children,
   title,
   description,
@@ -34,7 +34,7 @@ export function ConfirmAction({
   verificationValue,
   verificationPlaceholder,
   onConfirm,
-}: ConfirmActionProps): JSX.Element {
+}: ConfirmActionProps): JSX.Element => {
   const [open, setOpen] = useState(false);
   const [verification, setVerification] = useState("");
   const requiresVerification = typeof verificationValue === "string" && verificationValue.length > 0;
@@ -87,4 +87,4 @@ export function ConfirmAction({
       </DialogContent>
     </Dialog>
   );
-}
+};

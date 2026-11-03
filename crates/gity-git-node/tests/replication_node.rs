@@ -8,6 +8,8 @@ use support::{remote, settings, start_node};
 fn commit(path: &str, message: &str) -> GitOperation {
   GitOperation::CreateFileCommit {
     input: serde_json::to_value(CreateFileCommitInput {
+      expected_head_sha: None,
+      update_existing: false,
       branch_name: "main".into(),
       file_path: path.into(),
       content: message.into(),

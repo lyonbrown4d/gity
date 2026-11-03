@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EDITOR_PACKAGES = ["@monaco-editor", "monaco-editor", "@milkdown"];
 const MARKDOWN_PACKAGES = ["marked", "dompurify"];
 
-function normalizeProxyTarget(raw: string | undefined): string {
+const normalizeProxyTarget = (raw: string | undefined): string => {
   if (!raw || raw.trim().length === 0) {
     return "http://127.0.0.1:8080";
   }
@@ -19,7 +19,7 @@ function normalizeProxyTarget(raw: string | undefined): string {
   } catch {
     return raw;
   }
-}
+};
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -50,7 +50,7 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {
-          manualChunks(id) {
+          manualChunks: (id) => {
             if (!id.includes("node_modules")) {
               return;
             }

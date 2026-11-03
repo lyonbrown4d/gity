@@ -1,4 +1,4 @@
-import Editor from "@monaco-editor/react";
+import Editor from "@/components/code-editor";
 import { FormDialog as Modal } from "@/components/common/form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

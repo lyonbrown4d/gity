@@ -3,19 +3,21 @@
 //! Answers come from the project's lexical index. Missing or unreadable indexes
 //! are not errors — they produce empty results with `precision = "approximate"`,
 //! which is what lets the precise layer be added later without a shape change.
+use crate::AppState;
 use crate::access::{self, ProjectAction};
 use crate::openapi::code_schemas as spec;
 use crate::openapi::schemas as api;
-use crate::{AppState, repository};
 use axum::{
   Json,
   extract::{Path, Query, State},
   http::HeaderMap,
 };
-use gity_code_intel::{Status, SymbolDoc};
+#[path = "lookup_views.rs"]
+mod views;
 use gity_core::{AppError, ok};
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use views::{index_info, symbol};
 type Reply = Result<Json<Value>, AppError>;
 
 pub(crate) fn routes() -> utoipa_axum::router::OpenApiRouter<AppState> {
@@ -69,32 +71,6 @@ async fn blocking<T: Send + 'static>(
 /// Pulls the shared archive when this replica has no local index for the commit.
 async fn restore(s: &AppState, project: &Value) {
   crate::code_index::hydrate_head(s, project).await;
-}
-
-fn index_info(status: Option<&Status>) -> spec::CodeIndexInfo {
-  spec::CodeIndexInfo {
-    available: status.is_some(),
-    commit: status
-      .map(|status| status.commit.clone())
-      .unwrap_or_default(),
-    indexed_at: status
-      .map(|status| status.indexed_at.clone())
-      .unwrap_or_default(),
-    truncated: status.map(|status| status.truncated).unwrap_or(false),
-  }
-}
-
-fn symbol(row: SymbolDoc) -> spec::CodeSymbol {
-  spec::CodeSymbol {
-    path: row.path,
-    name: row.name,
-    kind: row.kind,
-    scope: row.scope,
-    line: row.line,
-    line_end: row.line_end,
-    column: row.column,
-    doc: row.doc,
-  }
 }
 
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
@@ -302,10 +278,4 @@ pub(crate) async fn search(
     precision: "approximate".into(),
     index: index_info(status.as_ref()),
   })))
-}
-
-/// Kept so the module compiles when the route table is trimmed during reviews.
-#[allow(dead_code)]
-fn _project_repo(project: &Value) -> String {
-  repository::repo(project)
 }

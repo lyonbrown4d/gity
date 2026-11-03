@@ -24,7 +24,7 @@ const routeTitleMap: Record<string, string> = {
   "/app/profile": "Profile",
 };
 
-export function UserLayout(): JSX.Element {
+export const UserLayout = (): JSX.Element => {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ export function UserLayout(): JSX.Element {
   return (
     <SidebarProvider
       className="gity-shell bg-background"
-      style={{ "--sidebar-width": "19rem", "--sidebar-width-icon": "3.5rem" } as CSSProperties}
+      style={{ "--sidebar-width": "15rem", "--sidebar-width-icon": "4rem" } as CSSProperties}
     >
       <a href="#main-content" className="skip-link">
         {t("Skip to main content")}
@@ -63,7 +63,7 @@ export function UserLayout(): JSX.Element {
         }
       />
       <SidebarInset className="min-w-0 overflow-hidden bg-background md:rounded-none md:shadow-none">
-        <header className="sticky top-0 z-20 grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border bg-background px-3 md:grid-cols-[minmax(12rem,1fr)_minmax(18rem,32rem)_minmax(12rem,1fr)]">
+        <header className="sticky top-0 z-20 grid h-14 shrink-0 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 border-b border-border bg-background px-3 md:grid-cols-[minmax(12rem,1fr)_minmax(18rem,32rem)_minmax(12rem,1fr)] md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <SidebarTrigger className="-ml-1 shrink-0" aria-label={t("Toggle Sidebar")} />
             <Separator orientation="vertical" className="h-4" />
@@ -87,7 +87,7 @@ export function UserLayout(): JSX.Element {
         <motion.main
           key={location.pathname}
           id="main-content"
-          className="flex flex-1 flex-col gap-4 p-3 md:p-5"
+          className="flex flex-1 flex-col gap-6 p-3 md:p-8"
           initial={reduceMotion ? false : { opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
@@ -97,4 +97,4 @@ export function UserLayout(): JSX.Element {
       </SidebarInset>
     </SidebarProvider>
   );
-}
+};

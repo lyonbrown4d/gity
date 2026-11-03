@@ -128,7 +128,7 @@ pub(super) async fn timeline(s: &AppState, project: i64, iid: i64) -> Result<Vec
         .map(|event| (event.created_at, event.id, event_entry(&event))),
     )
     .collect::<Vec<_>>();
-  rows.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+  rows.sort_by_key(|a| (a.0, a.1));
   Ok(rows.into_iter().map(|row| row.2).collect())
 }
 

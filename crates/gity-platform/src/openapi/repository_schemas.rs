@@ -78,6 +78,15 @@ pub struct CreateBranch {
 }
 #[derive(Deserialize, ToSchema)]
 pub struct FileCommitInput {
+  /// Skip automatic push pipelines while preserving repository events and indexing.
+  #[serde(default)]
+  #[schema(default = false)]
+  pub skip_pipeline: bool,
+  /// Expected branch tip. Empty string expects an absent branch; stale tips return 409.
+  pub expected_head_sha: Option<String>,
+  /// Update an existing blob, requiring expected_head_sha. Defaults to false.
+  #[serde(default)]
+  pub update_existing: bool,
   pub branch_name: Option<String>,
   pub file_path: Option<String>,
   pub path: Option<String>,

@@ -14,9 +14,7 @@ interface StatCardProps {
  * Compact metric card. Cards are reserved for standalone, emphasised content
  * such as dashboard metrics; page structure uses `Section` instead.
  */
-export function StatCard({ icon: Icon, label, value, detail, className }: StatCardProps): JSX.Element {
-  return (
-    <Card className={cn("flex items-center gap-3 rounded-md border-border p-3 shadow-none", className)}>
+export const StatCard = ({ icon: Icon, label, value, detail, className }: StatCardProps): JSX.Element => <Card className={cn("flex items-center gap-3 rounded-md border-border p-3 shadow-none", className)}>
       <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <Icon className="size-4" />
       </span>
@@ -29,6 +27,4 @@ export function StatCard({ icon: Icon, label, value, detail, className }: StatCa
           </p>
         )}
       </div>
-    </Card>
-  );
-}
+    </Card>;

@@ -15,7 +15,7 @@ const routeTitles: Record<string, string> = {
   "/admin/users": "Users",
 };
 
-export function AdminLayout(): JSX.Element {
+export const AdminLayout = (): JSX.Element => {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
@@ -79,7 +79,7 @@ export function AdminLayout(): JSX.Element {
         </aside>
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-xl">
-            <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-5">
+            <div className="flex h-14 items-center justify-between gap-3 px-3 sm:px-6">
               <div className="flex min-w-0 items-center gap-2">
                 <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
                 <p className="truncate font-mono text-xs text-muted-foreground">
@@ -102,7 +102,7 @@ export function AdminLayout(): JSX.Element {
           <motion.main
             key={location.pathname}
             id="admin-main-content"
-            className="p-3 sm:p-5 lg:p-6"
+            className="p-3 sm:p-6 lg:p-8"
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
@@ -113,7 +113,7 @@ export function AdminLayout(): JSX.Element {
       </div>
     </div>
   );
-}
+};
 
 interface AdminNavLinkProps {
   to: string;
@@ -122,7 +122,7 @@ interface AdminNavLinkProps {
   mobile?: boolean;
 }
 
-function AdminNavLink({ to, label, icon: Icon, mobile = false }: AdminNavLinkProps): JSX.Element {
+const AdminNavLink = ({ to, label, icon: Icon, mobile = false }: AdminNavLinkProps): JSX.Element => {
   return (
     <NavLink
       to={to}
@@ -140,4 +140,4 @@ function AdminNavLink({ to, label, icon: Icon, mobile = false }: AdminNavLinkPro
       {!mobile ? <span className="ml-auto size-1 rounded-full bg-sidebar-primary opacity-0 group-aria-[current=page]:opacity-100" /> : null}
     </NavLink>
   );
-}
+};

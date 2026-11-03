@@ -6,6 +6,8 @@ use gity_git_wire::GitOperation;
 
 fn file(branch: &str, path: &str) -> CreateFileCommitInput {
   CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: branch.into(),
     file_path: path.into(),
     content: path.into(),

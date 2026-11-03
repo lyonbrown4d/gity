@@ -52,6 +52,8 @@ async fn node(root: &Path, id: &str) -> (GitStorageNodeConfig, CancellationToken
 }
 fn input(content: &str) -> CreateFileCommitInput {
   CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: "main".into(),
     file_path: format!("{content}.txt"),
     content: content.into(),

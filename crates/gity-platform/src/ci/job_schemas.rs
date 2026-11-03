@@ -61,8 +61,18 @@ pub struct JobLog {
 pub struct Trace {
   pub job: Job,
   pub attempts: Vec<JobLog>,
-  pub log: JobLog,
+  pub log: Option<JobLog>,
   pub output: String,
+  /// Present in bounded mode; metadata only with empty output fields.
+  pub attempt_summaries: Option<Vec<JobLog>>,
+  pub attempt: Option<i32>,
+  /// Actual byte offset, advanced when the requested offset splits UTF-8.
+  pub offset: Option<u64>,
+  pub next_offset: Option<u64>,
+  pub total_bytes: Option<u64>,
+  pub has_more: Option<bool>,
+  /// True when persisted output was truncated by runner or storage limits.
+  pub truncated: Option<bool>,
 }
 #[derive(Serialize, ToSchema)]
 #[schema(as=CiJobArtifact)]

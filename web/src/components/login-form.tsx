@@ -15,13 +15,13 @@ interface LoginFormProps extends React.ComponentProps<"div"> {
   error?: string | null;
 }
 
-export function LoginForm({
+export const LoginForm = ({
   className,
   onLoginSubmit,
   loading = false,
   error = null,
   ...props
-}: LoginFormProps): JSX.Element {
+}: LoginFormProps): JSX.Element => {
   const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -121,14 +121,10 @@ export function LoginForm({
       </Card>
     </div>
   );
-}
+};
 
-function CanvasLine({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }): JSX.Element {
-  return (
-    <div className="flex items-center gap-3 py-2.5">
+const CanvasLine = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }): JSX.Element => <div className="flex items-center gap-3 py-2.5">
       <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <span className="text-[13px] font-medium">{label}</span>
       <span className="ml-auto text-xs text-muted-foreground">{value}</span>
-    </div>
-  );
-}
+    </div>;

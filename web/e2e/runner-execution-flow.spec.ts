@@ -56,7 +56,7 @@ stage test {
 	await expect(page.getByText(outputMarker, { exact: true })).toBeVisible();
 });
 
-async function runnerToken(codes: Locator): Promise<string> {
+const runnerToken = async (codes: Locator): Promise<string> => {
 	const count = await codes.count();
 	for (let index = 0; index < count; index += 1) {
 		const text = (await codes.nth(index).textContent())?.trim() ?? "";
@@ -65,9 +65,9 @@ async function runnerToken(codes: Locator): Promise<string> {
 		}
 	}
 	throw new Error("Runner token was not rendered in the registration result.");
-}
+};
 
-async function runRunnerOnce(token: string, marker: string): Promise<void> {
+const runRunnerOnce = async (token: string, marker: string): Promise<void> => {
 	if (!runnerBin) {
 		throw new Error("GITY_E2E_RUNNER_BIN is not set.");
 	}
@@ -88,10 +88,9 @@ async function runRunnerOnce(token: string, marker: string): Promise<void> {
 		"sh,bash,powershell,pwsh,cmd",
 		"--once",
 	]);
-}
+};
 
-function spawnRunner(args: string[]): Promise<void> {
-	return new Promise((resolve, reject) => {
+const spawnRunner = (args: string[]): Promise<void> => new Promise((resolve, reject) => {
 		const child = spawn(runnerBin!, args, {
 			cwd: path.resolve(testFileDir, "../.."),
 			env: process.env,
@@ -114,10 +113,9 @@ function spawnRunner(args: string[]): Promise<void> {
 			reject(new Error(`runner exited with code ${code ?? "null"} signal ${signal ?? "null"}\n${output}`));
 		});
 	});
-}
 
-async function typeInto(locator: Locator, value: string): Promise<void> {
+const typeInto = async (locator: Locator, value: string): Promise<void> => {
 	await locator.click();
 	await locator.pressSequentially(value);
 	await expect(locator).toHaveValue(value);
-}
+};

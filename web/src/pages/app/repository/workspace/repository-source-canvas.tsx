@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
-import Editor from "@monaco-editor/react";
+import Editor, { type Monaco } from "@/components/code-editor";
 import { BookOpen, FileCode2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { RepositoryBlobView, RepositoryView } from "@/pages/types";
 import { RepositoryEmptyState } from "../repository-empty-state";
 import { detectLanguage } from "../repository-utils";
+import { registerEditorTheme } from "@/lib/monaco-theme";
 
 interface SearchableEditor {
   setPosition: (position: { lineNumber: number; column: number }) => void;
@@ -46,6 +47,7 @@ export const RepositorySourceCanvas = ({
   searchTargetPath, onOpenFile,
 }: RepositorySourceCanvasProps): JSX.Element => {
   const editorRef = useRef<SearchableEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
 
   const jumpToSearchLine = () => {
@@ -85,6 +87,10 @@ export const RepositorySourceCanvas = ({
     jumpToSearchLine();
   }, [searchJumpRequest, searchLine, searchColumn, searchMatchLength, searchTargetPath, selectedBlob?.path, selectedBlob?.content]);
 
+  useEffect(() => {
+    if (monacoRef.current) registerEditorTheme(monacoRef.current);
+  }, [editorTheme]);
+
   useEffect(() => () => {
     if (editorRef.current && decorationsRef.current.length > 0) {
       decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, []);
@@ -92,13 +98,21 @@ export const RepositorySourceCanvas = ({
   }, []);
 
   return (
-    <main className="min-w-0 bg-background">
-      <div className="flex h-10 items-center justify-between border-b border-border px-3">
+    <main className="min-w-0 bg-background xl:border-r xl:border-border">
+      <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4">
         <div className="flex min-w-0 items-center gap-2">
           {selectedBlob ? <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" /> : <BookOpen className="size-3.5 shrink-0 text-muted-foreground" />}
-          <span className="truncate font-mono text-xs">{selectedBlob?.path ?? readmePath ?? t("README Preview")}</span>
+          <nav aria-label={t("File path")} className="flex min-w-0 items-center gap-1 overflow-hidden font-mono text-xs">
+            <span className="shrink-0 text-muted-foreground">{repository.name}</span>
+            {(selectedBlob?.path ?? readmePath ?? t("README Preview")).split("/").map((part, index, parts) => (
+              <span key={`${part}-${index}`} className="flex min-w-0 items-center gap-1">
+                <span aria-hidden="true" className="text-muted-foreground">/</span>
+                <span className={index === parts.length - 1 ? "truncate font-medium text-foreground" : "truncate text-muted-foreground"}>{part}</span>
+              </span>
+            ))}
+          </nav>
         </div>
-        {selectedBlob ? <span className="font-mono text-[10px] text-muted-foreground">{selectedBlob.size} B</span> : null}
+        {selectedBlob ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{selectedBlob.size} B</span> : null}
       </div>
       {selectedBlob ? (
         selectedBlob.is_binary ? (
@@ -111,8 +125,10 @@ export const RepositorySourceCanvas = ({
             language={detectLanguage(selectedBlob.path)}
             value={selectedBlob.content}
             theme={editorTheme}
-            onMount={(instance) => {
+            onMount={(instance, monaco) => {
               editorRef.current = instance;
+              monacoRef.current = monaco;
+              registerEditorTheme(monaco);
               jumpToSearchLine();
             }}
             options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, wordWrap: "on", scrollBeyondLastLine: false }}

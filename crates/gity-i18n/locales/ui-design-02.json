@@ -1,0 +1,243 @@
+{
+  "_version": 2,
+  "Cut the first release": {
+    "en": "Cut the first release",
+    "zh": "创建首个发行版本"
+  },
+  "Dark": {
+    "en": "Dark",
+    "zh": "深色"
+  },
+  "Dashboard views": {
+    "en": "Dashboard views",
+    "zh": "工作台视图"
+  },
+  "Default runner image": {
+    "en": "Default runner image",
+    "zh": "默认 Runner 镜像"
+  },
+  "Delete CI variable?": {
+    "en": "Delete CI variable?",
+    "zh": "确定删除此 CI 变量吗？"
+  },
+  "Delete approval rule?": {
+    "en": "Delete approval rule?",
+    "zh": "确定删除此审批规则吗？"
+  },
+  "Delete task": {
+    "en": "Delete task",
+    "zh": "删除任务"
+  },
+  "Delete user \"{name}\"?": {
+    "en": "Delete user \"%{name}\"?",
+    "zh": "确定删除用户“%{name}”吗？"
+  },
+  "Deleting this task removes its explicit dependency references.": {
+    "en": "Deleting this task removes its explicit dependency references.",
+    "zh": "删除此任务后，也会移除明确引用它的依赖关系。"
+  },
+  "Dependencies": {
+    "en": "Dependencies",
+    "zh": "依赖项"
+  },
+  "Dependency mode": {
+    "en": "Dependency mode",
+    "zh": "依赖模式"
+  },
+  "Deploy token name is required.": {
+    "en": "Deploy token name is required.",
+    "zh": "部署令牌名称不能为空。"
+  },
+  "Discard changes": {
+    "en": "Discard changes",
+    "zh": "放弃修改"
+  },
+  "Download full logs": {
+    "en": "Download full logs",
+    "zh": "下载完整日志"
+  },
+  "Download loaded segment": {
+    "en": "Download loaded segment",
+    "zh": "下载已加载片段"
+  },
+  "Download logs": {
+    "en": "Download logs",
+    "zh": "下载日志"
+  },
+  "Downloading logs": {
+    "en": "Downloading logs",
+    "zh": "正在下载日志"
+  },
+  "Draft release": {
+    "en": "Draft release",
+    "zh": "草拟发行版本"
+  },
+  "Edit YAML": {
+    "en": "Edit YAML",
+    "zh": "编辑 YAML"
+  },
+  "Edit configuration": {
+    "en": "Edit configuration",
+    "zh": "编辑配置"
+  },
+  "Edit pipeline": {
+    "en": "Edit pipeline",
+    "zh": "编辑流水线"
+  },
+  "Editor is still initializing": {
+    "en": "Editor is still initializing",
+    "zh": "编辑器仍在初始化"
+  },
+  "Enable/attach CI runtime for this repository.": {
+    "en": "Enable/attach CI runtime for this repository.",
+    "zh": "为此仓库启用或关联 CI 运行环境。"
+  },
+  "Enter image URL": {
+    "en": "Enter image URL",
+    "zh": "输入图片地址"
+  },
+  "Enter link URL": {
+    "en": "Enter link URL",
+    "zh": "输入链接地址"
+  },
+  "Environment variables": {
+    "en": "Environment variables",
+    "zh": "环境变量"
+  },
+  "Events across the projects you can access, newest first.": {
+    "en": "Events across the projects you can access, newest first.",
+    "zh": "你有权访问的项目动态，按时间从新到旧排列。"
+  },
+  "Existing merge request approvals remain, but future checks will ignore this rule.": {
+    "en": "Existing merge request approvals remain, but future checks will ignore this rule.",
+    "zh": "已有合并请求的审批记录会保留，后续检查将不再采用此规则。"
+  },
+  "Explicit dependencies": {
+    "en": "Explicit dependencies",
+    "zh": "明确依赖"
+  },
+  "Failed jobs": {
+    "en": "Failed jobs",
+    "zh": "失败任务"
+  },
+  "Failed to run editor command": {
+    "en": "Failed to run editor command",
+    "zh": "无法执行编辑器命令"
+  },
+  "Filter work": {
+    "en": "Filter work",
+    "zh": "筛选待办"
+  },
+  "Fix YAML before opening the canvas": {
+    "en": "Fix YAML before opening the canvas",
+    "zh": "修正 YAML 后再打开画布"
+  },
+  "Fix pipeline failures and rerun the failed pipeline.": {
+    "en": "Fix pipeline failures and rerun the failed pipeline.",
+    "zh": "修复流水线错误后，重新运行失败的流水线。"
+  },
+  "Follow stages": {
+    "en": "Follow stages",
+    "zh": "跟随阶段"
+  },
+  "Following output": {
+    "en": "Following output",
+    "zh": "正在跟随输出"
+  },
+  "Gate status unavailable": {
+    "en": "Gate status unavailable",
+    "zh": "无法获取检查门禁状态"
+  },
+  "Gity home": {
+    "en": "Gity home",
+    "zh": "Gity 首页"
+  },
+  "Have a required reviewer approve this merge request.": {
+    "en": "Have a required reviewer approve this merge request.",
+    "zh": "请由指定审查者批准此合并请求。"
+  },
+  "Heartbeat is present; verify toolchains and caches if jobs still fail.": {
+    "en": "Heartbeat is present; verify toolchains and caches if jobs still fail.",
+    "zh": "Runner 心跳正常；如果任务仍失败，请检查工具链和缓存。"
+  },
+  "Hidden after save and redacted from logs; still injected into eligible jobs.": {
+    "en": "Hidden after save and redacted from logs; still injected into eligible jobs.",
+    "zh": "保存后隐藏并在日志中脱敏，符合条件的任务仍会收到该变量。"
+  },
+  "Hidden after save, redacted from logs, and intended for protected CI contexts.": {
+    "en": "Hidden after save, redacted from logs, and intended for protected CI contexts.",
+    "zh": "保存后隐藏并在日志中脱敏，仅供受保护的 CI 环境使用。"
+  },
+  "Image": {
+    "en": "Image",
+    "zh": "镜像"
+  },
+  "Image description (optional)": {
+    "en": "Image description (optional)",
+    "zh": "图片说明（可选）"
+  },
+  "Inline discussion": {
+    "en": "Inline discussion",
+    "zh": "行内讨论"
+  },
+  "Insert issue reference": {
+    "en": "Insert issue reference",
+    "zh": "插入议题引用"
+  },
+  "Inspect job execution, logs, attempts and artifacts.": {
+    "en": "Inspect job execution, logs, attempts and artifacts.",
+    "zh": "查看任务执行情况、日志、尝试记录和产物。"
+  },
+  "Inspect jobs": {
+    "en": "Inspect jobs",
+    "zh": "查看任务"
+  },
+  "Inspect pipelines": {
+    "en": "Inspect pipelines",
+    "zh": "查看流水线"
+  },
+  "Iris": {
+    "en": "Iris",
+    "zh": "鸢尾"
+  },
+  "Issue backlog is clear": {
+    "en": "Issue backlog is clear",
+    "zh": "议题待办已清空"
+  },
+  "Issues will appear here after they are created.": {
+    "en": "Issues will appear here after they are created.",
+    "zh": "创建议题后，会在这里显示。"
+  },
+  "JSON object; secrets belong in project CI variables.": {
+    "en": "JSON object; secrets belong in project CI variables.",
+    "zh": "JSON 对象；秘密信息应存放在项目 CI 变量中。"
+  },
+  "Job": {
+    "en": "Job",
+    "zh": "任务"
+  },
+  "Job logs": {
+    "en": "Job logs",
+    "zh": "任务日志"
+  },
+  "Job payload (JSON)": {
+    "en": "Job payload (JSON)",
+    "zh": "任务负载（JSON）"
+  },
+  "Jobs started after deletion will no longer receive this variable.": {
+    "en": "Jobs started after deletion will no longer receive this variable.",
+    "zh": "删除后启动的任务将不再接收此变量。"
+  },
+  "Keep editing": {
+    "en": "Keep editing",
+    "zh": "继续编辑"
+  },
+  "Keep editing or discard the unsaved configuration.": {
+    "en": "Keep editing or discard the unsaved configuration.",
+    "zh": "可继续编辑，或放弃尚未保存的配置。"
+  },
+  "Kind": {
+    "en": "Kind",
+    "zh": "类型"
+  }
+}

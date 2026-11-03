@@ -31,6 +31,8 @@ async fn commit(s: &AppState, project: i64, path: &str, content: &str) -> String
     .create_file_commit(
       &format!("{project}.git"),
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: path.into(),
         content: content.into(),

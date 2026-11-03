@@ -82,6 +82,11 @@
 - 样式优先使用 Tailwind CSS；自定义样式使用 SCSS（`src/index.scss`），构建链为 sass + PostCSS。
 - 编辑器使用 Monaco 与 Milkdown（npm 依赖），不再维护手工 vendor 的第三方资产；不依赖 CDN。
 - 动效使用 motion，并尊重 `prefers-reduced-motion`；动效不得改变原有布局与视觉规范。
+- 手写前端函数统一使用 `const` 箭头函数，ESLint 内置语法规则强制执行；Orval 与 shadcn 生成物排除，不手改生成函数。`pnpm lint` 必须通过，生产构建包含 lint。
+- 页面及详情入口优先使用 React Router 路由，筛选条件可放 URL 查询参数；未保存编辑使用 data router 的导航拦截与草稿恢复。
+- 页面请求统一通过 Refine provider 调用 Orval 生成函数；生成期构造操作注册表，运行时不依赖 Swagger，不为未知操作兜底手写 HTTP。
+- 主题使用统一语义变量；组件不硬编码业务调色板。用户可设置色彩模式、预设、自定义颜色和圆角，主题需覆盖 shadcn、Monaco 与 React Flow。
+- CI 可视化编辑优先使用 `@xyflow/react`，YAML 为执行配置来源；保持 `needs` 缺省与空数组的区别，禁止把图形坐标或第二套 DSL 写入执行配置。
 - 前端优先复用成熟第三方组件与浏览器生态，避免自行重写已有的通用能力。
 - 按组件组织页面；表单、列表、分页、弹窗、状态反馈和编辑器应通过明确的组件接口复用。
 - 业务权限、数据请求和展示组件职责分开，不为不同页面复制同一组通用交互代码。

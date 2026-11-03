@@ -125,6 +125,8 @@ async fn protected_patterns_require_trusted_yaml_and_the_matching_branch_tip() {
     .create_file_commit(
       &format!("{project}.git"),
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "feature".into(),
         file_path: "untrusted.txt".into(),
         content: "untrusted".into(),

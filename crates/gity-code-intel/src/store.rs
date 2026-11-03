@@ -12,7 +12,6 @@
 use crate::archive::{self, Archive};
 use crate::index::{self, SymbolDoc};
 use crate::scan::{self, Limits};
-use crate::symbol::SymbolFile;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::fs::File;

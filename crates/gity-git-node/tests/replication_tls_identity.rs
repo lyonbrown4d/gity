@@ -214,6 +214,8 @@ async fn replica_uses_its_node_identity_and_never_forwards_api_identity() {
       "42.git",
       GitOperation::CreateFileCommit {
         input: serde_json::to_value(CreateFileCommitInput {
+          expected_head_sha: None,
+          update_existing: false,
           branch_name: "main".into(),
           file_path: "hello.txt".into(),
           content: "replicated".into(),

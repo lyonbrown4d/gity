@@ -1,0 +1,243 @@
+{
+  "_version": 2,
+  "Refresh while running": {
+    "en": "Refresh while running",
+    "zh": "运行期间刷新"
+  },
+  "Refreshing merge requirements...": {
+    "en": "Refreshing merge requirements...",
+    "zh": "正在刷新合并条件..."
+  },
+  "Reload branch configuration": {
+    "en": "Reload branch configuration",
+    "zh": "重新加载分支配置"
+  },
+  "Removing...": {
+    "en": "Removing...",
+    "zh": "正在移除..."
+  },
+  "Reply": {
+    "en": "Reply",
+    "zh": "回复"
+  },
+  "Reply to discussion": {
+    "en": "Reply to discussion",
+    "zh": "回复讨论"
+  },
+  "Reply to discussion...": {
+    "en": "Reply to discussion...",
+    "zh": "回复讨论..."
+  },
+  "Repositories available in your workspace.": {
+    "en": "Repositories available in your workspace.",
+    "zh": "工作区中可访问的仓库。"
+  },
+  "Repository write permission is required to commit configuration.": {
+    "en": "Repository write permission is required to commit configuration.",
+    "zh": "提交配置需要仓库写入权限。"
+  },
+  "Require merge request": {
+    "en": "Require merge request",
+    "zh": "必须通过合并请求"
+  },
+  "Require successful pipeline": {
+    "en": "Require successful pipeline",
+    "zh": "必须通过成功的流水线"
+  },
+  "Required checks must pass before merging.": {
+    "en": "Required checks must pass before merging.",
+    "zh": "必须通过所有必需检查后才能合并。"
+  },
+  "Reset appearance": {
+    "en": "Reset appearance",
+    "zh": "重置外观"
+  },
+  "Resolved": {
+    "en": "Resolved",
+    "zh": "已解决"
+  },
+  "Restore draft": {
+    "en": "Restore draft",
+    "zh": "恢复草稿"
+  },
+  "Resume following": {
+    "en": "Resume following",
+    "zh": "继续跟随输出"
+  },
+  "Retry job": {
+    "en": "Retry job",
+    "zh": "重试任务"
+  },
+  "Review MRs": {
+    "en": "Review MRs",
+    "zh": "查看合并请求"
+  },
+  "Review approval rules": {
+    "en": "Review approval rules",
+    "zh": "查看审批规则"
+  },
+  "Review issues": {
+    "en": "Review issues",
+    "zh": "查看议题"
+  },
+  "Review merge checks for details.": {
+    "en": "Review merge checks for details.",
+    "zh": "查看合并检查详情。"
+  },
+  "Review pending project activity and completed todos.": {
+    "en": "Review pending project activity and completed todos.",
+    "zh": "查看待处理的项目事项和已完成的待办。"
+  },
+  "Review users, organizations, projects, and instance health.": {
+    "en": "Review users, organizations, projects, and instance health.",
+    "zh": "查看用户、组织、项目和实例健康状态。"
+  },
+  "Rose": {
+    "en": "Rose",
+    "zh": "玫瑰"
+  },
+  "Run pipeline": {
+    "en": "Run pipeline",
+    "zh": "运行流水线"
+  },
+  "Run result": {
+    "en": "Run result",
+    "zh": "运行结果"
+  },
+  "Run the committed .gity-ci.yml at the selected revision.": {
+    "en": "Run the committed .gity-ci.yml at the selected revision.",
+    "zh": "在所选修订版本上运行已提交的 .gity-ci.yml。"
+  },
+  "Runner": {
+    "en": "Runner",
+    "zh": "Runner"
+  },
+  "Runner fleet is available": {
+    "en": "Runner fleet is available",
+    "zh": "Runner 集群运行正常"
+  },
+  "Saved": {
+    "en": "Saved",
+    "zh": "已保存"
+  },
+  "Saving does not run a pipeline. Run the committed revision from pipelines.": {
+    "en": "Saving does not run a pipeline. Run the committed revision from pipelines.",
+    "zh": "保存配置不会运行流水线。请前往流水线页面运行已提交的版本。"
+  },
+  "Script": {
+    "en": "Script",
+    "zh": "脚本"
+  },
+  "Script format": {
+    "en": "Script format",
+    "zh": "脚本格式"
+  },
+  "Search and copy apply to the loaded segment.": {
+    "en": "Search and copy apply to the loaded segment.",
+    "zh": "搜索和复制仅作用于已加载的片段。"
+  },
+  "Search branches": {
+    "en": "Search branches",
+    "zh": "搜索分支"
+  },
+  "Search loaded segment": {
+    "en": "Search loaded segment",
+    "zh": "搜索已加载片段"
+  },
+  "Search logs": {
+    "en": "Search logs",
+    "zh": "搜索日志"
+  },
+  "Search projects, issues, merge requests, files...": {
+    "en": "Search projects, issues, merge requests, files...",
+    "zh": "搜索项目、议题、合并请求和文件..."
+  },
+  "Search projects, repository sections, and workspace destinations.": {
+    "en": "Search projects, repository sections, and workspace destinations.",
+    "zh": "搜索项目、仓库区域和工作区入口。"
+  },
+  "Search title, label, or assignee": {
+    "en": "Search title, label, or assignee",
+    "zh": "搜索标题、标签或指派人"
+  },
+  "Search your work and projects": {
+    "en": "Search your work and projects",
+    "zh": "搜索待办和项目"
+  },
+  "Searching...": {
+    "en": "Searching...",
+    "zh": "正在搜索..."
+  },
+  "Select an existing package to inspect versions and files.": {
+    "en": "Select an existing package to inspect versions and files.",
+    "zh": "选择已有的包以查看版本和文件。"
+  },
+  "Select an item to see details": {
+    "en": "Select an item to see details",
+    "zh": "选择一项以查看详情"
+  },
+  "Select to inspect gates": {
+    "en": "Select to inspect gates",
+    "zh": "选择后查看检查门禁"
+  },
+  "Sending...": {
+    "en": "Sending...",
+    "zh": "正在发送..."
+  },
+  "Showing the 50 most recent events across the projects you can access.": {
+    "en": "Showing the 50 most recent events across the projects you can access.",
+    "zh": "显示你有权访问的项目中最近 50 条动态。"
+  },
+  "Sidebar background": {
+    "en": "Sidebar background",
+    "zh": "侧边栏背景"
+  },
+  "Single script": {
+    "en": "Single script",
+    "zh": "单段脚本"
+  },
+  "Skip to main content": {
+    "en": "Skip to main content",
+    "zh": "跳转到主要内容"
+  },
+  "Stage": {
+    "en": "Stage",
+    "zh": "阶段"
+  },
+  "Store SSH public keys for future SSH transport integration and repository deploy policy.": {
+    "en": "Store SSH public keys for future SSH transport integration and repository deploy policy.",
+    "zh": "保存 SSH 公钥，以便后续接入 SSH 传输和仓库部署策略。"
+  },
+  "System": {
+    "en": "System",
+    "zh": "跟随系统"
+  },
+  "Tagged deliverables are available": {
+    "en": "Tagged deliverables are available",
+    "zh": "已有带标签的交付版本"
+  },
+  "Task configuration": {
+    "en": "Task configuration",
+    "zh": "任务配置"
+  },
+  "Task name": {
+    "en": "Task name",
+    "zh": "任务名称"
+  },
+  "Tasks": {
+    "en": "Tasks",
+    "zh": "任务"
+  },
+  "The log changed while downloading. Retry the download.": {
+    "en": "The log changed while downloading. Retry the download.",
+    "zh": "下载期间日志已变化，请重试。"
+  },
+  "The original YAML is preserved while errors are present.": {
+    "en": "The original YAML is preserved while errors are present.",
+    "zh": "存在错误时会保留原始 YAML。"
+  },
+  "The runner truncated this output.": {
+    "en": "The runner truncated this output.",
+    "zh": "Runner 已截断此输出。"
+  }
+}

@@ -86,6 +86,8 @@ async fn replica_initialization_resumes_owned_partial_directory_after_restart() 
       "42.git",
       GitOperation::CreateFileCommit {
         input: serde_json::to_value(CreateFileCommitInput {
+          expected_head_sha: None,
+          update_existing: false,
           branch_name: "main".into(),
           file_path: "resume.txt".into(),
           content: "resumed".into(),

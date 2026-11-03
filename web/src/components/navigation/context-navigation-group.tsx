@@ -20,13 +20,13 @@ interface ContextNavigationGroupProps {
   onNavigate: () => void;
 }
 
-export function ContextNavigationGroup({
+export const ContextNavigationGroup = ({
   label,
   items,
   activeUrl,
   collapsible = false,
   onNavigate,
-}: ContextNavigationGroupProps): JSX.Element {
+}: ContextNavigationGroupProps): JSX.Element => {
   const content = (
     <SidebarGroupContent>
       <SidebarMenu className="gap-0.5">
@@ -39,8 +39,8 @@ export function ContextNavigationGroup({
 
   if (!collapsible) {
     return (
-      <SidebarGroup className="px-2 py-1.5">
-        <SidebarGroupLabel className="h-7 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+        <SidebarGroup className="px-2 py-1.5">
+        <SidebarGroupLabel className="h-7 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-sidebar-foreground/50">
           {label}
         </SidebarGroupLabel>
         {content}
@@ -51,7 +51,7 @@ export function ContextNavigationGroup({
   return (
     <Collapsible defaultOpen className="group/collapsible">
       <SidebarGroup className="px-2 py-1">
-        <SidebarGroupLabel asChild className="h-7 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">
+        <SidebarGroupLabel asChild className="h-7 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-sidebar-foreground/50">
           <CollapsibleTrigger>
             {label}
             <ChevronDown className="ml-auto size-3 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
@@ -61,13 +61,13 @@ export function ContextNavigationGroup({
       </SidebarGroup>
     </Collapsible>
   );
-}
+};
 
-function ContextLink({ item, activeUrl, onNavigate }: {
+const ContextLink = ({ item, activeUrl, onNavigate }: {
   item: ContextNavigationItem;
   activeUrl?: string;
   onNavigate: () => void;
-}): JSX.Element {
+}): JSX.Element => {
   const location = useLocation();
   const itemPath = item.url.split("?")[0];
   const currentUrl = `${location.pathname}${location.search}`;
@@ -78,15 +78,16 @@ function ContextLink({ item, activeUrl, onNavigate }: {
       <SidebarMenuButton
         asChild
         isActive={active}
-        className="h-9 rounded-md px-2 text-muted-foreground hover:bg-background hover:text-foreground data-[active=true]:bg-background data-[active=true]:font-medium data-[active=true]:text-foreground data-[active=true]:shadow-sm"
+        tooltip={item.title}
+        className="h-9 rounded-md px-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground"
       >
-        <NavLink to={item.url} onClick={onNavigate}>
-          <span className={active ? "flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary" : "flex size-6 items-center justify-center rounded-md"}>
-            <item.icon className="size-3.5" aria-hidden="true" />
+        <NavLink to={item.url} aria-label={item.title} onClick={onNavigate}>
+          <span className={active ? "flex size-6 items-center justify-center rounded-md bg-sidebar-primary/15 text-sidebar-primary group-data-[collapsible=icon]:size-4" : "flex size-6 items-center justify-center rounded-md group-data-[collapsible=icon]:size-4"}>
+            <item.icon className="size-3.5 group-data-[collapsible=icon]:size-3" aria-hidden="true" />
           </span>
-          <span className="truncate">{item.title}</span>
+          <span className="truncate group-data-[collapsible=icon]:hidden">{item.title}</span>
         </NavLink>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
-}
+};

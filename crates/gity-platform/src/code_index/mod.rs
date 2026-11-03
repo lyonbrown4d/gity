@@ -13,6 +13,7 @@ mod snapshot;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+#[path = "tests/remote.rs"]
 mod tests_remote;
 
 pub(crate) use ingest::ingest;

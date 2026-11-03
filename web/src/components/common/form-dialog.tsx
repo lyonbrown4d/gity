@@ -13,9 +13,7 @@ interface FormDialogProps {
   children: ReactNode;
 }
 
-export function FormDialog({ open, title, onClose, children }: FormDialogProps): JSX.Element {
-  return (
-    <Dialog
+export const FormDialog = ({ open, title, onClose, children }: FormDialogProps): JSX.Element => <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
@@ -29,6 +27,4 @@ export function FormDialog({ open, title, onClose, children }: FormDialogProps):
         </DialogHeader>
         {children}
       </DialogContent>
-    </Dialog>
-  );
-}
+    </Dialog>;

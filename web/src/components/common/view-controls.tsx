@@ -1,5 +1,6 @@
 import { Globe2, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AppearanceSettings } from "@/components/appearance/appearance-settings";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 
@@ -7,12 +8,13 @@ interface ViewControlsProps {
   compact?: boolean;
 }
 
-export function ViewControls({ compact = false }: ViewControlsProps): JSX.Element {
+export const ViewControls = ({ compact = false }: ViewControlsProps): JSX.Element => {
   const { theme, toggleTheme } = useTheme();
   const { locale, toggleLocale, t } = useI18n();
 
   return (
     <div className="flex items-center gap-2">
+      <AppearanceSettings compact />
       <Button
         type="button"
         variant="outline"
@@ -38,4 +40,4 @@ export function ViewControls({ compact = false }: ViewControlsProps): JSX.Elemen
       </Button>
     </div>
   );
-}
+};

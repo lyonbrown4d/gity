@@ -47,11 +47,11 @@ fn store_answers_lookups_over_real_files() {
   assert!(status.files >= 3, "{status:?}");
   assert!(status.definitions >= 10, "{status:?}");
 
-  let file = status
-    .commit
-    .is_empty()
-    .then_some("")
-    .unwrap_or("snowflake.rs");
+  let file = if status.commit.is_empty() {
+    ""
+  } else {
+    "snowflake.rs"
+  };
   let symbols: Vec<SymbolDoc> = store.symbols(9, file).expect("symbols");
   // The path in the index is relative to the scanned root.
   let symbols = if symbols.is_empty() {

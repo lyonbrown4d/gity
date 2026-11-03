@@ -20,7 +20,7 @@ pub(super) async fn branches(
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(post,path="/files",tag="Repository",params(api::ProjectPath),request_body=spec::FileCommitInput,
-    responses((status=200,description="Commit a file with authenticated author; triggers repository events and CI",body=api::Envelope<spec::FileCommit>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
+    responses((status=200,description="Commit a file with authenticated author; triggers repository events and CI unless skip_pipeline is true",body=api::Envelope<spec::FileCommit>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn files(
   State(s): State<AppState>,
   h: HeaderMap,
@@ -31,7 +31,7 @@ pub(super) async fn files(
 }
 #[gity_api_macros::application_operation(prefix = "/api/v1/projects/{id}/repository")]
 #[utoipa::path(post,path="/file-commits",tag="Repository",params(api::ProjectPath),request_body=spec::FileCommitInput,
-    responses((status=200,description="Commit a file with authenticated author; triggers repository events and CI",body=api::Envelope<spec::FileCommit>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
+    responses((status=200,description="Commit a file with authenticated author; triggers repository events and CI unless skip_pipeline is true",body=api::Envelope<spec::FileCommit>),api::Errors),security(("bearer"=[]),("private_token"=[])))]
 pub(super) async fn file_commits(
   State(s): State<AppState>,
   h: HeaderMap,

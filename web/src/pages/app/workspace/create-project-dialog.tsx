@@ -38,7 +38,7 @@ interface CreateProjectDialogProps {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
-export function CreateProjectDialog({
+export const CreateProjectDialog = ({
   open,
   organizations,
   draft,
@@ -46,7 +46,7 @@ export function CreateProjectDialog({
   onDraftChange,
   onClose,
   onSubmit,
-}: CreateProjectDialogProps): JSX.Element {
+}: CreateProjectDialogProps): JSX.Element => {
   const { t } = useI18n();
   const update = <Key extends keyof ProjectDraft>(key: Key, value: ProjectDraft[Key]) => {
     onDraftChange({ ...draft, [key]: value });
@@ -126,4 +126,4 @@ export function CreateProjectDialog({
       </form>
     </FormDialog>
   );
-}
+};

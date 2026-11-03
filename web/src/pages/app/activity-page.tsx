@@ -7,7 +7,7 @@ import { useActivity } from "./use-activity";
 
 const ACTIVITY_LIMIT = 50;
 
-export function AppActivityPage(): JSX.Element {
+export const AppActivityPage = (): JSX.Element => {
   const { t } = useI18n();
   const activity = useActivity(ACTIVITY_LIMIT);
   const queryError = activity.query.error instanceof Error ? activity.query.error.message : null;
@@ -55,4 +55,4 @@ export function AppActivityPage(): JSX.Element {
       </Section>
     </div>
   );
-}
+};

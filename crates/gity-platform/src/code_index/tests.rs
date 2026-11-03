@@ -18,6 +18,8 @@ async fn commit(s: &AppState, project: i64, path: &str, content: &str) -> String
     .create_file_commit(
       &format!("{project}.git"),
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "main".into(),
         file_path: path.into(),
         content: content.into(),
@@ -98,6 +100,8 @@ async fn non_default_branch_pushes_enqueue_nothing() {
     .create_file_commit(
       "20.git",
       gity_git::CreateFileCommitInput {
+        expected_head_sha: None,
+        update_existing: false,
         branch_name: "feature".into(),
         file_path: "src/extra.rs".into(),
         content: SOURCE.into(),

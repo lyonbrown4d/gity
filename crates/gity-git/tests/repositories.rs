@@ -24,6 +24,8 @@ async fn fixture() -> (TempDir, GitService) {
 }
 fn file(branch: &str, path: &str, content: &str) -> CreateFileCommitInput {
   CreateFileCommitInput {
+    expected_head_sha: None,
+    update_existing: false,
     branch_name: branch.into(),
     file_path: path.into(),
     content: content.into(),

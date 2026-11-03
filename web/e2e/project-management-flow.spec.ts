@@ -43,9 +43,9 @@ test("creates, opens, and deletes a project through the workspace UI", async ({ 
   await expect(page.locator("#main-content").getByRole("link", { name: projectName, exact: true })).toHaveCount(0);
 });
 
-async function typeInto(locator: Locator, value: string): Promise<void> {
+const typeInto = async (locator: Locator, value: string): Promise<void> => {
   await locator.click();
   await locator.pressSequentially(value);
   await expect(locator).toHaveValue(value);
-}
+};
 

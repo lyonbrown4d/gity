@@ -5,7 +5,7 @@ import type { TodoDoneView, TodoState, TodoView } from "./todo-types";
 
 const TODO_QUERY_KEY = ["todos"] as const;
 
-export function useTodoList(state: TodoState, limit = 100) {
+export const useTodoList = (state: TodoState, limit = 100) => {
   const query = useCustom<TodoView[]>({
     url: "/todos",
     method: "get",
@@ -21,15 +21,15 @@ export function useTodoList(state: TodoState, limit = 100) {
     todos: Array.isArray(query.result.data) ? query.result.data : [],
     query: query.query,
   };
-}
+};
 
-export function useMarkTodoDone() {
+export const useMarkTodoDone = () => {
   const queryClient = useQueryClient();
-  const [activeTodoId, setActiveTodoId] = useState<number | null>(null);
+  const [activeTodoId, setActiveTodoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { mutateAsync, mutation } = useCustomMutation<TodoDoneView>();
 
-  const markDone = async (todoId: number): Promise<void> => {
+  const markDone = async (todoId: string): Promise<void> => {
     if (mutation.isPending) {
       return;
     }
@@ -37,7 +37,7 @@ export function useMarkTodoDone() {
     setError(null);
     try {
       await mutateAsync({
-        url: `/todos/${encodeURIComponent(String(todoId))}/done`,
+        url: `/todos/${encodeURIComponent(todoId)}/done`,
         method: "post",
         values: {},
       });
@@ -55,4 +55,4 @@ export function useMarkTodoDone() {
     isPending: mutation.isPending,
     error,
   };
-}
+};

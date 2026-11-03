@@ -25,7 +25,7 @@ interface ProjectWorkspaceProps {
   onDelete: (repository: RepositoryView, confirmation: string) => void;
 }
 
-export function ProjectWorkspace({
+export const ProjectWorkspace = ({
   organizations,
   selectedOrganization,
   selectedOrganizationId,
@@ -37,7 +37,7 @@ export function ProjectWorkspace({
   onCreate,
   onCopy,
   onDelete,
-}: ProjectWorkspaceProps): JSX.Element {
+}: ProjectWorkspaceProps): JSX.Element => {
   const { t } = useI18n();
 
   return (
@@ -107,9 +107,9 @@ export function ProjectWorkspace({
       </Section>
     </div>
   );
-}
+};
 
-function ProjectRow({
+const ProjectRow = ({
   repository,
   isDeleting,
   onCopy,
@@ -119,7 +119,7 @@ function ProjectRow({
   isDeleting: boolean;
   onCopy: (cloneUrl: string) => void;
   onDelete: (repository: RepositoryView, confirmation: string) => void;
-}): JSX.Element {
+}): JSX.Element => {
   const { t } = useI18n();
   const projectUrl = `/app/projects/${repository.organization_id}/${repository.id}`;
 
@@ -172,28 +172,20 @@ function ProjectRow({
       </div>
     </DataRow>
   );
-}
+};
 
-function ScopeDetail({ label, value, mono = false }: { label: string; value: string; mono?: boolean }): JSX.Element {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2">
+const ScopeDetail = ({ label, value, mono = false }: { label: string; value: string; mono?: boolean }): JSX.Element => <div className="flex items-center justify-between gap-3 py-2">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className={`truncate text-[13px] ${mono ? "font-mono" : "font-semibold"}`}>{value}</dd>
-    </div>
-  );
-}
+    </div>;
 
-function DirectorySkeleton(): JSX.Element {
-  return (
-    <div className="divide-y divide-border">
+const DirectorySkeleton = (): JSX.Element => <div className="divide-y divide-border">
       {[0, 1, 2].map((item) => (
         <div key={item} className="px-4 py-3"><Skeleton className="h-10 w-full" /></div>
       ))}
-    </div>
-  );
-}
+    </div>;
 
-function EmptyDirectory({ onCreate }: { onCreate: () => void }): JSX.Element {
+const EmptyDirectory = ({ onCreate }: { onCreate: () => void }): JSX.Element => {
   const { t } = useI18n();
   return (
     <div className="flex min-h-48 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
@@ -203,4 +195,4 @@ function EmptyDirectory({ onCreate }: { onCreate: () => void }): JSX.Element {
       <Button type="button" size="sm" onClick={onCreate}><Plus aria-hidden="true" />{t("New Project")}</Button>
     </div>
   );
-}
+};

@@ -1,7 +1,7 @@
 import { Suspense, lazy, type ReactNode } from "react";
 import { Refine, Authenticated, usePermissions } from "@refinedev/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { createBrowserRouter, Navigate, Route, Routes, RouterProvider } from "react-router";
 import { useI18n } from "@/lib/i18n";
 import { authProvider } from "@/providers/auth-provider";
 import { dataProvider } from "@/providers/data-provider";
@@ -51,11 +51,12 @@ const AppProfilePage = lazy(() =>
 
 const queryClient = new QueryClient();
 
-export function App(): JSX.Element {
+export const App = (): JSX.Element => <RouterProvider router={router} />;
+
+const AppContent = (): JSX.Element => {
   const { t } = useI18n();
 
   return (
-    <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <Refine
           dataProvider={dataProvider}
@@ -110,6 +111,12 @@ export function App(): JSX.Element {
                 <Route path="/app/projects" element={<AppRepositoriesPage />} />
                 <Route path="/app/repositories" element={<Navigate to="/app/projects" replace />} />
                 <Route path="/app/projects/:organizationId/:projectId" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/:tab" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/pipelines/editor" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/pipelines/:pipelineId" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/jobs/:jobId" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/pipelines/:pipelineId/jobs/:jobId" element={<RepositoryDetailPage />} />
+                <Route path="/app/projects/:organizationId/:projectId/merge-requests/:mergeRequestIid" element={<RepositoryDetailPage />} />
                 <Route path="/app/repositories/:organizationId/:repoId" element={<RepositoryDetailPage />} />
                 <Route
                   path="/app/projects/:organizationId/:projectId/issues/:issueNumber"
@@ -135,11 +142,10 @@ export function App(): JSX.Element {
           </Suspense>
         </Refine>
       </QueryClientProvider>
-    </BrowserRouter>
   );
-}
+};
 
-function RequireSuperAdmin({ children }: { children: ReactNode }): JSX.Element {
+const RequireSuperAdmin = ({ children }: { children: ReactNode }): JSX.Element => {
   const { t } = useI18n();
   const { data: permissions, isLoading } = usePermissions<{ isSuperAdmin?: boolean }>({});
 
@@ -154,4 +160,6 @@ function RequireSuperAdmin({ children }: { children: ReactNode }): JSX.Element {
     return <Navigate to="/app/dashboard" replace />;
   }
   return <>{children}</>;
-}
+};
+
+const router = createBrowserRouter([{ path: "*", element: <AppContent /> }]);

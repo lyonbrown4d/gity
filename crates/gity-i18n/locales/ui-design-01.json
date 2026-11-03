@@ -1,0 +1,243 @@
+{
+  "_version": 2,
+  "A configuration draft was kept in this browser tab. Restore it or use the repository version.": {
+    "en": "A configuration draft was kept in this browser tab. Restore it or use the repository version.",
+    "zh": "此浏览器标签页中保留了一份配置草稿。可恢复草稿，或改用仓库中的版本。"
+  },
+  "Accent color": {
+    "en": "Accent color",
+    "zh": "强调色"
+  },
+  "Active jobs": {
+    "en": "Active jobs",
+    "zh": "运行中的任务"
+  },
+  "Active pipelines": {
+    "en": "Active pipelines",
+    "zh": "运行中的流水线"
+  },
+  "Activity": {
+    "en": "Activity",
+    "zh": "动态"
+  },
+  "Add comment": {
+    "en": "Add comment",
+    "zh": "添加评论"
+  },
+  "Add inline comment": {
+    "en": "Add inline comment",
+    "zh": "添加行内评论"
+  },
+  "Add task": {
+    "en": "Add task",
+    "zh": "添加任务"
+  },
+  "Administration": {
+    "en": "Administration",
+    "zh": "管理"
+  },
+  "Affected tasks": {
+    "en": "Affected tasks",
+    "zh": "受影响的任务"
+  },
+  "All projects": {
+    "en": "All projects",
+    "zh": "全部项目"
+  },
+  "All statuses": {
+    "en": "All statuses",
+    "zh": "全部状态"
+  },
+  "Allow delete": {
+    "en": "Allow delete",
+    "zh": "允许删除"
+  },
+  "Allow force push": {
+    "en": "Allow force push",
+    "zh": "允许强制推送"
+  },
+  "Appearance": {
+    "en": "Appearance",
+    "zh": "外观"
+  },
+  "Appearance settings": {
+    "en": "Appearance settings",
+    "zh": "外观设置"
+  },
+  "Apply task changes": {
+    "en": "Apply task changes",
+    "zh": "应用任务修改"
+  },
+  "Approval requirements are not met": {
+    "en": "Approval requirements are not met",
+    "zh": "尚未满足审批要求"
+  },
+  "Approval rule name is required.": {
+    "en": "Approval rule name is required.",
+    "zh": "审批规则名称不能为空。"
+  },
+  "Artifact paths": {
+    "en": "Artifact paths",
+    "zh": "产物路径"
+  },
+  "Artifacts are published": {
+    "en": "Artifacts are published",
+    "zh": "已有构建产物"
+  },
+  "Attempt": {
+    "en": "Attempt",
+    "zh": "尝试次数"
+  },
+  "Auto layout": {
+    "en": "Auto layout",
+    "zh": "自动布局"
+  },
+  "Back to jobs": {
+    "en": "Back to jobs",
+    "zh": "返回任务列表"
+  },
+  "Back to pipeline": {
+    "en": "Back to pipeline",
+    "zh": "返回流水线"
+  },
+  "Back to pipelines": {
+    "en": "Back to pipelines",
+    "zh": "返回流水线列表"
+  },
+  "Beginning": {
+    "en": "Beginning",
+    "zh": "开头"
+  },
+  "Browse code": {
+    "en": "Browse code",
+    "zh": "浏览代码"
+  },
+  "Browse files on the selected branch.": {
+    "en": "Browse files on the selected branch.",
+    "zh": "浏览所选分支中的文件。"
+  },
+  "Browse organization projects and clone URLs.": {
+    "en": "Browse organization projects and clone URLs.",
+    "zh": "浏览组织项目并查看克隆地址。"
+  },
+  "Browse projects": {
+    "en": "Browse projects",
+    "zh": "浏览项目"
+  },
+  "CI pipeline queue is calm": {
+    "en": "CI pipeline queue is calm",
+    "zh": "CI 流水线队列正常"
+  },
+  "CI variable key is required.": {
+    "en": "CI variable key is required.",
+    "zh": "CI 变量名称不能为空。"
+  },
+  "Can claim jobs; verify this host is isolated for CI workloads.": {
+    "en": "Can claim jobs; verify this host is isolated for CI workloads.",
+    "zh": "可以领取任务；请确认此主机已隔离，仅用于 CI 工作负载。"
+  },
+  "Cancel all pending and running jobs in this pipeline?": {
+    "en": "Cancel all pending and running jobs in this pipeline?",
+    "zh": "确定取消此流水线中所有待处理和正在运行的任务吗？"
+  },
+  "Cancel download": {
+    "en": "Cancel download",
+    "zh": "取消下载"
+  },
+  "Cancel this job and stop its current execution?": {
+    "en": "Cancel this job and stop its current execution?",
+    "zh": "确定取消此任务并停止当前执行吗？"
+  },
+  "Canvas": {
+    "en": "Canvas",
+    "zh": "画布"
+  },
+  "Canvas edits update YAML. Commit to apply changes.": {
+    "en": "Canvas edits update YAML. Commit to apply changes.",
+    "zh": "画布中的修改会同步到 YAML。提交后才会生效。"
+  },
+  "Check the pipeline tab for queued or recent pipeline runs.": {
+    "en": "Check the pipeline tab for queued or recent pipeline runs.",
+    "zh": "请前往流水线标签页查看排队中或最近的运行记录。"
+  },
+  "Checking...": {
+    "en": "Checking...",
+    "zh": "正在检查..."
+  },
+  "Choose a pending item from your work list.": {
+    "en": "Choose a pending item from your work list.",
+    "zh": "请从待办列表中选择一项。"
+  },
+  "Choose how Gity looks. Changes apply and save in this browser immediately.": {
+    "en": "Choose how Gity looks. Changes apply and save in this browser immediately.",
+    "zh": "自定义 Gity 的外观。更改会立即应用并保存在此浏览器中。"
+  },
+  "Color mode": {
+    "en": "Color mode",
+    "zh": "颜色模式"
+  },
+  "Color palette": {
+    "en": "Color palette",
+    "zh": "配色方案"
+  },
+  "Commit .gity-ci.yml to your repository, then run a pipeline.": {
+    "en": "Commit .gity-ci.yml to your repository, then run a pipeline.",
+    "zh": "先将 .gity-ci.yml 提交到仓库，再运行流水线。"
+  },
+  "Commit configuration": {
+    "en": "Commit configuration",
+    "zh": "提交配置"
+  },
+  "Configuration": {
+    "en": "Configuration",
+    "zh": "配置"
+  },
+  "Configuration is valid": {
+    "en": "Configuration is valid",
+    "zh": "配置有效"
+  },
+  "Configuration pinned to this run": {
+    "en": "Configuration pinned to this run",
+    "zh": "此配置已固定到本次运行"
+  },
+  "Copy clone URL": {
+    "en": "Copy clone URL",
+    "zh": "复制克隆地址"
+  },
+  "Copy failed": {
+    "en": "Copy failed",
+    "zh": "复制失败"
+  },
+  "Corner radius": {
+    "en": "Corner radius",
+    "zh": "圆角"
+  },
+  "Create a CI config file in the source branch to trigger pipeline generation.": {
+    "en": "Create a CI config file in the source branch to trigger pipeline generation.",
+    "zh": "在源分支中创建 CI 配置文件以触发流水线生成。"
+  },
+  "Create a project in this organization to start pushing code.": {
+    "en": "Create a project in this organization to start pushing code.",
+    "zh": "在此组织中创建项目，即可开始推送代码。"
+  },
+  "Create file requires repository write access": {
+    "en": "Create file requires repository write access",
+    "zh": "创建文件需要仓库写入权限。"
+  },
+  "Create onboarding docs": {
+    "en": "Create onboarding docs",
+    "zh": "创建入门文档"
+  },
+  "Create wiki": {
+    "en": "Create wiki",
+    "zh": "创建 Wiki"
+  },
+  "Current Project": {
+    "en": "Current Project",
+    "zh": "当前项目"
+  },
+  "Custom colors": {
+    "en": "Custom colors",
+    "zh": "自定义颜色"
+  }
+}

@@ -39,5 +39,13 @@ pub const CHUNKS: &[&str] = &[
   include_str!("../locales/production-ssh.json"),
   include_str!("../locales/production-merge.json"),
   include_str!("../locales/api-transports.json"),
+  include_str!("../locales/ui-design-01.json"),
+  include_str!("../locales/ui-design-02.json"),
+  include_str!("../locales/ui-design-03.json"),
+  include_str!("../locales/ui-design-04.json"),
+  include_str!("../locales/ui-design-05.json"),
+  include_str!("../locales/ui-design-06.json"),
+  include_str!("../locales/ui-design-07.json"),
+  include_str!("../locales/ui-design-08.json"),
   include_str!("../locales/global-search.json"),
 ];

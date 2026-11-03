@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { ViewControls } from "@/components/common/view-controls";
 import { LoginForm } from "@/components/login-form";
 
-export function LoginPage(): JSX.Element {
+export const LoginPage = (): JSX.Element => {
   const { t } = useI18n();
   const navigate = useNavigate();
   const tokens = getTokens();
@@ -46,4 +46,4 @@ export function LoginPage(): JSX.Element {
       </div>
     </main>
   );
-}
+};

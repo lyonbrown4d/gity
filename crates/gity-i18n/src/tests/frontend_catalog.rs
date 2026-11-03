@@ -26,7 +26,7 @@ fn static_frontend_translation_calls_and_component_labels_have_shared_assets() {
     r#"\b(?:title|description|label|subtitle|caption|empty_text)\s*=\s*("(?:\\.|[^"\\])*")"#,
   )
   .unwrap();
-  let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/gity-web/src");
+  let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/src");
   let mut missing = BTreeSet::new();
   visit(&root, &keys, &[call, prop], &mut missing);
   assert!(
@@ -42,12 +42,14 @@ fn visit(path: &Path, keys: &HashSet<String>, patterns: &[Regex], missing: &mut 
       if entry.file_name() != "tests" {
         visit(&path, keys, patterns, missing);
       }
-    } else if path.extension().is_some_and(|extension| extension == "rs")
+    } else if path
+      .extension()
+      .is_some_and(|extension| extension == "ts" || extension == "tsx")
       && !path
         .file_name()
         .unwrap()
         .to_string_lossy()
-        .ends_with("_tests.rs")
+        .contains(".test.")
     {
       let text = std::fs::read_to_string(&path).unwrap();
       for pattern in patterns {
